@@ -7,14 +7,13 @@
  * activeProfileId + profileKind.
  *
  * Session: cognation.session.v2
- * Demo storage disclaimer: in-browser registry only — not production identity.
+ * Production sign-in uses the configured account provider.
+ * Local preview uses an explicit demo unlock (no shared password in this file).
  */
 (function () {
   "use strict";
 
   var SESSION_KEY = "cognation.session.v2";
-  var EXPECTED_USER = "alexa";
-  var EXPECTED_PASS = "TowerCommune26";
 
   var API_BASE =
     (window.CognationConfig && window.CognationConfig.apiBaseUrl) || "/api";
@@ -173,6 +172,9 @@
   function establishSession(username, profile, auth) {
     var session = buildSession(username, profile, auth);
     writeLocalSession(session);
+    if (window.CognationDemo && window.CognationDemo.syncChrome) {
+      window.CognationDemo.syncChrome(session);
+    }
     closeGate();
     return session;
   }
@@ -191,7 +193,7 @@
       "alexa.thomas": true,
       "alexathomas": true,
     };
-    if (alexaAliases[u]) return EXPECTED_USER;
+    if (alexaAliases[u]) return "alexa";
     return u;
   }
 
@@ -233,9 +235,21 @@
     return null;
   }
 
-  function login(username, password) {
+  function login(username, password, opts) {
+    opts = opts || {};
     username = normalizeLoginUser(username);
     password = String(password || "").trim();
+    if (opts.demo) {
+      if (!username) username = "demo";
+      if (window.CognationDemo && window.CognationDemo.unlock) {
+        window.CognationDemo.unlock();
+      }
+      return Promise.resolve({
+        username: username,
+        profiles: loadProfilesForUser(username),
+        source: "demo",
+      });
+    }
     if (
       window.CognationSupabase &&
       window.CognationSupabase.configured &&
@@ -279,6 +293,7 @@
 
   function isAuthenticated() {
     var current = readLocalSession();
+    if (current && current.source === "demo") return true;
     if (
       window.CognationSupabase &&
       window.CognationSupabase.configured &&
@@ -308,6 +323,27 @@
       })
     );
     return session;
+  }
+
+  var demoUnlockBtn = form.querySelector("[data-login-demo-unlock]");
+  if (demoUnlockBtn) {
+    demoUnlockBtn.addEventListener("click", function () {
+      var userInput = form.querySelector('input[name="username"]');
+      var username = userInput && String(userInput.value || "").trim();
+      if (!username) username = "demo";
+      var note = form.querySelector("[data-login-demo-chrome]");
+      if (note) note.hidden = false;
+      setStatus("Opening local demo…", false);
+      login(username, "", { demo: true }).then(
+        function (result) {
+          setStatus("");
+          finishWithProfileChoice(result.username, result.profiles, result);
+        },
+        function (error) {
+          setStatus((error && error.message) || "Demo unlock failed.", true);
+        }
+      );
+    });
   }
 
   form.addEventListener("submit", function (e) {
@@ -461,7 +497,39 @@
     try {
       localStorage.removeItem("cognation.session.demo.v1");
     } catch (e) {}
+    if (window.CognationDemo && window.CognationDemo.syncChrome) {
+      window.CognationDemo.syncChrome(readLocalSession());
+    }
+    if (
+      window.CognationDemo &&
+      window.CognationDemo.isUnlocked &&
+      window.CognationDemo.isUnlocked() &&
+      readLocalSession() &&
+      readLocalSession().source === "demo"
+    ) {
+      var demoNote = form.querySelector("[data-login-demo-chrome]");
+      if (demoNote) demoNote.hidden = false;
+    }
     var session = readLocalSession();
+    if (session && session.source === "demo") {
+      if (window.CognationDemo && window.CognationDemo.unlock) {
+        window.CognationDemo.unlock();
+      }
+      hydrateSessionProfile(session);
+      closeGate();
+      return;
+    }
+    if (
+      window.CognationDemo &&
+      window.CognationDemo.isUnlocked &&
+      window.CognationDemo.isUnlocked() &&
+      (!session || session.source !== "supabase")
+    ) {
+      login(session && session.username ? session.username : "demo", "", { demo: true }).then(function (result) {
+        finishWithProfileChoice(result.username, result.profiles, result);
+      });
+      return;
+    }
     var remoteConfigured =
       window.CognationSupabase &&
       window.CognationSupabase.configured &&

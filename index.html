@@ -231,6 +231,10 @@
           </button>
         </p>
         <p class="form-hint login-demo-hint" data-login-demo-hint hidden>Sign in with the email and password you used to create your Cognation account.</p>
+        <div class="login-demo-unlock">
+          <button type="button" class="btn btn-secondary" data-login-demo-unlock>Demo unlock</button>
+          <p class="form-hint" data-login-demo-chrome hidden>Demo — not real auth</p>
+        </div>
         <p class="form-hint login-demo-storage-hint">Your account is secured by Cognation sign-in.</p>
       </form>
       </div>
@@ -392,7 +396,10 @@
                     </details>
 
                     <details class="tower-private-theme tower-private-calendar tower-compact-block" data-tower-private-calendar data-tower-calendar>
-                      <summary class="tower-private-theme-summary">Calendar</summary>
+                      <summary class="tower-private-theme-summary">
+                        Calendar
+                        <span class="cgn-deferral" role="note">Demo / local only — not live backend</span>
+                      </summary>
                       <div class="tower-private-theme-body">
                         <div class="tower-cal tower-cal--private tower-cal--compact" data-tower-cal-private></div>
                         <div class="tower-cal-google" data-tower-cal-google>
@@ -669,6 +676,7 @@
                       <section class="tower-live-panel" data-live-stage hidden>
                         <header class="tower-live-panel-head">
                           <h4 class="tower-live-panel-title">Live</h4>
+                          <p class="cgn-deferral" role="note">Demo / local only</p>
                           <div class="tower-live-share" role="group" aria-label="Share live">
                             <button type="button" class="btn btn-secondary" data-live-share-commune>Share to COMMUNE</button>
                             <button type="button" class="btn btn-secondary" data-live-share-tower>Share to Tower</button>
@@ -687,6 +695,7 @@
                           <button type="button" class="btn btn-secondary" data-live-approve-join>Approve join</button>
                         </div>
                         <div class="tower-live-sales" role="group" aria-label="Pro sales">
+                          <p class="cgn-deferral" role="note">Demo / local only — not live backend</p>
                           <button type="button" class="btn btn-primary" data-live-sales>Buy / tip</button>
                           <button type="button" class="btn btn-secondary" data-live-class>Join class</button>
                         </div>
@@ -1031,6 +1040,7 @@
                   <p class="paper-eyebrow">An official <span data-brand>COGNATION</span> publication</p>
                   <h3 class="paper-title">NEWS</h3>
                   <p class="paper-subtitle" data-commune-edition-subtitle>Local Newspaper · Demo</p>
+                  <p class="cgn-deferral" role="note">Demo / local only</p>
                   <div class="paper-dateline" role="group" aria-label="Edition details">
                     <span class="paper-volume" data-commune-volume>Vol. I · No. 1</span>
                     <span class="paper-rule" aria-hidden="true"></span>
@@ -1381,10 +1391,11 @@
                     </div>
                     <div class="well-chrome-end">
                       <div class="well-session-bar" data-well-session-bar hidden>
-                        <span class="well-session-chip" data-well-session-chip title="Session ends when this tab closes">
+                        <span class="well-session-chip" data-well-session-chip title="Local preview only. Clears when this tab closes.">
                           <span class="well-session-dot" aria-hidden="true"></span>
-                          WELL locked session
+                          Demo EHR — not HIPAA
                         </span>
+                        <span class="well-runtime-otp" data-well-runtime-otp hidden></span>
                         <button type="button" class="well-lock-btn" data-well-lock-btn>
                           Lock WELL
                         </button>
@@ -1416,9 +1427,7 @@
                       </div>
                     </div>
                   </div>
-                  <p class="well-disclaimer" role="note">
-                    Demo only · not a real EHR · not HIPAA-certified · no PHI leaves the browser.
-                  </p>
+                  <p class="well-disclaimer" role="note">Demo EHR — not HIPAA</p>
                 </header>
 
                 <div
@@ -1436,96 +1445,24 @@
                         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                       </svg>
                     </div>
-                    <p class="well-auth-eyebrow">Second authentication lock</p>
-                    <h4 id="well-auth-title" class="well-auth-title">WELL clinical sign-in</h4>
+                    <p class="well-auth-eyebrow">Local chart preview</p>
+                    <h4 id="well-auth-title" class="well-auth-title">WELL chart preview</h4>
                     <p id="well-auth-desc" class="well-auth-desc">
-                      Chart and provider content stay locked until you complete username/password and a demo second factor (2FA). Separate from the Cognation site login.
+                      Chart and provider content stay locked until you choose a local demo unlock. This is not clinical sign-in and is separate from the Cognation site login.
                     </p>
-
-                    <div class="well-auth-steps" data-well-auth-steps aria-hidden="true">
-                      <span class="well-auth-step is-active" data-well-auth-step-indicator="1">1 · Credentials</span>
-                      <span class="well-auth-step" data-well-auth-step-indicator="2">2 · 2FA</span>
+                    <p class="cgn-deferral" role="note">Demo / local only — not live backend</p>
+                    <p class="form-hint well-auth-hint">
+                      No shared password or one-time code is used on this site.
+                    </p>
+                    <p class="well-auth-status" data-well-auth-status="credentials" hidden role="status" aria-live="polite"></p>
+                    <div class="form-actions well-auth-actions">
+                      <button type="button" class="btn btn-primary well-auth-submit" data-well-demo-unlock>
+                        Demo unlock
+                      </button>
                     </div>
-
-                    <form
-                      class="well-auth-form"
-                      data-well-auth-form="credentials"
-                      action="#"
-                      method="post"
-                      novalidate
-                      autocomplete="off"
-                    >
-                      <div class="form-group">
-                        <label for="well-auth-username">WELL username</label>
-                        <input
-                          type="text"
-                          id="well-auth-username"
-                          name="wellUsername"
-                          autocomplete="off"
-                          autocapitalize="none"
-                          spellcheck="false"
-                          required
-                          placeholder="well-alexa"
-                        >
-                      </div>
-                      <div class="form-group">
-                        <label for="well-auth-password">WELL password</label>
-                        <input
-                          type="password"
-                          id="well-auth-password"
-                          name="wellPassword"
-                          autocomplete="off"
-                          required
-                          placeholder="••••••••"
-                        >
-                      </div>
-                      <p class="well-auth-status" data-well-auth-status="credentials" hidden role="status" aria-live="polite"></p>
-                      <div class="form-actions well-auth-actions">
-                        <button type="submit" class="btn btn-primary well-auth-submit">Continue to 2FA</button>
-                      </div>
-                      <p class="form-hint well-auth-hint">
-                        Demo WELL credentials: <code>well-alexa</code> or <code>alexa</code> · password <code>WellLock26</code>
-                      </p>
-                    </form>
-
-                    <form
-                      class="well-auth-form"
-                      data-well-auth-form="otp"
-                      action="#"
-                      method="post"
-                      novalidate
-                      autocomplete="off"
-                      hidden
-                    >
-                      <div class="well-auth-demo-code" data-well-auth-demo-code role="note">
-                        <span class="well-auth-demo-label">Demo authenticator / second factor</span>
-                        <strong class="well-auth-demo-value">Demo authenticator code: <code data-well-auth-code-display>————</code></strong>
-                        <span class="well-auth-demo-note">Shown on-screen for this prototype — not sent by SMS.</span>
-                      </div>
-                      <div class="form-group">
-                        <label for="well-auth-otp">6-digit verification code</label>
-                        <input
-                          type="text"
-                          id="well-auth-otp"
-                          name="wellOtp"
-                          inputmode="numeric"
-                          pattern="[0-9]{6}"
-                          maxlength="6"
-                          autocomplete="one-time-code"
-                          required
-                          placeholder="246801"
-                          spellcheck="false"
-                        >
-                      </div>
-                      <p class="well-auth-status" data-well-auth-status="otp" hidden role="status" aria-live="polite"></p>
-                      <div class="form-actions well-auth-actions">
-                        <button type="button" class="btn btn-secondary" data-well-auth-back>Back</button>
-                        <button type="submit" class="btn btn-primary well-auth-submit">Unlock WELL</button>
-                      </div>
-                      <p class="form-hint well-auth-hint">
-                        Enter the demo authenticator code shown above (prototype always uses a displayed code).
-                      </p>
-                    </form>
+                    <p class="form-hint well-auth-hint" data-well-demo-chrome hidden>
+                      Demo EHR — not HIPAA
+                    </p>
                   </div>
                 </div>
 
@@ -1609,11 +1546,13 @@
   </footer>
 
   <script src="js/cognation-config.js"></script>
+  <script src="/runtime-config"></script>
   <script src="js/supabase-client.js"></script>
   <script src="js/brand.js"></script>
   <script src="js/tabs.js" defer></script>
   <script src="js/main.js" defer></script>
   <script src="js/accounts.js"></script>
+  <script src="js/demo-mode.js" defer></script>
   <script src="js/login.js" defer></script>
   <script src="js/login-signup-shell.js" defer></script>
   <script src="js/screen-break.js" defer></script>

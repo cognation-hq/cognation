@@ -83,9 +83,10 @@
       applyHide(post);
       if (status) {
         status.hidden = false;
-        status.textContent = result.ok
-          ? "Reported as " + reason + " · queued for Investigator"
-          : "Reported as " + reason + (postId ? " · #" + postId : "") + " (saved locally).";
+        status.textContent =
+          "Reported as " +
+          reason +
+          " · saved in this browser only. Demo / local only.";
       }
     });
 

@@ -1,9 +1,12 @@
-/* Public browser configuration. The publishable key is intentionally safe to expose. */
+/* Public defaults only. Project URL and publishable key come from /runtime-config (Pages env). */
 (function () {
   "use strict";
 
-  window.CognationConfig = Object.assign({}, window.CognationConfig || {}, {
-    supabaseUrl: "https://elasyigwgytvqspnccln.supabase.co",
-    supabasePublishableKey: "sb_publishable_ARQB-3lcHo5WFqlomJc8_w_U1zExCNE",
-  });
+  window.CognationConfig = Object.assign(
+    {
+      supabaseUrl: "",
+      supabasePublishableKey: "",
+    },
+    window.CognationConfig || {}
+  );
 })();

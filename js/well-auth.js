@@ -1,21 +1,17 @@
 /**
- * WELL second authentication lock + demo 2FA (step-up gate).
+ * WELL local preview lock.
  *
- * Separate from Cognation site login (alexa / TowerCommune26).
+ * Not clinical sign-in. No shared password or one-time code ships in this file.
+ * Unlock is the Demo unlock control. A one-time code is generated after unlock.
  * Session: sessionStorage cognation.well.auth.v1 (clears on tab close).
  *
- * Demo only — not a real EHR · not HIPAA-certified · no PHI leaves the browser.
+ * Demo EHR — not HIPAA. Not a real EHR. No PHI leaves the browser.
  */
 (function () {
   "use strict";
 
   var AUTH_KEY = "cognation.well.auth.v1";
-  var TTL_MS = 4 * 60 * 60 * 1000; /* optional soft TTL note; tab close still ends session */
-  var EXPECTED_USERS = { "well-alexa": true, alexa: true };
-  var EXPECTED_PASS = "WellLock26";
-  var DEMO_OTP = "246801";
-
-  var pendingOtp = null;
+  var TTL_MS = 4 * 60 * 60 * 1000;
 
   function $(sel, root) {
     return (root || document).querySelector(sel);
@@ -52,46 +48,44 @@
     return !!readSession();
   }
 
-  function setStatus(root, which, message, isError) {
-    var el = $(('[data-well-auth-status="' + which + '"]'), root);
+  function setStatus(root, message, isError) {
+    var el = $('[data-well-auth-status="credentials"]', root);
     if (!el) return;
     el.hidden = !message;
     el.textContent = message || "";
     el.classList.toggle("is-error", !!isError);
   }
 
-  function setStep(root, step) {
-    root.setAttribute("data-well-auth-step", String(step));
-    $all("[data-well-auth-step-indicator]", root).forEach(function (el) {
-      var n = el.getAttribute("data-well-auth-step-indicator");
-      el.classList.toggle("is-active", n === String(step));
-      el.classList.toggle("is-done", Number(n) < step);
-    });
-    var cred = $('[data-well-auth-form="credentials"]', root);
-    var otp = $('[data-well-auth-form="otp"]', root);
-    if (cred) cred.hidden = step !== 1;
-    if (otp) otp.hidden = step !== 2;
-    if (step === 1) {
-      pendingOtp = null;
-      var display = $("[data-well-auth-code-display]", root);
-      if (display) display.textContent = "————";
-      var otpInput = $("#well-auth-otp", root);
-      if (otpInput) otpInput.value = "";
-      setStatus(root, "otp", "");
-      window.setTimeout(function () {
-        var u = $("#well-auth-username", root);
-        if (u) u.focus();
-      }, 30);
-    } else if (step === 2) {
-      pendingOtp = DEMO_OTP;
-      var codeEl = $("[data-well-auth-code-display]", root);
-      if (codeEl) codeEl.textContent = pendingOtp;
-      setStatus(root, "credentials", "");
-      window.setTimeout(function () {
-        var o = $("#well-auth-otp", root);
-        if (o) o.focus();
-      }, 30);
+  function runtimeCode() {
+    var n = 0;
+    try {
+      var buf = new Uint32Array(1);
+      window.crypto.getRandomValues(buf);
+      n = buf[0] % 900000;
+    } catch (e) {
+      n = Math.floor(Math.random() * 900000);
     }
+    return String(100000 + n);
+  }
+
+  function showRuntimeCode(root, code) {
+    var el = $("[data-well-runtime-otp]", root);
+    if (!el) return;
+    if (!code) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    el.textContent = "Runtime code " + code;
+  }
+
+  function showDemoChrome(root) {
+    if (window.CognationDemo && window.CognationDemo.ensureChrome) {
+      window.CognationDemo.ensureChrome();
+    }
+    var note = $("[data-well-demo-chrome]", root);
+    if (note) note.hidden = false;
   }
 
   function setLockedUi(root, locked) {
@@ -112,15 +106,13 @@
       if (locked) {
         secured.setAttribute("aria-hidden", "true");
         secured.setAttribute("inert", "");
-        secured.hidden = false; /* keep in DOM for well.js queries, but inert */
+        secured.hidden = false;
       } else {
         secured.removeAttribute("aria-hidden");
         secured.removeAttribute("inert");
       }
-      /* Patient/provider roots stay queryable; visually hide via CSS when locked */
     }
 
-    /* Hide chart roots from AT while locked */
     $all("[data-well-patient-root], [data-well-provider-root]", root).forEach(function (el) {
       if (locked) {
         el.setAttribute("aria-hidden", "true");
@@ -145,55 +137,62 @@
       });
     }
 
-    if (locked) setStep(root, 1);
+    if (!locked) showDemoChrome(root);
+    if (locked) {
+      showRuntimeCode(root, "");
+      window.setTimeout(function () {
+        var unlockBtn = $("[data-well-demo-unlock]", root);
+        if (unlockBtn) unlockBtn.focus();
+      }, 30);
+    }
   }
 
   function unlock(root, username) {
+    if (window.CognationDemo && window.CognationDemo.unlock) {
+      window.CognationDemo.unlock();
+    }
+    var code = runtimeCode();
     writeSession({
       ok: true,
-      user: username,
+      user: username || "demo",
       at: Date.now(),
-      factor: "password+otp",
-      note: "sessionStorage · expires on tab close · soft TTL 4h",
+      factor: "demo-unlock",
+      runtimeCode: code,
+      note: "Demo EHR — not HIPAA",
     });
-    pendingOtp = null;
+    showRuntimeCode(root, code);
     setLockedUi(root, false);
     document.dispatchEvent(
-      new CustomEvent("cognation:well-auth", { detail: { unlocked: true, user: username } })
+      new CustomEvent("cognation:well-auth", {
+        detail: { unlocked: true, user: username || "demo", demo: true },
+      })
     );
   }
 
   function lock(root, opts) {
     opts = opts || {};
     writeSession(null);
-    pendingOtp = null;
     if (!root) {
       $all("[data-well-app]").forEach(function (r) {
         setLockedUi(r, true);
-        setStatus(r, "credentials", opts.message || "");
-        setStatus(r, "otp", "");
+        setStatus(r, opts.message || "", !!opts.isError);
       });
     } else {
       setLockedUi(root, true);
-      setStatus(root, "credentials", opts.message || "", !!opts.isError);
-      setStatus(root, "otp", "");
+      setStatus(root, opts.message || "", !!opts.isError);
     }
     document.dispatchEvent(
       new CustomEvent("cognation:well-auth", { detail: { unlocked: false } })
     );
   }
 
-  function normalizeUser(raw) {
-    var u = String(raw || "").trim().toLowerCase();
-    if (u.charAt(0) === "@") u = u.slice(1);
-    return u;
-  }
-
   function ensureGate(root) {
     root = root || $("[data-well-app]");
     if (!root) return isAuthenticated();
     if (isAuthenticated()) {
+      var existing = readSession();
       setLockedUi(root, false);
+      showRuntimeCode(root, existing && existing.runtimeCode);
       return true;
     }
     setLockedUi(root, true);
@@ -210,59 +209,19 @@
     if (!root || root.__wellAuthWired) return;
     root.__wellAuthWired = true;
 
-    var credForm = $('[data-well-auth-form="credentials"]', root);
-    var otpForm = $('[data-well-auth-form="otp"]', root);
-    var backBtn = $("[data-well-auth-back]", root);
+    var unlockBtn = $("[data-well-demo-unlock]", root);
     var lockBtn = $("[data-well-lock-btn]", root);
 
-    if (credForm) {
-      credForm.addEventListener("submit", function (e) {
-        e.preventDefault();
-        var user = normalizeUser(($("#well-auth-username", root) || {}).value);
-        var pass = String(($("#well-auth-password", root) || {}).value || "");
-        if (!EXPECTED_USERS[user] || pass !== EXPECTED_PASS) {
-          setStatus(root, "credentials", "Wrong WELL username or password.", true);
-          return;
-        }
-        setStatus(root, "credentials", "");
-        setStep(root, 2);
-      });
-    }
-
-    if (otpForm) {
-      otpForm.addEventListener("submit", function (e) {
-        e.preventDefault();
-        var input = $("#well-auth-otp", root);
-        var code = String((input && input.value) || "").replace(/\s+/g, "");
-        var expected = pendingOtp || DEMO_OTP;
-        if (!/^\d{6}$/.test(code) || code !== expected) {
-          setStatus(root, "otp", "Wrong verification code. Try the demo authenticator code shown above.", true);
-          return;
-        }
-        var userEl = $("#well-auth-username", root);
-        unlock(root, normalizeUser(userEl && userEl.value) || "well-alexa");
-        setStatus(root, "otp", "");
-      });
-    }
-
-    if (backBtn) {
-      backBtn.addEventListener("click", function () {
-        setStep(root, 1);
-        setStatus(root, "credentials", "");
+    if (unlockBtn) {
+      unlockBtn.addEventListener("click", function () {
+        unlock(root, "demo");
+        setStatus(root, "");
       });
     }
 
     if (lockBtn) {
       lockBtn.addEventListener("click", function () {
-        lock(root, { message: "WELL locked. Sign in again to open the chart." });
-      });
-    }
-
-    /* OTP: digits only */
-    var otpInput = $("#well-auth-otp", root);
-    if (otpInput) {
-      otpInput.addEventListener("input", function () {
-        otpInput.value = otpInput.value.replace(/\D/g, "").slice(0, 6);
+        lock(root, { message: "WELL locked. Use Demo unlock to open the local chart preview." });
       });
     }
   }
@@ -273,7 +232,6 @@
       ensureGate(root);
     });
 
-    /* When main site logs out, also clear WELL clinical session */
     document.addEventListener("cognation:session-ended", function () {
       lock(null);
     });
@@ -288,7 +246,7 @@
     },
     unlockSession: function (username) {
       var root = $("[data-well-app]");
-      if (root) unlock(root, username || "well-alexa");
+      if (root) unlock(root, username || "demo");
     },
     onWellPanelShown: onWellPanelShown,
     getSession: readSession,

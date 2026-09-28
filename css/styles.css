@@ -10401,3 +10401,54 @@ body {
   box-shadow: none !important;
   backdrop-filter: none !important;
 }
+
+/* Demo unlock chrome and stub deferral labels */
+.cognation-demo-chrome {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 800;
+  margin: 0;
+  padding: 0.4rem 0.75rem;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #4a1d12;
+  background: #ffd7a8;
+  border-bottom: 1px solid #c47a3a;
+}
+
+body.cognation-demo-on {
+  padding-top: 2.15rem;
+}
+
+.login-demo-unlock {
+  margin: 0.85rem 0 0;
+  text-align: center;
+}
+
+.login-demo-unlock .btn {
+  width: 100%;
+}
+
+.cgn-deferral,
+#panel-tower .cgn-deferral,
+#panel-news .cgn-deferral,
+#panel-commune .cgn-deferral,
+#panel-well .cgn-deferral,
+.screen-break-panel .cgn-deferral {
+  display: block;
+  margin: 0.45rem 0;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: #6a3410 !important;
+  background: #fff6e8 !important;
+  border: 1px solid #e4c48a !important;
+  border-radius: 6px;
+}

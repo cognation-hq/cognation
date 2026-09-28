@@ -188,6 +188,7 @@
     el.innerHTML =
       '<div class="screen-break-backdrop" aria-hidden="true"></div>' +
       '<div class="screen-break-panel" tabindex="-1">' +
+      '  <p class="cgn-deferral" role="note">Demo / local only</p>' +
       '  <p class="screen-break-eyebrow">Screen break</p>' +
       '  <h2 id="screen-break-title">Cognitive rest</h2>' +
       '  <p id="screen-break-desc" class="screen-break-desc"></p>' +

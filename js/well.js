@@ -1811,7 +1811,8 @@
         (this.videoOn ? "" : " hidden") +
         "></video>" +
         "</div>" +
-        '<p class="well-muted well-tiny">Demo · open Patient in one tab and Provider in another, then Call. Signaling via BroadcastChannel.</p>' +
+        '<p class="cgn-deferral" role="note">Demo / local only</p>' +
+        '<p class="well-muted well-tiny">Demo · open Patient in one tab and Provider in another, then Call. Signaling stays in this browser.</p>' +
         "</section>"
       );
     },

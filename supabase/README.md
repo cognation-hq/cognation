@@ -11,6 +11,8 @@ multi-user UI flows, create the database objects:
 5. Add the deployed Cognation address in **Authentication** → **URL
    Configuration** → **Site URL** and **Redirect URLs**.
 
-The publishable key in `js/cognation-config.js` is safe to ship to the browser.
+The Supabase URL and publishable key are not committed. Cloudflare Pages
+reads `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` and serves them from
+`/runtime-config`. `js/cognation-config.js` only holds empty defaults.
 Never place the Supabase `service_role` secret in frontend JavaScript or commit
 it to the repository.

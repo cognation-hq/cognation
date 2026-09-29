@@ -6,13 +6,39 @@
 (function () {
   "use strict";
 
-  var config = window.CognationConfig || {};
-  var url = String(config.supabaseUrl || "").replace(/\/$/, "");
-  var key = String(config.supabasePublishableKey || "");
   var SESSION_KEY = "cognation.supabase.session.v1";
+  var refreshInflight = null;
+
+  /* Read on each call. /runtime-config assigns CognationConfig before this
+     file runs today, but a one-time snapshot stays empty if that script
+     fails or is ever reordered. */
+  function readConfig() {
+    var config = window.CognationConfig || {};
+    return {
+      url: String(config.supabaseUrl || "").replace(/\/$/, ""),
+      key: String(config.supabasePublishableKey || ""),
+    };
+  }
 
   function configured() {
-    return /^https:\/\//.test(url) && /^sb_publishable_/.test(key);
+    var cfg = readConfig();
+    return /^https:\/\//.test(cfg.url) && /^sb_publishable_/.test(cfg.key);
+  }
+
+  function stampExpiry(session) {
+    if (!session || !session.access_token) return session;
+    if (!session.expires_at && session.expires_in) {
+      session.expires_at = Math.floor(Date.now() / 1000) + Number(session.expires_in);
+    }
+    return session;
+  }
+
+  function accessTokenStale(session) {
+    if (!session || !session.access_token || !session.refresh_token) return false;
+    var exp = Number(session.expires_at);
+    if (!exp) return false;
+    if (exp > 1e12) exp = Math.floor(exp / 1000);
+    return Date.now() / 1000 >= exp - 60;
   }
 
   function readSession() {
@@ -30,13 +56,77 @@
     } catch (e) {}
   }
 
+  function refreshSession(session) {
+    var cfg = readConfig();
+    return fetch(cfg.url + "/auth/v1/token?grant_type=refresh_token", {
+      method: "POST",
+      headers: {
+        apikey: cfg.key,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ refresh_token: session.refresh_token }),
+    }).then(function (response) {
+      return response.text().then(function (text) {
+        var body = null;
+        try {
+          body = text ? JSON.parse(text) : null;
+        } catch (e) {
+          body = null;
+        }
+        if (!response.ok || !body || !body.access_token) {
+          var error = new Error(
+            (body && (body.error_description || body.msg || body.message)) || "Session refresh failed."
+          );
+          error.status = response.status;
+          error.body = body;
+          throw error;
+        }
+        stampExpiry(body);
+        writeSession(body);
+        return body;
+      });
+    });
+  }
+
+  /* One refresh in flight. Supabase rotates refresh tokens; parallel callers
+     on first paint must not redeem the same token twice. */
+  function ensureFreshSession() {
+    var session = readSession();
+    if (!session || !accessTokenStale(session)) return Promise.resolve(session);
+    if (!refreshInflight) {
+      refreshInflight = refreshSession(session).then(
+        function (next) {
+          refreshInflight = null;
+          return next;
+        },
+        function (error) {
+          refreshInflight = null;
+          throw error;
+        }
+      );
+    }
+    return refreshInflight;
+  }
+
   function request(path, options) {
     if (!configured()) return Promise.reject(new Error("Supabase is not configured."));
     options = options || {};
+    var prepare = options.skipAuthRefresh
+      ? Promise.resolve()
+      : ensureFreshSession().catch(function () {
+          return null;
+        });
+    return prepare.then(function () {
+      return send(path, options);
+    });
+  }
+
+  function send(path, options) {
+    var cfg = readConfig();
     var session = readSession();
     var headers = Object.assign(
       {
-        apikey: key,
+        apikey: cfg.key,
         "Content-Type": "application/json",
       },
       options.headers || {}
@@ -44,7 +134,12 @@
     if (session && session.access_token) {
       headers.Authorization = "Bearer " + session.access_token;
     }
-    return fetch(url + path, Object.assign({}, options, { headers: headers })).then(function (response) {
+    var fetchOptions = {
+      method: options.method,
+      headers: headers,
+    };
+    if (options.body != null) fetchOptions.body = options.body;
+    return fetch(cfg.url + path, fetchOptions).then(function (response) {
       return response.text().then(function (text) {
         var body = null;
         try {
@@ -77,7 +172,7 @@
         },
       }),
     }).then(function (result) {
-      if (result && result.session) writeSession(result.session);
+      if (result && result.session) writeSession(stampExpiry(result.session));
       return result;
     });
   }
@@ -87,7 +182,7 @@
       method: "POST",
       body: JSON.stringify({ email: email, password: password }),
     }).then(function (result) {
-      if (result && result.access_token) writeSession(result);
+      if (result && result.access_token) writeSession(stampExpiry(result));
       return result;
     });
   }

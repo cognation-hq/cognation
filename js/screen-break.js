@@ -691,6 +691,16 @@
   document.addEventListener("cognation:session-ended", onSessionEnded);
 
   function boot() {
+    /* Do not arm AFK polling from a local session until auth boot confirms it.
+       login.js closeGate() dispatches session-started; whenReady covers the
+       case where that event already fired before this script ran. */
+    var ready = window.CognationAuth && window.CognationAuth.whenReady;
+    if (ready && typeof ready.then === "function") {
+      ready.then(function () {
+        if (sessionActive()) start();
+      });
+      return;
+    }
     if (sessionActive()) start();
   }
 

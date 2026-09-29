@@ -3,6 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Start the uncached config request during HTML parse. The classic script
+       below still runs before js/supabase-client.js so auth sees the values. -->
+  <link rel="preload" href="/runtime-config" as="script">
+  <link rel="preload" as="image" href="assets/cognation-holographic-circuit-brain.png" fetchpriority="high">
   <meta
     name="description"
     content="COGNATION — a renameable starter site for your team. Clear, accessible, and ready to deploy."
@@ -14,7 +18,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Great+Vibes&family=Rozha+One&family=IM+Fell+English:ital@0;1&family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&family=Special+Elite&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
 </head>
-<body>
+<body class="login-gate-open">
   <a class="skip-link" href="#main">Skip to main content</a>
 
 
@@ -27,7 +31,7 @@
     aria-modal="true"
     aria-labelledby="login-gate-title"
     aria-describedby="login-gate-desc"
-    hidden
+    aria-hidden="false"
   >
     <div class="login-gate-backdrop" tabindex="-1" aria-hidden="true"></div>
     <div class="login-gate-panel">
@@ -251,6 +255,21 @@
       </div>
     </div>
   </div>
+  <script>
+    /* Paint the splash immediately. If a remote session exists, say so before
+       deferred auth scripts run (they clear this once the check settles). */
+    (function () {
+      try {
+        var raw = localStorage.getItem("cognation.session.v2");
+        var session = raw ? JSON.parse(raw) : null;
+        if (!session || session.source === "demo") return;
+        var el = document.getElementById("login-status");
+        if (!el) return;
+        el.hidden = false;
+        el.textContent = "Restoring your session…";
+      } catch (e) {}
+    })();
+  </script>
 
   <header class="site-header">
     <div class="container header-inner">
@@ -1545,13 +1564,15 @@
     </div>
   </footer>
 
+  <!-- Keep this order: config defaults, then blocking /runtime-config, then the client.
+       Do not mark /runtime-config async/defer or the client can boot with empty keys. -->
   <script src="js/cognation-config.js"></script>
   <script src="/runtime-config"></script>
   <script src="js/supabase-client.js"></script>
   <script src="js/brand.js"></script>
   <script src="js/tabs.js" defer></script>
   <script src="js/main.js" defer></script>
-  <script src="js/accounts.js"></script>
+  <script src="js/accounts.js" defer></script>
   <script src="js/demo-mode.js" defer></script>
   <script src="js/login.js" defer></script>
   <script src="js/login-signup-shell.js" defer></script>

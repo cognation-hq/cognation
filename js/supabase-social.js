@@ -529,6 +529,12 @@
       });
   }
 
+  var sawSessionStart = false;
+  document.addEventListener("cognation:session-started", function () {
+    sawSessionStart = true;
+    refresh();
+  });
+
   function boot() {
     if (state.initialized) return;
     state.initialized = true;
@@ -536,8 +542,16 @@
       emit("cognation:remote-profile-loaded", { profileId: viewedProfileId() });
       refreshFeed();
     });
-    document.addEventListener("cognation:session-started", refresh);
-    if (active()) refresh();
+    /* Wait until login.js finishes the first auth check. An eager refresh here
+       races getUser()/token refresh and paints the feed twice. */
+    var ready = window.CognationAuth && window.CognationAuth.whenReady;
+    if (ready && typeof ready.then === "function") {
+      ready.then(function () {
+        if (!sawSessionStart && active()) refresh();
+      });
+    } else if (active()) {
+      refresh();
+    }
   }
 
   window.CognationSupabaseSocial = {

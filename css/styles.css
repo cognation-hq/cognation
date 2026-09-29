@@ -766,7 +766,7 @@ body.login-gate-open {
 .login-gate {
   position: fixed;
   inset: 0;
-  z-index: 500;
+  z-index: 1100;
   display: grid;
   place-items: center;
   padding: 1.25rem;
@@ -7008,11 +7008,15 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   z-index: 2;
   margin-top: 0.85rem;
   padding: 0.65rem 0 0.15rem;
+  gap: 0.65rem;
   background: linear-gradient(180deg, transparent, var(--color-surface) 28%);
   display: flex !important;
   flex-direction: column;
   align-items: stretch;
   visibility: visible !important;
+}
+.login-form-actions .login-status {
+  margin: 0;
 }
 .login-submit-btn,
 .login-form-actions .btn-primary {

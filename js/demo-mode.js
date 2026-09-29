@@ -56,8 +56,18 @@
 
   function hideChrome() {
     document.body.classList.remove("cognation-demo-on");
+    document.documentElement.removeAttribute("data-cognation-demo");
     var el = document.getElementById("cognation-demo-chrome");
     if (el) el.hidden = true;
+  }
+
+  function clearUnlock() {
+    try {
+      sessionStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {}
+    hideChrome();
+    return true;
   }
 
   function syncChrome() {
@@ -81,6 +91,7 @@
     label: CHROME_TEXT,
     isUnlocked: isUnlocked,
     unlock: unlock,
+    clearUnlock: clearUnlock,
     ensureChrome: ensureChrome,
     hideChrome: hideChrome,
     syncChrome: syncChrome,

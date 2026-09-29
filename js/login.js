@@ -14,6 +14,11 @@
   "use strict";
 
   var SESSION_KEY = "cognation.session.v2";
+  var SUPABASE_SESSION_KEY = "cognation.supabase.session.v1";
+  var DEMO_SESSION_KEY = "cognation.session.demo.v1";
+  var DEMO_UNLOCK_KEY = "cognation.demo.unlock.v1";
+  var LOGOUT_NOTICE_KEY = "cognation.logout.notice.v1";
+  var loggingOut = false;
 
   var API_BASE =
     (window.CognationConfig && window.CognationConfig.apiBaseUrl) || "/api";
@@ -123,8 +128,50 @@
     });
   }
 
+  function scrubClientSession() {
+    writeLocalSession(null);
+    try {
+      localStorage.removeItem(SUPABASE_SESSION_KEY);
+      localStorage.removeItem(DEMO_SESSION_KEY);
+      localStorage.removeItem(DEMO_UNLOCK_KEY);
+      sessionStorage.removeItem(DEMO_UNLOCK_KEY);
+    } catch (e) {}
+    if (window.CognationDemo && typeof window.CognationDemo.clearUnlock === "function") {
+      try {
+        window.CognationDemo.clearUnlock();
+      } catch (e2) {}
+    }
+  }
+
+  function splashUrl() {
+    try {
+      var url = new URL(window.location.href);
+      url.searchParams.delete("demo");
+      url.hash = "";
+      return url.pathname + url.search;
+    } catch (e) {
+      return (window.location && window.location.pathname) || "/";
+    }
+  }
+
+  function goToSplash() {
+    var next = splashUrl();
+    try {
+      window.location.replace(next);
+    } catch (e) {}
+  }
+
   function openGate(opts) {
     opts = opts || {};
+    if (!opts.message) {
+      try {
+        var pendingNotice = sessionStorage.getItem(LOGOUT_NOTICE_KEY);
+        if (pendingNotice) {
+          sessionStorage.removeItem(LOGOUT_NOTICE_KEY);
+          opts.message = pendingNotice;
+        }
+      } catch (e) {}
+    }
     lastFocus = document.activeElement;
     gate.hidden = false;
     gate.setAttribute("aria-hidden", "false");
@@ -142,6 +189,7 @@
   }
 
   function closeGate() {
+    if (loggingOut) return;
     gate.hidden = true;
     gate.setAttribute("aria-hidden", "true");
     document.body.classList.remove("login-gate-open");
@@ -170,6 +218,7 @@
   }
 
   function establishSession(username, profile, auth) {
+    loggingOut = false;
     var session = buildSession(username, profile, auth);
     writeLocalSession(session);
     if (window.CognationDemo && window.CognationDemo.syncChrome) {
@@ -276,18 +325,34 @@
 
   function logout(opts) {
     opts = opts || {};
-    var remote =
+    var message = opts.message || "Signed out. Sign in to continue.";
+    loggingOut = true;
+    /* Start revocation while the access token is still stored, then drop
+       every local session immediately so a hung signOut cannot keep the app open. */
+    var remote = Promise.resolve();
+    if (
       window.CognationSupabase &&
       window.CognationSupabase.configured &&
-      window.CognationSupabase.configured()
-        ? window.CognationSupabase.signOut().catch(function () {})
-        : Promise.resolve();
+      window.CognationSupabase.configured() &&
+      typeof window.CognationSupabase.signOut === "function"
+    ) {
+      try {
+        remote = window.CognationSupabase.signOut().catch(function () {});
+      } catch (e) {
+        remote = Promise.resolve();
+      }
+    }
+    scrubClientSession();
+    try {
+      sessionStorage.setItem(LOGOUT_NOTICE_KEY, message);
+    } catch (e2) {}
+    openGate({
+      message: message,
+      isError: !!opts.isError,
+    });
+    goToSplash();
     return remote.then(function () {
-      writeLocalSession(null);
-      openGate({
-        message: opts.message || "Signed out. Sign in to continue.",
-        isError: !!opts.isError,
-      });
+      scrubClientSession();
     });
   }
 
@@ -544,6 +609,7 @@
         window.CognationSupabase
           .getUser()
           .then(function (user) {
+            if (loggingOut) return;
             if (!user || !user.id) throw new Error("Session expired.");
             session.supabaseUserId = user.id;
             writeLocalSession(session);

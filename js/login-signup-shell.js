@@ -81,7 +81,8 @@
     }
   }
 
-  function setMode(mode) {
+  function setMode(mode, opts) {
+    opts = opts || {};
     mode = mode === "signup" ? "signup" : "signin";
     step.setAttribute("data-login-mode", mode);
     var isSignup = mode === "signup";
@@ -129,7 +130,7 @@
         : 'Welcome to <span data-brand>COGNATION</span>. Sign in with your account to continue.';
     }
     if (demoHint) demoHint.hidden = true;
-    setStatus("");
+    if (!opts.keepStatus) setStatus("");
   }
 
   function markInvalid(el, bad) {
@@ -320,5 +321,5 @@
     else if (stateText && p.state) stateText.value = p.state;
   })();
 
-  setMode("signin");
+  setMode("signin", { keepStatus: true });
 })();

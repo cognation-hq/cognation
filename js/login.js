@@ -238,7 +238,8 @@
   function login(username, password, opts) {
     opts = opts || {};
     username = normalizeLoginUser(username);
-    password = String(password || "").trim();
+    /* Do not trim passwords. A trailing space is part of the secret. */
+    password = String(password || "");
     if (opts.demo) {
       if (!username) username = "demo";
       if (window.CognationDemo && window.CognationDemo.unlock) {
@@ -260,15 +261,27 @@
       }
       return window.CognationSupabase.signIn(username, password).then(function (result) {
         var user = result && result.user;
-        if (!user) throw new Error("bad credentials");
-        return loadSupabaseProfiles(user).then(function (profiles) {
-          return {
-            username: user.email || username,
-            profiles: profiles,
-            source: "supabase",
-            supabaseUserId: user.id,
-          };
-        });
+        if (!user || !user.id) throw new Error("Wrong email or password.");
+        /* A profiles miss must not undo a successful password grant. The gate
+           stayed up whenever that follow-up request rejected. */
+        return loadSupabaseProfiles(user).then(
+          function (profiles) {
+            return {
+              username: user.email || username,
+              profiles: profiles,
+              source: "supabase",
+              supabaseUserId: user.id,
+            };
+          },
+          function () {
+            return {
+              username: user.email || username,
+              profiles: [],
+              source: "supabase",
+              supabaseUserId: user.id,
+            };
+          }
+        );
       });
     }
     return Promise.reject(new Error("Cognation sign-in is not configured."));

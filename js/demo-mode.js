@@ -1,14 +1,13 @@
 /**
- * Demo unlock flag. No password or one-time code is stored here.
+ * Local preview flag. No password or one-time code is stored here.
  *
  * Live Pages (any *.pages.dev host, including cognation-3md.pages.dev) never
- * honors this flag. The public sign-in gate does not ship a Demo unlock control.
+ * honors this flag. Public pages do not ship a preview control.
  *
  * Local gate only:
  * - loopback or file://, or
  * - CognationConfig.localDemo from COGNATION_LOCAL_DEMO on a non-Pages host.
- * On that gate, ?demo=1 or the local Demo unlock control sets
- * sessionStorage cognation.demo.unlock.v1.
+ * On that gate, ?demo=1 sets sessionStorage cognation.demo.unlock.v1.
  * window.__COGNATION_DEMO__ stays unset for production and is ignored on live Pages.
  */
 (function () {

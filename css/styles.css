@@ -10416,7 +10416,7 @@ body {
   backdrop-filter: none !important;
 }
 
-/* Demo unlock chrome and stub deferral labels */
+/* Local preview chrome and stub deferral labels */
 .cognation-demo-chrome {
   position: fixed;
   top: 0;

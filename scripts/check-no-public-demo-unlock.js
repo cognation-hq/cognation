@@ -300,7 +300,7 @@ function testLocalGateStillOpens() {
   });
   assert.strictEqual(local.demo.localGateOpen(), true);
   assert.strictEqual(local.demo.isUnlocked(), false, "local sign-in stays locked until an explicit local unlock");
-  assert.ok(local.form.querySelector("[data-login-demo-unlock]"), "loopback may mount Demo unlock");
+  assert.strictEqual(local.form.querySelector("[data-login-demo-unlock]"), null, "loopback must not render a public preview control");
   assert.strictEqual(local.gate.hidden, false);
 
   var envHost = bootLogin({

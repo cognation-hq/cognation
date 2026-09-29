@@ -3,7 +3,7 @@
 Source of truth: `/workspace/cognation-site/`  
 Static sync: `/workspace/cognation-pages-deploy/` (excludes `server/`, `docs/`, `node_modules/`, `.wrangler/`)
 
-Login gate uses Cognation account sign-in. Public sign-in has no Demo unlock control. Local preview only (`localhost` or `COGNATION_LOCAL_DEMO=1` off live Pages) can use `?demo=1`. No shared password is stored in the site files. See `SOURCE-OF-TRUTH.md`.
+Login gate uses Cognation account sign-in. Public pages, including WELL, do not offer a preview-open control. Local preview only (`localhost` or `COGNATION_LOCAL_DEMO=1` off live Pages) can use `?demo=1`. No shared password is stored in the site files. See `SOURCE-OF-TRUTH.md`.
 
 ## How to try (Alexa)
 

@@ -5,14 +5,18 @@
  *
  *   SUPABASE_URL
  *   SUPABASE_PUBLISHABLE_KEY
+ *   COGNATION_LOCAL_DEMO  (optional; "1" enables local demo on non-Pages hosts only)
  */
 export async function onRequest(context) {
   const env = (context && context.env) || {};
   const url = String(env.SUPABASE_URL || "");
   const key = String(env.SUPABASE_PUBLISHABLE_KEY || "");
+  const localDemo = String(env.COGNATION_LOCAL_DEMO || "").toLowerCase();
   const payload = {};
   if (url) payload.supabaseUrl = url;
   if (key) payload.supabasePublishableKey = key;
+  /* Live Pages still ignores this. demo-mode.js refuses *.pages.dev hosts. */
+  if (localDemo === "1" || localDemo === "true") payload.localDemo = true;
   const body =
     "window.CognationConfig=Object.assign({},window.CognationConfig||{}," +
     JSON.stringify(payload) +

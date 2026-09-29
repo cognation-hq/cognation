@@ -5,7 +5,7 @@
 ## Endpoints
 - `GET /api/news/nationwide?country=United%20States`
 - `GET /api/news/international`
-- `GET /runtime-config` — browser config from `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`. No project values are stored in git. This is not a moderation ingest route.
+- `GET /runtime-config` — browser config from `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`. Optional `COGNATION_LOCAL_DEMO=1` sets `localDemo` for non-Pages hosts only; live Pages never opens demo unlock from it. No project values are stored in git. This is not a moderation ingest route.
 
 Returns JSON including `seedPosts` ready for News / commune feed refresh.
 

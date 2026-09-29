@@ -152,6 +152,7 @@
         if (!response.ok) {
           var error = new Error(apiErrorMessage(body, "Supabase request failed."));
           error.status = response.status;
+          error.code = body && (body.error_code || body.error);
           error.body = body;
           throw error;
         }

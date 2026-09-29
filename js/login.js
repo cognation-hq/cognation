@@ -359,6 +359,19 @@
     });
   }
 
+  function signInFailureMessage(error) {
+    var body = error && error.body;
+    var code = String((error && error.code) || (body && body.error_code) || "");
+    if (code === "invalid_credentials" || code === "invalid_grant") {
+      return "Wrong email or password.";
+    }
+    var message = (error && error.message) || "";
+    if (/invalid login credentials/i.test(message) || message === "bad credentials") {
+      return "Wrong email or password.";
+    }
+    return message || "Wrong email or password.";
+  }
+
   form.addEventListener("submit", function (e) {
     e.preventDefault();
     var userInput = form.querySelector('input[name="username"]');
@@ -380,10 +393,7 @@
         finishWithProfileChoice(result.username, result.profiles, result);
       },
       function (error) {
-        setStatus(
-          (error && error.message) || "Wrong email or password.",
-          true
-        );
+        setStatus(signInFailureMessage(error), true);
       }
     );
   });

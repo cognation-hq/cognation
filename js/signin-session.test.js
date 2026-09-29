@@ -210,6 +210,7 @@ function testSignInSkipsStaleSessionAndSurfacesMsg() {
     },
     function (error) {
       assert.strictEqual(error.message, "Invalid login credentials");
+      assert.strictEqual(error.code, "invalid_credentials");
       assert.ok(
         calls.every(function (call) {
           return String(call.url).indexOf("grant_type=refresh_token") === -1;
@@ -220,11 +221,166 @@ function testSignInSkipsStaleSessionAndSurfacesMsg() {
   );
 }
 
+function testInvalidCredentialsCopy() {
+  var html = [
+    '<div id="login-gate" hidden><form id="login-form">',
+    '<input name="username" value="test@example.com">',
+    '<input name="password" id="login-password" value="x">',
+    '<p id="login-status" hidden></p>',
+    '<button type="submit" data-login-submit>Sign in</button>',
+    "</form></div>",
+  ].join("");
+  var listeners = {};
+  function el(tag, attrs) {
+    var node = {
+      tagName: tag.toUpperCase(),
+      hidden: false,
+      value: "",
+      textContent: "",
+      className: "",
+      attrs: {},
+      children: [],
+      classList: {
+        toggle: function () {},
+        add: function () {},
+        remove: function () {},
+      },
+      setAttribute: function (name, value) {
+        node.attrs[name] = value;
+        if (name === "id") node.id = value;
+        if (name === "hidden") node.hidden = true;
+      },
+      getAttribute: function (name) {
+        return node.attrs[name];
+      },
+      removeAttribute: function (name) {
+        delete node.attrs[name];
+      },
+      appendChild: function (child) {
+        node.children.push(child);
+        return child;
+      },
+      addEventListener: function (name, fn) {
+        (node.listeners[name] = node.listeners[name] || []).push(fn);
+      },
+      dispatchEvent: function (ev) {
+        (node.listeners[ev.type] || []).forEach(function (fn) {
+          fn(ev);
+        });
+        (listeners[ev.type] || []).forEach(function (fn) {
+          fn(ev);
+        });
+      },
+      querySelector: function (sel) {
+        return find(node, sel);
+      },
+      querySelectorAll: function () {
+        return [];
+      },
+      focus: function () {},
+      listeners: {},
+    };
+    Object.keys(attrs || {}).forEach(function (key) {
+      node.attrs[key] = attrs[key];
+      node[key] = attrs[key];
+    });
+    return node;
+  }
+  var gate = el("div", { id: "login-gate", hidden: true });
+  var form = el("form", { id: "login-form" });
+  var user = el("input", { name: "username", value: "test@example.com" });
+  var pass = el("input", { name: "password", id: "login-password", value: "x" });
+  var status = el("p", { id: "login-status", hidden: true });
+  form.children = [user, pass, status];
+  form.querySelector = function (sel) {
+    if (sel.indexOf("username") !== -1) return user;
+    if (sel.indexOf("password") !== -1) return pass;
+    if (sel.indexOf("country") !== -1) return null;
+    if (sel.indexOf("login-demo") !== -1) return null;
+    return null;
+  };
+  gate.children = [form];
+  var document = {
+    readyState: "complete",
+    body: { classList: { add: function () {}, remove: function () {} } },
+    activeElement: null,
+    addEventListener: function (name, fn) {
+      (listeners[name] = listeners[name] || []).push(fn);
+    },
+    dispatchEvent: function (ev) {
+      (listeners[ev.type] || []).forEach(function (fn) {
+        fn(ev);
+      });
+    },
+    getElementById: function (id) {
+      if (id === "login-gate") return gate;
+      if (id === "login-form") return form;
+      if (id === "login-status") return status;
+      return null;
+    },
+    querySelector: function () {
+      return null;
+    },
+    querySelectorAll: function () {
+      return [];
+    },
+    createElement: function (tag) {
+      return el(tag);
+    },
+  };
+  var windowStub = {
+    document: document,
+    localStorage: memoryStorage(),
+    location: { hash: "" },
+    CustomEvent: CustomEventStub,
+    CognationSupabase: {
+      configured: function () {
+        return true;
+      },
+      signIn: function () {
+        var error = new Error("Invalid login credentials");
+        error.status = 400;
+        error.code = "invalid_credentials";
+        error.body = { error_code: "invalid_credentials", msg: "Invalid login credentials" };
+        return Promise.reject(error);
+      },
+    },
+    setTimeout: function (fn) {
+      if (typeof fn === "function") fn();
+      return 0;
+    },
+    clearTimeout: function () {},
+  };
+  windowStub.window = windowStub;
+  void html;
+  loadScript("js/login.js", windowStub);
+  var submitters = form.listeners.submit || [];
+  assert.ok(submitters.length, "login form listens for submit");
+  submitters[0]({ preventDefault: function () {} });
+  return new Promise(function (resolve) {
+    setTimeout(resolve, 0);
+  }).then(function () {
+    assert.strictEqual(status.textContent, "Wrong email or password.");
+    assert.strictEqual(status.hidden, false);
+  });
+}
+
+function testLoginActionsAreNotSticky() {
+  var css = read("css/styles.css");
+  var sticky = css.indexOf(".login-form-actions {\n  position: sticky;");
+  var unstick = css.indexOf(".login-gate .login-form-actions {\n  position: static;");
+  assert.ok(sticky !== -1, "sticky rule is still the shared actions style");
+  assert.ok(unstick > sticky, "the login gate must unstick Sign in after the sticky rule");
+}
+
 function main() {
   testRemoteProfileReadDoesNotRecurse();
-  return testSignInSkipsStaleSessionAndSurfacesMsg().then(function () {
-    console.log("signin-session tests passed");
-  });
+  testLoginActionsAreNotSticky();
+  return testSignInSkipsStaleSessionAndSurfacesMsg()
+    .then(testInvalidCredentialsCopy)
+    .then(function () {
+      console.log("signin-session tests passed");
+    });
 }
 
 main().catch(function (error) {

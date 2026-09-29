@@ -433,6 +433,18 @@
     }
   });
 
+  var resolveAuthReady = function () {};
+  var authReady = new Promise(function (resolve) {
+    resolveAuthReady = function () {
+      resolve();
+      resolveAuthReady = function () {};
+    };
+  });
+
+  function settleAuthReady() {
+    resolveAuthReady();
+  }
+
   window.CognationAuth = {
     openGate: openGate,
     closeGate: closeGate,
@@ -448,6 +460,8 @@
     setActiveProfile: setActiveProfile,
     SESSION_KEY: SESSION_KEY,
     apiBaseUrl: API_BASE,
+    /* Resolves once the first paint auth decision finishes (gate stays or closes). */
+    whenReady: authReady,
   };
 
   document.addEventListener("click", function (ev) {
@@ -492,6 +506,17 @@
     return session;
   }
 
+  var authBootGeneration = 0;
+
+  function noteRestoringSession() {
+    /* login-signup-shell clears #login-status while it sets sign-in mode.
+       Put the note back after that script, and only while the splash is up. */
+    window.setTimeout(function () {
+      if (gate.hidden) return;
+      setStatus("Restoring your session…", false);
+    }, 0);
+  }
+
   function boot() {
     /* Clear old demo sessions so they cannot bypass */
     try {
@@ -517,6 +542,7 @@
       }
       hydrateSessionProfile(session);
       closeGate();
+      settleAuthReady();
       return;
     }
     if (
@@ -525,9 +551,16 @@
       window.CognationDemo.isUnlocked() &&
       (!session || session.source !== "supabase")
     ) {
-      login(session && session.username ? session.username : "demo", "", { demo: true }).then(function (result) {
-        finishWithProfileChoice(result.username, result.profiles, result);
-      });
+      login(session && session.username ? session.username : "demo", "", { demo: true }).then(
+        function (result) {
+          finishWithProfileChoice(result.username, result.profiles, result);
+          settleAuthReady();
+        },
+        function () {
+          openGate({ message: "Could not restore the demo session.", isError: true });
+          settleAuthReady();
+        }
+      );
       return;
     }
     var remoteConfigured =
@@ -537,32 +570,57 @@
     if (remoteConfigured && (!session || session.source !== "supabase")) {
       writeLocalSession(null);
       openGate();
+      settleAuthReady();
       return;
     }
     if (session) {
       if (remoteConfigured) {
+        /* Splash is already visible. Do not openGate() here — that dispatches
+           session-ended and lets the app flash before getUser returns. */
+        var bootGen = ++authBootGeneration;
+        function claimRemoteBoot() {
+          if (bootGen !== authBootGeneration) return false;
+          authBootGeneration += 1;
+          return true;
+        }
+        noteRestoringSession();
+        window.setTimeout(function () {
+          if (!claimRemoteBoot()) return;
+          writeLocalSession(null);
+          openGate({
+            message: "Couldn't reach Cognation sign-in. Try again.",
+            isError: true,
+          });
+          settleAuthReady();
+        }, 12000);
         window.CognationSupabase
           .getUser()
           .then(function (user) {
             if (!user || !user.id) throw new Error("Session expired.");
+            if (!claimRemoteBoot()) return;
             session.supabaseUserId = user.id;
             writeLocalSession(session);
             hydrateSessionProfile(session);
             closeGate();
+            settleAuthReady();
           })
           .catch(function () {
+            if (!claimRemoteBoot()) return;
             writeLocalSession(null);
             openGate({
               message: "Your session ended. Sign in again to continue.",
               isError: true,
             });
+            settleAuthReady();
           });
         return;
       }
       hydrateSessionProfile(session);
       closeGate();
+      settleAuthReady();
     } else {
       openGate();
+      settleAuthReady();
     }
   }
 

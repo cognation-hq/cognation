@@ -8,7 +8,9 @@
  *
  * Session: cognation.session.v2
  * Production sign-in uses the configured account provider.
- * Local preview uses an explicit demo unlock (no shared password in this file).
+ * Public sign-in has no Demo unlock control. Local preview can still open
+ * demo mode behind CognationDemo.localGateOpen (loopback or COGNATION_LOCAL_DEMO),
+ * never on live Pages. No shared password is stored in this file.
  */
 (function () {
   "use strict";
@@ -241,10 +243,10 @@
     /* Do not trim passwords. A trailing space is part of the secret. */
     password = String(password || "");
     if (opts.demo) {
-      if (!username) username = "demo";
-      if (window.CognationDemo && window.CognationDemo.unlock) {
-        window.CognationDemo.unlock();
+      if (!demoGateOpen() || !window.CognationDemo.unlock()) {
+        return Promise.reject(new Error("Demo unlock is not available."));
       }
+      if (!username) username = "demo";
       return Promise.resolve({
         username: username,
         profiles: loadProfilesForUser(username),
@@ -338,9 +340,17 @@
     return session;
   }
 
-  var demoUnlockBtn = form.querySelector("[data-login-demo-unlock]");
-  if (demoUnlockBtn) {
-    demoUnlockBtn.addEventListener("click", function () {
+  function demoGateOpen() {
+    return !!(
+      window.CognationDemo &&
+      typeof window.CognationDemo.localGateOpen === "function" &&
+      window.CognationDemo.localGateOpen()
+    );
+  }
+
+  function bindDemoUnlock(btn) {
+    btn.addEventListener("click", function () {
+      if (!demoGateOpen()) return;
       var userInput = form.querySelector('input[name="username"]');
       var username = userInput && String(userInput.value || "").trim();
       if (!username) username = "demo";
@@ -358,6 +368,41 @@
       );
     });
   }
+
+  function mountLocalDemoUnlock() {
+    var existing = form.querySelector("[data-login-demo-unlock]");
+    if (!demoGateOpen()) {
+      if (existing) {
+        var wrap = existing.closest ? existing.closest(".login-demo-unlock") : null;
+        var node = wrap || existing;
+        if (node.parentNode) node.parentNode.removeChild(node);
+      }
+      return;
+    }
+    var btn = existing;
+    if (!btn) {
+      var holder = document.createElement("div");
+      holder.className = "login-demo-unlock";
+      btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-secondary";
+      btn.setAttribute("data-login-demo-unlock", "");
+      btn.textContent = "Demo unlock";
+      var note = document.createElement("p");
+      note.className = "form-hint";
+      note.setAttribute("data-login-demo-chrome", "");
+      note.hidden = true;
+      note.textContent = "Demo — not real auth";
+      holder.appendChild(btn);
+      holder.appendChild(note);
+      var anchor = form.querySelector(".login-demo-storage-hint");
+      if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(holder, anchor);
+      else form.appendChild(holder);
+    }
+    bindDemoUnlock(btn);
+  }
+
+  mountLocalDemoUnlock();
 
   function signInFailureMessage(error) {
     var body = error && error.body;
@@ -559,6 +604,13 @@
       if (demoNote) demoNote.hidden = false;
     }
     var session = readLocalSession();
+    if (session && session.source === "demo" && !demoGateOpen()) {
+      writeLocalSession(null);
+      if (window.CognationDemo && window.CognationDemo.clearUnlock) {
+        window.CognationDemo.clearUnlock();
+      }
+      session = null;
+    }
     if (session && session.source === "demo") {
       if (window.CognationDemo && window.CognationDemo.unlock) {
         window.CognationDemo.unlock();

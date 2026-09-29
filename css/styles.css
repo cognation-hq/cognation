@@ -7312,7 +7312,7 @@ body { padding-top: 0 !important; }
 }
 .tower-post-likes { display: none; }
 
-/* Private feed: button color + see-through author / messages */
+/* Private feed button color (fixed; not a user theme) */
 .tower-private-side {
   --tower-private-btn: #f4a4c4;
 }
@@ -7326,46 +7326,6 @@ body { padding-top: 0 !important; }
 .tower-private-side .btn-secondary:hover,
 .tower-private-side .btn-secondary:focus-visible {
   border-color: var(--tower-private-btn);
-}
-.tower-private-check {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin-top: 0.35rem;
-  font-size: 0.88rem;
-  cursor: pointer;
-}
-.tower-private-side[data-author-see-through="true"] .tower-author {
-  color: color-mix(in srgb, var(--tower-private-text) 42%, transparent);
-  background: transparent;
-  font-weight: 700;
-  text-shadow: none;
-  mix-blend-mode: multiply;
-  opacity: 0.72;
-}
-@supports not (color: color-mix(in srgb, #000 50%, transparent)) {
-  .tower-private-side[data-author-see-through="true"] .tower-author {
-    color: var(--tower-private-text);
-    opacity: 0.45;
-  }
-}
-.tower-private-side[data-messages-see-through="true"] .tower-private-messages {
-  background: color-mix(in srgb, var(--tower-private-bg) 35%, transparent) !important;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border-color: color-mix(in srgb, var(--tower-private-text) 18%, transparent);
-  box-shadow: none;
-}
-.tower-private-side[data-messages-see-through="true"] .tower-private-messages .tower-messages,
-.tower-private-side[data-messages-see-through="true"] .commune-thread,
-.tower-private-side[data-messages-see-through="true"] .commune-conv-list,
-.tower-private-side[data-messages-see-through="true"] .commune-messages {
-  background: transparent !important;
-}
-@supports not (background: color-mix(in srgb, #fff 50%, transparent)) {
-  .tower-private-side[data-messages-see-through="true"] .tower-private-messages {
-    background: rgba(255, 245, 249, 0.35) !important;
-  }
 }
 
 
@@ -7719,23 +7679,6 @@ body { padding-top: 0 !important; }
   box-shadow: 0 4px 16px rgba(74, 44, 58, 0.08);
 }
 
-/* Stronger messages panel see-through when option on */
-.tower-private-side[data-messages-see-through="true"] .tower-private-messages {
-  background: rgba(255, 245, 249, 0.22) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-.tower-private-side[data-messages-see-through="true"] .commune-msg,
-.tower-private-side[data-messages-see-through="true"] .commune-msg--mine {
-  background: rgba(255, 255, 255, 0.28) !important;
-  border-color: rgba(74, 44, 58, 0.12) !important;
-  box-shadow: none !important;
-}
-.tower-private-side[data-messages-see-through="false"] .tower-private-messages {
-  background: rgba(255, 245, 249, 0.96);
-}
-
-
 /* —— Dual profiles: login picker —— */
 .login-profile-picker {
   margin-top: 0.5rem;
@@ -7948,13 +7891,6 @@ body { padding-top: 0 !important; }
   font-size: 0.75rem;
   color: color-mix(in srgb, #4a2c3a 60%, transparent);
 }
-
-.tower-private-side[data-messages-see-through="true"] .tower-friends-browse {
-  background: rgba(255, 245, 249, 0.22) !important;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
 
 /* ===== TOWER calendar (private My feed + public scrapbook widget) ===== */
 .tower-private-calendar .tower-cal--private {

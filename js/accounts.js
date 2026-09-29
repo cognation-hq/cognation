@@ -94,6 +94,15 @@
     var doc = readJson(PROFILES_KEY, null);
     if (!doc || typeof doc !== "object") doc = { profiles: {} };
     if (!doc.profiles || typeof doc.profiles !== "object") doc.profiles = {};
+    var stripped = false;
+    Object.keys(doc.profiles).forEach(function (id) {
+      var rec = doc.profiles[id];
+      if (rec && Object.prototype.hasOwnProperty.call(rec, "privateFeedTheme")) {
+        delete rec.privateFeedTheme;
+        stripped = true;
+      }
+    });
+    if (stripped) saveProfilesDoc(doc);
     return doc;
   }
 
@@ -136,7 +145,6 @@
       publicButtonColor: "#f4a4c4",
       backgroundMode: "solid",
       backgroundHtml: "",
-      privateFeedTheme: null,
     };
   }
 
@@ -192,7 +200,6 @@
       publicButtonColor: "#64748b",
       backgroundMode: "solid",
       backgroundHtml: "",
-      privateFeedTheme: null,
     };
   }
 
@@ -314,6 +321,9 @@
   }
 
   function saveProfileRecord(rec) {
+    if (rec && Object.prototype.hasOwnProperty.call(rec, "privateFeedTheme")) {
+      delete rec.privateFeedTheme;
+    }
     var doc = loadProfilesDoc();
     rec.updatedAt = Date.now();
     doc.profiles[rec.id] = rec;
@@ -388,9 +398,11 @@
     var rec = getProfileById(id);
     if (!rec) return { ok: false, error: "Profile not found." };
     var merged = mergeTowerFields(stripMeta(rec), towerFields || {});
+    delete merged.privateFeedTheme;
     Object.keys(merged).forEach(function (k) {
       rec[k] = merged[k];
     });
+    delete rec.privateFeedTheme;
     if (towerFields && towerFields.handle != null) {
       var h = normalizeHandle(towerFields.handle);
       var clash = getProfileByHandle(h);
@@ -407,7 +419,14 @@
     try {
       var raw = localStorage.getItem(LEGACY_PROFILE_KEY);
       if (!raw) return null;
-      return JSON.parse(raw);
+      var parsed = JSON.parse(raw);
+      if (parsed && Object.prototype.hasOwnProperty.call(parsed, "privateFeedTheme")) {
+        delete parsed.privateFeedTheme;
+        try {
+          localStorage.setItem(LEGACY_PROFILE_KEY, JSON.stringify(parsed));
+        } catch (e2) {}
+      }
+      return parsed;
     } catch (e) {
       return null;
     }

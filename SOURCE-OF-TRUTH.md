@@ -32,14 +32,14 @@ The Supabase URL and publishable key are not stored in this repository. Cloudfla
 
 Public builds do not embed `EXPECTED_PASS` or `DEMO_OTP`.
 
-The public sign-in gate does not show a Demo unlock button, link, or other control. Live Pages (`*.pages.dev`, including `cognation-3md.pages.dev`) ignore `?demo=1`, `window.__COGNATION_DEMO__`, and any stored `cognation.demo.unlock.v1` flag. A saved demo session cannot skip sign-in on the product site.
+Public Cognation pages, including sign-in and WELL, do not show a preview-open button, link, or other control, and they do not include that label in the shipped HTML. Live Pages (`*.pages.dev`, including `cognation-3md.pages.dev`) ignore `?demo=1`, `window.__COGNATION_DEMO__`, and any stored `cognation.demo.unlock.v1` flag. A saved preview session cannot skip sign-in, and it cannot open the WELL chart.
 
 Local preview only, and never on live Pages:
 
 - Loopback (`localhost`, `127.0.0.1`, `::1`) or `file://`, or
 - `COGNATION_LOCAL_DEMO=1` on a host that is not live Pages. `/runtime-config` exposes that as `CognationConfig.localDemo`. Live Pages ignores the flag even if the env var is set.
 
-On that local gate, `?demo=1` or the local Demo unlock control sets `sessionStorage` key `cognation.demo.unlock.v1`. The site banner then reads **Demo — not real auth**.
+On that local gate, `?demo=1` sets `sessionStorage` key `cognation.demo.unlock.v1`. The site banner then reads **Demo — not real auth**. That banner is not shown on live Pages.
 
-- WELL shows **Demo EHR — not HIPAA**. Any one-time code is generated in the browser after its own chart unlock. It is not a default in the source, and it does not bypass Cognation sign-in on live Pages.
+- WELL stays locked on live Pages. On the local gate, an already-open local preview can show the chart. Any one-time code is generated in the browser after that. It is not a default in the source, and it does not bypass Cognation sign-in on live Pages.
 - `window.__COGNATION_DEMO__` stays unset for production.

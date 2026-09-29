@@ -1,11 +1,12 @@
 /**
- * WELL local preview lock.
+ * WELL chart lock.
  *
  * Not clinical sign-in. No shared password or one-time code ships in this file.
- * Unlock is the Demo unlock control. A one-time code is generated after unlock.
- * Session: sessionStorage cognation.well.auth.v1 (clears on tab close).
+ * The public site has no chart-open control. A local preview can open the chart
+ * only when CognationDemo.localGateOpen() is true (loopback or COGNATION_LOCAL_DEMO
+ * off live Pages). Session: sessionStorage cognation.well.auth.v1 (clears on tab close).
  *
- * Demo EHR — not HIPAA. Not a real EHR. No PHI leaves the browser.
+ * Not a clinical record. Not HIPAA. Not a real EHR. No PHI leaves the browser.
  */
 (function () {
   "use strict";
@@ -80,12 +81,29 @@
     el.textContent = "Runtime code " + code;
   }
 
+  function localChartGate() {
+    return !!(
+      window.CognationDemo &&
+      typeof window.CognationDemo.localGateOpen === "function" &&
+      window.CognationDemo.localGateOpen()
+    );
+  }
+
   function showDemoChrome(root) {
+    if (!localChartGate()) return;
     if (window.CognationDemo && window.CognationDemo.ensureChrome) {
       window.CognationDemo.ensureChrome();
     }
     var note = $("[data-well-demo-chrome]", root);
     if (note) note.hidden = false;
+  }
+
+  function scrubPublicUnlock(root) {
+    $all("[data-well-demo-unlock], [data-well-demo-chrome]", root).forEach(function (node) {
+      var wrap = node.closest && node.closest(".well-auth-actions");
+      var target = wrap && wrap !== node ? wrap : node;
+      if (target.parentNode) target.parentNode.removeChild(target);
+    });
   }
 
   function setLockedUi(root, locked) {
@@ -138,35 +156,36 @@
     }
 
     if (!locked) showDemoChrome(root);
-    if (locked) {
-      showRuntimeCode(root, "");
-      window.setTimeout(function () {
-        var unlockBtn = $("[data-well-demo-unlock]", root);
-        if (unlockBtn) unlockBtn.focus();
-      }, 30);
-    }
+    if (locked) showRuntimeCode(root, "");
   }
 
   function unlock(root, username) {
+    if (!localChartGate()) {
+      writeSession(null);
+      setLockedUi(root, true);
+      setStatus(root, "Chart preview is not available on this site.", true);
+      return false;
+    }
     if (window.CognationDemo && window.CognationDemo.unlock) {
       window.CognationDemo.unlock();
     }
     var code = runtimeCode();
     writeSession({
       ok: true,
-      user: username || "demo",
+      user: username || "local",
       at: Date.now(),
-      factor: "demo-unlock",
+      factor: "local-gate",
       runtimeCode: code,
-      note: "Demo EHR — not HIPAA",
+      note: "Not a clinical record — not HIPAA",
     });
     showRuntimeCode(root, code);
     setLockedUi(root, false);
     document.dispatchEvent(
       new CustomEvent("cognation:well-auth", {
-        detail: { unlocked: true, user: username || "demo", demo: true },
+        detail: { unlocked: true, user: username || "local", demo: true },
       })
     );
+    return true;
   }
 
   function lock(root, opts) {
@@ -189,6 +208,11 @@
   function ensureGate(root) {
     root = root || $("[data-well-app]");
     if (!root) return isAuthenticated();
+    if (!localChartGate()) {
+      writeSession(null);
+      setLockedUi(root, true);
+      return false;
+    }
     if (isAuthenticated()) {
       var existing = readSession();
       setLockedUi(root, false);
@@ -199,8 +223,21 @@
     return false;
   }
 
+  function openLocalPreview(root) {
+    if (
+      localChartGate() &&
+      window.CognationDemo &&
+      window.CognationDemo.isUnlocked &&
+      window.CognationDemo.isUnlocked()
+    ) {
+      return unlock(root, "local");
+    }
+    return false;
+  }
+
   function onWellPanelShown() {
     $all("[data-well-app]").forEach(function (root) {
+      if (openLocalPreview(root)) return;
       ensureGate(root);
     });
   }
@@ -209,26 +246,21 @@
     if (!root || root.__wellAuthWired) return;
     root.__wellAuthWired = true;
 
-    var unlockBtn = $("[data-well-demo-unlock]", root);
+    scrubPublicUnlock(root);
     var lockBtn = $("[data-well-lock-btn]", root);
-
-    if (unlockBtn) {
-      unlockBtn.addEventListener("click", function () {
-        unlock(root, "demo");
-        setStatus(root, "");
-      });
-    }
 
     if (lockBtn) {
       lockBtn.addEventListener("click", function () {
-        lock(root, { message: "WELL locked. Use Demo unlock to open the local chart preview." });
+        lock(root, { message: "WELL is locked." });
       });
     }
   }
 
   function boot() {
+    if (!localChartGate()) writeSession(null);
     $all("[data-well-app]").forEach(function (root) {
       wireRoot(root);
+      if (openLocalPreview(root)) return;
       ensureGate(root);
     });
 
@@ -246,7 +278,8 @@
     },
     unlockSession: function (username) {
       var root = $("[data-well-app]");
-      if (root) unlock(root, username || "demo");
+      if (!root || !localChartGate()) return false;
+      return unlock(root, username || "local");
     },
     onWellPanelShown: onWellPanelShown,
     getSession: readSession,

@@ -254,6 +254,15 @@
           window.CognationSupabase.configured()
         ) {
           setStatus("Creating your Cognation account…", false);
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.setAttribute("aria-busy", "true");
+          }
+          function releaseSignup() {
+            if (!submitBtn) return;
+            submitBtn.disabled = false;
+            submitBtn.setAttribute("aria-busy", "false");
+          }
           window.CognationSupabase
             .signUp({
               email: profile.email,
@@ -274,7 +283,11 @@
               );
               return null;
             })
+            .then(function () {
+              releaseSignup();
+            })
             .catch(function (error) {
+              releaseSignup();
               setStatus(
                 (error && error.message) || "Could not create your account. Please try again.",
                 true

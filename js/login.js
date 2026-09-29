@@ -39,6 +39,8 @@
   var pendingUsername = null;
   var pendingProfiles = null;
   var pendingAuth = null;
+  var submitBtn = form.querySelector("[data-login-submit]");
+  var submitGeneration = 0;
 
   function setStatus(message, isError) {
     if (!statusEl) return;
@@ -46,6 +48,26 @@
     statusEl.textContent = message || "";
     statusEl.classList.toggle("is-error", !!isError);
     statusEl.setAttribute("role", message ? "status" : "none");
+  }
+
+  function setSubmitBusy(busy) {
+    if (!submitBtn) return;
+    if (busy) {
+      if (!submitBtn.getAttribute("data-login-idle-label")) {
+        submitBtn.setAttribute("data-login-idle-label", submitBtn.textContent || "Sign in");
+      }
+      submitBtn.disabled = true;
+      submitBtn.setAttribute("aria-busy", "true");
+      submitBtn.textContent = "Signing in…";
+      return;
+    }
+    submitBtn.disabled = false;
+    submitBtn.setAttribute("aria-busy", "false");
+    var idle = submitBtn.getAttribute("data-login-idle-label");
+    if (idle) {
+      submitBtn.textContent = idle;
+      submitBtn.removeAttribute("data-login-idle-label");
+    }
   }
 
   function readLocalSession() {
@@ -219,6 +241,9 @@
 
   function establishSession(username, profile, auth) {
     loggingOut = false;
+    /* Drop any in-flight splash restore so a late getUser or the 12s timeout
+       cannot wipe this session and pop the gate back open. */
+    authBootGeneration += 1;
     var session = buildSession(username, profile, auth);
     writeLocalSession(session);
     if (window.CognationDemo && window.CognationDemo.syncChrome) {
@@ -272,6 +297,87 @@
     });
   }
 
+  function applyProfileFields(session, profile) {
+    session.activeProfileId = profile.id;
+    session.profileKind = profile.kind === "professional" ? "professional" : "personal";
+    session.profileHandle = profile.handle || "";
+    session.profileDisplayName = profile.displayName || "";
+    writeLocalSession(session);
+    document.dispatchEvent(
+      new CustomEvent("cognation:active-profile-changed", {
+        detail: { profileId: profile.id, kind: session.profileKind },
+      })
+    );
+  }
+
+  /* If profile loading is slow, still enter the app. When the rows arrive,
+     attach a single profile without sending the member back to the splash. */
+  function adoptLateProfiles(auth) {
+    if (loggingOut) return;
+    var session = readLocalSession();
+    if (!session || session.source !== "supabase") return;
+    if (
+      auth.supabaseUserId &&
+      session.supabaseUserId &&
+      session.supabaseUserId !== auth.supabaseUserId
+    ) {
+      return;
+    }
+    var profiles = auth.profiles || [];
+    if (!profiles.length || session.activeProfileId) return;
+    if (profiles.length === 1) {
+      applyProfileFields(session, profiles[0]);
+      return;
+    }
+    pendingAuth = {
+      source: auth.source,
+      supabaseUserId: auth.supabaseUserId,
+    };
+    showPickerStep(auth.username, profiles);
+    gate.hidden = false;
+    gate.setAttribute("aria-hidden", "false");
+    document.body.classList.add("login-gate-open");
+  }
+
+  function finishRemoteLogin(user, username) {
+    var authResult = {
+      username: user.email || username,
+      profiles: [],
+      source: "supabase",
+      supabaseUserId: user.id,
+    };
+    var settled = false;
+    function withProfiles(profiles) {
+      authResult.profiles = profiles || [];
+      if (settled) adoptLateProfiles(authResult);
+      return authResult;
+    }
+    var pending = loadSupabaseProfiles(user).then(withProfiles, function () {
+      return withProfiles([]);
+    });
+    return new Promise(function (resolve) {
+      var timer = window.setTimeout(function () {
+        if (settled) return;
+        settled = true;
+        resolve(authResult);
+      }, 4000);
+      pending.then(
+        function (result) {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timer);
+          resolve(result);
+        },
+        function () {
+          if (settled) return;
+          settled = true;
+          window.clearTimeout(timer);
+          resolve(authResult);
+        }
+      );
+    });
+  }
+
   function finishWithProfileChoice(username, profiles, auth) {
     profiles = profiles || [];
     if (profiles.length <= 1) {
@@ -308,16 +414,9 @@
         return Promise.reject(new Error("Enter the email address for your Cognation account."));
       }
       return window.CognationSupabase.signIn(username, password).then(function (result) {
-        var user = result && result.user;
-        if (!user) throw new Error("bad credentials");
-        return loadSupabaseProfiles(user).then(function (profiles) {
-          return {
-            username: user.email || username,
-            profiles: profiles,
-            source: "supabase",
-            supabaseUserId: user.id,
-          };
-        });
+        var user = result && (result.user || (result.session && result.session.user));
+        if (!user || !user.id) throw new Error("Wrong email or password.");
+        return finishRemoteLogin(user, username);
       });
     }
     return Promise.reject(new Error("Cognation sign-in is not configured."));
@@ -326,6 +425,8 @@
   function logout(opts) {
     opts = opts || {};
     var message = opts.message || "Signed out. Sign in to continue.";
+    submitGeneration += 1;
+    setSubmitBusy(false);
     loggingOut = true;
     /* Start revocation while the access token is still stored, then drop
        every local session immediately so a hung signOut cannot keep the app open. */
@@ -413,29 +514,57 @@
 
   form.addEventListener("submit", function (e) {
     e.preventDefault();
+    if (submitBtn && submitBtn.disabled) return;
     var userInput = form.querySelector('input[name="username"]');
     var passInput = form.querySelector('input[name="password"]');
     var countryInput = form.querySelector('select[name="country"]');
     var username = userInput ? userInput.value.trim() : "";
     var password = passInput ? passInput.value : "";
     var country = countryInput ? countryInput.value : "United States";
+    var generation = ++submitGeneration;
+    setSubmitBusy(true);
     setStatus("Signing in…", false);
+    var released = false;
+    function releaseSubmit() {
+      if (released || generation !== submitGeneration) return;
+      released = true;
+      setSubmitBusy(false);
+    }
+    var slowTimer = window.setTimeout(function () {
+      if (generation !== submitGeneration) return;
+      releaseSubmit();
+      if (!gate.hidden) {
+        setStatus("Sign-in is taking too long. You can try again.", true);
+      }
+    }, 15000);
     login(username, password).then(
       function (result) {
-        try {
-          localStorage.setItem("cognation.member.country.v1", country || "United States");
-        } catch (err) {}
-        if (window.CognationMemberCountry) {
-          window.CognationMemberCountry.set(country || "United States");
+        window.clearTimeout(slowTimer);
+        if (generation !== submitGeneration || loggingOut) {
+          releaseSubmit();
+          return;
         }
-        setStatus("");
-        finishWithProfileChoice(result.username, result.profiles, result);
+        try {
+          try {
+            localStorage.setItem("cognation.member.country.v1", country || "United States");
+          } catch (err) {}
+          if (window.CognationMemberCountry) {
+            window.CognationMemberCountry.set(country || "United States");
+          }
+          setStatus("");
+          finishWithProfileChoice(result.username, result.profiles, result);
+        } finally {
+          releaseSubmit();
+        }
       },
       function (error) {
+        window.clearTimeout(slowTimer);
+        if (generation !== submitGeneration) return;
         setStatus(
           (error && error.message) || "Wrong email or password.",
           true
         );
+        releaseSubmit();
       }
     );
   });
@@ -661,7 +790,10 @@
         window.CognationSupabase
           .getUser()
           .then(function (user) {
-            if (loggingOut) return;
+            if (loggingOut) {
+              claimRemoteBoot();
+              return;
+            }
             if (!user || !user.id) throw new Error("Session expired.");
             if (!claimRemoteBoot()) return;
             session.supabaseUserId = user.id;

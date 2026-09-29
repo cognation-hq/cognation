@@ -56,8 +56,26 @@
     } catch (e) {}
   }
 
+  function errorText(body, fallback) {
+    if (!body) return fallback;
+    if (typeof body === "string" && body) return body;
+    return body.error_description || body.msg || body.message || body.error_code || fallback;
+  }
+
   function refreshSession(session) {
     var cfg = readConfig();
+    var controller = typeof AbortController === "function" ? new AbortController() : null;
+    var timer = null;
+    if (controller && typeof setTimeout === "function") {
+      timer = setTimeout(function () {
+        try {
+          controller.abort();
+        } catch (e) {}
+      }, 8000);
+    }
+    function stopTimer() {
+      if (timer != null && typeof clearTimeout === "function") clearTimeout(timer);
+    }
     return fetch(cfg.url + "/auth/v1/token?grant_type=refresh_token", {
       method: "POST",
       headers: {
@@ -65,27 +83,33 @@
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ refresh_token: session.refresh_token }),
-    }).then(function (response) {
-      return response.text().then(function (text) {
-        var body = null;
-        try {
-          body = text ? JSON.parse(text) : null;
-        } catch (e) {
-          body = null;
-        }
-        if (!response.ok || !body || !body.access_token) {
-          var error = new Error(
-            (body && (body.error_description || body.msg || body.message)) || "Session refresh failed."
-          );
-          error.status = response.status;
-          error.body = body;
-          throw error;
-        }
-        stampExpiry(body);
-        writeSession(body);
-        return body;
-      });
-    });
+      signal: controller ? controller.signal : undefined,
+    }).then(
+      function (response) {
+        stopTimer();
+        return response.text().then(function (text) {
+          var body = null;
+          try {
+            body = text ? JSON.parse(text) : null;
+          } catch (e) {
+            body = null;
+          }
+          if (!response.ok || !body || !body.access_token) {
+            var error = new Error(errorText(body, "Session refresh failed."));
+            error.status = response.status;
+            error.body = body;
+            throw error;
+          }
+          stampExpiry(body);
+          writeSession(body);
+          return body;
+        });
+      },
+      function (error) {
+        stopTimer();
+        throw error;
+      }
+    );
   }
 
   /* One refresh in flight. Supabase rotates refresh tokens; parallel callers
@@ -131,7 +155,7 @@
       },
       options.headers || {}
     );
-    if (session && session.access_token) {
+    if (!options.omitAuth && session && session.access_token) {
       headers.Authorization = "Bearer " + session.access_token;
     }
     var fetchOptions = {
@@ -139,6 +163,8 @@
       headers: headers,
     };
     if (options.body != null) fetchOptions.body = options.body;
+    if (options.keepalive) fetchOptions.keepalive = true;
+    if (options.signal) fetchOptions.signal = options.signal;
     return fetch(cfg.url + path, fetchOptions).then(function (response) {
       return response.text().then(function (text) {
         var body = null;
@@ -148,7 +174,7 @@
           body = text;
         }
         if (!response.ok) {
-          var error = new Error((body && body.message) || "Supabase request failed.");
+          var error = new Error(errorText(body, "Supabase request failed."));
           error.status = response.status;
           error.body = body;
           throw error;
@@ -162,6 +188,7 @@
     fields = fields || {};
     return request("/auth/v1/signup", {
       method: "POST",
+      skipAuthRefresh: true,
       body: JSON.stringify({
         email: fields.email,
         password: fields.password,
@@ -178,8 +205,12 @@
   }
 
   function signIn(email, password) {
+    /* Password grant must not wait on a stuck refresh or send an expired bearer.
+       Otherwise the Sign in button stays on "Signing in…" until a hard reload. */
     return request("/auth/v1/token?grant_type=password", {
       method: "POST",
+      skipAuthRefresh: true,
+      omitAuth: true,
       body: JSON.stringify({ email: email, password: password }),
     }).then(function (result) {
       if (result && result.access_token) writeSession(stampExpiry(result));
@@ -190,7 +221,11 @@
   function signOut() {
     var existing = readSession();
     var token = existing && existing.access_token;
-    return request("/auth/v1/logout", { method: "POST", keepalive: true }).finally(function () {
+    return request("/auth/v1/logout", {
+      method: "POST",
+      keepalive: true,
+      skipAuthRefresh: true,
+    }).finally(function () {
       var current = readSession();
       if (!current || !token || current.access_token === token) writeSession(null);
     });

@@ -177,39 +177,51 @@ function assert(cond, msg) {
   if (!cond) throw new Error(msg);
 }
 
-const page = bootPage();
-assert(page.fetches.length === 1, "boot should be waiting on getUser");
-assert(page.gate.hidden === true, "gate stays closed until auth resolves");
-assert(page.sessionStorage.getItem("cognation.demo.unlock.v1") === "1", "demo query armed unlock");
+function tick() {
+  return new Promise(function (resolve) {
+    setTimeout(resolve, 0);
+  });
+}
 
-const logoutResult = page.sandbox.CognationAuth.logout({
-  message: "Signed out. Sign in to continue.",
+async function main() {
+  const page = bootPage();
+  await tick();
+  assert(page.fetches.length === 1, "boot should be waiting on getUser");
+  assert(page.gate.hidden === true, "gate stays closed until auth resolves");
+  assert(page.sessionStorage.getItem("cognation.demo.unlock.v1") === "1", "demo query armed unlock");
+
+  const logoutResult = page.sandbox.CognationAuth.logout({
+    message: "Signed out. Sign in to continue.",
+  });
+  assert(logoutResult && typeof logoutResult.then === "function", "logout returns a promise");
+  assert(page.localStorage.getItem("cognation.session.v2") == null, "app session cleared without waiting for signOut");
+  assert(page.localStorage.getItem("cognation.supabase.session.v1") == null, "supabase session cleared without waiting for signOut");
+  assert(page.sessionStorage.getItem("cognation.demo.unlock.v1") == null, "demo unlock cleared");
+  assert(page.gate.hidden === false, "sign-on gate is open");
+  assert(page.gate.attrs["aria-hidden"] === "false", "sign-on gate is exposed");
+  assert(page.replaced.length === 1 && page.replaced[0] === "/", "logout replaces the page with the splash path");
+  await tick();
+  assert(page.fetches.length === 2, "signOut was started");
+
+  const responseText = JSON.stringify({ id: "user-1" });
+  page.fetches[0]({
+    ok: true,
+    text: function () {
+      return Promise.resolve(responseText);
+    },
+  });
+
+  await new Promise(function (resolve) {
+    setTimeout(resolve, 30);
+  });
+  assert(page.localStorage.getItem("cognation.session.v2") == null, "late getUser must not restore the session");
+  assert(page.gate.hidden === false, "late getUser must not close the sign-on gate");
+  assert(page.sandbox.CognationAuth.isAuthenticated() === false, "logged-out session is not authenticated");
+  console.log("ok: logout clears sessions and opens the splash even when signOut hangs");
+  process.exit(0);
+}
+
+main().catch(function (error) {
+  console.error(error && error.stack ? error.stack : error);
+  process.exit(1);
 });
-assert(logoutResult && typeof logoutResult.then === "function", "logout returns a promise");
-assert(page.localStorage.getItem("cognation.session.v2") == null, "app session cleared without waiting for signOut");
-assert(page.localStorage.getItem("cognation.supabase.session.v1") == null, "supabase session cleared without waiting for signOut");
-assert(page.sessionStorage.getItem("cognation.demo.unlock.v1") == null, "demo unlock cleared");
-assert(page.gate.hidden === false, "sign-on gate is open");
-assert(page.gate.attrs["aria-hidden"] === "false", "sign-on gate is exposed");
-assert(page.replaced.length === 1 && page.replaced[0] === "/", "logout replaces the page with the splash path");
-assert(page.fetches.length === 2, "signOut was started");
-
-const responseText = JSON.stringify({ id: "user-1" });
-page.fetches[0]({
-  ok: true,
-  text: function () {
-    return Promise.resolve(responseText);
-  },
-});
-
-setTimeout(function () {
-  try {
-    assert(page.localStorage.getItem("cognation.session.v2") == null, "late getUser must not restore the session");
-    assert(page.gate.hidden === false, "late getUser must not close the sign-on gate");
-    assert(page.sandbox.CognationAuth.isAuthenticated() === false, "logged-out session is not authenticated");
-    console.log("ok: logout clears sessions and opens the splash even when signOut hangs");
-  } catch (error) {
-    console.error(error && error.stack ? error.stack : error);
-    process.exit(1);
-  }
-}, 30);

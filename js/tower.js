@@ -111,15 +111,6 @@
   }
 
   var TOWER_SIDE_KEY = "cognation.tower.side";
-  var DEFAULT_PRIVATE_FEED_THEME = {
-    backgroundColor: "#fff5f9",
-    fontFamily: "georgia",
-    fontSize: 16,
-    textColor: "#4a2c3a",
-    buttonColor: "#f4a4c4",
-    authorSeeThrough: true,
-    messagesSeeThrough: true,
-  };
 
   var COLLAGE_LAYOUTS = {
     none: { cells: 0 },
@@ -412,7 +403,6 @@
       publicButtonColor: "#f4a4c4",
       backgroundMode: "solid",
       backgroundHtml: "",
-      privateFeedTheme: JSON.parse(JSON.stringify(DEFAULT_PRIVATE_FEED_THEME)),
       calendarEvents: null,
       calendarIcsUrl: "",
       calendarGoogleConnected: false,
@@ -536,7 +526,11 @@
       else p.backgroundHtml = sanitizeProfileHtml(String(p.backgroundHtml).slice(0, 8000));
       if (typeof p.slogan !== "string") p.slogan = p.slogan ? String(p.slogan) : "";
       else p.slogan = String(p.slogan).slice(0, 400);
-      p.privateFeedTheme = normalizePrivateFeedTheme(p.privateFeedTheme);
+      var strippedPrivateFeedTheme = false;
+      if (p && Object.prototype.hasOwnProperty.call(p, "privateFeedTheme")) {
+        delete p.privateFeedTheme;
+        strippedPrivateFeedTheme = true;
+      }
       var before = p.awardedBadges;
       var beforeLen = Array.isArray(before) ? before.length : -1;
       var beforeVis = p.badgeVisibility;
@@ -544,7 +538,7 @@
       var calSeeded = seedCalendarEventsIfMissing(p);
       var visMig = normalizeBadgeVisibility(p);
       var afterLen = Array.isArray(p.awardedBadges) ? p.awardedBadges.length : -1;
-      if (created || before == null || afterLen > beforeLen || beforeVis == null || visMig.migrated || calSeeded) {
+      if (created || strippedPrivateFeedTheme || before == null || afterLen > beforeLen || beforeVis == null || visMig.migrated || calSeeded) {
         try {
           this.save(p);
         } catch (e) {}
@@ -571,8 +565,10 @@
         }
       }
       var towerBlob = {};
+      delete data.privateFeedTheme;
       Object.keys(data).forEach(function (k) {
         if (k.charAt(0) === "_") return;
+        if (k === "privateFeedTheme") return;
         towerBlob[k] = data[k];
       });
       if (id && window.CognationAccounts && typeof window.CognationAccounts.updateProfileTower === "function") {
@@ -1010,12 +1006,6 @@
     return DEFAULT_FEED_BG;
   }
 
-  function normalizePrivateFontSize(n) {
-    var v = parseInt(n, 10);
-    if ([14, 16, 18, 20].indexOf(v) === -1) return 16;
-    return v;
-  }
-
   function normalizePublicThemeColor(raw, fallback) {
     var fb = fallback || "#4a2c3a";
     var s = String(raw || "").trim();
@@ -1035,34 +1025,6 @@
       return "collage";
     }
     return "solid";
-  }
-
-  function normalizePrivateFeedTheme(raw) {
-    var t = raw && typeof raw === "object" ? raw : {};
-    return {
-      backgroundColor: normalizeFeedBgColor(t.backgroundColor || DEFAULT_PRIVATE_FEED_THEME.backgroundColor),
-      fontFamily: normalizeTowerFont(t.fontFamily || DEFAULT_PRIVATE_FEED_THEME.fontFamily),
-      fontSize: normalizePrivateFontSize(t.fontSize != null ? t.fontSize : DEFAULT_PRIVATE_FEED_THEME.fontSize),
-      textColor: (function () {
-        var rawC = t.textColor || DEFAULT_PRIVATE_FEED_THEME.textColor;
-        var c = normalizeFeedBgColor(rawC);
-        /* normalizeFeedBgColor falls back to pink feed bg — keep private text dark */
-        if (c === DEFAULT_FEED_BG && String(rawC || "").toLowerCase() !== DEFAULT_FEED_BG) {
-          return DEFAULT_PRIVATE_FEED_THEME.textColor;
-        }
-        return c;
-      })(),
-      buttonColor: (function () {
-        var rawB = t.buttonColor || DEFAULT_PRIVATE_FEED_THEME.buttonColor;
-        var c = normalizeFeedBgColor(rawB);
-        if (c === DEFAULT_FEED_BG && String(rawB || "").toLowerCase() !== DEFAULT_FEED_BG) {
-          return DEFAULT_PRIVATE_FEED_THEME.buttonColor;
-        }
-        return c;
-      })(),
-      authorSeeThrough: t.authorSeeThrough !== false,
-      messagesSeeThrough: t.messagesSeeThrough !== false,
-    };
   }
 
   function getSessionUsername() {
@@ -1169,54 +1131,6 @@
     return !!(hash && hash.indexOf("tower-profile-") === 0);
   }
 
-  function applyPrivateFeedTheme(root, theme) {
-    theme = normalizePrivateFeedTheme(theme);
-    var privateSide = root.querySelector("[data-tower-private-side]");
-    if (!privateSide) return;
-    var fontStack = TOWER_FONT_MAP[theme.fontFamily] || TOWER_FONT_MAP.georgia;
-    privateSide.style.setProperty("--tower-private-bg", theme.backgroundColor);
-    privateSide.style.setProperty("--tower-private-font", fontStack);
-    privateSide.style.setProperty("--tower-private-font-size", theme.fontSize + "px");
-    privateSide.style.setProperty("--tower-private-text", theme.textColor);
-    privateSide.style.setProperty("--tower-private-btn", theme.buttonColor);
-    privateSide.setAttribute("data-tower-private-font", theme.fontFamily);
-    privateSide.setAttribute("data-author-see-through", theme.authorSeeThrough ? "true" : "false");
-    privateSide.setAttribute("data-messages-see-through", theme.messagesSeeThrough ? "true" : "false");
-    var bgIn = root.querySelector("[data-tower-private-bg]");
-    var fontIn = root.querySelector("[data-tower-private-font]");
-    var sizeIn = root.querySelector("[data-tower-private-font-size]");
-    var textIn = root.querySelector("[data-tower-private-text]");
-    var btnIn = root.querySelector("[data-tower-private-btn]");
-    var authorSee = root.querySelector("[data-tower-private-author-see-through]");
-    var msgSee = root.querySelector("[data-tower-private-messages-see-through]");
-    if (bgIn && document.activeElement !== bgIn) bgIn.value = theme.backgroundColor;
-    if (fontIn && document.activeElement !== fontIn) fontIn.value = theme.fontFamily;
-    if (sizeIn && document.activeElement !== sizeIn) sizeIn.value = String(theme.fontSize);
-    if (textIn && document.activeElement !== textIn) textIn.value = theme.textColor;
-    if (btnIn && document.activeElement !== btnIn) btnIn.value = theme.buttonColor;
-    if (authorSee) authorSee.checked = !!theme.authorSeeThrough;
-    if (msgSee) msgSee.checked = !!theme.messagesSeeThrough;
-  }
-
-  function readPrivateFeedThemeFromForm(root) {
-    var bgIn = root.querySelector("[data-tower-private-bg]");
-    var fontIn = root.querySelector("[data-tower-private-font]");
-    var sizeIn = root.querySelector("[data-tower-private-font-size]");
-    var textIn = root.querySelector("[data-tower-private-text]");
-    var btnIn = root.querySelector("[data-tower-private-btn]");
-    var authorSee = root.querySelector("[data-tower-private-author-see-through]");
-    var msgSee = root.querySelector("[data-tower-private-messages-see-through]");
-    return normalizePrivateFeedTheme({
-      backgroundColor: bgIn ? bgIn.value : DEFAULT_PRIVATE_FEED_THEME.backgroundColor,
-      fontFamily: fontIn ? fontIn.value : DEFAULT_PRIVATE_FEED_THEME.fontFamily,
-      fontSize: sizeIn ? sizeIn.value : DEFAULT_PRIVATE_FEED_THEME.fontSize,
-      textColor: textIn ? textIn.value : DEFAULT_PRIVATE_FEED_THEME.textColor,
-      buttonColor: btnIn ? btnIn.value : DEFAULT_PRIVATE_FEED_THEME.buttonColor,
-      authorSeeThrough: authorSee ? !!authorSee.checked : true,
-      messagesSeeThrough: msgSee ? !!msgSee.checked : true,
-    });
-  }
-
   function syncPublicUrlFields(root, profile) {
     var url = profilePublicUrl(profile);
     root.querySelectorAll("[data-tower-public-url], [data-tower-public-url-preview]").forEach(function (el) {
@@ -1308,40 +1222,6 @@
       applyTowerSide(root, side);
       syncPublicUrlFields(root, TowerProfileStore.get());
     });
-  }
-
-  function initPrivateFeedThemeControls(root) {
-    if (!root || root.__cognationPrivateThemeBound) return;
-    root.__cognationPrivateThemeBound = true;
-    var saveBtn = root.querySelector("[data-tower-private-theme-save]");
-    var status = root.querySelector("[data-tower-private-theme-status]");
-    function setStatus(msg, isError) {
-      if (!status) return;
-      status.hidden = !msg;
-      status.textContent = msg || "";
-      status.classList.toggle("is-error", !!isError);
-    }
-    function livePreview() {
-      applyPrivateFeedTheme(root, readPrivateFeedThemeFromForm(root));
-    }
-    ["data-tower-private-bg", "data-tower-private-font", "data-tower-private-font-size", "data-tower-private-text", "data-tower-private-btn", "data-tower-private-author-see-through", "data-tower-private-messages-see-through"].forEach(function (sel) {
-      var el = root.querySelector("[" + sel + "]");
-      if (!el) return;
-      el.addEventListener("input", livePreview);
-      el.addEventListener("change", livePreview);
-    });
-    if (saveBtn) {
-      saveBtn.addEventListener("click", function () {
-        var p = TowerProfileStore.get();
-        p.privateFeedTheme = readPrivateFeedThemeFromForm(root);
-        if (!TowerProfileStore.save(p)) {
-          setStatus("Could not save feed look.", true);
-          return;
-        }
-        applyPrivateFeedTheme(root, p.privateFeedTheme);
-        setStatus("Feed look saved (private only).", false);
-      });
-    }
   }
 
   function initPublicUrlCopy(root) {
@@ -5760,7 +5640,6 @@
     initAvatarFrameResize(root);
     initDisplayNameResize(root);
     applyTowerTheme(root, p);
-    applyPrivateFeedTheme(root, p.privateFeedTheme);
     syncPublicUrlFields(root, p);
     try { syncProfileKindToggle(root); } catch (eKind) {}
     try { syncAddProfileUi(root); } catch (eAdd) {}
@@ -5799,7 +5678,6 @@
     initPublicLookControls(root);
     initProfileEditDropdown(root);
     initTowerSideToggle(root);
-    initPrivateFeedThemeControls(root);
     initPublicUrlCopy(root);
     initRotateToolbar(root);
     initProfileKindToggle(root);

@@ -188,8 +188,11 @@
   }
 
   function signOut() {
-    return request("/auth/v1/logout", { method: "POST" }).finally(function () {
-      writeSession(null);
+    var existing = readSession();
+    var token = existing && existing.access_token;
+    return request("/auth/v1/logout", { method: "POST", keepalive: true }).finally(function () {
+      var current = readSession();
+      if (!current || !token || current.access_token === token) writeSession(null);
     });
   }
 

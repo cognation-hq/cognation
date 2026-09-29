@@ -131,7 +131,9 @@
       },
       options.headers || {}
     );
-    if (session && session.access_token) {
+    /* Password sign-in must not send a leftover user JWT. GoTrue can treat
+       that header as the session and never apply the email and password. */
+    if (!options.omitUserAuth && session && session.access_token) {
       headers.Authorization = "Bearer " + session.access_token;
     }
     var fetchOptions = {
@@ -148,8 +150,9 @@
           body = text;
         }
         if (!response.ok) {
-          var error = new Error((body && body.message) || "Supabase request failed.");
+          var error = new Error(apiErrorMessage(body, "Supabase request failed."));
           error.status = response.status;
+          error.code = body && (body.error_code || body.error);
           error.body = body;
           throw error;
         }
@@ -158,10 +161,26 @@
     });
   }
 
+  function apiErrorMessage(body, fallback) {
+    if (body && typeof body === "object") {
+      return (
+        body.msg ||
+        body.error_description ||
+        body.message ||
+        body.error_code ||
+        fallback
+      );
+    }
+    if (typeof body === "string" && body) return String(body).slice(0, 180);
+    return fallback;
+  }
+
   function signUp(fields) {
     fields = fields || {};
     return request("/auth/v1/signup", {
       method: "POST",
+      skipAuthRefresh: true,
+      omitUserAuth: true,
       body: JSON.stringify({
         email: fields.email,
         password: fields.password,
@@ -180,6 +199,10 @@
   function signIn(email, password) {
     return request("/auth/v1/token?grant_type=password", {
       method: "POST",
+      /* Do not refresh or attach a previous session first. A hung or stale
+         token was leaving the button on "Signing in…". */
+      skipAuthRefresh: true,
+      omitUserAuth: true,
       body: JSON.stringify({ email: email, password: password }),
     }).then(function (result) {
       if (result && result.access_token) writeSession(stampExpiry(result));

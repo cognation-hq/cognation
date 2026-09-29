@@ -7014,6 +7014,15 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   align-items: stretch;
   visibility: visible !important;
 }
+/* Inside the scrolling gate, sticky bottom pulls Sign in up over Email and
+   Password. Clicks land on the button instead of the fields. Leave the
+   button in normal flow; the panel still scrolls on a short screen. */
+.login-gate .login-form-actions {
+  position: static;
+  bottom: auto;
+  z-index: auto;
+  background: none;
+}
 .login-submit-btn,
 .login-form-actions .btn-primary {
   display: block !important;

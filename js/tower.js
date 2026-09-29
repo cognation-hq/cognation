@@ -537,6 +537,19 @@
       if (typeof p.slogan !== "string") p.slogan = p.slogan ? String(p.slogan) : "";
       else p.slogan = String(p.slogan).slice(0, 400);
       p.privateFeedTheme = normalizePrivateFeedTheme(p.privateFeedTheme);
+      /* A live Supabase profile does not store demo badges or calendar rows.
+         Seeding them made every read look unsaved, and save() dispatched
+         cognation:tower-profile-updated. tower-follow syncAll calls get()
+         again, which overflowed the stack and flooded PATCH /profiles the
+         moment Sign in closed the gate. Render remote profiles as-is. */
+      if (usingRemoteSocial() || p._remote) {
+        if (!Array.isArray(p.awardedBadges)) p.awardedBadges = [];
+        if (!p.badgeVisibility || typeof p.badgeVisibility !== "object") p.badgeVisibility = {};
+        if (!Array.isArray(p.calendarEvents)) p.calendarEvents = [];
+        if (typeof p.calendarIcsUrl !== "string") p.calendarIcsUrl = "";
+        if (p.calendarGoogleConnected == null) p.calendarGoogleConnected = false;
+        return p;
+      }
       var before = p.awardedBadges;
       var beforeLen = Array.isArray(before) ? before.length : -1;
       var beforeVis = p.badgeVisibility;
@@ -552,6 +565,11 @@
       return p;
     },
     save: function (data) {
+      /* Listeners of tower-profile-updated call get(), which can call save().
+         A re-entrant save is what turned one profile read into a stack overflow. */
+      if (this._saving) return false;
+      this._saving = true;
+      try {
       data = data || {};
       var id = data._profileId || resolveActiveProfileId();
       if (usingRemoteSocial() && id) {
@@ -613,6 +631,9 @@
         } catch (e2) {
           return false;
         }
+      }
+      } finally {
+        this._saving = false;
       }
     },
   };

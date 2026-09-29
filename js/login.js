@@ -238,7 +238,8 @@
   function login(username, password, opts) {
     opts = opts || {};
     username = normalizeLoginUser(username);
-    password = String(password || "").trim();
+    /* Do not trim passwords. A trailing space is part of the secret. */
+    password = String(password || "");
     if (opts.demo) {
       if (!username) username = "demo";
       if (window.CognationDemo && window.CognationDemo.unlock) {
@@ -260,15 +261,27 @@
       }
       return window.CognationSupabase.signIn(username, password).then(function (result) {
         var user = result && result.user;
-        if (!user) throw new Error("bad credentials");
-        return loadSupabaseProfiles(user).then(function (profiles) {
-          return {
-            username: user.email || username,
-            profiles: profiles,
-            source: "supabase",
-            supabaseUserId: user.id,
-          };
-        });
+        if (!user || !user.id) throw new Error("Wrong email or password.");
+        /* A profiles miss must not undo a successful password grant. The gate
+           stayed up whenever that follow-up request rejected. */
+        return loadSupabaseProfiles(user).then(
+          function (profiles) {
+            return {
+              username: user.email || username,
+              profiles: profiles,
+              source: "supabase",
+              supabaseUserId: user.id,
+            };
+          },
+          function () {
+            return {
+              username: user.email || username,
+              profiles: [],
+              source: "supabase",
+              supabaseUserId: user.id,
+            };
+          }
+        );
       });
     }
     return Promise.reject(new Error("Cognation sign-in is not configured."));
@@ -346,6 +359,19 @@
     });
   }
 
+  function signInFailureMessage(error) {
+    var body = error && error.body;
+    var code = String((error && error.code) || (body && body.error_code) || "");
+    if (code === "invalid_credentials" || code === "invalid_grant") {
+      return "Wrong email or password.";
+    }
+    var message = (error && error.message) || "";
+    if (/invalid login credentials/i.test(message) || message === "bad credentials") {
+      return "Wrong email or password.";
+    }
+    return message || "Wrong email or password.";
+  }
+
   form.addEventListener("submit", function (e) {
     e.preventDefault();
     var userInput = form.querySelector('input[name="username"]');
@@ -367,10 +393,7 @@
         finishWithProfileChoice(result.username, result.profiles, result);
       },
       function (error) {
-        setStatus(
-          (error && error.message) || "Wrong email or password.",
-          true
-        );
+        setStatus(signInFailureMessage(error), true);
       }
     );
   });

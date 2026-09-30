@@ -512,78 +512,13 @@
                     <div class="tower-private-theme-body">
                       <p class="form-hint">Styles the public scrapbook visitors see.</p>
                       <div class="form-group tower-private-theme-fields">
-                        <label for="tower-font">Font family</label>
-                        <select id="tower-font" name="towerFont" data-tower-font>
-                          <option value="georgia">Georgia (serif)</option>
-                          <option value="chomsky">Chomsky (display)</option>
-                          <option value="system">system-ui (sans)</option>
-                          <option value="serif">Classic serif</option>
-                          <option value="sans">Clean sans</option>
-                          <option value="scrapbook">Comic-ish scrapbook</option>
-                        </select>
-                        <label for="tower-feed-bg" class="tower-music-url-label">Page background color</label>
-                        <input id="tower-feed-bg" name="feedBackgroundColor" type="color" value="#fff5f9" data-tower-feed-bg>
                         <label for="tower-public-text" class="tower-music-url-label">Text color</label>
                         <input id="tower-public-text" type="color" value="#4a2c3a" data-tower-public-text>
                         <label for="tower-public-btn" class="tower-music-url-label">Button / accent color</label>
                         <input id="tower-public-btn" type="color" value="#f4a4c4" data-tower-public-btn>
-                        <label for="tower-bg-mode" class="tower-music-url-label">Background type</label>
-                        <select id="tower-bg-mode" data-tower-bg-mode>
-                          <option value="solid">Solid color</option>
-                          <option value="collage">Collage</option>
-                          <option value="html">Custom HTML</option>
-                        </select>
-                        <p class="form-hint tower-public-look-edit-bg-row">
-                          <button type="button" class="btn btn-secondary" data-tower-public-look-edit-bg hidden>Change background</button>
-                        </p>
-                        <div class="tower-bg-options" data-tower-bg-options>
-                          <div class="tower-bg-mode-panel" data-tower-bg-mode-panel="solid">
-                            <p class="form-hint">Uses the page background color above. Tap a swatch to set it:</p>
-                            <div class="tower-bg-swatches" data-tower-bg-swatches role="group" aria-label="Background color presets">
-                              <button type="button" class="tower-bg-swatch" data-tower-bg-swatch="#fff5f9" style="background:#fff5f9" title="Baby pink" aria-label="Baby pink"></button>
-                              <button type="button" class="tower-bg-swatch" data-tower-bg-swatch="#ffffff" style="background:#ffffff" title="White" aria-label="White"></button>
-                              <button type="button" class="tower-bg-swatch" data-tower-bg-swatch="#fef3c7" style="background:#fef3c7" title="Cream" aria-label="Cream"></button>
-                              <button type="button" class="tower-bg-swatch" data-tower-bg-swatch="#e8f4f8" style="background:#e8f4f8" title="Sky" aria-label="Sky"></button>
-                              <button type="button" class="tower-bg-swatch" data-tower-bg-swatch="#ecfdf5" style="background:#ecfdf5" title="Mint" aria-label="Mint"></button>
-                              <button type="button" class="tower-bg-swatch" data-tower-bg-swatch="#f3e8ff" style="background:#f3e8ff" title="Lavender" aria-label="Lavender"></button>
-                              <button type="button" class="tower-bg-swatch" data-tower-bg-swatch="#1a1a2e" style="background:#1a1a2e" title="Night" aria-label="Night"></button>
-                              <button type="button" class="tower-bg-swatch" data-tower-bg-swatch="#4a2c3a" style="background:#4a2c3a" title="Plum" aria-label="Plum"></button>
-                            </div>
-                          </div>
-                          <div class="tower-bg-mode-panel" data-tower-bg-mode-panel="collage" hidden>
-                            <p class="form-hint">Collage sits behind your stickers. Pick a layout, then drop in image URLs or keep the baby-pink demo tiles.</p>
-                            <div class="form-group">
-                              <label for="tower-collage-layout">Layout</label>
-                              <select id="tower-collage-layout" data-tower-collage-layout>
-                                <option value="grid-3x3">3 × 3 grid</option>
-                                <option value="grid-2x3">2 × 3 grid</option>
-                                <option value="masonry">Masonry / brick</option>
-                                <option value="hero-smalls">One large + smalls</option>
-                                <option value="polaroid-scatter">Polaroid scatter</option>
-                                <option value="none">None (plain pink)</option>
-                              </select>
-                            </div>
-                            <div class="tower-collage-cells" data-tower-collage-cells></div>
-                            <div class="form-actions tower-collage-actions">
-                              <button type="button" class="btn btn-secondary" data-tower-collage-demo>Fill demo tiles</button>
-                              <button type="button" class="btn btn-primary" data-tower-collage-apply>Apply collage</button>
-                            </div>
-                          </div>
-                          <div class="tower-bg-mode-panel" data-tower-bg-mode-panel="html" hidden>
-                            <p class="form-hint">Paste sanitized HTML for a full-bleed background behind stickers (no scripts). Or upload a .html / .txt file.</p>
-                            <label for="tower-bg-html">Background HTML</label>
-                            <textarea
-                              id="tower-bg-html"
-                              rows="6"
-                              maxlength="8000"
-                              spellcheck="false"
-                              placeholder="Optional HTML background (no scripts)."
-                              data-tower-bg-html
-                            ></textarea>
-                            <label for="tower-bg-html-file" class="tower-music-url-label">Upload .html / .txt</label>
-                            <input id="tower-bg-html-file" type="file" accept=".html,.htm,.txt,text/html,text/plain" data-tower-bg-html-file>
-                          </div>
-                        </div>
+                        <label for="tower-bg-image" class="tower-music-url-label">Page background</label>
+                        <input id="tower-bg-image" class="tower-bg-image-upload" type="file" accept="image/*" data-tower-bg-image>
+                        <p class="form-hint" data-tower-bg-image-status>Upload an image to use as the page background.</p>
                       </div>
                       <div class="form-actions">
                         <button type="button" class="btn btn-secondary" data-tower-public-look-preview>Preview</button>
@@ -941,6 +876,24 @@
                         <div class="tower-profile-html-public" data-tower-html-public></div>
                       </div>
 
+                      <div class="tower-sticker tower-sticker--camera" data-tower-widget="camera" data-sticker-label="Camera">
+                        <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Camera sticker" tabindex="-1" hidden>⋮⋮</button>
+                        <div class="tower-camera" data-tower-camera>
+                          <div class="tower-camera-top" aria-hidden="true"><span class="tower-camera-flash"></span></div>
+                          <div class="tower-camera-lens" data-tower-camera-lens></div>
+                          <p class="tower-camera-label">Camera</p>
+                        </div>
+                      </div>
+
+                      <div class="tower-sticker tower-sticker--mp3" data-tower-widget="mp3" data-sticker-label="MP3 player">
+                        <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move MP3 player sticker" tabindex="-1" hidden>⋮⋮</button>
+                        <div class="tower-mp3-face">
+                          <div class="tower-mp3-screen"><span data-tower-mp3-label>MP3 player</span></div>
+                          <div class="tower-mp3-buttons" aria-hidden="true"><b></b><b></b><b></b></div>
+                          <button type="button" class="tower-music-toggle" data-tower-music-toggle aria-pressed="true">Play</button>
+                        </div>
+                      </div>
+
                       <div class="tower-sticker tower-sticker--polaroid" data-tower-widget="polaroid" data-sticker-label="Polaroid">
                         <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Polaroid sticker" tabindex="-1" hidden>⋮⋮</button>
                         <div class="tower-avatar-wrap" data-tower-avatar-frame="polaroid" data-tower-polaroid>
@@ -954,8 +907,9 @@
                         <div class="tower-cal tower-cal--public" data-tower-cal-public data-tower-calendar-personal aria-label="Personal calendar">
                           <h4 class="tower-cal-public-title">Calendar</h4>
                           <div data-tower-cal-public-body></div>
+                          <details class="tower-cal-friend-dropdown" data-tower-cal-friend-dropdown>
+                          <summary class="tower-cal-friend-heading">Friends schedule</summary>
                           <form class="tower-cal-friend-form" data-tower-cal-friend-form action="#" method="post">
-                            <h5 class="tower-cal-friend-heading">Friends schedule</h5>
                             <p class="form-hint">Request a hangout on this profile’s calendar (demo). Owner can accept or edit from My feed.</p>
                             <div class="form-group">
                               <label for="tower-cal-friend-name">Your name</label>
@@ -984,6 +938,7 @@
                             </div>
                             <p class="commune-status" data-tower-cal-friend-status hidden role="status" aria-live="polite"></p>
                           </form>
+                          </details>
                         </div>
                       </div>
                   </aside>

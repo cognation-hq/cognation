@@ -2691,25 +2691,28 @@
     return safeHttpUrl(raw);
   }
 
+  function storedSocialValue(id, value) {
+    if (id === "venmo") return String(value || "").trim().slice(0, 500);
+    return safeHttpUrl(value);
+  }
+
   function commitSocialDraft(root, id, value) {
     var p = TowerProfileStore.get();
     if (!p.socialLinks || typeof p.socialLinks !== "object") p.socialLinks = {};
-    p.socialLinks[id] = String(value || "").trim().slice(0, 500);
+    p.socialLinks[id] = storedSocialValue(id, value);
     p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
-    p.publicWidgets.social = true;
+    p.publicWidgets.social = profileHasSocialLinks(p);
     TowerProfileStore.save(p);
-    var formInput = root.querySelector('[data-tower-social="' + id + '"]');
-    if (formInput && document.activeElement !== formInput) formInput.value = p.socialLinks[id];
+    var saved = TowerProfileStore.get();
+    renderSocialLinks(root, saved);
+    applyPublicWidgets(root, saved);
   }
 
   function renderSocialLinks(root, p) {
     var box = root.querySelector("[data-tower-social-links]");
     if (!box) return;
     var links = (p && p.socialLinks) || {};
-    var personal = !p || p._profileKind !== "professional";
-    var owner = isTowerOwner(p) && root.getAttribute("data-tower-side") === "public" && personal;
     socialLinkDefs().forEach(function (net) {
-      if (!owner && net.id === "venmo" && !personal) return;
       var formInput = root.querySelector('[data-tower-social="' + net.id + '"]');
       if (formInput && document.activeElement !== formInput) formInput.value = links[net.id] || "";
     });
@@ -2717,36 +2720,8 @@
     box.innerHTML = "";
     var any = false;
     socialLinkDefs().forEach(function (net) {
-      if (net.id === "venmo" && !personal) return;
       var raw = links[net.id] || "";
       var href = socialHref(net.id, raw);
-      if (owner) {
-        any = true;
-        var label = document.createElement("label");
-        label.className = "tower-social-edit";
-        var name = document.createElement("span");
-        name.textContent = net.label;
-        var field = document.createElement("input");
-        field.type = "text";
-        field.maxLength = 500;
-        field.placeholder = net.id === "venmo" ? "@handle or link" : "https://";
-        field.value = raw;
-        field.setAttribute("data-tower-social-inline", net.id);
-        field.setAttribute("aria-label", net.label);
-        field.addEventListener("change", function () {
-          commitSocialDraft(root, net.id, field.value);
-        });
-        field.addEventListener("keydown", function (ev) {
-          if (ev.key === "Enter") {
-            ev.preventDefault();
-            field.blur();
-          }
-        });
-        label.appendChild(name);
-        label.appendChild(field);
-        box.appendChild(label);
-        return;
-      }
       if (!href) return;
       any = true;
       var a = document.createElement("a");
@@ -2761,9 +2736,9 @@
     });
     box.hidden = !any;
     var sticker = box.closest('[data-tower-widget="social"]');
-    if (sticker && owner) {
-      sticker.hidden = false;
-      sticker.classList.remove("is-widget-off");
+    if (sticker) {
+      sticker.hidden = !any;
+      sticker.classList.toggle("is-widget-off", !any);
     }
   }
 
@@ -3160,9 +3135,9 @@
 
   function profileHasSocialLinks(p) {
     var links = (p && p.socialLinks) || {};
-    var keys = Object.keys(links);
-    for (var i = 0; i < keys.length; i++) {
-      if (String(links[keys[i]] || "").trim()) return true;
+    var defs = socialLinkDefs();
+    for (var i = 0; i < defs.length; i++) {
+      if (socialHref(defs[i].id, links[defs[i].id])) return true;
     }
     return false;
   }
@@ -3189,9 +3164,7 @@
     var htmlText = typeof p.customHtml === "string" ? p.customHtml.trim() : "";
     if (!sloganText) p.publicWidgets.slogan = false;
     if (!htmlText) p.publicWidgets.html = false;
-    if (!profileHasSocialLinks(p) && !(p._profileKind !== "professional" && isTowerOwner(p))) {
-      p.publicWidgets.social = false;
-    }
+    p.publicWidgets.social = profileHasSocialLinks(p);
     if (visibleMusicSkin(p.musicSkin) === "none" || p.musicEnabled === false) p.publicWidgets.music = false;
     if (!(p.featuredFriendIds && p.featuredFriendIds.length)) p.publicWidgets.friends = false;
     if (!profileHasVisibleBadges(p)) p.publicWidgets.badges = false;
@@ -3211,10 +3184,7 @@
       if (id === "slogan" && !sloganText) on = false;
       /* Auto-prune empty shells so ghost handles do not linger on personal scrapbooks */
       if (id === "html" && !htmlText) on = false;
-      if (id === "social" && !profileHasSocialLinks(p)) {
-        var ownerPersonal = isTowerOwner(p) && p && p._profileKind !== "professional";
-        if (!ownerPersonal) on = false;
-      }
+      if (id === "social") on = profileHasSocialLinks(p);
       if (id === "music") {
         var personalMusic = !p || p._profileKind !== "professional";
         var skinChoice = visibleMusicSkin(p && p.musicSkin);
@@ -6524,7 +6494,7 @@
         p.socialLinks = p.socialLinks || {};
         socialLinkDefs().forEach(function (net) {
           var input = root.querySelector('[data-tower-social="' + net.id + '"]');
-          p.socialLinks[net.id] = input ? safeHttpUrl(input.value) : "";
+          p.socialLinks[net.id] = input ? storedSocialValue(net.id, input.value) : "";
         });
         p.customHtml = sanitizeProfileHtml(htmlInput ? htmlInput.value : "");
         var sloganIn = root.querySelector("[data-tower-slogan]");
@@ -6594,6 +6564,7 @@
         /* keep widgetLayout as last dragged */
         if (!p.widgetLayout) p.widgetLayout = JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT));
         p.publicWidgets = readPublicWidgetsFromForm(root);
+        p.publicWidgets.social = profileHasSocialLinks(p);
         if (!TowerProfileStore.save(p)) {
           setProfileStatus("Could not save profile (storage full or blocked). Try a smaller photo.", true);
           return;
@@ -6606,6 +6577,17 @@
         window.setTimeout(function () {
           window.location.reload();
         }, 250);
+      });
+    }
+
+    if (!root.__cognationSocialFieldsBound) {
+      root.__cognationSocialFieldsBound = true;
+      root.querySelectorAll("[data-tower-social]").forEach(function (input) {
+        input.addEventListener("change", function () {
+          var id = input.getAttribute("data-tower-social");
+          if (!id) return;
+          commitSocialDraft(root, id, input.value);
+        });
       });
     }
 

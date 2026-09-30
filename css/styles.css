@@ -4391,23 +4391,6 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .tower-social-btn--tiktok { background: #010101; color: #fff; border-color: #010101; }
 .tower-social-btn--linkedin { background: #0a66c2; color: #fff; border-color: #0a66c2; }
 .tower-social-btn--venmo { background: #008cff; color: #fff; border-color: #0074d4; }
-.tower-social-edit {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin: 0.2rem 0;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-.tower-social-edit span {
-  width: 4.6rem;
-  flex: 0 0 auto;
-}
-.tower-social-edit input {
-  flex: 1 1 6rem;
-  min-width: 0;
-  font-weight: 500;
-}
 [data-tower-app]:not([data-tower-is-owner="true"]) .tower-sticker--polaroid .tower-avatar-upload {
   display: none !important;
 }

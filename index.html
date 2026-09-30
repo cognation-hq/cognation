@@ -704,24 +704,13 @@
                           <input id="tower-music-title" name="musicTitle" type="text" maxlength="120" placeholder="Song title" data-tower-music-title>
                           <label for="tower-music-artist" class="tower-music-url-label">Artist</label>
                           <input id="tower-music-artist" name="musicArtist" type="text" maxlength="120" placeholder="Artist name" data-tower-music-artist>
-                          <p class="tower-frame-fields-label">Radio / YouTube URL</p>
-                          <div class="tower-video-radio-box" data-tower-music-radio-box>
-                            <div class="tower-radio-face tower-video-radio-face">
-                              <div class="tower-radio-dial" aria-hidden="true"></div>
-                              <label class="tower-video-radio-marquee" for="tower-music-url">
-                                <span class="tower-video-radio-marquee-tag" aria-hidden="true">URL</span>
-                                <input id="tower-music-url" name="musicUrl" type="url" maxlength="500" placeholder="Paste YouTube or audio link…" data-tower-music-url inputmode="url" autocomplete="off">
-                              </label>
-                              <div class="tower-radio-knobs" aria-hidden="true"><i></i><i></i><i></i></div>
-                            </div>
-                          </div>
-                          <span class="form-hint">One player only — paste a YouTube (or MP3) link, Save profile, and it loads for everyone who opens your public Tower.</span>
+                          <label for="tower-music-url" class="tower-music-url-label">Song URL</label>
+                          <input id="tower-music-url" name="musicUrl" type="url" maxlength="500" placeholder="Paste YouTube or audio link…" data-tower-music-url inputmode="url" autocomplete="off">
+                          <span class="form-hint">One player only — paste a YouTube or audio link, Save profile, and it loads for everyone who opens your public Tower.</span>
                           <label for="tower-music-skin">Player look</label>
                           <select id="tower-music-skin" data-tower-music-skin>
-                            <option value="radio" selected>Old-school radio</option>
-                            <option value="classic">Classic one-line</option>
+                            <option value="classic" selected>Classic one-line</option>
                             <option value="cd">CD player</option>
-                            <option value="mp3">MP3 player</option>
                           </select>
                           <label class="tower-music-enable">
                             <input type="checkbox" data-tower-music-enable checked>
@@ -802,16 +791,6 @@
                           <span class="tower-music-classic-line" data-tower-music-label>Song — Artist</span>
                         </div>
 
-                        <!-- radio -->
-                        <div class="tower-music-skin tower-music-skin--radio" data-music-face="radio" hidden>
-                          <div class="tower-radio-face">
-                            <div class="tower-radio-dial" aria-hidden="true"></div>
-                            <div class="tower-radio-marquee"><span data-tower-music-label>Song — Artist</span></div>
-                            <div class="tower-radio-knobs" aria-hidden="true"><i></i><i></i></div>
-                            <button type="button" class="tower-music-toggle tower-radio-toggle" data-tower-music-toggle aria-pressed="true">Sound on</button>
-                          </div>
-                        </div>
-
                         <!-- cd player -->
                         <div class="tower-music-skin tower-music-skin--cd" data-music-face="cd" hidden>
                           <div class="tower-cd-face">
@@ -823,18 +802,6 @@
                           </div>
                         </div>
 
-                        <!-- mp3 -->
-                        <div class="tower-music-skin tower-music-skin--mp3" data-music-face="mp3" hidden>
-                          <div class="tower-mp3-face">
-                            <div class="tower-mp3-screen"><span data-tower-music-label>Song — Artist</span></div>
-                            <div class="tower-mp3-buttons" aria-hidden="true"><b></b><b></b><b></b></div>
-                            <button type="button" class="tower-music-toggle" data-tower-music-toggle aria-pressed="true">Sound on</button>
-                          </div>
-                        </div>
-                      </div>
-                      <!-- radio side scroller (page edge) -->
-                      <div class="tower-radio-side" data-tower-radio-side hidden aria-hidden="true">
-                        <div class="tower-radio-side-track"><span data-tower-radio-side-text>Now playing</span></div>
                       </div>
 
                       <div class="tower-sticker tower-sticker--badges" data-tower-widget="badges" data-sticker-label="Badges"><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Badges sticker" tabindex="-1" hidden>⋮⋮</button><div class="tower-badge-shelf" data-tower-badge-shelf aria-label="Badges">

@@ -4594,28 +4594,6 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   margin: 0 auto;
 }
 
-.tower-sticker--mp3 .tower-mp3-face {
-  width: 11rem;
-}
-/* The original player is the radio face. Later sticker and music-card
-   chrome sat on top of it and made that graphic look like a plain panel. */
-.tower-layout--scrapbook.is-sticker-stage .tower-sticker--music:has([data-music-face="radio"]:not([hidden])) {
-  background: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-}
-.tower-layout--scrapbook.is-sticker-stage .tower-sticker--music:has([data-music-face="radio"]:not([hidden])) > .tower-music {
-  margin: 0 !important;
-  padding: 0 !important;
-  border: 0 !important;
-  background: transparent !important;
-  background-image: none !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--polaroid {
   background: transparent !important;
   background-image: none !important;
@@ -10568,13 +10546,3 @@ body.cognation-demo-on {
   text-overflow: clip;
 }
 
-/* The visual system paints every span and button. Keep the original radio readout and cream control. */
-.tower-radio-marquee span {
-  color: #9cff9c !important;
-}
-.tower-radio-face .tower-radio-toggle {
-  border: 2px solid #333 !important;
-  background: #f5e6c8 !important;
-  color: #3d2a1c !important;
-  box-shadow: none !important;
-}

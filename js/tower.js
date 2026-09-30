@@ -2502,17 +2502,24 @@
       hideMusicSkins(root);
       clearYoutubeEmbed(root);
       clearTowerAudio(audio);
-      /* No track yet. The original MP3 face still belongs on a personal page.
-         Hiding it here is what left only the later stand-in on the scrapbook. */
+      /* No track yet. The green MP3 skin is a hidden option, and filling it
+         with "Untitled" is not the player this page shipped. The original
+         graphic is the old-school radio: it is the selected Player look, the
+         face on the music URL box, and the skin a YouTube link uses. */
       if (p && p._profileKind !== "professional") {
         var musicSticker = root.querySelector('[data-tower-widget="music"]');
-        var mp3Face = wrap.querySelector('[data-music-face="mp3"]');
+        var radioFace = wrap.querySelector('[data-music-face="radio"]');
         if (musicSticker) {
           musicSticker.hidden = false;
           musicSticker.classList.remove("is-widget-off");
         }
         wrap.hidden = false;
-        if (mp3Face) mp3Face.hidden = false;
+        wrap.setAttribute("data-music-skin", "radio");
+        if (radioFace) {
+          radioFace.hidden = false;
+          var idleLabel = radioFace.querySelector("[data-tower-music-label]");
+          if (idleLabel && !(p.musicTitle || "").trim()) idleLabel.textContent = "Song — Artist";
+        }
       }
       return;
     }
@@ -3223,7 +3230,7 @@
       /* Auto-prune empty shells so ghost handles do not linger on personal scrapbooks */
       if (id === "html" && !htmlText) on = false;
       if (id === "social" && !profileHasSocialLinks(p)) on = false;
-      /* Personal pages keep the original MP3 graphic even before a track is saved.
+      /* Personal pages keep the original radio graphic even before a track is saved.
          A professional page still hides the player until it has a real URL. */
       if (id === "music" && !musicOn) on = !!(p && p._profileKind !== "professional");
       if (id === "friends" && (!friendIds || !friendIds.length)) on = false;

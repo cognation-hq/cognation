@@ -73,7 +73,7 @@
   /* Default sticker positions (%) — approximate classic left-rail + feed */
   var DEFAULT_WIDGET_LAYOUT = {
     avatar: { x: 2, y: 3, z: 5, tilt: 0 },
-    identity: { x: 2, y: 16, z: 4, tilt: 0 },
+    identity: { x: 2, y: 26, z: 4, tilt: 0 },
     slogan: { x: 22, y: 16, z: 4, tilt: 0 },
     social: { x: 2, y: 22, z: 4, tilt: 0 },
     music: { x: 2, y: 28, z: 6, tilt: 0 },
@@ -82,6 +82,7 @@
     html: { x: 22, y: 3, z: 3, tilt: 0 },
     calendar: { x: 55, y: 28, z: 5, tilt: 0 },
     polaroid: { x: 40, y: 6, z: 6, tilt: 0 },
+    mp3: { x: 28, y: 70, z: 7, tilt: 0 },
   };
   /* Old scrapbook leans and the ±15° nudges. Rotate clicks land on 90° steps. */
   var FACTORY_WIDGET_TILT = {
@@ -471,6 +472,7 @@
       publicButtonColor: "#f4a4c4",
       backgroundMode: "solid",
       backgroundHtml: "",
+      backgroundImageDataUrl: "",
       privateFeedTheme: JSON.parse(JSON.stringify(DEFAULT_PRIVATE_FEED_THEME)),
       calendarEvents: null,
       calendarIcsUrl: "",
@@ -685,6 +687,9 @@
       );
       if (typeof p.backgroundHtml !== "string") p.backgroundHtml = "";
       else p.backgroundHtml = sanitizeProfileHtml(String(p.backgroundHtml).slice(0, 8000));
+      if (typeof p.backgroundImageDataUrl !== "string" || p.backgroundImageDataUrl.indexOf("data:image/") !== 0) {
+        p.backgroundImageDataUrl = "";
+      }
       if (typeof p.slogan !== "string") p.slogan = p.slogan ? String(p.slogan) : "";
       else p.slogan = String(p.slogan).slice(0, 400);
       p.privateFeedTheme = normalizePrivateFeedTheme(p.privateFeedTheme);
@@ -794,6 +799,9 @@
           }
           if (slim.backgroundHtml && String(slim.backgroundHtml).length > 12000) {
             slim.backgroundHtml = String(slim.backgroundHtml).slice(0, 8000);
+          }
+          if (slim.backgroundImageDataUrl && String(slim.backgroundImageDataUrl).length > 500000) {
+            slim.backgroundImageDataUrl = "";
           }
           if (id && window.CognationAccounts && window.CognationAccounts.updateProfileTower) {
             window.CognationAccounts.updateProfileTower(id, slim);
@@ -1718,7 +1726,7 @@
     if (textIn && document.activeElement !== textIn) textIn.value = textColor;
     var btnIn = root.querySelector("[data-tower-public-btn]");
     if (btnIn && document.activeElement !== btnIn) btnIn.value = btnColor;
-    var modeSel = root.querySelector("[data-tower-bg-mode]");
+    var modeSel = root.querySelector("select[data-tower-bg-mode]");
     if (modeSel && document.activeElement !== modeSel) modeSel.value = bgMode;
     var htmlIn = root.querySelector("[data-tower-bg-html]");
     if (htmlIn && document.activeElement !== htmlIn) {
@@ -1751,9 +1759,35 @@
     stage.hidden = !stage.innerHTML;
   }
 
-  /** Apply solid / collage / html background behind stickers. */
+  function paintPageBackgroundImage(el, url) {
+    if (!el) return;
+    if (url) {
+      el.style.setProperty("--tower-bg-image", 'url("' + String(url).replace(/"/g, "") + '")');
+      el.setAttribute("data-has-bg-image", "true");
+    } else {
+      el.style.removeProperty("--tower-bg-image");
+      el.removeAttribute("data-has-bg-image");
+    }
+  }
+
+  /** Apply an uploaded image, or the saved collage / html background, behind stickers. */
   function applyPublicBackground(root, profile) {
     if (!root) return;
+    var imageUrl = profile && typeof profile.backgroundImageDataUrl === "string"
+      ? profile.backgroundImageDataUrl
+      : "";
+    var hasImage = imageUrl.indexOf("data:image/") === 0;
+    var scrapbook = root.querySelector("[data-tower-scrapbook]");
+    var publicSide = root.querySelector("[data-tower-public-side]");
+    if (hasImage) {
+      clearCollageStage(root);
+      clearBgHtmlStage(root);
+      paintPageBackgroundImage(scrapbook, imageUrl);
+      paintPageBackgroundImage(publicSide, imageUrl);
+      return;
+    }
+    paintPageBackgroundImage(scrapbook, "");
+    paintPageBackgroundImage(publicSide, "");
     var mode = normalizeBackgroundMode(
       profile && profile.backgroundMode,
       profile && profile.backgroundCollage,
@@ -2457,6 +2491,10 @@
     var audio = root.querySelector("[data-tower-audio]");
     if (!wrap || !audio) return;
 
+    var mp3Label = root.querySelector("[data-tower-mp3-label]");
+    if (mp3Label) {
+      mp3Label.textContent = (p.musicTitle || "").trim() ? formatSongLine(p) : "MP3 player";
+    }
     var url = (p.musicUrl || "").trim();
     var enabled = p.musicEnabled !== false && !!url;
     var skin = p.musicSkin || "classic";
@@ -3032,7 +3070,7 @@
 
   function applyAvatarFrame(root, frameId, cowboyColor) {
     frameId = normalizeFrameId(frameId);
-    var wrap = root.querySelector("[data-tower-avatar-frame]");
+    var wrap = root.querySelector('[data-tower-widget="avatar"] [data-tower-avatar-frame]');
     var overlay = root.querySelector("[data-tower-frame-overlay]");
     var hiddenInput = root.querySelector("[data-tower-avatar-frame-input]");
     if (wrap) wrap.setAttribute("data-tower-avatar-frame", frameId);
@@ -3059,6 +3097,9 @@
       cowboyColor = colorIn ? colorIn.value : "tan";
     }
     applyCowboyHatColor(root, cowboyColor);
+    root.querySelectorAll("[data-tower-polaroid]").forEach(function (el) {
+      el.setAttribute("data-tower-avatar-frame", "polaroid");
+    });
     var scaleIn = TowerProfileStore.get();
     applyAvatarFrameScale(root, scaleIn && scaleIn.avatarFrameScale);
   }
@@ -3733,13 +3774,78 @@
     );
   }
 
-  function saveCalendarToProfile(mutator) {
+  function saveCalendarToProfile(mutator, opts) {
     var p = TowerProfileStore.get();
     seedCalendarEventsIfMissing(p);
     mutator(p);
     p.calendarEvents = normalizeCalendarEventsList(p.calendarEvents);
-    TowerProfileStore.save(p);
+    TowerProfileStore.save(p, opts && opts.geometry ? { geometry: true } : undefined);
     return p;
+  }
+
+  function minutesOfClock(t) {
+    var parts = String(t || "").split(":");
+    var h = parseInt(parts[0], 10);
+    var m = parseInt(parts[1], 10);
+    if (isNaN(h)) return null;
+    return h * 60 + (isNaN(m) ? 0 : m);
+  }
+
+  var HANGOUT_SLOTS = [
+    { time: "09:00", label: "Morning" },
+    { time: "11:00", label: "Late morning" },
+    { time: "13:00", label: "Early afternoon" },
+    { time: "15:00", label: "Afternoon" },
+    { time: "17:00", label: "Late afternoon" },
+    { time: "19:30", label: "Evening" },
+  ];
+
+  /* Open parts of the selected day, from events already on the calendar. */
+  function suggestHangoutTimes(events, iso) {
+    var day = eventsForDate(events, iso);
+    var busy = day.map(function (e) { return minutesOfClock(e.time); }).filter(function (n) {
+      return n != null;
+    });
+    function isOpen(slot) {
+      var m = minutesOfClock(slot.time);
+      if (m == null) return false;
+      return busy.every(function (b) { return Math.abs(b - m) >= 90; });
+    }
+    var open = HANGOUT_SLOTS.filter(isOpen);
+    if (open.length < 3) {
+      HANGOUT_SLOTS.forEach(function (slot) {
+        if (open.length >= 3) return;
+        if (open.some(function (s) { return s.time === slot.time; })) return;
+        open.push(slot);
+      });
+    }
+    return open.slice(0, 3);
+  }
+
+  function renderSchedulerPanel(events, iso) {
+    var slots = suggestHangoutTimes(events, iso);
+    var dayEvents = eventsForDate(events, iso);
+    var busyNote = dayEvents.length
+      ? "Already on this day: " + dayEvents.map(function (e) {
+          return escapeHtml(e.title) + (e.time ? " at " + escapeHtml(formatEventTime(e.time)) : "");
+        }).join(", ") + "."
+      : "Nothing is booked on this day yet.";
+    return (
+      '<div class="tower-cal-scheduler" data-tower-cal-scheduler>' +
+      "<h5 class=\"tower-cal-friend-heading\">Suggested hangouts</h5>" +
+      '<p class="form-hint">Open times on ' + escapeHtml(iso) + ". " + busyNote + " Pick one.</p>" +
+      '<div class="tower-cal-scheduler-actions">' +
+      slots.map(function (slot) {
+        return (
+          '<button type="button" class="btn btn-secondary tower-cal-suggest" data-tower-cal-suggest="' +
+          escapeHtml(slot.time) +
+          '">' +
+          escapeHtml(slot.label) + " · " + escapeHtml(formatEventTime(slot.time)) +
+          "</button>"
+        );
+      }).join("") +
+      "</div></div>"
+    );
   }
 
   function renderPrivateCalendar(root) {
@@ -3839,6 +3945,9 @@
       return owner && e.status === "pending";
     });
     var selected = view.selected;
+    var schedulerHtml = view.schedulerOpen
+      ? renderSchedulerPanel(p.calendarEvents || [], selected)
+      : "";
     body.innerHTML =
       renderTowerMonthGrid(view, events, { gridLabel: "Public calendar" }) +
       '<div class="tower-cal-day-panel">' +
@@ -3846,7 +3955,8 @@
       escapeHtml(selected) +
       "</h5>" +
       renderDayEventList(events, selected, { ownerControls: owner }) +
-      "</div>";
+      "</div>" +
+      schedulerHtml;
     var dateInput = root.querySelector("[data-tower-cal-friend-date]");
     if (dateInput && !dateInput.value) dateInput.value = selected;
   }
@@ -3950,6 +4060,7 @@
         view2.year = parseInt(parts[0], 10);
         view2.month0 = parseInt(parts[1], 10) - 1;
         if (key2 === "public") {
+          view2.schedulerOpen = true;
           var friendDate = root.querySelector("[data-tower-cal-friend-date]");
           if (friendDate) friendDate.value = iso;
         } else {
@@ -4029,6 +4140,32 @@
         return;
       }
 
+      var suggestBtn = t.closest("[data-tower-cal-suggest]");
+      if (suggestBtn) {
+        var slotTime = suggestBtn.getAttribute("data-tower-cal-suggest") || "";
+        var viewS = getCalendarViewState(root, "public");
+        var slotIso = viewS.selected;
+        if (!/^\d{2}:\d{2}$/.test(slotTime) || !/^\d{4}-\d{2}-\d{2}$/.test(slotIso)) return;
+        saveCalendarToProfile(function (p) {
+          var taken = (p.calendarEvents || []).some(function (e) {
+            return e && e.date === slotIso && String(e.time || "").slice(0, 5) === slotTime;
+          });
+          if (taken) return;
+          p.calendarEvents.push({
+            id: newCalendarEventId(),
+            title: "Hangout",
+            date: slotIso,
+            time: slotTime,
+            notes: "Suggested open time",
+            status: "accepted",
+            source: "owner",
+          });
+        }, { geometry: true });
+        viewS.schedulerOpen = true;
+        refreshTowerCalendars(root);
+        return;
+      }
+
       if (t.closest("[data-tower-cal-ics-save]")) {
         var ics = root.querySelector("[data-tower-cal-ics-url]");
         var url = ics ? String(ics.value || "").trim().slice(0, 500) : "";
@@ -4044,6 +4181,14 @@
         }
         return;
       }
+
+      var pubCal = t.closest('[data-tower-widget="calendar"]');
+      if (!pubCal || !pubCal.contains(t)) return;
+      if (pubCal.__cognationDraggedAt && Date.now() - pubCal.__cognationDraggedAt < 500) return;
+      if (t.closest("[data-tower-cal-friend-dropdown], a, button, input, textarea, select, label, summary")) return;
+      var viewG = getCalendarViewState(root, "public");
+      viewG.schedulerOpen = true;
+      refreshTowerCalendars(root);
     });
 
     root.addEventListener("submit", function (ev) {
@@ -4539,7 +4684,6 @@
       '<button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Polaroid sticker" tabindex="-1" hidden>⋮⋮</button>' +
       '<div class="tower-avatar-wrap" data-tower-avatar-frame="polaroid" data-tower-polaroid>' +
       '<div class="tower-avatar" data-tower-polaroid-photo aria-hidden="true"></div>' +
-      '<span class="tower-avatar-upload-hint" aria-hidden="true">📷</span>' +
       "</div>"
     );
   }
@@ -4574,12 +4718,61 @@
     el.classList.remove("is-widget-off");
   }
 
+  function mp3Markup() {
+    return (
+      '<button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move MP3 player sticker" tabindex="-1" hidden>⋮⋮</button>' +
+      '<div class="tower-mp3-face">' +
+      '<div class="tower-mp3-screen"><span data-tower-mp3-label>MP3 player</span></div>' +
+      '<div class="tower-mp3-buttons" aria-hidden="true"><b></b><b></b><b></b></div>' +
+      '<button type="button" class="tower-music-toggle" data-tower-music-toggle aria-pressed="true">Play</button>' +
+      "</div>"
+    );
+  }
+
+    /* One upright MP3 player on every personal profile. */
+  function ensurePersonalSticker(root, p, id, className, label, markup) {
+    var stage = root.querySelector("[data-tower-scrapbook]");
+    if (!stage) return;
+    var nodes = Array.prototype.slice.call(stage.querySelectorAll('[data-tower-widget="' + id + '"]'));
+    var personal = !p || p._profileKind !== "professional";
+    if (!personal) {
+      nodes.forEach(function (el) {
+        el.hidden = true;
+        el.classList.add("is-widget-off");
+      });
+      return;
+    }
+    while (nodes.length > 1) {
+      var extra = nodes.pop();
+      if (extra && extra.parentNode) extra.parentNode.removeChild(extra);
+    }
+    var el = nodes[0];
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "tower-sticker " + className;
+      el.setAttribute("data-tower-widget", id);
+      el.setAttribute("data-sticker-label", label);
+      el.innerHTML = markup;
+      stage.appendChild(el);
+    }
+    el.hidden = false;
+    el.classList.remove("is-widget-off");
+  }
+
   function applyWidgetLayout(root, p) {
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (!stage) return;
     stage.classList.add("is-sticker-stage");
     ensureStickersOnStage(stage);
     ensurePersonalPolaroid(root, p);
+    ensurePersonalSticker(root, p, "mp3", "tower-sticker--mp3", "MP3 player", mp3Markup());
+    /* The generic camera sticker is not the Polaroid. Drop it if a previous session left one. */
+    var stageCam = root.querySelector("[data-tower-scrapbook]");
+    if (stageCam) {
+      stageCam.querySelectorAll('[data-tower-widget="camera"]').forEach(function (el) {
+        el.remove();
+      });
+    }
     if (p) mergeScrapbookLayout(p);
     if (p) settleArrivalTilts(p);
     var layout = getWidgetLayout(p) || DEFAULT_WIDGET_LAYOUT;
@@ -4784,6 +4977,139 @@
       stage.appendChild(el);
     });
     syncOwnerStickerHandles(root);
+  }
+
+  function commitInlineName(root, el) {
+    var p = TowerProfileStore.get();
+    var next = String(el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 80);
+    if (!next) next = p.displayName || "You";
+    p.displayName = next;
+    el.textContent = next;
+    var nameInput = root.querySelector("#tower-display-name");
+    if (nameInput) nameInput.value = next;
+    TowerProfileStore.save(p);
+    root.querySelectorAll("[data-tower-polaroid-photo]").forEach(function (photo) {
+      if (!p.avatarDataUrl) photo.textContent = initials(next);
+    });
+  }
+
+  function commitInlineHandle(root, el) {
+    var p = TowerProfileStore.get();
+    var prev = normalizeHandle(p.handle || "");
+    var next = normalizeHandle(el.textContent || "");
+    if (!next) {
+      el.textContent = prev ? "@" + prev : "@";
+      return;
+    }
+    if (window.CognationAccounts && typeof window.CognationAccounts.getProfileByHandle === "function") {
+      var clash = window.CognationAccounts.getProfileByHandle(next);
+      if (clash && clash.id !== p._profileId) {
+        el.textContent = prev ? "@" + prev : "@";
+        return;
+      }
+    }
+    p.handle = next;
+    el.textContent = "@" + next;
+    var input = root.querySelector("[data-tower-handle]");
+    if (input) input.value = next;
+    TowerProfileStore.save(p);
+    var profileRoot = root.querySelector("[data-tower-profile]");
+    if (profileRoot) {
+      var slug = profilePublicSlug(p);
+      profileRoot.id = "tower-profile-" + slug;
+      profileRoot.setAttribute("data-tower-handle", next);
+      profileRoot.setAttribute("data-author-slug", slug);
+    }
+  }
+
+  function commitInlineQuote(root, el) {
+    var sticker = el.closest("[data-tower-quote-id]");
+    if (!sticker) return;
+    var id = sticker.getAttribute("data-tower-quote-id");
+    var p = TowerProfileStore.get();
+    var quotes = getQuoteStickers(p);
+    var prev = "";
+    quotes.forEach(function (q) {
+      if (q && q.id === id) prev = q.text || "";
+    });
+    var text = String(el.textContent || "").trim().slice(0, 400);
+    if (!text) {
+      el.textContent = prev;
+      return;
+    }
+    p.quoteStickers = quotes.map(function (q) {
+      if (!q || q.id !== id) return q;
+      return { id: q.id, text: text, x: q.x, y: q.y, z: q.z, tilt: q.tilt };
+    });
+    sticker.setAttribute("data-quote-text", text);
+    el.textContent = text;
+    TowerProfileStore.save(p, { geometry: true });
+  }
+
+  function commitInlineSlogan(root, el) {
+    var p = TowerProfileStore.get();
+    var text = String(el.textContent || "").trim().slice(0, 400);
+    p.slogan = text;
+    p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
+    p.publicWidgets.slogan = !!text;
+    var input = root.querySelector("[data-tower-slogan]");
+    if (input) input.value = text;
+    el.textContent = text;
+    TowerProfileStore.save(p);
+    if (!text) {
+      var sticker = el.closest('[data-tower-widget="slogan"]');
+      if (sticker) {
+        sticker.hidden = true;
+        sticker.classList.add("is-widget-off");
+      }
+    }
+  }
+
+  function initInlineProfileEdits(root) {
+    if (!root || root.__cognationInlineEditBound) return;
+    root.__cognationInlineEditBound = true;
+
+    function canEdit() {
+      var p = TowerProfileStore.get();
+      return isTowerOwner(p) && p && p._profileKind !== "professional" && root.getAttribute("data-tower-side") === "public";
+    }
+
+    function recentDrag(el) {
+      var sticker = el && el.closest("[data-tower-widget]");
+      return !!(sticker && sticker.__cognationDraggedAt && Date.now() - sticker.__cognationDraggedAt < 500);
+    }
+
+    root.addEventListener("click", function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest || !root.contains(t) || !canEdit()) return;
+      var el = t.closest(".tower-quote-card, .tower-slogan-card, [data-tower-profile-name], [data-tower-handle-badge]");
+      if (!el || !root.contains(el) || recentDrag(el)) return;
+      if (el.getAttribute("contenteditable") === "true") return;
+      el.setAttribute("contenteditable", "true");
+      el.setAttribute("spellcheck", "false");
+      try { el.focus(); } catch (eFocus) {}
+    });
+
+    root.addEventListener("keydown", function (ev) {
+      var el = ev.target;
+      if (!el || el.getAttribute("contenteditable") !== "true") return;
+      if (!el.closest(".tower-quote-card, .tower-slogan-card, [data-tower-profile-name], [data-tower-handle-badge]")) return;
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        el.blur();
+      }
+    });
+
+    root.addEventListener("focusout", function (ev) {
+      var el = ev.target;
+      if (!el || !el.getAttribute || el.getAttribute("contenteditable") !== "true") return;
+      if (!root.contains(el)) return;
+      el.removeAttribute("contenteditable");
+      if (el.matches(".tower-quote-card")) commitInlineQuote(root, el);
+      else if (el.matches(".tower-slogan-card")) commitInlineSlogan(root, el);
+      else if (el.matches("[data-tower-profile-name]")) commitInlineName(root, el);
+      else if (el.matches("[data-tower-handle-badge]")) commitInlineHandle(root, el);
+    });
   }
 
   function openAddWidgetDialog(root) {
@@ -5193,6 +5519,7 @@
           sticker.classList.remove("is-dragging");
           return;
         }
+        sticker.__cognationDraggedAt = Date.now();
         /* Read the drop before get()/save(). A profile refresh inside save
            repaints from the original layout and would otherwise record spawn. */
         var dropX = parseFloat(sticker.getAttribute("data-sticker-x") || "0");
@@ -5650,7 +5977,7 @@
   function syncPublicLookForm(root, p) {
     if (!root || !p) return;
     var mode = normalizeBackgroundMode(p.backgroundMode, p.backgroundCollage, p.backgroundHtml);
-    var modeSel = root.querySelector("[data-tower-bg-mode]");
+    var modeSel = root.querySelector("select[data-tower-bg-mode]");
     if (modeSel && document.activeElement !== modeSel) modeSel.value = mode;
     var textIn = root.querySelector("[data-tower-public-text]");
     if (textIn && document.activeElement !== textIn) {
@@ -5698,7 +6025,7 @@
   function showBgOptions(root) {
     var options = root.querySelector("[data-tower-bg-options]");
     if (options) options.hidden = false;
-    var modeSel = root.querySelector("[data-tower-bg-mode]");
+    var modeSel = root.querySelector("select[data-tower-bg-mode]");
     var mode = modeSel ? modeSel.value : "solid";
     populateBgModeOptions(root, mode, { reveal: true });
     var panel = root.querySelector("[data-tower-public-look]");
@@ -5712,7 +6039,7 @@
     var feedBgIn = root.querySelector("[data-tower-feed-bg]");
     var textIn = root.querySelector("[data-tower-public-text]");
     var btnIn = root.querySelector("[data-tower-public-btn]");
-    var modeSel = root.querySelector("[data-tower-bg-mode]");
+    var modeSel = root.querySelector("select[data-tower-bg-mode]");
     var htmlIn = root.querySelector("[data-tower-bg-html]");
     var mode = normalizeBackgroundMode(modeSel ? modeSel.value : "solid", null, null);
     var out = {
@@ -5744,12 +6071,12 @@
   function initPublicLookControls(root) {
     if (!root || root.__cognationPublicLookBound) return;
     root.__cognationPublicLookBound = true;
-    var modeSel = root.querySelector("[data-tower-bg-mode]");
+    var modeSel = root.querySelector("select[data-tower-bg-mode]");
     var saveBtn = root.querySelector("[data-tower-public-look-save]");
     var status = root.querySelector("[data-tower-public-look-status]");
     var editBgBtn = root.querySelector("[data-tower-public-look-edit-bg]");
     var htmlFile = root.querySelector("[data-tower-bg-html-file]");
-    var swatches = root.querySelector("[data-tower-bg-swatches]");
+    var bgImageFile = root.querySelector("[data-tower-bg-image]");
 
     function setStatus(msg, isError) {
       if (!status) return;
@@ -5791,15 +6118,67 @@
       el.addEventListener("change", livePreview);
     });
 
-    if (swatches && !swatches.__cognationSwatchBound) {
-      swatches.__cognationSwatchBound = true;
-      swatches.addEventListener("click", function (ev) {
-        var btn = ev.target.closest("[data-tower-bg-swatch]");
-        if (!btn || !swatches.contains(btn)) return;
-        var color = normalizeFeedBgColor(btn.getAttribute("data-tower-bg-swatch"));
-        var bgIn = root.querySelector("[data-tower-feed-bg]");
-        if (bgIn) bgIn.value = color;
-        livePreview();
+    function loadBackgroundImageFile(file) {
+      if (!file) return;
+      if (!/^image\//.test(file.type)) {
+        setStatus("Choose an image file.", true);
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function () {
+        var img = new Image();
+        img.onload = function () {
+          var maxEdge = 1400;
+          var scale = Math.min(1, maxEdge / Math.max(img.width || 1, img.height || 1));
+          var cw = Math.max(1, Math.round((img.width || 1) * scale));
+          var ch = Math.max(1, Math.round((img.height || 1) * scale));
+          var canvas = document.createElement("canvas");
+          canvas.width = cw;
+          canvas.height = ch;
+          var ctx = canvas.getContext("2d");
+          if (!ctx) {
+            setStatus("Could not read that image.", true);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, cw, ch);
+          var dataUrl = "";
+          try {
+            dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+          } catch (eUrl) {
+            dataUrl = String(reader.result || "");
+          }
+          if (dataUrl.indexOf("data:image/") !== 0) {
+            setStatus("Could not read that image.", true);
+            return;
+          }
+          var pImg = TowerProfileStore.get();
+          pImg.backgroundImageDataUrl = dataUrl;
+          if (!TowerProfileStore.save(pImg)) {
+            setStatus("Could not save that background (storage full). Try a smaller image.", true);
+            return;
+          }
+          applyTowerTheme(root, pImg);
+          var hint = root.querySelector("[data-tower-bg-image-status]");
+          if (hint) hint.textContent = "Background image set.";
+          setStatus("Page background updated.", false);
+        };
+        img.onerror = function () {
+          setStatus("Could not read that image.", true);
+        };
+        img.src = String(reader.result || "");
+      };
+      reader.onerror = function () {
+        setStatus("Could not read that image.", true);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    if (bgImageFile && !bgImageFile.__cognationBgImageBound) {
+      bgImageFile.__cognationBgImageBound = true;
+      bgImageFile.addEventListener("change", function () {
+        var file = bgImageFile.files && bgImageFile.files[0];
+        loadBackgroundImageFile(file);
+        try { bgImageFile.value = ""; } catch (eClrBg) {}
       });
     }
 
@@ -5851,16 +6230,18 @@
       saveBtn.addEventListener("click", function () {
         var p = TowerProfileStore.get();
         var look = readPublicLookFromForm(root);
-        p.towerFont = look.towerFont;
-        p.feedBackgroundColor = look.feedBackgroundColor;
+        if (root.querySelector("[data-tower-font]")) p.towerFont = look.towerFont;
+        if (root.querySelector("[data-tower-feed-bg]")) p.feedBackgroundColor = look.feedBackgroundColor;
         p.publicTextColor = look.publicTextColor;
         p.publicButtonColor = look.publicButtonColor;
-        p.backgroundMode = look.backgroundMode;
-        if (look.backgroundMode === "collage") {
-          p.backgroundCollage = look.backgroundCollage || readCollageFromForm(root);
-        }
-        if (look.backgroundMode === "html") {
-          p.backgroundHtml = look.backgroundHtml || "";
+        if (root.querySelector("select[data-tower-bg-mode]")) {
+          p.backgroundMode = look.backgroundMode;
+          if (look.backgroundMode === "collage") {
+            p.backgroundCollage = look.backgroundCollage || readCollageFromForm(root);
+          }
+          if (look.backgroundMode === "html") {
+            p.backgroundHtml = look.backgroundHtml || "";
+          }
         }
         if (!TowerProfileStore.save(p)) {
           setStatus("Could not save public look (storage full or blocked).", true);
@@ -5910,7 +6291,7 @@
           cells: demoCollageCells(collageCellCount(layoutId)),
         };
         TowerProfileStore.save(p);
-        var modeSel3 = root.querySelector("[data-tower-bg-mode]");
+        var modeSel3 = root.querySelector("select[data-tower-bg-mode]");
         if (modeSel3) modeSel3.value = "collage";
         syncCollageForm(root, p);
         applyTowerTheme(root, p);
@@ -5923,7 +6304,7 @@
         p.backgroundMode = "collage";
         p.backgroundCollage = readCollageFromForm(root);
         TowerProfileStore.save(p);
-        var modeSel = root.querySelector("[data-tower-bg-mode]");
+        var modeSel = root.querySelector("select[data-tower-bg-mode]");
         if (modeSel) modeSel.value = "collage";
         applyTowerTheme(root, p);
         var lookStatus = root.querySelector("[data-tower-public-look-status]");
@@ -5944,15 +6325,19 @@
     var nameInput = root.querySelector("#tower-display-name");
     var htmlInput = root.querySelector("[data-tower-profile-html]");
     var preview = root.querySelector("[data-tower-html-preview]");
-    if (nameEl) nameEl.textContent = p.displayName || "You";
+    if (nameEl && document.activeElement !== nameEl) nameEl.textContent = p.displayName || "You";
     applyDisplayNameSize(root, p.displayNameSize || 28);
     initDisplayNameResize(root);
     var handleBadge = root.querySelector("[data-tower-handle-badge]");
     var handleVal = normalizeHandle(p.handle || "");
-    if (handleBadge) {
+    if (handleBadge && document.activeElement !== handleBadge) {
+      var ownerEditing = isTowerOwner(p) && p._profileKind !== "professional";
       if (handleVal) {
         handleBadge.hidden = false;
         handleBadge.textContent = "@" + handleVal;
+      } else if (ownerEditing) {
+        handleBadge.hidden = false;
+        handleBadge.textContent = "@";
       } else {
         handleBadge.hidden = true;
         handleBadge.textContent = "";
@@ -5984,6 +6369,22 @@
         avatar.style.backgroundImage = "";
         avatar.textContent = initials(p.displayName);
       }
+    }
+    root.querySelectorAll("[data-tower-polaroid-photo]").forEach(function (photo) {
+      if (document.activeElement === photo) return;
+      if (p.avatarDataUrl) {
+        photo.style.backgroundImage = 'url("' + p.avatarDataUrl.replace(/"/g, "") + '")';
+        photo.textContent = "";
+      } else {
+        photo.style.backgroundImage = "";
+        photo.textContent = initials(p.displayName);
+      }
+    });
+    var bgHint = root.querySelector("[data-tower-bg-image-status]");
+    if (bgHint && !(p.backgroundImageDataUrl && document.activeElement && document.activeElement.matches && document.activeElement.matches("[data-tower-bg-image]"))) {
+      bgHint.textContent = p.backgroundImageDataUrl
+        ? "Background image set."
+        : "Upload an image to use as the page background.";
     }
     applyAvatarFrame(root, p.avatarFrame || "none", p.cowboyHatColor || "tan");
     applyAvatarOrnament(root, p.avatarOrnament || "none", p.avatarOrnamentPos || "above");
@@ -6070,6 +6471,7 @@
     initDisplayNameResize(root);
     initOrnamentPicker(root);
     initScrapbookStickers(root);
+    initInlineProfileEdits(root);
     initCollageControls(root);
     initPublicLookControls(root);
     initProfileEditDropdown(root);
@@ -6168,7 +6570,7 @@
         var feedBgIn = root.querySelector("[data-tower-feed-bg]");
         var pubTextIn = root.querySelector("[data-tower-public-text]");
         var pubBtnIn = root.querySelector("[data-tower-public-btn]");
-        var bgModeIn = root.querySelector("[data-tower-bg-mode]");
+        var bgModeIn = root.querySelector("select[data-tower-bg-mode]");
         var bgHtmlIn = root.querySelector("[data-tower-bg-html]");
         if (fontIn) p.towerFont = normalizeTowerFont(fontIn.value);
         if (feedBgIn) p.feedBackgroundColor = normalizeFeedBgColor(feedBgIn.value);

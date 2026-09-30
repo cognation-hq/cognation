@@ -3073,6 +3073,20 @@ body.login-gate-open .app-topbar {
 
 [data-tower-app] .tower-layout--scrapbook {
   background-color: var(--tower-feed-bg);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+.tower-bg-image-upload {
+  display: block;
+  width: 100%;
+  max-width: 22rem;
+  margin-top: 0.35rem;
+  padding: 0.65rem;
+  border: 1px dashed rgba(74, 44, 58, 0.45);
+  border-radius: var(--radius-sm, 6px);
+  background: #fff;
+  cursor: pointer;
 }
 
 [data-tower-app] .tower-public-side .btn-primary,
@@ -4580,6 +4594,16 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   margin: 0 auto;
 }
 
+.tower-sticker--mp3 .tower-mp3-face {
+  width: 11rem;
+}
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--polaroid {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
 .tower-avatar-wrap[data-tower-avatar-frame="matte-black"] {
   width: 6.2rem;
   height: 7.1rem;
@@ -4950,7 +4974,7 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--slogan,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--identity,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--avatar,
-.tower-layout--scrapbook.is-sticker-stage .tower-sticker--polaroid {
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--mp3 {
   background: rgba(255, 234, 243, 0.92);
   border: 1px solid transparent;
   border-radius: var(--radius);
@@ -8140,6 +8164,31 @@ body { padding-top: 0 !important; }
   font-size: 0.72rem;
   line-height: 1.2;
 }
+.tower-cal-friend-dropdown {
+  margin-top: 0.75rem;
+}
+.tower-cal-friend-dropdown > summary {
+  cursor: pointer;
+  list-style: disclosure-closed;
+}
+.tower-cal-friend-dropdown[open] > summary {
+  list-style: disclosure-open;
+  margin-bottom: 0.45rem;
+}
+.tower-cal-scheduler {
+  margin-top: 0.75rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(212, 137, 176, 0.45);
+}
+.tower-cal-scheduler-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+.tower-cal-suggest {
+  text-align: left;
+}
 .tower-cal-editor,
 .tower-cal-friend-form,
 .tower-cal-google {
@@ -9984,6 +10033,13 @@ body {
   background-image: none !important;
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.17);
   backdrop-filter: blur(16px) saturate(120%);
+}
+[data-tower-public-side][data-has-bg-image],
+[data-tower-scrapbook][data-has-bg-image] {
+  background-image: var(--tower-bg-image) !important;
+  background-size: cover !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
 }
 
 .tower-post:hover,

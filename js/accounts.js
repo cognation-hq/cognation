@@ -317,8 +317,10 @@
     var doc = loadProfilesDoc();
     rec.updatedAt = Date.now();
     doc.profiles[rec.id] = rec;
-    saveProfilesDoc(doc);
-    /* Mirror active-looking blob for older readers */
+    var wrote = saveProfilesDoc(doc);
+    if (!wrote) return null;
+    /* Mirror active-looking blob for older readers. A failed mirror must not
+       undo the profile write that just succeeded. */
     try {
       if (rec.kind === "personal") {
         localStorage.setItem(LEGACY_PROFILE_KEY, JSON.stringify(stripMeta(rec)));
@@ -399,7 +401,9 @@
       }
       rec.handle = h;
     }
-    saveProfileRecord(rec);
+    if (!saveProfileRecord(rec)) {
+      return { ok: false, error: "storage" };
+    }
     return { ok: true, profile: rec };
   }
 

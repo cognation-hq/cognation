@@ -252,61 +252,6 @@
       awardedAt: "2026-09-01T12:00:00.000Z",
       note: "Peer pin from a demo friend",
     },
-    {
-      id: "yearbook-class-clown",
-      title: "Class Clown",
-      subtitle: "Yearbook superlative",
-      fromName: "Yearbook Committee",
-      fromHandle: "yearbook",
-      kind: "yearbook",
-      imageUrl: "assets/badges/yearbook-class-clown.png",
-      awardedAt: "2026-05-20T15:00:00.000Z",
-      note: "Yearbook superlative — Class Clown",
-    },
-    {
-      id: "yearbook-most-likely-to-succeed",
-      title: "Most Likely to Succeed",
-      subtitle: "Yearbook superlative",
-      fromName: "Yearbook Committee",
-      fromHandle: "yearbook",
-      kind: "yearbook",
-      imageUrl: "assets/badges/yearbook-most-likely-to-succeed.svg",
-      awardedAt: "2026-05-20T15:00:00.000Z",
-      note: "Yearbook superlative — Most Likely to Succeed",
-    },
-    {
-      id: "yearbook-best-smile",
-      title: "Best Smile",
-      subtitle: "Yearbook superlative",
-      fromName: "Yearbook Committee",
-      fromHandle: "yearbook",
-      kind: "yearbook",
-      imageUrl: "assets/badges/yearbook-best-smile.svg",
-      awardedAt: "2026-05-20T15:00:00.000Z",
-      note: "Yearbook superlative — Best Smile",
-    },
-    {
-      id: "yearbook-biggest-heart",
-      title: "Biggest Heart",
-      subtitle: "Yearbook superlative",
-      fromName: "Yearbook Committee",
-      fromHandle: "yearbook",
-      kind: "yearbook",
-      imageUrl: "assets/badges/yearbook-biggest-heart.svg",
-      awardedAt: "2026-05-20T15:00:00.000Z",
-      note: "Yearbook superlative — Biggest Heart",
-    },
-    {
-      id: "yearbook-class-president",
-      title: "Class President",
-      subtitle: "Yearbook superlative",
-      fromName: "Yearbook Committee",
-      fromHandle: "yearbook",
-      kind: "yearbook",
-      imageUrl: "assets/badges/yearbook-class-president.svg",
-      awardedAt: "2026-05-20T15:00:00.000Z",
-      note: "Yearbook superlative — Class President",
-    },
   ];
 
   function seedAwardedBadgesIfMissing(profile) {
@@ -774,6 +719,10 @@
           document.dispatchEvent(new CustomEvent("cognation:tower-profile-updated", { detail: towerBlob }));
           return true;
         }
+        /* Quota is swallowed inside the accounts write and used to come back
+           as ok. Treating that as success made the avatar handler re-read an
+           unchanged profile and leave the old initials in place. */
+        if (result && result.error === "storage") return false;
       }
       try {
         localStorage.setItem(TOWER_PROFILE_KEY, JSON.stringify(towerBlob));
@@ -2036,43 +1985,6 @@
       addCheck(badge.id, label, isBadgeVisible(profile, badge.id));
     });
 
-    var genWrap = document.createElement("div");
-    genWrap.className = "tower-badge-generate";
-    var genTitle = document.createElement("p");
-    genTitle.className = "tower-badge-generate-label";
-    genTitle.textContent = "Generate badge";
-    var genHint = document.createElement("span");
-    genHint.className = "form-hint";
-    genHint.textContent = "Add a yearbook-style pin as a public pin widget (does not gift to others).";
-    genWrap.appendChild(genTitle);
-    genWrap.appendChild(genHint);
-    var chips = document.createElement("div");
-    chips.className = "tower-badge-generate-chips";
-    var owned = {};
-    list.forEach(function (b) {
-      if (b && b.id) owned[b.id] = true;
-    });
-    var available = 0;
-    getYearbookDemoDefs().forEach(function (def) {
-      if (!def || !def.id || owned[def.id]) return;
-      available++;
-      var btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "tower-badge-generate-chip";
-      btn.setAttribute("data-tower-generate-badge", def.id);
-      btn.textContent = def.title || def.id;
-      btn.title = "Generate " + (def.title || "badge") + " as a public pin widget";
-      chips.appendChild(btn);
-    });
-    if (!available) {
-      var none = document.createElement("span");
-      none.className = "form-hint";
-      none.textContent = "You already own every yearbook template.";
-      chips.appendChild(none);
-    }
-    genWrap.appendChild(chips);
-    box.appendChild(genWrap);
-
     if (!box.__cognationBadgeVisBound) {
       box.__cognationBadgeVisBound = true;
       box.addEventListener("change", function (ev) {
@@ -2080,12 +1992,6 @@
         if (!cb || !box.contains(cb)) return;
         var id = cb.getAttribute("data-tower-badge-vis");
         setBadgeVisibility(root, id, !!cb.checked);
-      });
-      box.addEventListener("click", function (ev) {
-        var btn = ev.target && ev.target.closest("[data-tower-generate-badge]");
-        if (!btn || !box.contains(btn)) return;
-        ev.preventDefault();
-        generateYearbookBadge(root, btn.getAttribute("data-tower-generate-badge"));
       });
     }
   }
@@ -2361,11 +2267,11 @@
     return iframe;
   }
 
-  /* Green MP3 and wood radio are not personal-profile looks. Pink is the classic note, silver is the CD. */
+  /* Green MP3 and wood radio are not personal-profile looks. Pink is the classic note, silver is the CD. None hides the player. */
   function visibleMusicSkin(skin) {
-    skin = skin || "classic";
-    if (skin === "radio" || skin === "mp3") return "classic";
-    return skin;
+    if (skin === "none") return "none";
+    if (skin === "cd") return "cd";
+    return "classic";
   }
 
   function applyMusicSkin(root, skin) {
@@ -2496,10 +2402,11 @@
     if (!wrap || !audio) return;
 
     var url = (p.musicUrl || "").trim();
-    var enabled = p.musicEnabled !== false && !!url;
     var skin = visibleMusicSkin(p.musicSkin || "classic");
+    var personal = !p || p._profileKind !== "professional";
+    var enabled = p.musicEnabled !== false && skin !== "none" && (personal || !!url);
     var ytId = parseYoutubeVideoId(url);
-    setAllMusicLabels(root, formatSongLine(p));
+    setAllMusicLabels(root, url ? formatSongLine(p) : "Song — Artist");
 
     if (!enabled) {
       wrap.hidden = true;
@@ -2512,6 +2419,20 @@
         musicSticker.hidden = true;
         musicSticker.classList.add("is-widget-off");
       }
+      return;
+    }
+
+    var musicOn = root.querySelector('[data-tower-widget="music"]');
+    if (musicOn) {
+      musicOn.hidden = false;
+      musicOn.classList.remove("is-widget-off");
+    }
+    if (!url) {
+      wrap.hidden = false;
+      wrap.setAttribute("data-music-mode", "audio");
+      clearYoutubeEmbed(root);
+      clearTowerAudio(audio);
+      applyMusicSkin(root, skin);
       return;
     }
 
@@ -2752,16 +2673,80 @@
     }
   }
 
+  function socialLinkDefs() {
+    return SOCIAL_NETWORKS.concat([{ id: "venmo", label: "Venmo", short: "Venmo" }]);
+  }
+
+  function venmoHref(raw) {
+    var text = String(raw || "").trim();
+    if (!text) return "";
+    if (/^https?:\/\//i.test(text)) return safeHttpUrl(text);
+    var handle = text.replace(/^@+/, "").replace(/[^a-zA-Z0-9_-]/g, "");
+    if (!handle) return "";
+    return "https://venmo.com/u/" + handle;
+  }
+
+  function socialHref(id, raw) {
+    if (id === "venmo") return venmoHref(raw);
+    return safeHttpUrl(raw);
+  }
+
+  function commitSocialDraft(root, id, value) {
+    var p = TowerProfileStore.get();
+    if (!p.socialLinks || typeof p.socialLinks !== "object") p.socialLinks = {};
+    p.socialLinks[id] = String(value || "").trim().slice(0, 500);
+    p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
+    p.publicWidgets.social = true;
+    TowerProfileStore.save(p);
+    var formInput = root.querySelector('[data-tower-social="' + id + '"]');
+    if (formInput && document.activeElement !== formInput) formInput.value = p.socialLinks[id];
+  }
+
   function renderSocialLinks(root, p) {
     var box = root.querySelector("[data-tower-social-links]");
     if (!box) return;
-    box.innerHTML = "";
     var links = (p && p.socialLinks) || {};
+    var personal = !p || p._profileKind !== "professional";
+    var owner = isTowerOwner(p) && root.getAttribute("data-tower-side") === "public" && personal;
+    socialLinkDefs().forEach(function (net) {
+      if (!owner && net.id === "venmo" && !personal) return;
+      var formInput = root.querySelector('[data-tower-social="' + net.id + '"]');
+      if (formInput && document.activeElement !== formInput) formInput.value = links[net.id] || "";
+    });
+    if (box.contains(document.activeElement)) return;
+    box.innerHTML = "";
     var any = false;
-    SOCIAL_NETWORKS.forEach(function (net) {
-      var href = safeHttpUrl(links[net.id] || "");
-      var input = root.querySelector('[data-tower-social="' + net.id + '"]');
-      if (input && document.activeElement !== input) input.value = links[net.id] || "";
+    socialLinkDefs().forEach(function (net) {
+      if (net.id === "venmo" && !personal) return;
+      var raw = links[net.id] || "";
+      var href = socialHref(net.id, raw);
+      if (owner) {
+        any = true;
+        var label = document.createElement("label");
+        label.className = "tower-social-edit";
+        var name = document.createElement("span");
+        name.textContent = net.label;
+        var field = document.createElement("input");
+        field.type = "text";
+        field.maxLength = 500;
+        field.placeholder = net.id === "venmo" ? "@handle or link" : "https://";
+        field.value = raw;
+        field.setAttribute("data-tower-social-inline", net.id);
+        field.setAttribute("aria-label", net.label);
+        field.addEventListener("change", function () {
+          commitSocialDraft(root, net.id, field.value);
+        });
+        field.addEventListener("keydown", function (ev) {
+          if (ev.key === "Enter") {
+            ev.preventDefault();
+            field.blur();
+          }
+        });
+        label.appendChild(name);
+        label.appendChild(field);
+        box.appendChild(label);
+        return;
+      }
       if (!href) return;
       any = true;
       var a = document.createElement("a");
@@ -2775,6 +2760,11 @@
       box.appendChild(a);
     });
     box.hidden = !any;
+    var sticker = box.closest('[data-tower-widget="social"]');
+    if (sticker && owner) {
+      sticker.hidden = false;
+      sticker.classList.remove("is-widget-off");
+    }
   }
 
   function getFriendPinLayout(p) {
@@ -3197,11 +3187,12 @@
     p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
     var sloganText = typeof p.slogan === "string" ? p.slogan.trim() : "";
     var htmlText = typeof p.customHtml === "string" ? p.customHtml.trim() : "";
-    var musicUrl = typeof p.musicUrl === "string" ? p.musicUrl.trim() : "";
     if (!sloganText) p.publicWidgets.slogan = false;
     if (!htmlText) p.publicWidgets.html = false;
-    if (!profileHasSocialLinks(p)) p.publicWidgets.social = false;
-    if (!(p.musicEnabled !== false && musicUrl)) p.publicWidgets.music = false;
+    if (!profileHasSocialLinks(p) && !(p._profileKind !== "professional" && isTowerOwner(p))) {
+      p.publicWidgets.social = false;
+    }
+    if (visibleMusicSkin(p.musicSkin) === "none" || p.musicEnabled === false) p.publicWidgets.music = false;
     if (!(p.featuredFriendIds && p.featuredFriendIds.length)) p.publicWidgets.friends = false;
     if (!profileHasVisibleBadges(p)) p.publicWidgets.badges = false;
     return p;
@@ -3220,8 +3211,17 @@
       if (id === "slogan" && !sloganText) on = false;
       /* Auto-prune empty shells so ghost handles do not linger on personal scrapbooks */
       if (id === "html" && !htmlText) on = false;
-      if (id === "social" && !profileHasSocialLinks(p)) on = false;
-      if (id === "music" && !musicOn) on = false;
+      if (id === "social" && !profileHasSocialLinks(p)) {
+        var ownerPersonal = isTowerOwner(p) && p && p._profileKind !== "professional";
+        if (!ownerPersonal) on = false;
+      }
+      if (id === "music") {
+        var personalMusic = !p || p._profileKind !== "professional";
+        var skinChoice = visibleMusicSkin(p && p.musicSkin);
+        if (skinChoice === "none" || (p && p.musicEnabled === false)) on = false;
+        else if (personalMusic) on = true;
+        else on = on && musicOn;
+      }
       if (id === "friends" && (!friendIds || !friendIds.length)) on = false;
       if (id === "badges" && !profileHasVisibleBadges(p)) on = false;
       var el = root.querySelector('[data-tower-widget="' + id + '"]');
@@ -4689,7 +4689,11 @@
       '<button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Polaroid sticker" tabindex="-1" hidden>⋮⋮</button>' +
       '<div class="tower-avatar-wrap" data-tower-avatar-frame="polaroid" data-tower-polaroid>' +
       '<div class="tower-avatar" data-tower-polaroid-photo aria-hidden="true"></div>' +
-      "</div>"
+      '<label class="tower-avatar-upload" title="Upload polaroid">' +
+      '<span class="tower-avatar-upload-hint" aria-hidden="true">📷</span>' +
+      '<span class="visually-hidden">Upload polaroid</span>' +
+      '<input type="file" accept="image/*" data-tower-polaroid-file>' +
+      "</label></div>"
     );
   }
 
@@ -4699,8 +4703,7 @@
     if (!stage) return;
     var nodes = Array.prototype.slice.call(stage.querySelectorAll('[data-tower-widget="polaroid"]'));
     var personal = !p || p._profileKind !== "professional";
-    var hasPhoto = !!(p && p.polaroidDataUrl);
-    if (!personal || !hasPhoto || (p && p.polaroidRemoved)) {
+    if (!personal || (p && p.polaroidRemoved)) {
       nodes.forEach(function (el) {
         el.hidden = true;
         el.classList.add("is-widget-off");
@@ -6366,10 +6369,12 @@
 
     if (avatar) {
       if (p.avatarDataUrl) {
-        avatar.style.backgroundImage = 'url("' + p.avatarDataUrl.replace(/"/g, "") + '")';
+        avatar.style.setProperty("background-image", 'url("' + p.avatarDataUrl.replace(/"/g, "") + '")', "important");
+        avatar.style.backgroundSize = "cover";
+        avatar.style.backgroundPosition = "center";
         avatar.textContent = "";
       } else {
-        avatar.style.backgroundImage = "";
+        avatar.style.removeProperty("background-image");
         avatar.textContent = initials(p.displayName);
       }
     }
@@ -6517,7 +6522,7 @@
         var handleInputSave = root.querySelector("[data-tower-handle]");
         p.handle = normalizeHandle(handleInputSave ? handleInputSave.value : p.handle);
         p.socialLinks = p.socialLinks || {};
-        SOCIAL_NETWORKS.forEach(function (net) {
+        socialLinkDefs().forEach(function (net) {
           var input = root.querySelector('[data-tower-social="' + net.id + '"]');
           p.socialLinks[net.id] = input ? safeHttpUrl(input.value) : "";
         });
@@ -6604,22 +6609,63 @@
       });
     }
 
-    function applyAvatarFile(file, statusFn) {
+    function looksLikeImage(file) {
+      if (!file) return false;
+      if (/^image\//.test(file.type || "")) return true;
+      return /\.(png|jpe?g|gif|webp|bmp|heic|heif|avif)$/i.test(file.name || "");
+    }
+
+    function storeProfileImage(dataUrl, field, statusFn, okMsg, mutate) {
+      if (!dataUrl || dataUrl.indexOf("data:image/") !== 0) {
+        (statusFn || setProfileStatus)("Could not read that image.", true);
+        return;
+      }
+      var p = TowerProfileStore.get();
+      if (mutate) mutate(p);
+      p[field] = dataUrl;
+      var saved = false;
+      try { saved = !!TowerProfileStore.save(p); } catch (eSave) { saved = false; }
+      var stored = TowerProfileStore.get();
+      if (!stored || stored[field] !== dataUrl) saved = false;
+      renderProfileChrome(root);
+      if (!saved) {
+        (statusFn || setProfileStatus)("Could not save photo (storage full). Try a smaller image.", true);
+        return;
+      }
+      (statusFn || setProfileStatus)(okMsg, false);
+    }
+
+    function readImageFile(file, statusFn, onUrl) {
       if (!file) return;
-      if (!/^image\//.test(file.type)) {
+      if (file.type && !looksLikeImage(file)) {
         (statusFn || setProfileStatus)("Choose an image file.", true);
         return;
       }
       var reader = new FileReader();
       reader.onload = function () {
-        var p = TowerProfileStore.get();
-        p.avatarDataUrl = String(reader.result || "");
-        if (!TowerProfileStore.save(p)) {
-          (statusFn || setProfileStatus)("Could not save photo (storage full). Try a smaller image.", true);
-          return;
-        }
-        renderProfileChrome(root);
-        (statusFn || setProfileStatus)("Profile picture updated.", false);
+        var raw = String(reader.result || "");
+        var img = new Image();
+        img.onload = function () {
+          var maxEdge = 640;
+          var scale = Math.min(1, maxEdge / Math.max(img.width || 1, img.height || 1));
+          var cw = Math.max(1, Math.round((img.width || 1) * scale));
+          var ch = Math.max(1, Math.round((img.height || 1) * scale));
+          var canvas = document.createElement("canvas");
+          canvas.width = cw;
+          canvas.height = ch;
+          var ctx = canvas.getContext("2d");
+          var dataUrl = raw;
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, cw, ch);
+            try { dataUrl = canvas.toDataURL("image/jpeg", 0.82); } catch (eUrl) {}
+          }
+          onUrl(dataUrl);
+        };
+        img.onerror = function () {
+          if (raw.indexOf("data:image/") === 0) onUrl(raw);
+          else (statusFn || setProfileStatus)("Could not read that image.", true);
+        };
+        img.src = raw;
       };
       reader.onerror = function () {
         (statusFn || setProfileStatus)("Could not read that image.", true);
@@ -6627,22 +6673,58 @@
       reader.readAsDataURL(file);
     }
 
+    function applyAvatarFile(file, statusFn) {
+      readImageFile(file, statusFn, function (dataUrl) {
+        storeProfileImage(dataUrl, "avatarDataUrl", statusFn, "Profile picture updated.");
+      });
+    }
+
+    function applyPolaroidFile(file, statusFn) {
+      readImageFile(file, statusFn, function (dataUrl) {
+        storeProfileImage(dataUrl, "polaroidDataUrl", statusFn, "Polaroid updated.", function (p) {
+          p.polaroidRemoved = false;
+        });
+      });
+    }
+
+    function pullChosenImage(input, applyFn) {
+      if (!input || !input.files || !input.files[0]) return;
+      var file = input.files[0];
+      if (input.__cognationAppliedFile === file) return;
+      input.__cognationAppliedFile = file;
+      applyFn(file, setProfileStatus);
+    }
+
     if (avatarFile) {
       avatarFile.addEventListener("change", function () {
-        var file = avatarFile.files && avatarFile.files[0];
-        applyAvatarFile(file, setProfileStatus);
-        try { avatarFile.value = ""; } catch (eClr) {}
+        pullChosenImage(avatarFile, applyAvatarFile);
       });
     }
     var avatarFilePanel = root.querySelector("[data-tower-avatar-file-panel]");
     if (avatarFilePanel && !avatarFilePanel.__cognationAvatarPanelBound) {
       avatarFilePanel.__cognationAvatarPanelBound = true;
       avatarFilePanel.addEventListener("change", function () {
-        var file = avatarFilePanel.files && avatarFilePanel.files[0];
-        applyAvatarFile(file, setProfileStatus);
-        try { avatarFilePanel.value = ""; } catch (eClr2) {}
+        pullChosenImage(avatarFilePanel, applyAvatarFile);
       });
     }
+    if (!root.__cognationAvatarFocusPull) {
+      root.__cognationAvatarFocusPull = true;
+      window.addEventListener("focus", function () {
+        setTimeout(function () {
+          pullChosenImage(root.querySelector("[data-tower-avatar-file]"), applyAvatarFile);
+          pullChosenImage(root.querySelector("[data-tower-avatar-file-panel]"), applyAvatarFile);
+          var pol = root.querySelector("[data-tower-polaroid-file]");
+          pullChosenImage(pol, applyPolaroidFile);
+        }, 0);
+      });
+    }
+    root.querySelectorAll("[data-tower-polaroid-file]").forEach(function (input) {
+      if (input.__cognationPolaroidBound) return;
+      input.__cognationPolaroidBound = true;
+      input.addEventListener("change", function () {
+        pullChosenImage(input, applyPolaroidFile);
+      });
+    });
     var clearAvatarBtn = root.querySelector("[data-tower-clear-avatar]");
     if (clearAvatarBtn && !clearAvatarBtn.__cognationClearAvatarBound) {
       clearAvatarBtn.__cognationClearAvatarBound = true;

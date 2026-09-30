@@ -508,6 +508,12 @@
                   </div>
                 </div>
 
+                  <div class="tower-bg-upload" data-tower-public-look>
+                    <label for="tower-bg-image" class="tower-music-url-label">Page background</label>
+                    <input id="tower-bg-image" class="tower-bg-image-upload" type="file" accept="image/*" data-tower-bg-image>
+                    <p class="form-hint" data-tower-bg-image-status>Upload an image to use as the page background.</p>
+                  </div>
+
                   <div class="tower-layout tower-layout--scrapbook" data-tower-scrapbook>
                     <div class="tower-collage-stage" data-tower-collage-stage aria-hidden="true"></div>
                     <div class="tower-bg-html-stage" data-tower-bg-html-stage aria-hidden="true"></div>
@@ -699,6 +705,8 @@
                           <input id="tower-social-tiktok" name="socialTiktok" type="url" maxlength="500" placeholder="https://tiktok.com/@…" data-tower-social="tiktok" inputmode="url">
                           <label for="tower-social-linkedin">LinkedIn</label>
                           <input id="tower-social-linkedin" name="socialLinkedin" type="url" maxlength="500" placeholder="https://linkedin.com/in/…" data-tower-social="linkedin" inputmode="url">
+                          <label for="tower-social-venmo">Venmo</label>
+                          <input id="tower-social-venmo" name="socialVenmo" type="text" maxlength="500" placeholder="@handle or https://venmo.com/…" data-tower-social="venmo" autocomplete="off">
                         </div>
                         <div class="form-group tower-music-fields">
                           <label for="tower-music-title">Favorite song (profile player)</label>
@@ -710,8 +718,9 @@
                           <span class="form-hint">One player only — paste a YouTube or audio link, Save profile, and it loads for everyone who opens your public Tower.</span>
                           <label for="tower-music-skin">Player look</label>
                           <select id="tower-music-skin" data-tower-music-skin>
-                            <option value="classic" selected>Classic one-line</option>
-                            <option value="cd">CD player</option>
+                            <option value="classic" selected>Pink</option>
+                            <option value="cd">Silver</option>
+                            <option value="none">None</option>
                           </select>
                           <label class="tower-music-enable">
                             <input type="checkbox" data-tower-music-enable checked>
@@ -827,6 +836,11 @@
                         <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Polaroid sticker" tabindex="-1" hidden>⋮⋮</button>
                         <div class="tower-avatar-wrap" data-tower-avatar-frame="polaroid" data-tower-polaroid>
                           <div class="tower-avatar" data-tower-polaroid-photo aria-hidden="true"></div>
+                          <label class="tower-avatar-upload" title="Upload polaroid">
+                            <span class="tower-avatar-upload-hint" aria-hidden="true">📷</span>
+                            <span class="visually-hidden">Upload polaroid</span>
+                            <input type="file" accept="image/*" data-tower-polaroid-file>
+                          </label>
                         </div>
                       </div>
 

@@ -82,25 +82,6 @@
     html: { x: 22, y: 3, z: 3, tilt: 0 },
     calendar: { x: 55, y: 28, z: 5, tilt: 0 },
   };
-  /* Earlier scrapbook defaults leaned a few degrees. Treat those as unset
-     so a saved factory layout still paints upright. Any other tilt is kept. */
-  var LEGACY_SPAWN_TILT = {
-    avatar: -2,
-    identity: 1,
-    slogan: -1,
-    music: -3,
-    badges: 2,
-    friends: -1,
-    html: 2,
-    calendar: -2,
-  };
-
-  function tiltForSpawn(id, raw) {
-    var n = typeof raw === "number" ? raw : parseFloat(raw);
-    if (isNaN(n)) return 0;
-    if (Object.prototype.hasOwnProperty.call(LEGACY_SPAWN_TILT, id) && n === LEGACY_SPAWN_TILT[id]) return 0;
-    return n;
-  }
 
   var PUBLIC_WIDGET_IDS = ["identity", "slogan", "social", "music", "badges", "friends", "html", "calendar"];
   var DEFAULT_PUBLIC_WIDGETS = {
@@ -4393,7 +4374,7 @@
       var x = typeof pos.x === "number" ? pos.x : DEFAULT_WIDGET_LAYOUT[id].x;
       var y = typeof pos.y === "number" ? pos.y : DEFAULT_WIDGET_LAYOUT[id].y;
       var z = typeof pos.z === "number" ? pos.z : DEFAULT_WIDGET_LAYOUT[id].z || zBase;
-      var tilt = tiltForSpawn(id, typeof pos.tilt === "number" ? pos.tilt : 0);
+      var tilt = typeof pos.tilt === "number" ? pos.tilt : 0;
       el.style.setProperty("--sticker-x", x + "%");
       el.style.setProperty("--sticker-y", y + "%");
       el.style.setProperty("--sticker-z", String(z));

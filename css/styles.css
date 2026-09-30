@@ -4832,7 +4832,10 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   border-radius: 0.45rem;
   font-size: 1.15rem;
   line-height: 1;
-  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji" !important;
+  font-variant-emoji: emoji;
+  font-weight: 400;
+  background-image: none;
 }
 .tower-sticker--emoji {
   display: flex;
@@ -4845,7 +4848,12 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   display: block;
   font-size: var(--emoji-size, 64px);
   line-height: 1;
-  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji" !important;
+  font-variant-emoji: emoji;
+  font-weight: 400;
+  font-style: normal;
+  background: none !important;
+  background-image: none !important;
 }
 .tower-emoji-resize {
   position: absolute;

@@ -4574,6 +4574,11 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   );
   pointer-events: none;
 }
+/* The scrapbook Polaroid is a sticker, so the frame itself stays upright. */
+.tower-sticker--polaroid .tower-avatar-wrap[data-tower-avatar-frame="polaroid"] {
+  transform: none;
+  margin: 0 auto;
+}
 
 .tower-avatar-wrap[data-tower-avatar-frame="matte-black"] {
   width: 6.2rem;
@@ -4944,7 +4949,8 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--social,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--slogan,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--identity,
-.tower-layout--scrapbook.is-sticker-stage .tower-sticker--avatar {
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--avatar,
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--polaroid {
   background: rgba(255, 234, 243, 0.92);
   border: 1px solid transparent;
   border-radius: var(--radius);

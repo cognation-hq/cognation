@@ -81,6 +81,7 @@
     friends: { x: 2, y: 52, z: 4, tilt: 0 },
     html: { x: 22, y: 3, z: 3, tilt: 0 },
     calendar: { x: 55, y: 28, z: 5, tilt: 0 },
+    polaroid: { x: 40, y: 6, z: 6, tilt: 0 },
   };
   /* Old scrapbook leans and the ±15° nudges. Rotate clicks land on 90° steps. */
   var FACTORY_WIDGET_TILT = {
@@ -477,6 +478,58 @@
     };
   }
 
+  var SCRAPBOOK_LAYOUT_KEY = "cognation.scrapbookLayout.v1";
+
+  function scrapbookLayoutId(p) {
+    var id = p && (p._profileId || p.id);
+    id = id ? String(id) : "";
+    return id || "default";
+  }
+
+  function readScrapbookLayouts() {
+    try {
+      var raw = localStorage.getItem(SCRAPBOOK_LAYOUT_KEY);
+      var doc = raw ? JSON.parse(raw) : {};
+      return doc && typeof doc === "object" ? doc : {};
+    } catch (eLayout) {
+      return {};
+    }
+  }
+
+  function writeScrapbookLayout(p) {
+    if (!p) return;
+    var doc = readScrapbookLayouts();
+    var id = scrapbookLayoutId(p);
+    var prev = doc[id] && typeof doc[id] === "object" ? doc[id] : {};
+    var nextLayout = p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : prev.widgetLayout || null;
+    var nextQuotes = Array.isArray(p.quoteStickers) && p.quoteStickers.length
+      ? p.quoteStickers
+      : (Array.isArray(prev.quoteStickers) ? prev.quoteStickers : []);
+    doc[id] = { widgetLayout: nextLayout, quoteStickers: nextQuotes };
+    try {
+      localStorage.setItem(SCRAPBOOK_LAYOUT_KEY, JSON.stringify(doc));
+    } catch (eWrite) {}
+  }
+
+  /* Remote profiles do not store widget x/y. Keep the last drop on this profile. */
+  function mergeScrapbookLayout(p) {
+    if (!p) return p;
+    var saved = readScrapbookLayouts()[scrapbookLayoutId(p)];
+    if (!saved || typeof saved !== "object") return p;
+    if ((!p.widgetLayout || typeof p.widgetLayout !== "object") && saved.widgetLayout && typeof saved.widgetLayout === "object") {
+      p.widgetLayout = saved.widgetLayout;
+    }
+    if ((!Array.isArray(p.quoteStickers) || !p.quoteStickers.length) && Array.isArray(saved.quoteStickers) && saved.quoteStickers.length) {
+      p.quoteStickers = saved.quoteStickers;
+    }
+    return p;
+  }
+
+  function layoutCoord(value, fallback) {
+    var n = typeof value === "number" ? value : parseFloat(value);
+    return isNaN(n) ? fallback : n;
+  }
+
   var TowerProfileStore = {
     getActiveProfileId: resolveActiveProfileId,
     load: function () {
@@ -606,6 +659,7 @@
         if (!Array.isArray(p.calendarEvents)) p.calendarEvents = [];
         if (typeof p.calendarIcsUrl !== "string") p.calendarIcsUrl = "";
         if (p.calendarGoogleConnected == null) p.calendarGoogleConnected = false;
+        mergeScrapbookLayout(p);
         return p;
       }
       var before = p.awardedBadges;
@@ -615,6 +669,7 @@
       var calSeeded = seedCalendarEventsIfMissing(p);
       var visMig = normalizeBadgeVisibility(p);
       var afterLen = Array.isArray(p.awardedBadges) ? p.awardedBadges.length : -1;
+      mergeScrapbookLayout(p);
       if (created || before == null || afterLen > beforeLen || beforeVis == null || visMig.migrated || calSeeded) {
         try {
           this.save(p);
@@ -629,11 +684,20 @@
       this._saving = true;
       try {
       data = data || {};
+      writeScrapbookLayout(data);
       var id = data._profileId || resolveActiveProfileId();
       if (usingRemoteSocial() && id) {
         var social = remoteSocial();
         var activeSession = getSessionObject();
+        var remoteRow = social && social.getProfile ? social.getProfile(id) : null;
+        var identityChanged = !remoteRow ||
+          String(data.displayName || "").trim() !== String(remoteRow.display_name || "").trim() ||
+          String(data.handle || "").trim() !== String(remoteRow.handle || "").trim() ||
+          String(data.slogan || "").trim() !== String(remoteRow.bio || "").trim();
+        /* A drop only changes x/y. Skip the profile PATCH so the page does not
+           reload the remote profile and snap the sticker back to its spawn point. */
         if (
+          identityChanged &&
           social &&
           social.updateCurrentProfile &&
           activeSession &&
@@ -4419,11 +4483,52 @@
     stage.__cognationStickersReparented = true;
   }
 
+  function polaroidMarkup() {
+    return (
+      '<button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Polaroid sticker" tabindex="-1" hidden>⋮⋮</button>' +
+      '<div class="tower-avatar-wrap" data-tower-avatar-frame="polaroid" data-tower-polaroid>' +
+      '<div class="tower-avatar" data-tower-polaroid-photo aria-hidden="true"></div>' +
+      '<span class="tower-avatar-upload-hint" aria-hidden="true">📷</span>' +
+      "</div>"
+    );
+  }
+
+  /* One upright Polaroid on every personal profile. Professional pages stay without it. */
+  function ensurePersonalPolaroid(root, p) {
+    var stage = root.querySelector("[data-tower-scrapbook]");
+    if (!stage) return;
+    var nodes = Array.prototype.slice.call(stage.querySelectorAll('[data-tower-widget="polaroid"]'));
+    var personal = !p || p._profileKind !== "professional";
+    if (!personal) {
+      nodes.forEach(function (el) {
+        el.hidden = true;
+        el.classList.add("is-widget-off");
+      });
+      return;
+    }
+    while (nodes.length > 1) {
+      var extra = nodes.pop();
+      if (extra && extra.parentNode) extra.parentNode.removeChild(extra);
+    }
+    var el = nodes[0];
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "tower-sticker tower-sticker--polaroid";
+      el.setAttribute("data-tower-widget", "polaroid");
+      el.setAttribute("data-sticker-label", "Polaroid");
+      el.innerHTML = polaroidMarkup();
+      stage.appendChild(el);
+    }
+    el.hidden = false;
+    el.classList.remove("is-widget-off");
+  }
+
   function applyWidgetLayout(root, p) {
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (!stage) return;
     stage.classList.add("is-sticker-stage");
     ensureStickersOnStage(stage);
+    ensurePersonalPolaroid(root, p);
     if (p) settleArrivalTilts(p);
     var layout = getWidgetLayout(p) || DEFAULT_WIDGET_LAYOUT;
     var zBase = 2;
@@ -4432,10 +4537,11 @@
       var el = stage.querySelector('[data-tower-widget="' + id + '"]');
       if (!el) return;
       var pos = layout[id] || DEFAULT_WIDGET_LAYOUT[id];
-      var x = typeof pos.x === "number" ? pos.x : DEFAULT_WIDGET_LAYOUT[id].x;
-      var y = typeof pos.y === "number" ? pos.y : DEFAULT_WIDGET_LAYOUT[id].y;
-      var z = typeof pos.z === "number" ? pos.z : DEFAULT_WIDGET_LAYOUT[id].z || zBase;
-      var tilt = typeof pos.tilt === "number" ? pos.tilt : 0;
+      var fallback = DEFAULT_WIDGET_LAYOUT[id] || { x: 8, y: 8, z: zBase, tilt: 0 };
+      var x = layoutCoord(pos && pos.x, fallback.x);
+      var y = layoutCoord(pos && pos.y, fallback.y);
+      var z = layoutCoord(pos && pos.z, fallback.z || zBase);
+      var tilt = layoutCoord(pos && pos.tilt, 0);
       el.style.setProperty("--sticker-x", x + "%");
       el.style.setProperty("--sticker-y", y + "%");
       el.style.setProperty("--sticker-z", String(z));
@@ -5020,13 +5126,18 @@
         sticker.setAttribute("data-sticker-z", String(stickerZCounter));
       }
 
+      var dropCommitted = false;
       function onUp() {
+        if (dropCommitted) return;
+        dropCommitted = true;
         sticker.classList.remove("is-dragging");
         document.removeEventListener("pointermove", onMove);
         document.removeEventListener("pointerup", onUp);
         document.removeEventListener("pointercancel", onUp);
         document.removeEventListener("touchmove", onMove);
         document.removeEventListener("touchend", onUp);
+        window.removeEventListener("pointerup", onUp, true);
+        window.removeEventListener("pointercancel", onUp, true);
         if (!dragStarted) return;
         var p = TowerProfileStore.get();
         var layout = getWidgetLayout(p) || JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT));
@@ -5063,6 +5174,8 @@
       document.addEventListener("pointermove", onMove);
       document.addEventListener("pointerup", onUp);
       document.addEventListener("pointercancel", onUp);
+      window.addEventListener("pointerup", onUp, true);
+      window.addEventListener("pointercancel", onUp, true);
       document.addEventListener("touchmove", onMove, { passive: false });
       document.addEventListener("touchend", onUp);
     }

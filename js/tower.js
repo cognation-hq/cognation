@@ -73,7 +73,7 @@
   /* Default sticker positions (%) — approximate classic left-rail + feed */
   var DEFAULT_WIDGET_LAYOUT = {
     avatar: { x: 2, y: 3, z: 5, tilt: 0 },
-    identity: { x: 2, y: 16, z: 4, tilt: 0 },
+    identity: { x: 2, y: 26, z: 4, tilt: 0 },
     slogan: { x: 22, y: 16, z: 4, tilt: 0 },
     social: { x: 2, y: 22, z: 4, tilt: 0 },
     music: { x: 2, y: 28, z: 6, tilt: 0 },
@@ -82,7 +82,6 @@
     html: { x: 22, y: 3, z: 3, tilt: 0 },
     calendar: { x: 55, y: 28, z: 5, tilt: 0 },
     polaroid: { x: 40, y: 6, z: 6, tilt: 0 },
-    camera: { x: 8, y: 58, z: 7, tilt: 0 },
     mp3: { x: 28, y: 70, z: 7, tilt: 0 },
   };
   /* Old scrapbook leans and the ±15° nudges. Rotate clicks land on 90° steps. */
@@ -3071,7 +3070,7 @@
 
   function applyAvatarFrame(root, frameId, cowboyColor) {
     frameId = normalizeFrameId(frameId);
-    var wrap = root.querySelector("[data-tower-avatar-frame]");
+    var wrap = root.querySelector('[data-tower-widget="avatar"] [data-tower-avatar-frame]');
     var overlay = root.querySelector("[data-tower-frame-overlay]");
     var hiddenInput = root.querySelector("[data-tower-avatar-frame-input]");
     if (wrap) wrap.setAttribute("data-tower-avatar-frame", frameId);
@@ -3098,6 +3097,9 @@
       cowboyColor = colorIn ? colorIn.value : "tan";
     }
     applyCowboyHatColor(root, cowboyColor);
+    root.querySelectorAll("[data-tower-polaroid]").forEach(function (el) {
+      el.setAttribute("data-tower-avatar-frame", "polaroid");
+    });
     var scaleIn = TowerProfileStore.get();
     applyAvatarFrameScale(root, scaleIn && scaleIn.avatarFrameScale);
   }
@@ -4682,7 +4684,6 @@
       '<button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Polaroid sticker" tabindex="-1" hidden>⋮⋮</button>' +
       '<div class="tower-avatar-wrap" data-tower-avatar-frame="polaroid" data-tower-polaroid>' +
       '<div class="tower-avatar" data-tower-polaroid-photo aria-hidden="true"></div>' +
-      '<span class="tower-avatar-upload-hint" aria-hidden="true">📷</span>' +
       "</div>"
     );
   }
@@ -4717,17 +4718,6 @@
     el.classList.remove("is-widget-off");
   }
 
-  function cameraMarkup() {
-    return (
-      '<button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Camera sticker" tabindex="-1" hidden>⋮⋮</button>' +
-      '<div class="tower-camera" data-tower-camera>' +
-      '<div class="tower-camera-top" aria-hidden="true"><span class="tower-camera-flash"></span></div>' +
-      '<div class="tower-camera-lens" data-tower-camera-lens></div>' +
-      '<p class="tower-camera-label">Camera</p>' +
-      "</div>"
-    );
-  }
-
   function mp3Markup() {
     return (
       '<button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move MP3 player sticker" tabindex="-1" hidden>⋮⋮</button>' +
@@ -4739,7 +4729,7 @@
     );
   }
 
-  /* One upright camera and one upright MP3 player on every personal profile. */
+    /* One upright MP3 player on every personal profile. */
   function ensurePersonalSticker(root, p, id, className, label, markup) {
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (!stage) return;
@@ -4775,8 +4765,14 @@
     stage.classList.add("is-sticker-stage");
     ensureStickersOnStage(stage);
     ensurePersonalPolaroid(root, p);
-    ensurePersonalSticker(root, p, "camera", "tower-sticker--camera", "Camera", cameraMarkup());
     ensurePersonalSticker(root, p, "mp3", "tower-sticker--mp3", "MP3 player", mp3Markup());
+    /* The generic camera sticker is not the Polaroid. Drop it if a previous session left one. */
+    var stageCam = root.querySelector("[data-tower-scrapbook]");
+    if (stageCam) {
+      stageCam.querySelectorAll('[data-tower-widget="camera"]').forEach(function (el) {
+        el.remove();
+      });
+    }
     if (p) mergeScrapbookLayout(p);
     if (p) settleArrivalTilts(p);
     var layout = getWidgetLayout(p) || DEFAULT_WIDGET_LAYOUT;
@@ -4981,6 +4977,139 @@
       stage.appendChild(el);
     });
     syncOwnerStickerHandles(root);
+  }
+
+  function commitInlineName(root, el) {
+    var p = TowerProfileStore.get();
+    var next = String(el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 80);
+    if (!next) next = p.displayName || "You";
+    p.displayName = next;
+    el.textContent = next;
+    var nameInput = root.querySelector("#tower-display-name");
+    if (nameInput) nameInput.value = next;
+    TowerProfileStore.save(p);
+    root.querySelectorAll("[data-tower-polaroid-photo]").forEach(function (photo) {
+      if (!p.avatarDataUrl) photo.textContent = initials(next);
+    });
+  }
+
+  function commitInlineHandle(root, el) {
+    var p = TowerProfileStore.get();
+    var prev = normalizeHandle(p.handle || "");
+    var next = normalizeHandle(el.textContent || "");
+    if (!next) {
+      el.textContent = prev ? "@" + prev : "@";
+      return;
+    }
+    if (window.CognationAccounts && typeof window.CognationAccounts.getProfileByHandle === "function") {
+      var clash = window.CognationAccounts.getProfileByHandle(next);
+      if (clash && clash.id !== p._profileId) {
+        el.textContent = prev ? "@" + prev : "@";
+        return;
+      }
+    }
+    p.handle = next;
+    el.textContent = "@" + next;
+    var input = root.querySelector("[data-tower-handle]");
+    if (input) input.value = next;
+    TowerProfileStore.save(p);
+    var profileRoot = root.querySelector("[data-tower-profile]");
+    if (profileRoot) {
+      var slug = profilePublicSlug(p);
+      profileRoot.id = "tower-profile-" + slug;
+      profileRoot.setAttribute("data-tower-handle", next);
+      profileRoot.setAttribute("data-author-slug", slug);
+    }
+  }
+
+  function commitInlineQuote(root, el) {
+    var sticker = el.closest("[data-tower-quote-id]");
+    if (!sticker) return;
+    var id = sticker.getAttribute("data-tower-quote-id");
+    var p = TowerProfileStore.get();
+    var quotes = getQuoteStickers(p);
+    var prev = "";
+    quotes.forEach(function (q) {
+      if (q && q.id === id) prev = q.text || "";
+    });
+    var text = String(el.textContent || "").trim().slice(0, 400);
+    if (!text) {
+      el.textContent = prev;
+      return;
+    }
+    p.quoteStickers = quotes.map(function (q) {
+      if (!q || q.id !== id) return q;
+      return { id: q.id, text: text, x: q.x, y: q.y, z: q.z, tilt: q.tilt };
+    });
+    sticker.setAttribute("data-quote-text", text);
+    el.textContent = text;
+    TowerProfileStore.save(p, { geometry: true });
+  }
+
+  function commitInlineSlogan(root, el) {
+    var p = TowerProfileStore.get();
+    var text = String(el.textContent || "").trim().slice(0, 400);
+    p.slogan = text;
+    p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
+    p.publicWidgets.slogan = !!text;
+    var input = root.querySelector("[data-tower-slogan]");
+    if (input) input.value = text;
+    el.textContent = text;
+    TowerProfileStore.save(p);
+    if (!text) {
+      var sticker = el.closest('[data-tower-widget="slogan"]');
+      if (sticker) {
+        sticker.hidden = true;
+        sticker.classList.add("is-widget-off");
+      }
+    }
+  }
+
+  function initInlineProfileEdits(root) {
+    if (!root || root.__cognationInlineEditBound) return;
+    root.__cognationInlineEditBound = true;
+
+    function canEdit() {
+      var p = TowerProfileStore.get();
+      return isTowerOwner(p) && p && p._profileKind !== "professional" && root.getAttribute("data-tower-side") === "public";
+    }
+
+    function recentDrag(el) {
+      var sticker = el && el.closest("[data-tower-widget]");
+      return !!(sticker && sticker.__cognationDraggedAt && Date.now() - sticker.__cognationDraggedAt < 500);
+    }
+
+    root.addEventListener("click", function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest || !root.contains(t) || !canEdit()) return;
+      var el = t.closest(".tower-quote-card, .tower-slogan-card, [data-tower-profile-name], [data-tower-handle-badge]");
+      if (!el || !root.contains(el) || recentDrag(el)) return;
+      if (el.getAttribute("contenteditable") === "true") return;
+      el.setAttribute("contenteditable", "true");
+      el.setAttribute("spellcheck", "false");
+      try { el.focus(); } catch (eFocus) {}
+    });
+
+    root.addEventListener("keydown", function (ev) {
+      var el = ev.target;
+      if (!el || el.getAttribute("contenteditable") !== "true") return;
+      if (!el.closest(".tower-quote-card, .tower-slogan-card, [data-tower-profile-name], [data-tower-handle-badge]")) return;
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        el.blur();
+      }
+    });
+
+    root.addEventListener("focusout", function (ev) {
+      var el = ev.target;
+      if (!el || !el.getAttribute || el.getAttribute("contenteditable") !== "true") return;
+      if (!root.contains(el)) return;
+      el.removeAttribute("contenteditable");
+      if (el.matches(".tower-quote-card")) commitInlineQuote(root, el);
+      else if (el.matches(".tower-slogan-card")) commitInlineSlogan(root, el);
+      else if (el.matches("[data-tower-profile-name]")) commitInlineName(root, el);
+      else if (el.matches("[data-tower-handle-badge]")) commitInlineHandle(root, el);
+    });
   }
 
   function openAddWidgetDialog(root) {
@@ -6196,15 +6325,19 @@
     var nameInput = root.querySelector("#tower-display-name");
     var htmlInput = root.querySelector("[data-tower-profile-html]");
     var preview = root.querySelector("[data-tower-html-preview]");
-    if (nameEl) nameEl.textContent = p.displayName || "You";
+    if (nameEl && document.activeElement !== nameEl) nameEl.textContent = p.displayName || "You";
     applyDisplayNameSize(root, p.displayNameSize || 28);
     initDisplayNameResize(root);
     var handleBadge = root.querySelector("[data-tower-handle-badge]");
     var handleVal = normalizeHandle(p.handle || "");
-    if (handleBadge) {
+    if (handleBadge && document.activeElement !== handleBadge) {
+      var ownerEditing = isTowerOwner(p) && p._profileKind !== "professional";
       if (handleVal) {
         handleBadge.hidden = false;
         handleBadge.textContent = "@" + handleVal;
+      } else if (ownerEditing) {
+        handleBadge.hidden = false;
+        handleBadge.textContent = "@";
       } else {
         handleBadge.hidden = true;
         handleBadge.textContent = "";
@@ -6237,14 +6370,16 @@
         avatar.textContent = initials(p.displayName);
       }
     }
-    var cameraLens = root.querySelector("[data-tower-camera-lens]");
-    if (cameraLens) {
+    root.querySelectorAll("[data-tower-polaroid-photo]").forEach(function (photo) {
+      if (document.activeElement === photo) return;
       if (p.avatarDataUrl) {
-        cameraLens.style.backgroundImage = 'url("' + p.avatarDataUrl.replace(/"/g, "") + '")';
+        photo.style.backgroundImage = 'url("' + p.avatarDataUrl.replace(/"/g, "") + '")';
+        photo.textContent = "";
       } else {
-        cameraLens.style.backgroundImage = "";
+        photo.style.backgroundImage = "";
+        photo.textContent = initials(p.displayName);
       }
-    }
+    });
     var bgHint = root.querySelector("[data-tower-bg-image-status]");
     if (bgHint && !(p.backgroundImageDataUrl && document.activeElement && document.activeElement.matches && document.activeElement.matches("[data-tower-bg-image]"))) {
       bgHint.textContent = p.backgroundImageDataUrl
@@ -6336,6 +6471,7 @@
     initDisplayNameResize(root);
     initOrnamentPicker(root);
     initScrapbookStickers(root);
+    initInlineProfileEdits(root);
     initCollageControls(root);
     initPublicLookControls(root);
     initProfileEditDropdown(root);

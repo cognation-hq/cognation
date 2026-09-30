@@ -4594,53 +4594,14 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   margin: 0 auto;
 }
 
-.tower-camera {
-  width: 7.2rem;
-  padding: 0.45rem 0.45rem 0.35rem;
-  background: linear-gradient(180deg, #f4f1ea, #d9d3c7);
-  border: 2px solid #2c241c;
-  border-radius: 0.85rem 0.85rem 0.55rem 0.55rem;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-}
-.tower-camera-top {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 0.3rem;
-}
-.tower-camera-flash {
-  display: block;
-  width: 1.1rem;
-  height: 0.45rem;
-  border-radius: 2px;
-  background: #f7f3c8;
-  border: 1px solid #2c241c;
-}
-.tower-camera-lens {
-  width: 4.4rem;
-  height: 4.4rem;
-  margin: 0 auto;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.15) 0 38%, transparent 39%),
-    #1c2430 center / cover no-repeat;
-  border: 4px solid #2c241c;
-  box-shadow: inset 0 0 0 6px #8a93a0, inset 0 0 0 8px #2c241c;
-}
-.tower-camera-label {
-  margin: 0.35rem 0 0;
-  text-align: center;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #2c241c;
-}
 .tower-sticker--mp3 .tower-mp3-face {
   width: 11rem;
 }
-.tower-sticker--camera,
-.tower-sticker--mp3,
-.tower-sticker--polaroid {
-  transform: rotate(var(--sticker-tilt, 0deg));
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--polaroid {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
 }
 
 .tower-avatar-wrap[data-tower-avatar-frame="matte-black"] {
@@ -5013,8 +4974,6 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--slogan,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--identity,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--avatar,
-.tower-layout--scrapbook.is-sticker-stage .tower-sticker--polaroid,
-.tower-layout--scrapbook.is-sticker-stage .tower-sticker--camera,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--mp3 {
   background: rgba(255, 234, 243, 0.92);
   border: 1px solid transparent;

@@ -635,7 +635,6 @@
       if ((!p.musicUrl || !String(p.musicUrl).trim()) && p.videoUrl && String(p.videoUrl).trim()) {
         p.musicUrl = String(p.videoUrl).trim();
         if (p.videoTitle && !p.musicTitle) p.musicTitle = p.videoTitle;
-        if (!p.musicSkin || p.musicSkin === "classic") p.musicSkin = "radio";
         p.musicEnabled = p.videoEnabled !== false;
       }
       if (p.publicWidgets && typeof p.publicWidgets === "object") {
@@ -2363,6 +2362,13 @@
     return iframe;
   }
 
+  /* Green MP3 and wood radio are not personal-profile looks. Pink is the classic note, silver is the CD. */
+  function visibleMusicSkin(skin) {
+    skin = skin || "classic";
+    if (skin === "radio" || skin === "mp3") return "classic";
+    return skin;
+  }
+
   function applyMusicSkin(root, skin) {
     skin = skin || "classic";
     var wrap = root.querySelector("[data-tower-music]");
@@ -2492,7 +2498,7 @@
 
     var url = (p.musicUrl || "").trim();
     var enabled = p.musicEnabled !== false && !!url;
-    var skin = p.musicSkin || "classic";
+    var skin = visibleMusicSkin(p.musicSkin || "classic");
     var ytId = parseYoutubeVideoId(url);
     setAllMusicLabels(root, formatSongLine(p));
 
@@ -2502,24 +2508,10 @@
       hideMusicSkins(root);
       clearYoutubeEmbed(root);
       clearTowerAudio(audio);
-      /* No track yet. The green MP3 skin is a hidden option, and filling it
-         with "Untitled" is not the player this page shipped. The original
-         graphic is the old-school radio: it is the selected Player look, the
-         face on the music URL box, and the skin a YouTube link uses. */
-      if (p && p._profileKind !== "professional") {
-        var musicSticker = root.querySelector('[data-tower-widget="music"]');
-        var radioFace = wrap.querySelector('[data-music-face="radio"]');
-        if (musicSticker) {
-          musicSticker.hidden = false;
-          musicSticker.classList.remove("is-widget-off");
-        }
-        wrap.hidden = false;
-        wrap.setAttribute("data-music-skin", "radio");
-        if (radioFace) {
-          radioFace.hidden = false;
-          var idleLabel = radioFace.querySelector("[data-tower-music-label]");
-          if (idleLabel && !(p.musicTitle || "").trim()) idleLabel.textContent = "Song — Artist";
-        }
+      var musicSticker = root.querySelector('[data-tower-widget="music"]');
+      if (musicSticker) {
+        musicSticker.hidden = true;
+        musicSticker.classList.add("is-widget-off");
       }
       return;
     }
@@ -3230,9 +3222,7 @@
       /* Auto-prune empty shells so ghost handles do not linger on personal scrapbooks */
       if (id === "html" && !htmlText) on = false;
       if (id === "social" && !profileHasSocialLinks(p)) on = false;
-      /* Personal pages keep the original radio graphic even before a track is saved.
-         A professional page still hides the player until it has a real URL. */
-      if (id === "music" && !musicOn) on = !!(p && p._profileKind !== "professional");
+      if (id === "music" && !musicOn) on = false;
       if (id === "friends" && (!friendIds || !friendIds.length)) on = false;
       if (id === "badges" && !profileHasVisibleBadges(p)) on = false;
       var el = root.querySelector('[data-tower-widget="' + id + '"]');
@@ -6393,7 +6383,7 @@
     if (artistIn && document.activeElement !== artistIn) artistIn.value = p.musicArtist || "";
     if (urlIn && document.activeElement !== urlIn) urlIn.value = p.musicUrl || "";
     if (enIn) enIn.checked = p.musicEnabled !== false;
-    if (skinIn) skinIn.value = p.musicSkin || "classic";
+    if (skinIn) skinIn.value = visibleMusicSkin(p.musicSkin || "classic");
     initTowerMusic(root, p);
 
     var videoUrlIn = root.querySelector("[data-tower-video-url]");
@@ -6513,11 +6503,7 @@
         p.musicArtist = artistIn ? artistIn.value.trim().slice(0, 120) : "";
         p.musicUrl = urlIn ? urlIn.value.trim().slice(0, 500) : "";
         p.musicEnabled = enIn ? !!enIn.checked : true;
-        p.musicSkin = skinIn && skinIn.value ? skinIn.value : "classic";
-        /* Prefer radio look for the single YouTube/radio widget when unset */
-        if (p.musicUrl && parseYoutubeVideoId(p.musicUrl) && (!skinIn || !skinIn.value)) {
-          p.musicSkin = "radio";
-        }
+        p.musicSkin = visibleMusicSkin(skinIn && skinIn.value ? skinIn.value : "classic");
         p.videoEnabled = false;
         p.videoUrl = "";
         if (p.musicYoutubeWidth == null) p.musicYoutubeWidth = 320;
@@ -6659,7 +6645,7 @@
     if (skinInLive) {
       skinInLive.addEventListener("change", function () {
         var cur = TowerProfileStore.get();
-        cur.musicSkin = skinInLive.value || "classic";
+        cur.musicSkin = visibleMusicSkin(skinInLive.value || "classic");
         TowerProfileStore.save(cur);
         initTowerMusic(root, cur);
       });

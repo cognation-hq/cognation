@@ -72,16 +72,35 @@
 
   /* Default sticker positions (%) — approximate classic left-rail + feed */
   var DEFAULT_WIDGET_LAYOUT = {
-    avatar: { x: 2, y: 3, z: 5, tilt: -2 },
-    identity: { x: 2, y: 16, z: 4, tilt: 1 },
-    slogan: { x: 22, y: 16, z: 4, tilt: -1 },
+    avatar: { x: 2, y: 3, z: 5, tilt: 0 },
+    identity: { x: 2, y: 16, z: 4, tilt: 0 },
+    slogan: { x: 22, y: 16, z: 4, tilt: 0 },
     social: { x: 2, y: 22, z: 4, tilt: 0 },
-    music: { x: 2, y: 28, z: 6, tilt: -3 },
-    badges: { x: 2, y: 38, z: 5, tilt: 2 },
-    friends: { x: 2, y: 52, z: 4, tilt: -1 },
-    html: { x: 22, y: 3, z: 3, tilt: 2 },
-    calendar: { x: 55, y: 28, z: 5, tilt: -2 },
+    music: { x: 2, y: 28, z: 6, tilt: 0 },
+    badges: { x: 2, y: 38, z: 5, tilt: 0 },
+    friends: { x: 2, y: 52, z: 4, tilt: 0 },
+    html: { x: 22, y: 3, z: 3, tilt: 0 },
+    calendar: { x: 55, y: 28, z: 5, tilt: 0 },
   };
+  /* Earlier scrapbook defaults leaned a few degrees. Treat those as unset
+     so a saved factory layout still paints upright. Any other tilt is kept. */
+  var LEGACY_SPAWN_TILT = {
+    avatar: -2,
+    identity: 1,
+    slogan: -1,
+    music: -3,
+    badges: 2,
+    friends: -1,
+    html: 2,
+    calendar: -2,
+  };
+
+  function tiltForSpawn(id, raw) {
+    var n = typeof raw === "number" ? raw : parseFloat(raw);
+    if (isNaN(n)) return 0;
+    if (Object.prototype.hasOwnProperty.call(LEGACY_SPAWN_TILT, id) && n === LEGACY_SPAWN_TILT[id]) return 0;
+    return n;
+  }
 
   var PUBLIC_WIDGET_IDS = ["identity", "slogan", "social", "music", "badges", "friends", "html", "calendar"];
   var DEFAULT_PUBLIC_WIDGETS = {
@@ -1622,7 +1641,7 @@
       x: Math.max(0, Math.min(88, baseX + 22 + col * 10)),
       y: Math.max(0, Math.min(88, baseY + 10 + row * 14)),
       z: 14 + index,
-      tilt: (index % 2 === 0 ? -4 : 3) + (index % 3) - 1,
+      tilt: 0,
     };
   }
 
@@ -2578,7 +2597,7 @@
       x: Math.max(0, Math.min(88, baseX + 18 + col * 9)),
       y: Math.max(0, Math.min(88, baseY + row * 12)),
       z: 12 + index,
-      tilt: (index % 2 === 0 ? -3 : 2) + (index % 3),
+      tilt: 0,
     };
   }
 
@@ -3132,6 +3151,13 @@
     var show = !!(owner && selected);
     bar.hidden = !show;
     bar.setAttribute("aria-hidden", show ? "false" : "true");
+    var scrap = bar.closest("[data-tower-scrapbook-bar]");
+    if (scrap) {
+      scrap.hidden = !show;
+      scrap.setAttribute("aria-hidden", show ? "false" : "true");
+    }
+    var rotateBtn = bar.querySelector("[data-tower-rotate]");
+    if (rotateBtn) rotateBtn.disabled = !selected;
   }
 
   function readTiltFromElement(el) {
@@ -4367,7 +4393,7 @@
       var x = typeof pos.x === "number" ? pos.x : DEFAULT_WIDGET_LAYOUT[id].x;
       var y = typeof pos.y === "number" ? pos.y : DEFAULT_WIDGET_LAYOUT[id].y;
       var z = typeof pos.z === "number" ? pos.z : DEFAULT_WIDGET_LAYOUT[id].z || zBase;
-      var tilt = typeof pos.tilt === "number" ? pos.tilt : DEFAULT_WIDGET_LAYOUT[id].tilt || 0;
+      var tilt = tiltForSpawn(id, typeof pos.tilt === "number" ? pos.tilt : 0);
       el.style.setProperty("--sticker-x", x + "%");
       el.style.setProperty("--sticker-y", y + "%");
       el.style.setProperty("--sticker-z", String(z));
@@ -4514,7 +4540,7 @@
       x: layout && typeof layout.x === "number" ? layout.x : 36 + Math.random() * 20,
       y: layout && typeof layout.y === "number" ? layout.y : 30 + Math.random() * 25,
       z: layout && typeof layout.z === "number" ? layout.z : 10,
-      tilt: layout && typeof layout.tilt === "number" ? layout.tilt : (Math.random() * 6 - 3),
+      tilt: layout && typeof layout.tilt === "number" ? layout.tilt : 0,
     };
     var found = false;
     quotes = quotes.map(function (q) {
@@ -4669,11 +4695,6 @@
 
     var resetBtn = root.querySelector("[data-tower-reset-layout]");
     var undoBtn = root.querySelector("[data-tower-undo-widget]");
-    var hint = root.querySelector("[data-tower-scrapbook-bar] .tower-scrapbook-hint");
-    if (hint) {
-      hint.textContent =
-        "Drag ⋮⋮ to move · click to select · rotate / straighten selected · Backspace removes · Undo restores · Reset brings widgets back";
-    }
     if (!root.__cognationWidgetUndo) root.__cognationWidgetUndo = [];
 
     function setProfileStatusSafe(msg, isError) {

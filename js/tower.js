@@ -6496,7 +6496,7 @@
           var input = root.querySelector('[data-tower-social="' + net.id + '"]');
           p.socialLinks[net.id] = input ? storedSocialValue(net.id, input.value) : "";
         });
-        p.customHtml = sanitizeProfileHtml(htmlInput ? htmlInput.value : "");
+        p.customHtml = htmlInput ? sanitizeProfileHtml(htmlInput.value) : (p.customHtml || "");
         var sloganIn = root.querySelector("[data-tower-slogan]");
         p.slogan = sloganIn ? String(sloganIn.value || "").trim().slice(0, 400) : (p.slogan || "");
         p.badges = { role: "", interest: "", status: "" };
@@ -6504,20 +6504,22 @@
           seedAwardedBadgesIfMissing(p);
         }
         var countSel = root.querySelector("[data-tower-friends-count]");
-        var n = parseInt(countSel && countSel.value ? countSel.value : "3", 10);
-        if ([3, 6, 8].indexOf(n) === -1) n = 3;
-        p.friendsDisplayCount = n;
-        p.featuredFriendIds = (p.featuredFriendIds || []).slice(0, n);
+        if (countSel) {
+          var n = parseInt(countSel.value ? countSel.value : "3", 10);
+          if ([3, 6, 8].indexOf(n) === -1) n = 3;
+          p.friendsDisplayCount = n;
+          p.featuredFriendIds = (p.featuredFriendIds || []).slice(0, n);
+        }
         var titleIn = root.querySelector("[data-tower-music-title]");
         var urlIn = root.querySelector("[data-tower-music-url]");
         var enIn = root.querySelector("[data-tower-music-enable]");
         var artistIn = root.querySelector("[data-tower-music-artist]");
         var skinIn = root.querySelector("[data-tower-music-skin]");
-        p.musicTitle = titleIn ? titleIn.value.trim().slice(0, 120) : "";
-        p.musicArtist = artistIn ? artistIn.value.trim().slice(0, 120) : "";
-        p.musicUrl = urlIn ? urlIn.value.trim().slice(0, 500) : "";
-        p.musicEnabled = enIn ? !!enIn.checked : true;
-        p.musicSkin = visibleMusicSkin(skinIn && skinIn.value ? skinIn.value : "classic");
+        if (titleIn) p.musicTitle = titleIn.value.trim().slice(0, 120);
+        if (artistIn) p.musicArtist = artistIn.value.trim().slice(0, 120);
+        if (urlIn) p.musicUrl = urlIn.value.trim().slice(0, 500);
+        if (enIn) p.musicEnabled = !!enIn.checked;
+        if (skinIn) p.musicSkin = visibleMusicSkin(skinIn.value || "classic");
         p.videoEnabled = false;
         p.videoUrl = "";
         if (p.musicYoutubeWidth == null) p.musicYoutubeWidth = 320;
@@ -6563,7 +6565,10 @@
         }
         /* keep widgetLayout as last dragged */
         if (!p.widgetLayout) p.widgetLayout = JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT));
-        p.publicWidgets = readPublicWidgetsFromForm(root);
+        if (root.querySelector("[data-tower-public-widget]")) {
+          p.publicWidgets = readPublicWidgetsFromForm(root);
+        }
+        p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
         p.publicWidgets.social = profileHasSocialLinks(p);
         if (!TowerProfileStore.save(p)) {
           setProfileStatus("Could not save profile (storage full or blocked). Try a smaller photo.", true);

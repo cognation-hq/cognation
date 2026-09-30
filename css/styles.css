@@ -10577,3 +10577,110 @@ body.cognation-demo-on {
   text-overflow: clip;
 }
 
+/* Edit Profile: black type on white, packed so the social fields and frames are readable. */
+#panel-tower .tower-profile-edit-dropdown {
+  width: min(20.5rem, 92vw) !important;
+  max-height: min(78vh, 34rem) !important;
+  padding: 0.4rem 0.5rem 0.45rem !important;
+  background: #fff !important;
+  color: #000 !important;
+}
+#panel-tower .tower-profile-edit-dropdown :is(p, label, span, button, input, .form-hint) {
+  color: #000 !important;
+}
+#panel-tower .tower-profile-edit-dropdown .form-group,
+#panel-tower .tower-profile-edit-dropdown .tower-profile-form .form-group {
+  margin: 0 0 0.35rem !important;
+}
+#panel-tower .tower-profile-edit-dropdown .tower-social-fields {
+  display: grid;
+  grid-template-columns: 5.1rem minmax(0, 1fr);
+  column-gap: 0.35rem;
+  row-gap: 0.22rem;
+  align-items: center;
+}
+#panel-tower .tower-profile-edit-dropdown .tower-social-fields-label,
+#panel-tower .tower-profile-edit-dropdown .tower-frame-fields-label {
+  grid-column: 1 / -1;
+  margin: 0 !important;
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  line-height: 1.15 !important;
+  color: #000 !important;
+}
+#panel-tower .tower-profile-edit-dropdown .tower-social-fields label {
+  margin: 0 !important;
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
+  line-height: 1.1 !important;
+}
+#panel-tower .tower-profile-edit-dropdown input {
+  width: 100%;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0.18rem 0.4rem !important;
+  border: 1px solid #222 !important;
+  border-radius: 0.3rem !important;
+  background: #fff !important;
+  color: #000 !important;
+  font-size: 0.8rem !important;
+  line-height: 1.2 !important;
+  box-shadow: none !important;
+}
+#panel-tower .tower-profile-edit-dropdown input::placeholder {
+  color: #444 !important;
+  opacity: 1 !important;
+}
+#panel-tower .tower-profile-edit-dropdown .tower-frame-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.22rem;
+  margin: 0.2rem 0 0.15rem !important;
+}
+#panel-tower .tower-profile-edit-dropdown .tower-frame-chip,
+#panel-tower .tower-profile-edit-dropdown [data-tower-frame-chips] .tower-frame-chip {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.22rem !important;
+  margin: 0 !important;
+  padding: 0.1rem 0.35rem 0.1rem 0.12rem !important;
+  border: 1px solid #222 !important;
+  border-radius: 0.35rem !important;
+  background: #fff !important;
+  color: #000 !important;
+  font-size: 0.72rem !important;
+  line-height: 1.1 !important;
+  font-weight: 650 !important;
+}
+#panel-tower .tower-profile-edit-dropdown [data-tower-frame-chips] .tower-frame-chip > .tower-frame-chip-name,
+#panel-tower .tower-profile-edit-dropdown .tower-frame-chip-name {
+  display: inline !important;
+  color: #000 !important;
+  font-size: 0.72rem !important;
+  line-height: 1.1 !important;
+  text-indent: 0 !important;
+}
+#panel-tower .tower-profile-edit-dropdown [data-tower-frame-chips] .tower-frame-chip-swatch,
+#panel-tower .tower-profile-edit-dropdown .tower-cowboy-swatch {
+  width: 0.95rem !important;
+  height: 0.95rem !important;
+  flex: 0 0 auto;
+}
+#panel-tower .tower-profile-edit-dropdown .tower-frame-chip.is-selected,
+#panel-tower .tower-profile-edit-dropdown .tower-frame-chip[aria-pressed="true"] {
+  background: #f4a4c4 !important;
+  border-color: #000 !important;
+  color: #000 !important;
+}
+#panel-tower .tower-profile-edit-dropdown .form-actions {
+  margin: 0.15rem 0 0 !important;
+}
+#panel-tower .tower-profile-edit-dropdown .btn {
+  padding: 0.22rem 0.55rem !important;
+  background: #fff !important;
+  color: #000 !important;
+  border: 1px solid #000 !important;
+  font-size: 0.75rem !important;
+  box-shadow: none !important;
+}
+

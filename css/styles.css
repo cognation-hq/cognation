@@ -7434,20 +7434,7 @@ body { padding-top: 0 !important; }
   flex: 0 0 auto;
 }
 .tower-avatar-upload-hint {
-  position: absolute;
-  right: 0.15rem;
-  bottom: 0.15rem;
-  z-index: 5;
-  width: 1.35rem;
-  height: 1.35rem;
-  border-radius: 50%;
-  background: rgba(74, 44, 58, 0.75);
-  color: #fff;
-  font-size: 0.7rem;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-  opacity: 0.85;
+  display: none !important;
 }
 [data-tower-app][data-tower-is-owner="true"] .tower-avatar-upload {
   cursor: pointer;

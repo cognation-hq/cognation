@@ -7876,11 +7876,7 @@ body { padding-top: 0 !important; }
 
 /* —— Rotate toolbar —— */
 .tower-rotate-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0;
+  display: contents;
 }
 .tower-rotate-toolbar[hidden] {
   display: none !important;

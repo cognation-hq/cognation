@@ -83,7 +83,7 @@
     calendar: { x: 55, y: 28, z: 5, tilt: 0 },
     polaroid: { x: 40, y: 6, z: 6, tilt: 0 },
   };
-  /* Old scrapbook leans and the ±15° nudges. Rotate clicks land on 90° steps. */
+  /* Old scrapbook leans. A Rotate click adds 5° and that angle is kept. */
   var FACTORY_WIDGET_TILT = {
     avatar: -2,
     identity: 1,
@@ -95,18 +95,11 @@
     calendar: -2,
   };
 
-  function isUserRotateTilt(n) {
-    var norm = ((n % 360) + 360) % 360;
-    return norm === 0 || Math.abs(norm - 90) < 0.01 || Math.abs(norm - 180) < 0.01 || Math.abs(norm - 270) < 0.01;
-  }
-
   function isArrivalTilt(id, tilt) {
     var n = typeof tilt === "number" ? tilt : parseFloat(tilt);
     if (isNaN(n) || n === 0) return false;
-    if (isUserRotateTilt(n)) return false;
-    if (id && FACTORY_WIDGET_TILT[id] === n) return true;
-    /* Scrapbook lean or a leftover ±15°, including a saved 15° calendar. */
-    return Math.abs(n) <= 15;
+    /* Only the original factory leans. A 5° Rotate step must survive reload. */
+    return !!(id && FACTORY_WIDGET_TILT[id] === n);
   }
 
   function settleArrivalTilts(p) {
@@ -3356,12 +3349,11 @@
     var stage = root.querySelector("[data-tower-scrapbook]");
     var owner = isTowerOwner(TowerProfileStore.get()) && root.getAttribute("data-tower-side") === "public";
     var selected = getSelectedArrangeable(stage);
-    var showRotate = !!(owner && selected);
     if (bar) {
-      bar.hidden = !showRotate;
-      bar.setAttribute("aria-hidden", showRotate ? "false" : "true");
+      bar.hidden = false;
+      bar.setAttribute("aria-hidden", "false");
       var rotateBtn = bar.querySelector("[data-tower-rotate]");
-      if (rotateBtn) rotateBtn.disabled = !selected;
+      if (rotateBtn) rotateBtn.disabled = !(owner && selected);
     }
     var scrap = root.querySelector("[data-tower-scrapbook-bar]");
     if (scrap) {

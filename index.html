@@ -310,7 +310,6 @@
               <button type="button" role="tab" id="tab-pages" aria-controls="panel-pages" aria-selected="false" tabindex="-1" hidden>PAGES</button>
             </div>
             <div class="app-topbar-actions">
-              <a class="grok-whisper" href="https://x.ai/bot" rel="noopener noreferrer">talk to grok bot</a>
               <button type="button" class="app-logout-btn" data-cognation-logout>Log out</button>
             </div>
           </div>
@@ -329,50 +328,6 @@
                     <header class="tower-header">
                       <h3 class="tower-title">TOWER</h3>
                     </header>
-
-                    
-                    <details class="tower-private-theme" data-tower-private-theme>
-                      <summary class="tower-private-theme-summary">My feed look · private only</summary>
-                      <div class="tower-private-theme-body">
-                        <p class="form-hint">Styles your newsfeed backside — separate from the public scrapbook.</p>
-                        <div class="form-group tower-private-theme-fields">
-                          <label for="tower-private-bg">Newsfeed background</label>
-                          <input id="tower-private-bg" type="color" value="#fff5f9" data-tower-private-bg>
-                          <label for="tower-private-font" class="tower-music-url-label">Font family</label>
-                          <select id="tower-private-font" data-tower-private-font>
-                            <option value="georgia">Georgia (serif)</option>
-                            <option value="chomsky">Chomsky (display)</option>
-                            <option value="system">system-ui (sans)</option>
-                            <option value="serif">Classic serif</option>
-                            <option value="sans">Clean sans</option>
-                            <option value="scrapbook">Comic-ish scrapbook</option>
-                          </select>
-                          <label for="tower-private-font-size" class="tower-music-url-label">Font size</label>
-                          <select id="tower-private-font-size" data-tower-private-font-size>
-                            <option value="14">14px · compact</option>
-                            <option value="16" selected>16px · default</option>
-                            <option value="18">18px · comfortable</option>
-                            <option value="20">20px · large</option>
-                          </select>
-                          <label for="tower-private-text" class="tower-music-url-label">Text color</label>
-                          <input id="tower-private-text" type="color" value="#4a2c3a" data-tower-private-text>
-                          <label for="tower-private-btn" class="tower-music-url-label">Button color</label>
-                          <input id="tower-private-btn" type="color" value="#f4a4c4" data-tower-private-btn>
-                          <label class="tower-private-check">
-                            <input type="checkbox" data-tower-private-author-see-through checked>
-                            <span>See-through names on posts</span>
-                          </label>
-                          <label class="tower-private-check">
-                            <input type="checkbox" data-tower-private-messages-see-through checked>
-                            <span>See-through messages panel (bubbles &amp; chrome)</span>
-                          </label>
-                        </div>
-                        <div class="form-actions">
-                          <button type="button" class="btn btn-primary tower-btn-compact" data-tower-private-theme-save>Save</button>
-                        </div>
-                        <p class="commune-status" data-tower-private-theme-status hidden role="status" aria-live="polite"></p>
-                      </div>
-                    </details>
 
                     <details class="tower-private-theme tower-private-friends tower-compact-block" data-tower-private-friends data-tower-top-friends>
                       <summary class="tower-private-theme-summary">Top friends</summary>
@@ -546,31 +501,16 @@
                     <button type="button" class="tower-kind-btn" role="tab" data-tower-profile-kind="personal" aria-selected="true" id="tower-kind-personal">Personal page</button>
                     <button type="button" class="tower-kind-btn" role="tab" data-tower-profile-kind="professional" aria-selected="false" id="tower-kind-professional">Professional page</button>
                   </div>
-                  <div class="tower-scrapbook-bar" data-tower-scrapbook-bar>
-                  <button type="button" class="btn btn-secondary" data-tower-add-widget title="Add a quote or text sticker">Add content</button>
-                  <button type="button" class="btn btn-secondary" data-tower-reset-layout>Reset layout</button>
-                  <button type="button" class="btn btn-secondary" data-tower-undo-widget disabled title="Restore last removed widget">Undo</button>
+                  <div class="tower-scrapbook-bar" data-tower-scrapbook-bar hidden>
                   <div class="tower-rotate-toolbar" data-tower-rotate-toolbar hidden>
-                    <span class="tower-rotate-label">Rotate</span>
-                    <button type="button" class="btn btn-secondary tower-rotate-btn" data-tower-rotate="straighten" title="Straighten (0°)">Straighten</button>
-                    <button type="button" class="btn btn-secondary tower-rotate-btn" data-tower-rotate="-90" title="Rotate 90° counter-clockwise">↺ 90°</button>
-                    <button type="button" class="btn btn-secondary tower-rotate-btn" data-tower-rotate="90" title="Rotate 90° clockwise">↻ 90°</button>
-                    <button type="button" class="btn btn-secondary tower-rotate-btn" data-tower-rotate="180" title="Upside down (180°)">180°</button>
-                    <button type="button" class="btn btn-secondary tower-rotate-btn" data-tower-rotate="-15" title="Nudge −15° ([)">−15°</button>
-                    <button type="button" class="btn btn-secondary tower-rotate-btn" data-tower-rotate="15" title="Nudge +15° (])">+15°</button>
-                  </div>
-                  <span class="form-hint tower-scrapbook-hint">Drag ⋮⋮ to move · click to select · Add content for quotes · Backspace removes · Undo restores</span>
-                  <div class="tower-public-url-chip" data-tower-public-url-chip>
-                    <label class="visually-hidden" for="tower-public-url-preview">Public profile link</label>
-                    <input id="tower-public-url-preview" type="text" readonly data-tower-public-url-preview spellcheck="false">
-                    <button type="button" class="btn btn-secondary" data-tower-copy-public-url>Copy link</button>
+                    <button type="button" class="btn btn-secondary tower-rotate-btn" data-tower-rotate="90" title="Rotate selected widget 90° clockwise">Rotate</button>
                   </div>
                 </div>
 
                   <details class="tower-private-theme tower-public-look-panel" data-tower-collage-panel data-tower-public-look>
                     <summary class="tower-private-theme-summary">Public profile look</summary>
                     <div class="tower-private-theme-body">
-                      <p class="form-hint">Styles the public scrapbook visitors see — separate from My feed look (private).</p>
+                      <p class="form-hint">Styles the public scrapbook visitors see.</p>
                       <div class="form-group tower-private-theme-fields">
                         <label for="tower-font">Font family</label>
                         <select id="tower-font" name="towerFont" data-tower-font>

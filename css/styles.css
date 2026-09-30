@@ -3766,7 +3766,7 @@ body.login-gate-open .app-topbar {
   box-shadow:
     0 3px 0 rgba(74, 44, 58, 0.06),
     0 6px 16px rgba(74, 44, 58, 0.12);
-  transform: rotate(var(--sticker-tilt, -2deg));
+  transform: rotate(var(--sticker-tilt, 0deg));
   touch-action: none;
   user-select: none;
   transition: box-shadow 0.15s ease, transform 0.15s ease;
@@ -3839,7 +3839,7 @@ body.login-gate-open .app-topbar {
   box-shadow:
     0 3px 0 rgba(74, 44, 58, 0.06),
     0 6px 16px rgba(74, 44, 58, 0.12);
-  transform: rotate(var(--sticker-tilt, -2deg));
+  transform: rotate(var(--sticker-tilt, 0deg));
   touch-action: none;
   user-select: none;
   transition: box-shadow 0.15s ease, transform 0.15s ease;
@@ -4774,6 +4774,9 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   border-radius: var(--radius);
   background: var(--color-surface);
 }
+.tower-scrapbook-bar[hidden] {
+  display: none !important;
+}
 
 /* Public widgets opt-in checkboxes in Edit profile */
 .tower-public-widgets {
@@ -4991,45 +4994,24 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   min-height: 3.2rem;
 }
 
-.tower-sticker-handle {
-  display: none;
-  position: absolute;
-  top: -0.45rem;
-  right: -0.45rem;
-  z-index: 5;
-  width: 1.6rem;
-  height: 1.6rem;
-  border-radius: 999px;
-  border: 1px solid var(--color-border);
-  background: var(--color-accent);
-  color: var(--color-heading);
-  font-size: 0.7rem;
-  line-height: 1;
-  cursor: grab;
-  touch-action: none;
-  box-shadow: 0 2px 6px rgba(74, 44, 58, 0.2);
-}
-/* Owner on public side: always show ⋮⋮ drag handles (no Arrange mode) */
-[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker-handle {
-  display: grid;
-  place-items: center;
-  pointer-events: auto;
-  width: 2rem;
-  height: 2rem;
-  top: -0.55rem;
-  right: -0.55rem;
-  font-size: 0.85rem;
-  z-index: 20;
-}
+/* Grab circles are gone. The whole sticker moves; controls keep their own cursor. */
+.tower-sticker-handle,
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker-handle,
 [data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker-handle[hidden] {
-  display: grid !important;
-}
-[data-tower-app]:not([data-tower-is-owner="true"]) .tower-sticker-handle,
-[data-tower-app][data-tower-side="private"] .tower-sticker-handle {
   display: none !important;
+  pointer-events: none !important;
 }
-.tower-sticker-handle:active {
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-layout--scrapbook.is-sticker-stage > .tower-sticker {
+  cursor: grab;
+}
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker.is-dragging {
   cursor: grabbing;
+}
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker :is(a, button, summary) {
+  cursor: pointer;
+}
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker :is(input, textarea, select) {
+  cursor: text;
 }
 .tower-layout--scrapbook .tower-sticker.is-widget-selected {
   outline: 2px solid var(--color-accent);

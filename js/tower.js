@@ -72,16 +72,74 @@
 
   /* Default sticker positions (%) — approximate classic left-rail + feed */
   var DEFAULT_WIDGET_LAYOUT = {
-    avatar: { x: 2, y: 3, z: 5, tilt: -2 },
-    identity: { x: 2, y: 16, z: 4, tilt: 1 },
-    slogan: { x: 22, y: 16, z: 4, tilt: -1 },
+    avatar: { x: 2, y: 3, z: 5, tilt: 0 },
+    identity: { x: 2, y: 16, z: 4, tilt: 0 },
+    slogan: { x: 22, y: 16, z: 4, tilt: 0 },
     social: { x: 2, y: 22, z: 4, tilt: 0 },
-    music: { x: 2, y: 28, z: 6, tilt: -3 },
-    badges: { x: 2, y: 38, z: 5, tilt: 2 },
-    friends: { x: 2, y: 52, z: 4, tilt: -1 },
-    html: { x: 22, y: 3, z: 3, tilt: 2 },
-    calendar: { x: 55, y: 28, z: 5, tilt: -2 },
+    music: { x: 2, y: 28, z: 6, tilt: 0 },
+    badges: { x: 2, y: 38, z: 5, tilt: 0 },
+    friends: { x: 2, y: 52, z: 4, tilt: 0 },
+    html: { x: 22, y: 3, z: 3, tilt: 0 },
+    calendar: { x: 55, y: 28, z: 5, tilt: 0 },
   };
+  /* Old scrapbook leans and the ±15° nudges. Rotate clicks land on 90° steps. */
+  var FACTORY_WIDGET_TILT = {
+    avatar: -2,
+    identity: 1,
+    slogan: -1,
+    music: -3,
+    badges: 2,
+    friends: -1,
+    html: 2,
+    calendar: -2,
+  };
+
+  function isUserRotateTilt(n) {
+    var norm = ((n % 360) + 360) % 360;
+    return norm === 0 || Math.abs(norm - 90) < 0.01 || Math.abs(norm - 180) < 0.01 || Math.abs(norm - 270) < 0.01;
+  }
+
+  function isArrivalTilt(id, tilt) {
+    var n = typeof tilt === "number" ? tilt : parseFloat(tilt);
+    if (isNaN(n) || n === 0) return false;
+    if (isUserRotateTilt(n)) return false;
+    if (id && FACTORY_WIDGET_TILT[id] === n) return true;
+    /* Scrapbook lean or a leftover ±15°, including a saved 15° calendar. */
+    return Math.abs(n) <= 15;
+  }
+
+  function settleArrivalTilts(p) {
+    if (!p) return false;
+    var changed = false;
+    function clearTilt(obj, id) {
+      if (!obj || typeof obj !== "object") return;
+      if (!isArrivalTilt(id, obj.tilt)) return;
+      obj.tilt = 0;
+      changed = true;
+    }
+    var layout = p.widgetLayout;
+    if (layout && typeof layout === "object") {
+      Object.keys(layout).forEach(function (id) {
+        clearTilt(layout[id], id);
+      });
+    }
+    ["friendPinLayout", "badgePinLayout"].forEach(function (key) {
+      var pins = p[key];
+      if (!pins || typeof pins !== "object") return;
+      Object.keys(pins).forEach(function (id) {
+        clearTilt(pins[id], null);
+      });
+    });
+    if (Array.isArray(p.quoteStickers)) {
+      p.quoteStickers.forEach(function (q) {
+        clearTilt(q, null);
+      });
+    }
+    if (changed) {
+      try { TowerProfileStore.save(p); } catch (eSettle) {}
+    }
+    return changed;
+  }
 
   var PUBLIC_WIDGET_IDS = ["identity", "slogan", "social", "music", "badges", "friends", "html", "calendar"];
   var DEFAULT_PUBLIC_WIDGETS = {
@@ -1622,7 +1680,7 @@
       x: Math.max(0, Math.min(88, baseX + 22 + col * 10)),
       y: Math.max(0, Math.min(88, baseY + 10 + row * 14)),
       z: 14 + index,
-      tilt: (index % 2 === 0 ? -4 : 3) + (index % 3) - 1,
+      tilt: 0,
     };
   }
 
@@ -1699,6 +1757,7 @@
     stage.classList.add("is-sticker-stage");
     ensureStickersOnStage(stage);
     var p = profile || TowerProfileStore.get();
+    if (p) settleArrivalTilts(p);
     var widgets = normalizePublicWidgets(p && p.publicWidgets);
     stage.querySelectorAll("[data-tower-badge-pin]").forEach(function (el) {
       el.remove();
@@ -2578,7 +2637,7 @@
       x: Math.max(0, Math.min(88, baseX + 18 + col * 9)),
       y: Math.max(0, Math.min(88, baseY + row * 12)),
       z: 12 + index,
-      tilt: (index % 2 === 0 ? -3 : 2) + (index % 3),
+      tilt: 0,
     };
   }
 
@@ -2617,6 +2676,7 @@
     if (!stage) return;
     stage.classList.add("is-sticker-stage");
     ensureStickersOnStage(stage);
+    if (p) settleArrivalTilts(p);
     var widgets = normalizePublicWidgets(p && p.publicWidgets);
     if (!widgets.friends) {
       stage.querySelectorAll("[data-tower-friend-pin]").forEach(function (el) {
@@ -3099,7 +3159,7 @@
     var onPublic = root.getAttribute("data-tower-side") === "public";
     var show = owner && onPublic;
     stage.querySelectorAll("[data-tower-sticker-handle]").forEach(function (h) {
-      h.hidden = !show;
+      h.hidden = true;
     });
     stage.querySelectorAll("[data-tower-friend-pin]").forEach(function (pin) {
       pin.classList.toggle("is-arrangeable", show);
@@ -3132,6 +3192,13 @@
     var show = !!(owner && selected);
     bar.hidden = !show;
     bar.setAttribute("aria-hidden", show ? "false" : "true");
+    var scrap = bar.closest("[data-tower-scrapbook-bar]");
+    if (scrap) {
+      scrap.hidden = !show;
+      scrap.setAttribute("aria-hidden", show ? "false" : "true");
+    }
+    var rotateBtn = bar.querySelector("[data-tower-rotate]");
+    if (rotateBtn) rotateBtn.disabled = !selected;
   }
 
   function readTiltFromElement(el) {
@@ -4357,6 +4424,7 @@
     if (!stage) return;
     stage.classList.add("is-sticker-stage");
     ensureStickersOnStage(stage);
+    if (p) settleArrivalTilts(p);
     var layout = getWidgetLayout(p) || DEFAULT_WIDGET_LAYOUT;
     var zBase = 2;
     Object.keys(DEFAULT_WIDGET_LAYOUT).forEach(function (id) {
@@ -4367,7 +4435,7 @@
       var x = typeof pos.x === "number" ? pos.x : DEFAULT_WIDGET_LAYOUT[id].x;
       var y = typeof pos.y === "number" ? pos.y : DEFAULT_WIDGET_LAYOUT[id].y;
       var z = typeof pos.z === "number" ? pos.z : DEFAULT_WIDGET_LAYOUT[id].z || zBase;
-      var tilt = typeof pos.tilt === "number" ? pos.tilt : DEFAULT_WIDGET_LAYOUT[id].tilt || 0;
+      var tilt = typeof pos.tilt === "number" ? pos.tilt : 0;
       el.style.setProperty("--sticker-x", x + "%");
       el.style.setProperty("--sticker-y", y + "%");
       el.style.setProperty("--sticker-z", String(z));
@@ -4514,7 +4582,7 @@
       x: layout && typeof layout.x === "number" ? layout.x : 36 + Math.random() * 20,
       y: layout && typeof layout.y === "number" ? layout.y : 30 + Math.random() * 25,
       z: layout && typeof layout.z === "number" ? layout.z : 10,
-      tilt: layout && typeof layout.tilt === "number" ? layout.tilt : (Math.random() * 6 - 3),
+      tilt: layout && typeof layout.tilt === "number" ? layout.tilt : 0,
     };
     var found = false;
     quotes = quotes.map(function (q) {
@@ -4534,6 +4602,7 @@
   function renderQuoteStickers(root, p) {
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (!stage) return;
+    if (p) settleArrivalTilts(p);
     stage.querySelectorAll("[data-tower-quote-id]").forEach(function (el) {
       el.remove();
     });
@@ -4552,9 +4621,7 @@
       el.style.setProperty("--sticker-y", q.y + "%");
       el.style.setProperty("--sticker-z", String(q.z || 10));
       el.style.setProperty("--sticker-tilt", (q.tilt || 0) + "deg");
-      el.innerHTML =
-        '<button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move quote sticker" tabindex="-1">⋮⋮</button>' +
-        '<blockquote class="tower-quote-card"></blockquote>';
+      el.innerHTML = '<blockquote class="tower-quote-card"></blockquote>';
       el.querySelector(".tower-quote-card").textContent = q.text;
       stage.appendChild(el);
     });
@@ -4669,11 +4736,6 @@
 
     var resetBtn = root.querySelector("[data-tower-reset-layout]");
     var undoBtn = root.querySelector("[data-tower-undo-widget]");
-    var hint = root.querySelector("[data-tower-scrapbook-bar] .tower-scrapbook-hint");
-    if (hint) {
-      hint.textContent =
-        "Drag ⋮⋮ to move · click to select · rotate / straighten selected · Backspace removes · Undo restores · Reset brings widgets back";
-    }
     if (!root.__cognationWidgetUndo) root.__cognationWidgetUndo = [];
 
     function setProfileStatusSafe(msg, isError) {
@@ -4916,31 +4978,39 @@
         return;
       }
 
-      /* Stickers: drag only from ⋮⋮ handle so links/buttons still work */
-      var handle = ev.target.closest("[data-tower-sticker-handle]");
-      if (!handle || !stage.contains(handle)) return;
-      var sticker = handle.closest("[data-tower-widget]");
+      /* Drag from anywhere on the sticker. Real controls keep their clicks. */
+      if (ev.target.closest("a, button, input, textarea, select, label, summary, [contenteditable='true'], [data-tower-rotate], [data-tower-avatar-resize], [data-tower-name-resize]")) {
+        return;
+      }
+      var sticker = ev.target.closest("[data-tower-widget]");
       if (!sticker || !stage.contains(sticker)) return;
       var wid = sticker.getAttribute("data-tower-widget");
       if (wid === "feed" || wid === "messages") return;
-      ev.preventDefault();
-      if (ev.pointerId != null && handle.setPointerCapture) {
-        try { handle.setPointerCapture(ev.pointerId); } catch (err) {}
-      }
-      stickerZCounter += 1;
-      sticker.style.setProperty("--sticker-z", String(stickerZCounter));
-      sticker.classList.add("is-dragging");
+      if (sticker.hidden || sticker.classList.contains("is-widget-off")) return;
 
       var rect = stage.getBoundingClientRect();
       var start = pointerPos(ev);
       var startX = parseFloat(sticker.getAttribute("data-sticker-x") || "0");
       var startY = parseFloat(sticker.getAttribute("data-sticker-y") || "0");
+      var dragStarted = false;
 
       function onMove(e) {
         var cur = pointerPos(e);
+        var dxPx = cur.x - start.x;
+        var dyPx = cur.y - start.y;
+        if (!dragStarted) {
+          if (Math.abs(dxPx) < 5 && Math.abs(dyPx) < 5) return;
+          dragStarted = true;
+          stickerZCounter += 1;
+          sticker.style.setProperty("--sticker-z", String(stickerZCounter));
+          sticker.classList.add("is-dragging");
+          if (e.pointerId != null && sticker.setPointerCapture) {
+            try { sticker.setPointerCapture(e.pointerId); } catch (errCap) {}
+          }
+        }
         if (e.cancelable) e.preventDefault();
-        var dxPct = ((cur.x - start.x) / rect.width) * 100;
-        var dyPct = ((cur.y - start.y) / rect.height) * 100;
+        var dxPct = (dxPx / rect.width) * 100;
+        var dyPct = (dyPx / rect.height) * 100;
         var nx = Math.max(0, Math.min(88, startX + dxPct));
         var ny = Math.max(0, Math.min(88, startY + dyPct));
         sticker.style.setProperty("--sticker-x", nx + "%");
@@ -4957,6 +5027,7 @@
         document.removeEventListener("pointercancel", onUp);
         document.removeEventListener("touchmove", onMove);
         document.removeEventListener("touchend", onUp);
+        if (!dragStarted) return;
         var p = TowerProfileStore.get();
         var layout = getWidgetLayout(p) || JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT));
         var id = sticker.getAttribute("data-tower-widget");

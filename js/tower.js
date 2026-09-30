@@ -3159,7 +3159,7 @@
     var onPublic = root.getAttribute("data-tower-side") === "public";
     var show = owner && onPublic;
     stage.querySelectorAll("[data-tower-sticker-handle]").forEach(function (h) {
-      h.hidden = !show;
+      h.hidden = true;
     });
     stage.querySelectorAll("[data-tower-friend-pin]").forEach(function (pin) {
       pin.classList.toggle("is-arrangeable", show);
@@ -4621,9 +4621,7 @@
       el.style.setProperty("--sticker-y", q.y + "%");
       el.style.setProperty("--sticker-z", String(q.z || 10));
       el.style.setProperty("--sticker-tilt", (q.tilt || 0) + "deg");
-      el.innerHTML =
-        '<button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move quote sticker" tabindex="-1">⋮⋮</button>' +
-        '<blockquote class="tower-quote-card"></blockquote>';
+      el.innerHTML = '<blockquote class="tower-quote-card"></blockquote>';
       el.querySelector(".tower-quote-card").textContent = q.text;
       stage.appendChild(el);
     });
@@ -4980,31 +4978,39 @@
         return;
       }
 
-      /* Stickers: drag only from ⋮⋮ handle so links/buttons still work */
-      var handle = ev.target.closest("[data-tower-sticker-handle]");
-      if (!handle || !stage.contains(handle)) return;
-      var sticker = handle.closest("[data-tower-widget]");
+      /* Drag from anywhere on the sticker. Real controls keep their clicks. */
+      if (ev.target.closest("a, button, input, textarea, select, label, summary, [contenteditable='true'], [data-tower-rotate], [data-tower-avatar-resize], [data-tower-name-resize]")) {
+        return;
+      }
+      var sticker = ev.target.closest("[data-tower-widget]");
       if (!sticker || !stage.contains(sticker)) return;
       var wid = sticker.getAttribute("data-tower-widget");
       if (wid === "feed" || wid === "messages") return;
-      ev.preventDefault();
-      if (ev.pointerId != null && handle.setPointerCapture) {
-        try { handle.setPointerCapture(ev.pointerId); } catch (err) {}
-      }
-      stickerZCounter += 1;
-      sticker.style.setProperty("--sticker-z", String(stickerZCounter));
-      sticker.classList.add("is-dragging");
+      if (sticker.hidden || sticker.classList.contains("is-widget-off")) return;
 
       var rect = stage.getBoundingClientRect();
       var start = pointerPos(ev);
       var startX = parseFloat(sticker.getAttribute("data-sticker-x") || "0");
       var startY = parseFloat(sticker.getAttribute("data-sticker-y") || "0");
+      var dragStarted = false;
 
       function onMove(e) {
         var cur = pointerPos(e);
+        var dxPx = cur.x - start.x;
+        var dyPx = cur.y - start.y;
+        if (!dragStarted) {
+          if (Math.abs(dxPx) < 5 && Math.abs(dyPx) < 5) return;
+          dragStarted = true;
+          stickerZCounter += 1;
+          sticker.style.setProperty("--sticker-z", String(stickerZCounter));
+          sticker.classList.add("is-dragging");
+          if (e.pointerId != null && sticker.setPointerCapture) {
+            try { sticker.setPointerCapture(e.pointerId); } catch (errCap) {}
+          }
+        }
         if (e.cancelable) e.preventDefault();
-        var dxPct = ((cur.x - start.x) / rect.width) * 100;
-        var dyPct = ((cur.y - start.y) / rect.height) * 100;
+        var dxPct = (dxPx / rect.width) * 100;
+        var dyPct = (dyPx / rect.height) * 100;
         var nx = Math.max(0, Math.min(88, startX + dxPct));
         var ny = Math.max(0, Math.min(88, startY + dyPct));
         sticker.style.setProperty("--sticker-x", nx + "%");
@@ -5021,6 +5027,7 @@
         document.removeEventListener("pointercancel", onUp);
         document.removeEventListener("touchmove", onMove);
         document.removeEventListener("touchend", onUp);
+        if (!dragStarted) return;
         var p = TowerProfileStore.get();
         var layout = getWidgetLayout(p) || JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT));
         var id = sticker.getAttribute("data-tower-widget");

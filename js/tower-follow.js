@@ -83,8 +83,17 @@
     }
   }
 
+  function localProfileExists(id) {
+    if (!id || !window.CognationAccounts || typeof window.CognationAccounts.getProfileById !== "function") {
+      return false;
+    }
+    return !!window.CognationAccounts.getProfileById(id);
+  }
+
   function syncRemoteButton(btn, graph, id, pro) {
     var row = btn.closest("[data-tower-follow-row]");
+    /* A saved profile page is on screen. The missing-page label is only for an id with no page. */
+    if (id && !graph.isRemoteProfileId(id) && localProfileExists(id)) return false;
     if (!id || !graph.isRemoteProfileId(id)) {
       if (row) row.hidden = false;
       btn.hidden = false;
@@ -96,7 +105,7 @@
         "aria-label",
         "This demo profile is not yet a Cognation member page"
       );
-      return;
+      return true;
     }
     btn.disabled = true;
     graph
@@ -112,6 +121,7 @@
           "Could not load this member connection. Try again."
         );
       });
+    return true;
   }
 
   function syncButton(btn) {
@@ -124,8 +134,7 @@
     if (row) row.hidden = false;
     btn.hidden = false;
     if (graph && graph.isReady && graph.isReady()) {
-      syncRemoteButton(btn, graph, id, pro);
-      return;
+      if (syncRemoteButton(btn, graph, id, pro) !== false) return;
     }
     btn.disabled = false;
     if (!id || !api) {
@@ -163,9 +172,11 @@
     btn.setAttribute("data-profile-id", id);
     if (graph && graph.isReady && graph.isReady()) {
       if (!graph.isRemoteProfileId(id)) {
-        btn.setAttribute("aria-label", "This demo profile is not yet a Cognation member page");
-        return;
-      }
+        if (!localProfileExists(id)) {
+          btn.setAttribute("aria-label", "This demo profile is not yet a Cognation member page");
+          return;
+        }
+      } else {
       btn.disabled = true;
       graph
         .act(id, isProfessionalContext(btn) ? "professional" : "personal")
@@ -181,6 +192,7 @@
           );
         });
       return;
+      }
     }
     if (!api) return;
     api.toggleFollow(id);

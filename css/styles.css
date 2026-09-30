@@ -2954,6 +2954,12 @@ body.login-gate-open .app-topbar {
   overflow: hidden;
   background-size: cover;
   background-position: center;
+  padding: 0;
+  appearance: none;
+  cursor: pointer;
+}
+[data-tower-app]:not([data-tower-is-owner="true"]) .tower-avatar {
+  cursor: default;
 }
 
 .tower-avatar-upload {
@@ -3773,17 +3779,15 @@ body.login-gate-open .app-topbar {
   align-items: center;
   gap: 0.25rem;
   width: max-content;
-  max-width: 5.5rem;
+  max-width: 6rem;
   margin: 0;
-  padding: 0.35rem 0.4rem 0.4rem;
+  padding: 0.4rem 0.45rem 0.45rem;
   text-decoration: none;
-  color: #4a2c3a;
-  background: rgba(255, 245, 249, 0.94);
-  border: 1px solid rgba(244, 164, 196, 0.85);
-  border-radius: 0.85rem;
-  box-shadow:
-    0 3px 0 rgba(74, 44, 58, 0.06),
-    0 6px 16px rgba(74, 44, 58, 0.12);
+  color: #f7f9ff;
+  background: rgba(16, 19, 48, 0.42);
+  border: 1px solid var(--cgn-border);
+  border-radius: var(--radius);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.15);
   transform: rotate(var(--sticker-tilt, 0deg));
   touch-action: none;
   user-select: none;
@@ -3794,17 +3798,18 @@ body.login-gate-open .app-topbar {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.35rem;
-  height: 2.35rem;
+  width: 3.4rem;
+  height: 3.4rem;
   border-radius: 50%;
-  background: linear-gradient(145deg, #ffd0e4, #f4a4c4);
+  background: linear-gradient(145deg, #ffd0e4, #f4a4c4) center / cover no-repeat;
   border: 2px solid #fff;
   box-shadow: 0 2px 6px rgba(74, 44, 58, 0.15);
   font-family: Georgia, "Times New Roman", Times, serif;
-  font-size: 0.78rem;
+  font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: #4a2c3a;
+  overflow: hidden;
 }
 
 .tower-friend-pin-name {
@@ -4814,6 +4819,53 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 }
 .tower-scrapbook-bar[hidden] {
   display: none !important;
+}
+.tower-emoji-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.tower-emoji-add {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 0.45rem;
+  font-size: 1.15rem;
+  line-height: 1;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+}
+.tower-sticker--emoji {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.45rem 0.7rem;
+  line-height: 1;
+}
+.tower-emoji-glyph {
+  display: block;
+  font-size: var(--emoji-size, 64px);
+  line-height: 1;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+}
+.tower-emoji-resize {
+  position: absolute;
+  right: 0.1rem;
+  bottom: 0.1rem;
+  z-index: 6;
+  width: 0.85rem;
+  height: 0.85rem;
+  padding: 0;
+  border: 2px solid #fff;
+  border-left: none;
+  border-top: none;
+  border-radius: 0 0 4px 0;
+  background: rgba(74, 44, 58, 0.55);
+  cursor: nwse-resize;
+  touch-action: none;
+  display: none;
+}
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-emoji-resize {
+  display: block;
 }
 
 /* Public widgets opt-in checkboxes in Edit profile */
@@ -7435,6 +7487,14 @@ body { padding-top: 0 !important; }
 }
 .tower-avatar-upload-hint {
   display: none !important;
+}
+.tower-offscreen-file {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
 }
 [data-tower-app][data-tower-is-owner="true"] .tower-avatar-upload {
   cursor: pointer;
@@ -10453,6 +10513,7 @@ body {
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--social,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--slogan,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--quote,
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--emoji,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--avatar {
   border-color: var(--cgn-border) !important;
   background: rgba(16, 19, 48, 0.42) !important;
@@ -10672,12 +10733,14 @@ body.cognation-demo-on {
 }
 
 /* Pink click-wheel player. The black screen holds a normal YouTube embed. */
-.tower-layout--scrapbook.is-sticker-stage .tower-sticker--music {
-  background: transparent !important;
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--music,
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--instax {
+  border: 1px solid var(--cgn-border) !important;
+  border-radius: var(--radius) !important;
+  background: rgba(16, 19, 48, 0.42) !important;
   background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  padding: 0 !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.15) !important;
+  padding: 0.4rem 0.5rem !important;
 }
 .tower-sticker--music .tower-music,
 .tower-sticker--music .tower-music-skin--classic {
@@ -10690,24 +10753,32 @@ body.cognation-demo-on {
   padding: 0 !important;
 }
 .tower-ipod {
-  width: 11.6rem;
+  width: 18.5rem;
+  max-width: 100%;
   box-sizing: border-box;
-  background: linear-gradient(180deg, #ff5eae 0%, #ff2f8e 42%, #e51078 100%);
-  border: 2px solid #c00068;
+  background: linear-gradient(165deg, #ff8ec4 0%, #ff3d98 38%, #e01078 72%, #b80a62 100%);
   border-radius: 1.45rem;
-  padding: 0.72rem 0.7rem 0.85rem;
+  padding: 0.72rem 0.7rem 0.95rem;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -10px 14px rgba(160, 0, 70, 0.28),
-    0 10px 18px rgba(80, 0, 40, 0.28);
+    inset 0 2px 0 rgba(255, 255, 255, 0.62),
+    inset 0 -14px 18px rgba(110, 0, 48, 0.38),
+    inset 3px 0 6px rgba(255, 255, 255, 0.18),
+    inset -3px 0 6px rgba(90, 0, 40, 0.2),
+    0 8px 0 #9d0a52,
+    0 12px 16px rgba(20, 0, 12, 0.38);
 }
 .tower-ipod-screen {
   position: relative;
-  height: 4.7rem;
-  border-radius: 0.45rem;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 9.4rem;
+  border-radius: 0.55rem;
   background: #070707;
-  border: 2px solid #1c1c1c;
-  box-shadow: inset 0 0 0 1px #3a3a3a, inset 0 8px 14px rgba(0, 0, 0, 0.45);
+  box-shadow:
+    inset 0 10px 18px rgba(0, 0, 0, 0.72),
+    inset 0 0 0 2px #111,
+    inset 0 0 0 3px #3a3a3a,
+    0 1px 0 rgba(255, 255, 255, 0.4);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -10750,14 +10821,15 @@ body.cognation-demo-on {
   position: relative;
   width: 7.55rem;
   height: 7.55rem;
-  margin: 0.85rem auto 0.15rem;
+  margin: 0.95rem auto 0.2rem;
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 42%, #ffffff 0%, #ececec 58%, #c8c8c8 100%);
+  background: radial-gradient(circle at 50% 38%, #ffffff 0%, #f2f2f2 42%, #d0d0d0 78%, #b5b5b5 100%);
   box-shadow:
-    inset 0 2px 3px rgba(255, 255, 255, 0.9),
-    inset 0 -3px 6px rgba(0, 0, 0, 0.12),
-    0 3px 0 #b01068,
-    0 7px 10px rgba(0, 0, 0, 0.18);
+    inset 0 3px 4px rgba(255, 255, 255, 0.95),
+    inset 0 -8px 10px rgba(0, 0, 0, 0.2),
+    0 5px 0 #dedede,
+    0 7px 0 #9a0a4e,
+    0 11px 14px rgba(0, 0, 0, 0.32);
 }
 .tower-ipod-menu,
 .tower-ipod-vol {
@@ -10806,7 +10878,8 @@ body.cognation-demo-on {
   padding: 0 !important;
 }
 .tower-music-owner {
-  width: 11.6rem;
+  width: 18.5rem;
+  max-width: 100%;
   margin-top: 0.35rem;
   display: flex;
   flex-direction: column;
@@ -10861,29 +10934,33 @@ body.cognation-demo-on {
 }
 
 /* White instant camera. Click opens an image upload; the photo is not the widget. */
-.tower-layout--scrapbook.is-sticker-stage .tower-sticker--instax {
-  background: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  padding: 0.5rem !important;
-}
 .tower-instax {
   position: relative;
   display: block;
   width: 8.5rem;
-  cursor: pointer;
+  cursor: grab;
 }
 .tower-instax-body {
   display: block;
   position: relative;
   height: 11rem;
-  background: linear-gradient(180deg, #fffdf8 0%, #f6f1e6 68%, #e6dfd0 100%);
-  border: 2px solid #d5ccbc;
+  background: linear-gradient(165deg, #fffefb 0%, #f7f2e8 55%, #ddd4c4 100%);
   border-radius: 1.15rem;
   box-shadow:
-    inset 0 1px 0 #fff,
-    0 8px 16px rgba(40, 30, 20, 0.18);
+    inset 0 2px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -12px 16px rgba(90, 70, 40, 0.16),
+    inset 3px 0 6px rgba(255, 255, 255, 0.45),
+    inset -3px 0 6px rgba(80, 60, 30, 0.08),
+    0 7px 0 #cfc4b2,
+    0 11px 14px rgba(20, 12, 6, 0.28);
+}
+.tower-instax-file {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
 }
 .tower-instax-flash {
   position: absolute;
@@ -10915,10 +10992,12 @@ body.cognation-demo-on {
   transform: translate(-50%, -50%);
   border-radius: 50%;
   background:
-    radial-gradient(circle at 50% 50%, transparent 0 38%, #f4f4f4 39% 46%, #bdbdbd 47% 62%, #f7f7f7 63% 78%, #8d8d8d 79% 100%);
+    radial-gradient(circle at 50% 50%, transparent 0 38%, #f7f7f7 39% 46%, #c4c4c4 47% 62%, #f4f4f4 63% 78%, #8a8a8a 79% 100%);
   box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    inset 0 2px 2px rgba(255, 255, 255, 0.85),
+    inset 0 -4px 6px rgba(0, 0, 0, 0.18),
+    0 5px 0 #bdbdbd,
+    0 8px 10px rgba(0, 0, 0, 0.28);
 }
 .tower-instax-lens-glass {
   position: absolute;
@@ -10941,17 +11020,6 @@ body.cognation-demo-on {
   border-radius: 50%;
   background: radial-gradient(circle at 40% 35%, #6a6a6a, #111 70%);
   box-shadow: 0 0 0 3px #eee, 0 0 0 4px #c8c8c8;
-}
-.tower-instax input {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-}
-[data-tower-app]:not([data-tower-is-owner="true"]) .tower-instax input {
-  display: none !important;
 }
 [data-tower-app]:not([data-tower-is-owner="true"]) .tower-instax {
   cursor: default;

@@ -506,6 +506,7 @@
                   <div class="tower-rotate-toolbar" data-tower-rotate-toolbar>
                     <button type="button" class="btn btn-secondary tower-rotate-btn" data-tower-rotate="5" title="Rotate selected widget 5° clockwise">Rotate</button>
                   </div>
+                  <div class="tower-emoji-bar" data-tower-emoji-bar role="group" aria-label="Emoji widgets"></div>
                 </div>
 
                   <div class="tower-bg-upload" data-tower-public-look>
@@ -524,14 +525,10 @@
                         <img class="tower-avatar-ornament" data-tower-ornament-img src="" alt="" aria-hidden="true" hidden>
                         <div class="tower-avatar-wrap" data-tower-avatar-frame="none">
                         <div class="tower-avatar-mat">
-                          <div class="tower-avatar" data-tower-avatar aria-hidden="true">?</div>
+                          <button type="button" class="tower-avatar" data-tower-avatar aria-label="Upload profile photo">?</button>
                         </div>
                         <img class="tower-avatar-frame-overlay" data-tower-frame-overlay src="" alt="" aria-hidden="true" hidden>
                         <button type="button" class="tower-avatar-resize" data-tower-avatar-resize aria-label="Drag to resize frame" title="Drag to resize frame"></button>
-                        <label class="tower-avatar-upload" title="Upload profile photo">
-                          <span class="visually-hidden">Upload profile picture</span>
-                          <input type="file" accept="image/*" data-tower-avatar-file>
-                        </label>
                       </div>
                       <div class="tower-profile-actions">
                         <div class="tower-follow-row" data-tower-follow-row>
@@ -725,7 +722,7 @@
 
                       <div class="tower-sticker tower-sticker--instax" data-tower-widget="instax" data-sticker-label="Camera">
                         <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Camera sticker" tabindex="-1" hidden>⋮⋮</button>
-                        <label class="tower-instax" title="Upload a photo">
+                        <div class="tower-instax" title="Upload a photo">
                           <span class="visually-hidden">Upload a photo</span>
                           <span class="tower-instax-body" aria-hidden="true">
                             <span class="tower-instax-flash"></span>
@@ -733,9 +730,10 @@
                             <span class="tower-instax-lens"><span class="tower-instax-lens-glass"></span></span>
                             <span class="tower-instax-shutter"></span>
                           </span>
-                          <input type="file" accept="image/*" data-tower-instax-file>
-                        </label>
+                        </div>
                       </div>
+                      <input type="file" accept="image/*" data-tower-avatar-file class="tower-offscreen-file" tabindex="-1" aria-label="Upload profile photo">
+                      <input type="file" accept="image/*" data-tower-instax-file class="tower-offscreen-file" tabindex="-1" aria-label="Upload a photo">
 
                       <div class="tower-sticker tower-sticker--calendar" data-tower-widget="calendar" data-sticker-label="Calendar" data-tower-calendar-personal>
                         <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Calendar sticker" tabindex="-1" hidden>⋮⋮</button>

@@ -407,6 +407,7 @@
       friendPinLayout: {},
       badgePinLayout: {},
       quoteStickers: [],
+      emojiStickers: [],
       featuredFriendIds: [],
       friendsDisplayCount: 3,
       backgroundCollage: { layoutId: "none", cells: [] },
@@ -475,7 +476,10 @@
     var nextQuotes = Array.isArray(p.quoteStickers) && p.quoteStickers.length
       ? p.quoteStickers
       : (Array.isArray(prev.quoteStickers) ? prev.quoteStickers : []);
-    var record = { widgetLayout: nextLayout, quoteStickers: nextQuotes };
+    var nextEmoji = Array.isArray(p.emojiStickers) && p.emojiStickers.length
+      ? p.emojiStickers
+      : (Array.isArray(prev.emojiStickers) ? prev.emojiStickers : []);
+    var record = { widgetLayout: nextLayout, quoteStickers: nextQuotes, emojiStickers: nextEmoji };
     scrapbookLayoutKeys(p).forEach(function (key) {
       doc[key] = record;
     });
@@ -507,6 +511,9 @@
     }
     if (Array.isArray(saved.quoteStickers) && saved.quoteStickers.length && (!Array.isArray(p.quoteStickers) || !p.quoteStickers.length)) {
       p.quoteStickers = saved.quoteStickers;
+    }
+    if (Array.isArray(saved.emojiStickers) && saved.emojiStickers.length && (!Array.isArray(p.emojiStickers) || !p.emojiStickers.length)) {
+      p.emojiStickers = saved.emojiStickers;
     }
     return p;
   }
@@ -597,6 +604,7 @@
       if (!p.badgePinLayout || typeof p.badgePinLayout !== "object") {
         p.badgePinLayout = {};
       }
+      p.emojiStickers = normalizeEmojiStickers(p.emojiStickers);
       if (!Array.isArray(p.featuredFriendIds)) p.featuredFriendIds = [];
       else {
         p.featuredFriendIds = p.featuredFriendIds
@@ -2421,6 +2429,12 @@
         initTowerMusic(root, saved);
       }
       inline.addEventListener("change", commitMusicUrl);
+      inline.addEventListener("paste", function () {
+        setTimeout(commitMusicUrl, 0);
+      });
+      inline.addEventListener("input", function () {
+        if (parseYoutubeVideoId(inline.value)) commitMusicUrl();
+      });
       inline.addEventListener("keydown", function (ev) {
         if (ev.key === "Enter") {
           ev.preventDefault();
@@ -2858,22 +2872,29 @@
     pin.setAttribute("data-sticker-z", String(z));
   }
 
+  function resolveTopFriendIds(p) {
+    var known = {};
+    DEMO_FRIENDS.forEach(function (friend) {
+      if (friend && friend.id) known[friend.id] = true;
+    });
+    var ranked = ((p && p.featuredFriendIds) || []).filter(function (id) { return known[id]; });
+    if (ranked.length) {
+      var max = parseInt((p && p.friendsDisplayCount) || 3, 10);
+      if ([3, 6, 8].indexOf(max) === -1) max = 3;
+      return ranked.slice(0, max);
+    }
+    return DEMO_FRIENDS.filter(function (friend) {
+      return friend && friend.id && friend.id !== "alexa-thomas";
+    }).map(function (friend) { return friend.id; });
+  }
+
   function renderFriendPins(root, p) {
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (!stage) return;
     stage.classList.add("is-sticker-stage");
     ensureStickersOnStage(stage);
     if (p) settleArrivalTilts(p);
-    var widgets = normalizePublicWidgets(p && p.publicWidgets);
-    if (!widgets.friends) {
-      stage.querySelectorAll("[data-tower-friend-pin]").forEach(function (el) {
-        el.remove();
-      });
-      return;
-    }
-    var max = parseInt(p.friendsDisplayCount || 3, 10);
-    if ([3, 6, 8].indexOf(max) === -1) max = 3;
-    var selected = (p.featuredFriendIds || []).slice(0, max);
+    var selected = resolveTopFriendIds(p);
     if (ensureFriendPinPositions(p, selected)) {
       TowerProfileStore.save(p);
     }
@@ -2890,16 +2911,20 @@
       var pos = pinLayout[id];
       if (!pos) return;
       var pin = stage.querySelector('[data-tower-friend-pin="' + id + '"]');
+      var friendIndex = 0;
+      DEMO_FRIENDS.forEach(function (entry, entryIndex) {
+        if (entry.id === id) friendIndex = entryIndex;
+      });
+      var profileHash = "tower-profile-" + friendHandleFromId(id);
       if (!pin) {
         pin = document.createElement("a");
         pin.className = "tower-friend-pin";
         pin.setAttribute("data-tower-friend-pin", id);
-        pin.href = "#tower-profile-" + id;
-        pin.setAttribute("aria-label", friend.name);
+        pin.href = "#" + profileHash;
+        pin.setAttribute("aria-label", friend.name + " tower profile");
         var av = document.createElement("span");
         av.className = "tower-friend-pin-avatar";
         av.setAttribute("aria-hidden", "true");
-        av.textContent = initials(friend.name);
         var nm = document.createElement("span");
         nm.className = "tower-friend-pin-name";
         nm.textContent = friend.name;
@@ -2912,14 +2937,14 @@
           }
         });
         stage.appendChild(pin);
-      } else {
-        pin.href = "#tower-profile-" + id;
-        pin.setAttribute("aria-label", friend.name);
-        var avEl = pin.querySelector(".tower-friend-pin-avatar");
-        var nmEl = pin.querySelector(".tower-friend-pin-name");
-        if (avEl) avEl.textContent = initials(friend.name);
-        if (nmEl) nmEl.textContent = friend.name;
       }
+      pin.href = "#" + profileHash;
+      pin.setAttribute("aria-label", friend.name + " tower profile");
+      var avEl = pin.querySelector(".tower-friend-pin-avatar");
+      var nmEl = pin.querySelector(".tower-friend-pin-name");
+      if (nmEl) nmEl.textContent = friend.name;
+      paintFriendPicture(avEl, friend, friendIndex);
+      if (pin.classList.contains("is-dragging")) return;
       /* Apply saved layout only — never invent here */
       applyFriendPinPosition(pin, pos);
       var owner = isTowerOwner(p);
@@ -3272,7 +3297,8 @@
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (stage) {
       stage.querySelectorAll("[data-tower-friend-pin]").forEach(function (pin) {
-        if (!widgets.friends) {
+        var showPins = resolveTopFriendIds(p).length > 0;
+        if (!showPins) {
           pin.hidden = true;
           pin.classList.add("is-widget-off");
         } else {
@@ -3509,6 +3535,28 @@
     if (!parts.length) return "?";
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
     return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  }
+
+  function paintFriendPicture(node, friend, index) {
+    if (!node || !friend) return;
+    var style = friendAvatarStyle(friend, index);
+    node.textContent = style.initials;
+    node.style.background = style.background;
+    node.style.color = style.color;
+    node.style.backgroundSize = "";
+    node.style.backgroundPosition = "";
+    var rec = null;
+    if (window.CognationAccounts && typeof window.CognationAccounts.getProfileByHandle === "function") {
+      rec = window.CognationAccounts.getProfileByHandle(friendHandleFromId(friend.id));
+    }
+    var url = rec && rec.avatarDataUrl && String(rec.avatarDataUrl).indexOf("data:image/") === 0
+      ? String(rec.avatarDataUrl)
+      : "";
+    if (!url) return;
+    node.textContent = "";
+    node.style.backgroundImage = 'url("' + url.replace(/"/g, "") + '")';
+    node.style.backgroundSize = "cover";
+    node.style.backgroundPosition = "center";
   }
 
   function friendAvatarStyle(friend, index) {
@@ -4743,16 +4791,14 @@
   function instaxMarkup() {
     return (
       '<button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Camera sticker" tabindex="-1" hidden>⋮⋮</button>' +
-      '<label class="tower-instax" title="Upload a photo">' +
+      '<div class="tower-instax" title="Upload a photo">' +
       '<span class="visually-hidden">Upload a photo</span>' +
       '<span class="tower-instax-body" aria-hidden="true">' +
       '<span class="tower-instax-flash"></span>' +
       '<span class="tower-instax-viewfinder"></span>' +
       '<span class="tower-instax-lens"><span class="tower-instax-lens-glass"></span></span>' +
       '<span class="tower-instax-shutter"></span>' +
-      "</span>" +
-      '<input type="file" accept="image/*" data-tower-instax-file>' +
-      "</label>"
+      "</span></div>"
     );
   }
 
@@ -4842,6 +4888,192 @@
     }
   }
 
+  var EMOJI_WIDGETS = [
+    { id: "emoji-cowboy", glyph: "🤠", label: "Cowboy hat face" },
+    { id: "emoji-fire", glyph: "🔥", label: "Fire" },
+    { id: "emoji-heart-hands", glyph: "🫶", label: "Heart hands" },
+    { id: "emoji-pink-heart", glyph: "🩷", label: "Pink heart" },
+    { id: "emoji-sparkles", glyph: "✨", label: "Sparkles" },
+  ];
+
+  function emojiById(id) {
+    for (var i = 0; i < EMOJI_WIDGETS.length; i++) {
+      if (EMOJI_WIDGETS[i].id === id) return EMOJI_WIDGETS[i];
+    }
+    return null;
+  }
+
+  function normalizeEmojiSize(value) {
+    var n = parseFloat(value);
+    if (isNaN(n)) n = 64;
+    return Math.max(36, Math.min(168, Math.round(n)));
+  }
+
+  function normalizeEmojiStickers(list) {
+    var out = [];
+    var seen = {};
+    (Array.isArray(list) ? list : []).forEach(function (item) {
+      if (!item) return;
+      var spec = emojiById(item.id);
+      if (!spec || seen[spec.id]) return;
+      seen[spec.id] = true;
+      out.push({ id: spec.id, glyph: spec.glyph, size: normalizeEmojiSize(item.size) });
+    });
+    return out;
+  }
+
+  function defaultEmojiPos(index) {
+    return {
+      x: 78,
+      y: 12 + index * 8,
+      z: 24 + index,
+      tilt: 0,
+    };
+  }
+
+  function renderEmojiStickers(root, p) {
+    var stage = root.querySelector("[data-tower-scrapbook]");
+    if (!stage) return;
+    var placed = normalizeEmojiStickers(p && p.emojiStickers);
+    var ids = {};
+    placed.forEach(function (item) { ids[item.id] = item; });
+    stage.querySelectorAll("[data-tower-emoji]").forEach(function (el) {
+      var id = el.getAttribute("data-tower-widget");
+      if (!ids[id] && !el.classList.contains("is-dragging")) el.remove();
+    });
+    var layout = (p && p.widgetLayout) || {};
+    placed.forEach(function (item, index) {
+      var el = stage.querySelector('[data-tower-widget="' + item.id + '"]');
+      if (!el) {
+        el = document.createElement("div");
+        el.className = "tower-sticker tower-sticker--emoji";
+        el.setAttribute("data-tower-widget", item.id);
+        el.setAttribute("data-tower-emoji", item.id);
+        el.setAttribute("data-sticker-label", item.label);
+        var glyph = document.createElement("span");
+        glyph.className = "tower-emoji-glyph";
+        glyph.setAttribute("aria-hidden", "true");
+        var handle = document.createElement("button");
+        handle.type = "button";
+        handle.className = "tower-emoji-resize";
+        handle.setAttribute("data-tower-emoji-resize", "");
+        handle.setAttribute("aria-label", "Drag to resize " + item.label);
+        el.appendChild(glyph);
+        el.appendChild(handle);
+        stage.appendChild(el);
+      }
+      var glyphEl = el.querySelector(".tower-emoji-glyph");
+      if (glyphEl) glyphEl.textContent = item.glyph;
+      el.setAttribute("aria-label", item.label);
+      el.style.setProperty("--emoji-size", item.size + "px");
+      el.setAttribute("data-emoji-size", String(item.size));
+      if (el.classList.contains("is-dragging")) return;
+      var pos = layout[item.id] || defaultEmojiPos(index);
+      var x = layoutCoord(pos.x, defaultEmojiPos(index).x);
+      var y = layoutCoord(pos.y, defaultEmojiPos(index).y);
+      var z = layoutCoord(pos.z, defaultEmojiPos(index).z);
+      var tilt = layoutCoord(pos.tilt, 0);
+      el.style.setProperty("--sticker-x", x + "%");
+      el.style.setProperty("--sticker-y", y + "%");
+      el.style.setProperty("--sticker-z", String(z));
+      el.style.setProperty("--sticker-tilt", tilt + "deg");
+      el.setAttribute("data-sticker-x", String(x));
+      el.setAttribute("data-sticker-y", String(y));
+      el.setAttribute("data-sticker-z", String(z));
+      el.hidden = false;
+      el.classList.remove("is-widget-off");
+    });
+  }
+
+  function placeEmojiWidget(root, id) {
+    var spec = emojiById(id);
+    if (!spec || !isTowerOwner(TowerProfileStore.get())) return;
+    var p = TowerProfileStore.get();
+    var list = normalizeEmojiStickers(p.emojiStickers);
+    var found = false;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === spec.id) found = true;
+    }
+    if (!found) {
+      list.push({ id: spec.id, glyph: spec.glyph, size: 64 });
+      if (!p.widgetLayout || typeof p.widgetLayout !== "object") {
+        p.widgetLayout = JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT));
+      }
+      p.widgetLayout[spec.id] = defaultEmojiPos(list.length - 1);
+      p.emojiStickers = list;
+      TowerProfileStore.save(p);
+    }
+    var saved = TowerProfileStore.get();
+    renderEmojiStickers(root, saved);
+    var stage = root.querySelector("[data-tower-scrapbook]");
+    var el = stage && stage.querySelector('[data-tower-widget="' + spec.id + '"]');
+    if (!stage || !el) return;
+    stage.querySelectorAll(".is-widget-selected").forEach(function (node) {
+      node.classList.remove("is-widget-selected");
+    });
+    el.classList.add("is-widget-selected");
+    syncRotateToolbar(root);
+  }
+
+  function initEmojiWidgets(root) {
+    if (!root || root.__cognationEmojiWidgetsBound) return;
+    root.__cognationEmojiWidgetsBound = true;
+    var bar = root.querySelector("[data-tower-emoji-bar]");
+    if (bar) {
+      EMOJI_WIDGETS.forEach(function (item) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "tower-emoji-add";
+        btn.setAttribute("data-tower-emoji-add", item.id);
+        btn.setAttribute("aria-label", "Add " + item.label);
+        btn.title = item.label;
+        btn.textContent = item.glyph;
+        bar.appendChild(btn);
+      });
+      bar.addEventListener("click", function (ev) {
+        var btn = ev.target.closest("[data-tower-emoji-add]");
+        if (!btn || !bar.contains(btn)) return;
+        ev.preventDefault();
+        placeEmojiWidget(root, btn.getAttribute("data-tower-emoji-add"));
+      });
+    }
+    var stage = root.querySelector("[data-tower-scrapbook]");
+    if (!stage) return;
+    stage.addEventListener("pointerdown", function (ev) {
+      var handle = ev.target.closest("[data-tower-emoji-resize]");
+      if (!handle || !stage.contains(handle)) return;
+      if (!isTowerOwner(TowerProfileStore.get())) return;
+      var sticker = handle.closest("[data-tower-emoji]");
+      if (!sticker) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      var startX = ev.clientX;
+      var startY = ev.clientY;
+      var startSize = normalizeEmojiSize(sticker.getAttribute("data-emoji-size") || 64);
+      function onMove(e) {
+        var next = normalizeEmojiSize(startSize + (e.clientX - startX) + (e.clientY - startY));
+        sticker.style.setProperty("--emoji-size", next + "px");
+        sticker.setAttribute("data-emoji-size", String(next));
+      }
+      function onUp() {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        document.removeEventListener("pointercancel", onUp);
+        var size = normalizeEmojiSize(sticker.getAttribute("data-emoji-size") || startSize);
+        var wid = sticker.getAttribute("data-tower-widget");
+        var cur = TowerProfileStore.get();
+        cur.emojiStickers = normalizeEmojiStickers(cur.emojiStickers).map(function (item) {
+          if (item.id !== wid) return item;
+          return { id: item.id, glyph: item.glyph, size: size };
+        });
+        TowerProfileStore.save(cur, { geometry: true });
+      }
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+      document.addEventListener("pointercancel", onUp);
+    });
+  }
+
   function applyWidgetLayout(root, p) {
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (!stage) return;
@@ -4857,6 +5089,7 @@
     }
     if (p) mergeScrapbookLayout(p);
     if (p) settleArrivalTilts(p);
+    renderEmojiStickers(root, p);
     var layout = getWidgetLayout(p) || DEFAULT_WIDGET_LAYOUT;
     var zBase = 2;
     Object.keys(DEFAULT_WIDGET_LAYOUT).forEach(function (id) {
@@ -5589,7 +5822,7 @@
       }
 
       /* Drag from anywhere on the sticker. Real controls keep their clicks. */
-      if (ev.target.closest("a, button, input, textarea, select, label, summary, [contenteditable='true'], [data-tower-rotate], [data-tower-avatar-resize], [data-tower-name-resize]")) {
+      if (ev.target.closest("a, button, input, textarea, select, label, summary, [contenteditable='true'], [data-tower-rotate], [data-tower-avatar-resize], [data-tower-name-resize], [data-tower-emoji-resize]")) {
         return;
       }
       var sticker = ev.target.closest("[data-tower-widget]");
@@ -5709,6 +5942,17 @@
     stage.addEventListener("click", function (ev) {
       if (!ownerOnPublic()) return;
       if (ev.target.closest("[data-tower-profile-edit]")) return;
+      var instaxHit = ev.target.closest('[data-tower-widget="instax"]');
+      if (
+        instaxHit &&
+        stage.contains(instaxHit) &&
+        !instaxHit.hidden &&
+        !ev.target.closest("a, button, input, textarea, select, label, summary")
+      ) {
+        var justDragged = instaxHit.__cognationDraggedAt && Date.now() - instaxHit.__cognationDraggedAt < 700;
+        var instaxFile = root.querySelector("[data-tower-instax-file]");
+        if (!justDragged && instaxFile) instaxFile.click();
+      }
       var handleClick = ev.target.closest("[data-tower-sticker-handle]");
       if (handleClick) {
         var handleSticker = handleClick.closest("[data-tower-widget]");
@@ -6608,6 +6852,7 @@
     initDisplayNameResize(root);
     initOrnamentPicker(root);
     initScrapbookStickers(root);
+    initEmojiWidgets(root);
     initInlineProfileEdits(root);
     initCollageControls(root);
     initPublicLookControls(root);
@@ -6851,6 +7096,17 @@
     if (avatarFile) {
       avatarFile.addEventListener("change", function () {
         pullChosenImage(avatarFile, applyAvatarFile);
+      });
+    }
+    var avatarCircle = root.querySelector("[data-tower-avatar]");
+    if (avatarCircle && !avatarCircle.__cognationAvatarClickBound) {
+      avatarCircle.__cognationAvatarClickBound = true;
+      avatarCircle.addEventListener("click", function (ev) {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        var input = root.querySelector("[data-tower-avatar-file]");
+        if (input) input.click();
       });
     }
     var avatarFilePanel = root.querySelector("[data-tower-avatar-file-panel]");

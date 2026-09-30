@@ -4341,6 +4341,10 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   display: block;
 }
 
+.tower-handle-badge.is-owner-editable {
+  cursor: text;
+}
+
 
 .tower-social-links {
   display: flex;
@@ -7878,6 +7882,9 @@ body { padding-top: 0 !important; }
   gap: 0.35rem;
   padding: 0.25rem 0;
 }
+.tower-rotate-toolbar[hidden] {
+  display: none !important;
+}
 .tower-rotate-label {
   font-size: 0.78rem;
   font-weight: 700;
@@ -8161,6 +8168,9 @@ body { padding-top: 0 !important; }
   font-size: 0.72rem;
   line-height: 1.2;
 }
+.tower-cal--public {
+  position: relative;
+}
 .tower-cal-friend-dropdown {
   margin-top: 0.75rem;
 }
@@ -8170,7 +8180,24 @@ body { padding-top: 0 !important; }
 }
 .tower-cal-friend-dropdown[open] > summary {
   list-style: disclosure-open;
-  margin-bottom: 0.45rem;
+  margin-bottom: 0;
+}
+/* Closed schedule stays out of the month grid. Open schedule floats so the grid box does not grow. */
+.tower-cal-friend-dropdown:not([open]) > :not(summary) {
+  display: none !important;
+}
+.tower-cal-friend-dropdown[open] > .tower-cal-friend-form {
+  position: absolute;
+  z-index: 6;
+  left: 0;
+  right: 0;
+  top: calc(100% + 0.35rem);
+  margin-top: 0;
+  background: rgba(255, 245, 249, 0.98);
+  border: 1px solid rgba(212, 137, 176, 0.55);
+  border-radius: 0.4rem;
+  padding: 0.55rem 0.65rem 0.7rem;
+  box-shadow: 0 8px 18px rgba(74, 44, 58, 0.14);
 }
 .tower-cal-scheduler {
   margin-top: 0.75rem;

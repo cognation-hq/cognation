@@ -164,7 +164,7 @@
       badgeVisibility: {},
       widgetLayout: {
         avatar: { x: 4, y: 4, z: 5, tilt: 0 },
-        identity: { x: 4, y: 18, z: 4, tilt: 0 },
+        identity: { x: 4, y: 26, z: 4, tilt: 0 },
         slogan: { x: 28, y: 18, z: 4, tilt: 0 },
         social: { x: 4, y: 26, z: 4, tilt: 0 },
         music: { x: 4, y: 34, z: 6, tilt: 0 },

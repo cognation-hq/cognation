@@ -123,6 +123,12 @@
       Object.keys(layout).forEach(function (id) {
         clearTilt(layout[id], id);
       });
+      /* Professional seed parked the name under the avatar, so the @ could not be clicked. */
+      var idPos = layout.identity;
+      if (idPos && idPos.x === 4 && idPos.y === 18 && idPos.z === 4 && (!idPos.tilt || idPos.tilt === 0)) {
+        idPos.y = 26;
+        changed = true;
+      }
     }
     ["friendPinLayout", "badgePinLayout"].forEach(function (key) {
       var pins = p[key];
@@ -2261,7 +2267,7 @@
       .trim()
       .replace(/^@+/, "")
       .toLowerCase()
-      .replace(/[^a-z0-9_]/g, "")
+      .replace(/[^a-z0-9._-]/g, "")
       .slice(0, 32);
   }
 
@@ -3347,20 +3353,21 @@
 
   function syncRotateToolbar(root) {
     var bar = root.querySelector("[data-tower-rotate-toolbar]");
-    if (!bar) return;
     var stage = root.querySelector("[data-tower-scrapbook]");
     var owner = isTowerOwner(TowerProfileStore.get()) && root.getAttribute("data-tower-side") === "public";
     var selected = getSelectedArrangeable(stage);
-    var show = !!(owner && selected);
-    bar.hidden = !show;
-    bar.setAttribute("aria-hidden", show ? "false" : "true");
-    var scrap = bar.closest("[data-tower-scrapbook-bar]");
-    if (scrap) {
-      scrap.hidden = !show;
-      scrap.setAttribute("aria-hidden", show ? "false" : "true");
+    var showRotate = !!(owner && selected);
+    if (bar) {
+      bar.hidden = !showRotate;
+      bar.setAttribute("aria-hidden", showRotate ? "false" : "true");
+      var rotateBtn = bar.querySelector("[data-tower-rotate]");
+      if (rotateBtn) rotateBtn.disabled = !selected;
     }
-    var rotateBtn = bar.querySelector("[data-tower-rotate]");
-    if (rotateBtn) rotateBtn.disabled = !selected;
+    var scrap = root.querySelector("[data-tower-scrapbook-bar]");
+    if (scrap) {
+      scrap.hidden = !owner;
+      scrap.setAttribute("aria-hidden", owner ? "false" : "true");
+    }
   }
 
   function readTiltFromElement(el) {
@@ -4700,7 +4707,8 @@
     if (!stage) return;
     var nodes = Array.prototype.slice.call(stage.querySelectorAll('[data-tower-widget="polaroid"]'));
     var personal = !p || p._profileKind !== "professional";
-    if (!personal) {
+    var hasPhoto = !!(p && p.polaroidDataUrl);
+    if (!personal || !hasPhoto || (p && p.polaroidRemoved)) {
       nodes.forEach(function (el) {
         el.hidden = true;
         el.classList.add("is-widget-off");
@@ -4952,9 +4960,6 @@
     var nameInput = root.querySelector("#tower-display-name");
     if (nameInput) nameInput.value = next;
     TowerProfileStore.save(p);
-    root.querySelectorAll("[data-tower-polaroid-photo]").forEach(function (photo) {
-      if (!p.avatarDataUrl) photo.textContent = initials(next);
-    });
   }
 
   function commitInlineHandle(root, el) {
@@ -4984,6 +4989,9 @@
       profileRoot.setAttribute("data-tower-handle", next);
       profileRoot.setAttribute("data-author-slug", slug);
     }
+    try {
+      if (location.hash !== "#" + profilePublicHash(p)) location.hash = profilePublicHash(p);
+    } catch (eHash) {}
   }
 
   function commitInlineQuote(root, el) {
@@ -5033,9 +5041,17 @@
     if (!root || root.__cognationInlineEditBound) return;
     root.__cognationInlineEditBound = true;
 
+    function ownerPublic() {
+      return isTowerOwner(TowerProfileStore.get()) && root.getAttribute("data-tower-side") === "public";
+    }
+
     function canEdit() {
       var p = TowerProfileStore.get();
-      return isTowerOwner(p) && p && p._profileKind !== "professional" && root.getAttribute("data-tower-side") === "public";
+      return ownerPublic() && p && p._profileKind !== "professional";
+    }
+
+    function canEditHandle() {
+      return ownerPublic();
     }
 
     function recentDrag(el) {
@@ -5045,10 +5061,17 @@
 
     root.addEventListener("click", function (ev) {
       var t = ev.target;
-      if (!t || !t.closest || !root.contains(t) || !canEdit()) return;
+      if (!t || !t.closest || !root.contains(t)) return;
       var el = t.closest(".tower-quote-card, .tower-slogan-card, [data-tower-profile-name], [data-tower-handle-badge]");
       if (!el || !root.contains(el) || recentDrag(el)) return;
+      var isHandle = el.matches("[data-tower-handle-badge]");
+      if (isHandle) {
+        if (!canEditHandle()) return;
+      } else if (!canEdit()) return;
       if (el.getAttribute("contenteditable") === "true") return;
+      /* First click selects the sticker so Backspace can remove it. The next click edits. */
+      var sticker = el.closest("[data-tower-widget]");
+      if (!sticker || !sticker.__cognationWasSelected) return;
       el.setAttribute("contenteditable", "true");
       el.setAttribute("spellcheck", "false");
       try { el.focus(); } catch (eFocus) {}
@@ -5233,6 +5256,15 @@
         return;
       }
       if (entry.type === "shell") {
+        if (entry.id === "polaroid") {
+          var pPolUndo = TowerProfileStore.get();
+          pPolUndo.polaroidRemoved = false;
+          TowerProfileStore.save(pPolUndo);
+          ensurePersonalPolaroid(root, pPolUndo);
+          applyWidgetLayout(root, pPolUndo);
+          setProfileStatusSafe("Restored Polaroid.", false);
+          return;
+        }
         setProfileStatusSafe("Shell restore is limited in this demo — use Reset layout.", false);
         return;
       }
@@ -5285,6 +5317,7 @@
         if (p.widgetLayout && p.widgetLayout.feed) delete p.widgetLayout.feed;
         if (p.widgetLayout && p.widgetLayout.messages) delete p.widgetLayout.messages;
         p.publicWidgets = JSON.parse(JSON.stringify(DEFAULT_PUBLIC_WIDGETS));
+        p.polaroidRemoved = false;
         TowerProfileStore.save(p);
         applyWidgetLayout(root, p);
         applyPublicWidgets(root, p);
@@ -5591,6 +5624,7 @@
       if (sticker && stage.contains(sticker) && !sticker.hidden && !sticker.classList.contains("is-widget-off")) {
         var wid = sticker.getAttribute("data-tower-widget");
         if (wid === "feed" || wid === "messages") return;
+        sticker.__cognationWasSelected = sticker.classList.contains("is-widget-selected");
         clearWidgetSelection(stage);
         sticker.classList.add("is-widget-selected");
         syncRotateToolbar(root);
@@ -5680,7 +5714,18 @@
         var id = selected.getAttribute("data-tower-widget");
         if (!id || id === "avatar" || id === "feed" || id === "messages") return;
         clearWidgetSelection(stage);
+        syncRotateToolbar(root);
         var label = selected.getAttribute("data-sticker-label") || id;
+        if (id === "polaroid") {
+          pushWidgetUndo({ type: "shell", id: id, label: label });
+          selected.hidden = true;
+          selected.classList.add("is-widget-off");
+          var pPol = TowerProfileStore.get();
+          pPol.polaroidRemoved = true;
+          TowerProfileStore.save(pPol);
+          setProfileStatusSafe(label + " removed — Reset layout to restore.", false);
+          return;
+        }
         if (PUBLIC_WIDGET_IDS.indexOf(id) >= 0) {
           pushWidgetUndo({ type: "widget", id: id, label: label });
           setPublicWidgetVisible(root, id, false);
@@ -6295,7 +6340,8 @@
     var handleBadge = root.querySelector("[data-tower-handle-badge]");
     var handleVal = normalizeHandle(p.handle || "");
     if (handleBadge && document.activeElement !== handleBadge) {
-      var ownerEditing = isTowerOwner(p) && p._profileKind !== "professional";
+      var ownerEditing = isTowerOwner(p) && root.getAttribute("data-tower-side") === "public";
+      handleBadge.classList.toggle("is-owner-editable", ownerEditing);
       if (handleVal) {
         handleBadge.hidden = false;
         handleBadge.textContent = "@" + handleVal;
@@ -6305,6 +6351,7 @@
       } else {
         handleBadge.hidden = true;
         handleBadge.textContent = "";
+        handleBadge.classList.remove("is-owner-editable");
       }
     }
     var handleInput = root.querySelector("[data-tower-handle]");
@@ -6336,12 +6383,12 @@
     }
     root.querySelectorAll("[data-tower-polaroid-photo]").forEach(function (photo) {
       if (document.activeElement === photo) return;
-      if (p.avatarDataUrl) {
-        photo.style.backgroundImage = 'url("' + p.avatarDataUrl.replace(/"/g, "") + '")';
+      if (p.polaroidDataUrl) {
+        photo.style.backgroundImage = 'url("' + String(p.polaroidDataUrl).replace(/"/g, "") + '")';
         photo.textContent = "";
       } else {
         photo.style.backgroundImage = "";
-        photo.textContent = initials(p.displayName);
+        photo.textContent = "";
       }
     });
     var bgHint = root.querySelector("[data-tower-bg-image-status]");

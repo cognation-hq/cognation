@@ -82,6 +82,7 @@
     html: { x: 22, y: 3, z: 3, tilt: 0 },
     calendar: { x: 55, y: 28, z: 5, tilt: 0 },
     polaroid: { x: 40, y: 6, z: 6, tilt: 0 },
+    instax: { x: 62, y: 4, z: 7, tilt: 0 },
   };
   /* Old scrapbook leans. A Rotate click adds 5° and that angle is kept. */
   var FACTORY_WIDGET_TILT = {
@@ -2396,6 +2397,61 @@
     });
   }
 
+  function syncMusicLookButtons(root, skin) {
+    root.querySelectorAll("[data-tower-music-look]").forEach(function (btn) {
+      var on = btn.getAttribute("data-tower-music-look") === skin;
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+      btn.classList.toggle("is-selected", on);
+    });
+  }
+
+  function bindMusicOwnerControls(root) {
+    var inline = root.querySelector("[data-tower-music-url-inline]");
+    if (inline && !inline.__cognationMusicUrlBound) {
+      inline.__cognationMusicUrlBound = true;
+      function commitMusicUrl() {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
+        var cur = TowerProfileStore.get();
+        var next = (inline.value || "").trim().slice(0, 500);
+        if (next === String(cur.musicUrl || "")) return;
+        cur.musicUrl = next;
+        if (!TowerProfileStore.save(cur)) return;
+        var saved = TowerProfileStore.get();
+        applyPublicWidgets(root, saved);
+        initTowerMusic(root, saved);
+      }
+      inline.addEventListener("change", commitMusicUrl);
+      inline.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          commitMusicUrl();
+          inline.blur();
+        }
+      });
+    }
+    root.querySelectorAll("[data-tower-music-look]").forEach(function (btn) {
+      if (btn.__cognationMusicLookBound) return;
+      btn.__cognationMusicLookBound = true;
+      btn.addEventListener("click", function () {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
+        var look = visibleMusicSkin(btn.getAttribute("data-tower-music-look") || "classic");
+        var cur = TowerProfileStore.get();
+        cur.musicSkin = look;
+        if (look !== "none") cur.musicEnabled = true;
+        if (!TowerProfileStore.save(cur)) return;
+        renderProfileChrome(root);
+      });
+    });
+  }
+
+  function showMusicSticker(root, on) {
+    var musicSticker = root.querySelector('[data-tower-widget="music"]');
+    if (!musicSticker) return;
+    musicSticker.hidden = !on;
+    musicSticker.classList.toggle("is-widget-off", !on);
+    if (!on) musicSticker.classList.remove("is-widget-selected");
+  }
+
   function initTowerMusic(root, p) {
     var wrap = root.querySelector("[data-tower-music]");
     var audio = root.querySelector("[data-tower-audio]");
@@ -2404,29 +2460,33 @@
     var url = (p.musicUrl || "").trim();
     var skin = visibleMusicSkin(p.musicSkin || "classic");
     var personal = !p || p._profileKind !== "professional";
+    var ownerPublic = isTowerOwner(p) && root.getAttribute("data-tower-side") === "public";
     var enabled = p.musicEnabled !== false && skin !== "none" && (personal || !!url);
     var ytId = parseYoutubeVideoId(url);
+    var inlineUrl = root.querySelector("[data-tower-music-url-inline]");
+    if (inlineUrl && document.activeElement !== inlineUrl) inlineUrl.value = url;
     setAllMusicLabels(root, url ? formatSongLine(p) : "Song — Artist");
+    bindMusicOwnerControls(root);
+    syncMusicLookButtons(root, skin);
 
     if (!enabled) {
-      wrap.hidden = true;
-      wrap.removeAttribute("data-music-mode");
-      hideMusicSkins(root);
       clearYoutubeEmbed(root);
       clearTowerAudio(audio);
-      var musicSticker = root.querySelector('[data-tower-widget="music"]');
-      if (musicSticker) {
-        musicSticker.hidden = true;
-        musicSticker.classList.add("is-widget-off");
+      hideMusicSkins(root);
+      /* None hides the player. The owner keeps Pink / Silver / None so they can turn it back on. */
+      if (ownerPublic && (skin === "none" || (!personal && !url))) {
+        wrap.hidden = false;
+        wrap.setAttribute("data-music-mode", "none");
+        showMusicSticker(root, true);
+        return;
       }
+      wrap.hidden = true;
+      wrap.removeAttribute("data-music-mode");
+      showMusicSticker(root, false);
       return;
     }
 
-    var musicOn = root.querySelector('[data-tower-widget="music"]');
-    if (musicOn) {
-      musicOn.hidden = false;
-      musicOn.classList.remove("is-widget-off");
-    }
+    showMusicSticker(root, true);
     if (!url) {
       wrap.hidden = false;
       wrap.setAttribute("data-music-mode", "audio");
@@ -2437,32 +2497,35 @@
     }
 
     wrap.hidden = false;
-    var off = viewerWantsMusicOff();
 
-    if (ytId) {
+    if (ytId && skin === "classic") {
+      /* The pink click-wheel stays up. The video plays inside its black screen. */
       wrap.setAttribute("data-music-mode", "youtube");
-      hideMusicSkins(root);
+      applyMusicSkin(root, "classic");
       clearTowerAudio(audio);
-      applyYoutubeWidth(root, p.musicYoutubeWidth || 320);
-      initYoutubeResize(root);
-      /* BUG FIX: do not autoplay on Tower load/login — wait for explicit Play / Sound on. */
       var iframe = ensureYoutubeIframe(root, ytId, true, false);
       if (iframe) {
         postYoutubeCommand(iframe, "mute");
         postYoutubeCommand(iframe, "pauseVideo");
       }
-      /* Start with sound "off" until the viewer presses Play — avoids login autoplay. */
+      /* Start paused until the viewer presses the pink center — avoids login autoplay. */
       if (!viewerWantsMusicOff()) {
         try {
           sessionStorage.setItem(VIEWER_MUSIC_OFF_KEY, "1");
         } catch (eMute) {}
-        off = true;
       }
       bindMusicToggles(root, { youtubeIframe: iframe });
       syncMusicToggleUi(root, true);
-      root.querySelectorAll("[data-tower-music-toggle]").forEach(function (btn) {
-        if (btn.textContent !== "♪") btn.textContent = "Play";
-      });
+      return;
+    }
+
+    if (ytId) {
+      wrap.setAttribute("data-music-mode", "audio");
+      clearYoutubeEmbed(root);
+      clearTowerAudio(audio);
+      applyMusicSkin(root, skin);
+      bindMusicToggles(root, {});
+      syncMusicToggleUi(root, true);
       return;
     }
 
@@ -2478,7 +2541,8 @@
     bindMusicToggles(root, { audio: audio });
     syncMusicToggleUi(root, true);
     root.querySelectorAll("[data-tower-music-toggle]").forEach(function (btn) {
-      if (btn.textContent !== "♪") btn.textContent = "Play";
+      if (btn.getAttribute("data-music-face-btn") != null || btn.textContent === "♪") return;
+      btn.textContent = "Play";
     });
   }
 
@@ -2691,25 +2755,28 @@
     return safeHttpUrl(raw);
   }
 
+  function storedSocialValue(id, value) {
+    if (id === "venmo") return String(value || "").trim().slice(0, 500);
+    return safeHttpUrl(value);
+  }
+
   function commitSocialDraft(root, id, value) {
     var p = TowerProfileStore.get();
     if (!p.socialLinks || typeof p.socialLinks !== "object") p.socialLinks = {};
-    p.socialLinks[id] = String(value || "").trim().slice(0, 500);
+    p.socialLinks[id] = storedSocialValue(id, value);
     p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
-    p.publicWidgets.social = true;
+    p.publicWidgets.social = profileHasSocialLinks(p);
     TowerProfileStore.save(p);
-    var formInput = root.querySelector('[data-tower-social="' + id + '"]');
-    if (formInput && document.activeElement !== formInput) formInput.value = p.socialLinks[id];
+    var saved = TowerProfileStore.get();
+    renderSocialLinks(root, saved);
+    applyPublicWidgets(root, saved);
   }
 
   function renderSocialLinks(root, p) {
     var box = root.querySelector("[data-tower-social-links]");
     if (!box) return;
     var links = (p && p.socialLinks) || {};
-    var personal = !p || p._profileKind !== "professional";
-    var owner = isTowerOwner(p) && root.getAttribute("data-tower-side") === "public" && personal;
     socialLinkDefs().forEach(function (net) {
-      if (!owner && net.id === "venmo" && !personal) return;
       var formInput = root.querySelector('[data-tower-social="' + net.id + '"]');
       if (formInput && document.activeElement !== formInput) formInput.value = links[net.id] || "";
     });
@@ -2717,36 +2784,8 @@
     box.innerHTML = "";
     var any = false;
     socialLinkDefs().forEach(function (net) {
-      if (net.id === "venmo" && !personal) return;
       var raw = links[net.id] || "";
       var href = socialHref(net.id, raw);
-      if (owner) {
-        any = true;
-        var label = document.createElement("label");
-        label.className = "tower-social-edit";
-        var name = document.createElement("span");
-        name.textContent = net.label;
-        var field = document.createElement("input");
-        field.type = "text";
-        field.maxLength = 500;
-        field.placeholder = net.id === "venmo" ? "@handle or link" : "https://";
-        field.value = raw;
-        field.setAttribute("data-tower-social-inline", net.id);
-        field.setAttribute("aria-label", net.label);
-        field.addEventListener("change", function () {
-          commitSocialDraft(root, net.id, field.value);
-        });
-        field.addEventListener("keydown", function (ev) {
-          if (ev.key === "Enter") {
-            ev.preventDefault();
-            field.blur();
-          }
-        });
-        label.appendChild(name);
-        label.appendChild(field);
-        box.appendChild(label);
-        return;
-      }
       if (!href) return;
       any = true;
       var a = document.createElement("a");
@@ -2761,9 +2800,9 @@
     });
     box.hidden = !any;
     var sticker = box.closest('[data-tower-widget="social"]');
-    if (sticker && owner) {
-      sticker.hidden = false;
-      sticker.classList.remove("is-widget-off");
+    if (sticker) {
+      sticker.hidden = !any;
+      sticker.classList.toggle("is-widget-off", !any);
     }
   }
 
@@ -3160,9 +3199,9 @@
 
   function profileHasSocialLinks(p) {
     var links = (p && p.socialLinks) || {};
-    var keys = Object.keys(links);
-    for (var i = 0; i < keys.length; i++) {
-      if (String(links[keys[i]] || "").trim()) return true;
+    var defs = socialLinkDefs();
+    for (var i = 0; i < defs.length; i++) {
+      if (socialHref(defs[i].id, links[defs[i].id])) return true;
     }
     return false;
   }
@@ -3189,9 +3228,7 @@
     var htmlText = typeof p.customHtml === "string" ? p.customHtml.trim() : "";
     if (!sloganText) p.publicWidgets.slogan = false;
     if (!htmlText) p.publicWidgets.html = false;
-    if (!profileHasSocialLinks(p) && !(p._profileKind !== "professional" && isTowerOwner(p))) {
-      p.publicWidgets.social = false;
-    }
+    p.publicWidgets.social = profileHasSocialLinks(p);
     if (visibleMusicSkin(p.musicSkin) === "none" || p.musicEnabled === false) p.publicWidgets.music = false;
     if (!(p.featuredFriendIds && p.featuredFriendIds.length)) p.publicWidgets.friends = false;
     if (!profileHasVisibleBadges(p)) p.publicWidgets.badges = false;
@@ -3211,10 +3248,7 @@
       if (id === "slogan" && !sloganText) on = false;
       /* Auto-prune empty shells so ghost handles do not linger on personal scrapbooks */
       if (id === "html" && !htmlText) on = false;
-      if (id === "social" && !profileHasSocialLinks(p)) {
-        var ownerPersonal = isTowerOwner(p) && p && p._profileKind !== "professional";
-        if (!ownerPersonal) on = false;
-      }
+      if (id === "social") on = profileHasSocialLinks(p);
       if (id === "music") {
         var personalMusic = !p || p._profileKind !== "professional";
         var skinChoice = visibleMusicSkin(p && p.musicSkin);
@@ -4684,17 +4718,56 @@
     stage.__cognationStickersReparented = true;
   }
 
+  function polaroidPrintList(p) {
+    var list = [];
+    if (p && Array.isArray(p.polaroidPrints)) {
+      p.polaroidPrints.forEach(function (url) {
+        if (typeof url === "string" && url.indexOf("data:image/") === 0) list.push(url);
+      });
+    }
+    if (!list.length && p && typeof p.polaroidDataUrl === "string" && p.polaroidDataUrl.indexOf("data:image/") === 0) {
+      list.push(p.polaroidDataUrl);
+    }
+    return list;
+  }
+
   function polaroidMarkup() {
     return (
       '<button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Polaroid sticker" tabindex="-1" hidden>⋮⋮</button>' +
       '<div class="tower-avatar-wrap" data-tower-avatar-frame="polaroid" data-tower-polaroid>' +
       '<div class="tower-avatar" data-tower-polaroid-photo aria-hidden="true"></div>' +
-      '<label class="tower-avatar-upload" title="Upload polaroid">' +
-      '<span class="tower-avatar-upload-hint" aria-hidden="true">📷</span>' +
-      '<span class="visually-hidden">Upload polaroid</span>' +
-      '<input type="file" accept="image/*" data-tower-polaroid-file>' +
-      "</label></div>"
+      "</div>"
     );
+  }
+
+  function instaxMarkup() {
+    return (
+      '<button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Camera sticker" tabindex="-1" hidden>⋮⋮</button>' +
+      '<label class="tower-instax" title="Upload a photo">' +
+      '<span class="visually-hidden">Upload a photo</span>' +
+      '<span class="tower-instax-body" aria-hidden="true">' +
+      '<span class="tower-instax-flash"></span>' +
+      '<span class="tower-instax-viewfinder"></span>' +
+      '<span class="tower-instax-lens"><span class="tower-instax-lens-glass"></span></span>' +
+      '<span class="tower-instax-shutter"></span>' +
+      "</span>" +
+      '<input type="file" accept="image/*" data-tower-instax-file>' +
+      "</label>"
+    );
+  }
+
+  function paintPolaroidPhoto(photo, url) {
+    if (!photo) return;
+    photo.textContent = "";
+    if (url) {
+      photo.style.backgroundImage = 'url("' + String(url).replace(/"/g, "") + '")';
+      photo.style.backgroundSize = "cover";
+      photo.style.backgroundPosition = "center";
+    } else {
+      photo.style.backgroundImage = "";
+      photo.style.backgroundSize = "";
+      photo.style.backgroundPosition = "";
+    }
   }
 
   /* One upright Polaroid on every personal profile. Professional pages stay without it. */
@@ -4703,11 +4776,20 @@
     if (!stage) return;
     var nodes = Array.prototype.slice.call(stage.querySelectorAll('[data-tower-widget="polaroid"]'));
     var personal = !p || p._profileKind !== "professional";
+    var cam = stage.querySelector('[data-tower-widget="instax"]');
     if (!personal || (p && p.polaroidRemoved)) {
       nodes.forEach(function (el) {
         el.hidden = true;
         el.classList.add("is-widget-off");
       });
+      stage.querySelectorAll("[data-tower-polaroid-extra]").forEach(function (el) {
+        el.hidden = true;
+        el.classList.add("is-widget-off");
+      });
+      if (cam) {
+        cam.hidden = true;
+        cam.classList.add("is-widget-off");
+      }
       return;
     }
     while (nodes.length > 1) {
@@ -4725,6 +4807,39 @@
     }
     el.hidden = false;
     el.classList.remove("is-widget-off");
+    if (!cam) {
+      cam = document.createElement("div");
+      cam.className = "tower-sticker tower-sticker--instax";
+      cam.setAttribute("data-tower-widget", "instax");
+      cam.setAttribute("data-sticker-label", "Camera");
+      cam.innerHTML = instaxMarkup();
+      stage.appendChild(cam);
+    }
+    cam.hidden = false;
+    cam.classList.remove("is-widget-off");
+    var prints = polaroidPrintList(p);
+    var needed = Math.max(0, prints.length - 1);
+    var extras = Array.prototype.slice.call(stage.querySelectorAll("[data-tower-polaroid-extra]"));
+    while (extras.length > needed) {
+      var gone = extras.pop();
+      if (gone && gone.parentNode) gone.parentNode.removeChild(gone);
+    }
+    for (var i = 0; i < needed; i++) {
+      var extraId = "polaroid-extra-" + i;
+      var printEl = stage.querySelector('[data-tower-widget="' + extraId + '"]');
+      if (!printEl) {
+        printEl = document.createElement("div");
+        printEl.className = "tower-sticker tower-sticker--polaroid";
+        printEl.setAttribute("data-tower-widget", extraId);
+        printEl.setAttribute("data-tower-polaroid-extra", String(i));
+        printEl.setAttribute("data-sticker-label", "Polaroid");
+        printEl.innerHTML = polaroidMarkup();
+        stage.appendChild(printEl);
+      }
+      printEl.hidden = false;
+      printEl.classList.remove("is-widget-off");
+      paintPolaroidPhoto(printEl.querySelector("[data-tower-polaroid-photo]"), prints[i + 1]);
+    }
   }
 
   function applyWidgetLayout(root, p) {
@@ -4761,6 +4876,25 @@
       el.setAttribute("data-sticker-x", String(x));
       el.setAttribute("data-sticker-y", String(y));
       el.setAttribute("data-sticker-z", String(z));
+    });
+    stage.querySelectorAll("[data-tower-polaroid-extra]").forEach(function (extraEl) {
+      if (extraEl.classList.contains("is-dragging")) return;
+      var extraId = extraEl.getAttribute("data-tower-widget");
+      var idx = parseInt(extraEl.getAttribute("data-tower-polaroid-extra") || "0", 10);
+      if (isNaN(idx)) idx = 0;
+      var savedPos = extraId && layout[extraId];
+      var pos = savedPos || { x: 48 + idx * 7, y: 22 + idx * 8, z: 8 + idx, tilt: 0 };
+      var ex = layoutCoord(pos.x, 48);
+      var ey = layoutCoord(pos.y, 22);
+      var ez = layoutCoord(pos.z, 8);
+      var et = layoutCoord(pos.tilt, 0);
+      extraEl.style.setProperty("--sticker-x", ex + "%");
+      extraEl.style.setProperty("--sticker-y", ey + "%");
+      extraEl.style.setProperty("--sticker-z", String(ez));
+      extraEl.style.setProperty("--sticker-tilt", et + "deg");
+      extraEl.setAttribute("data-sticker-x", String(ex));
+      extraEl.setAttribute("data-sticker-y", String(ey));
+      extraEl.setAttribute("data-sticker-z", String(ez));
     });
   }
 
@@ -6378,16 +6512,11 @@
         avatar.textContent = initials(p.displayName);
       }
     }
-    root.querySelectorAll("[data-tower-polaroid-photo]").forEach(function (photo) {
-      if (document.activeElement === photo) return;
-      if (p.polaroidDataUrl) {
-        photo.style.backgroundImage = 'url("' + String(p.polaroidDataUrl).replace(/"/g, "") + '")';
-        photo.textContent = "";
-      } else {
-        photo.style.backgroundImage = "";
-        photo.textContent = "";
-      }
-    });
+    var polaroidPrints = polaroidPrintList(p);
+    var primaryPhoto = root.querySelector('[data-tower-widget="polaroid"] [data-tower-polaroid-photo]');
+    if (primaryPhoto && document.activeElement !== primaryPhoto) {
+      paintPolaroidPhoto(primaryPhoto, polaroidPrints[0] || "");
+    }
     var bgHint = root.querySelector("[data-tower-bg-image-status]");
     if (bgHint && !(p.backgroundImageDataUrl && document.activeElement && document.activeElement.matches && document.activeElement.matches("[data-tower-bg-image]"))) {
       bgHint.textContent = p.backgroundImageDataUrl
@@ -6524,9 +6653,9 @@
         p.socialLinks = p.socialLinks || {};
         socialLinkDefs().forEach(function (net) {
           var input = root.querySelector('[data-tower-social="' + net.id + '"]');
-          p.socialLinks[net.id] = input ? safeHttpUrl(input.value) : "";
+          p.socialLinks[net.id] = input ? storedSocialValue(net.id, input.value) : "";
         });
-        p.customHtml = sanitizeProfileHtml(htmlInput ? htmlInput.value : "");
+        p.customHtml = htmlInput ? sanitizeProfileHtml(htmlInput.value) : (p.customHtml || "");
         var sloganIn = root.querySelector("[data-tower-slogan]");
         p.slogan = sloganIn ? String(sloganIn.value || "").trim().slice(0, 400) : (p.slogan || "");
         p.badges = { role: "", interest: "", status: "" };
@@ -6534,20 +6663,22 @@
           seedAwardedBadgesIfMissing(p);
         }
         var countSel = root.querySelector("[data-tower-friends-count]");
-        var n = parseInt(countSel && countSel.value ? countSel.value : "3", 10);
-        if ([3, 6, 8].indexOf(n) === -1) n = 3;
-        p.friendsDisplayCount = n;
-        p.featuredFriendIds = (p.featuredFriendIds || []).slice(0, n);
+        if (countSel) {
+          var n = parseInt(countSel.value ? countSel.value : "3", 10);
+          if ([3, 6, 8].indexOf(n) === -1) n = 3;
+          p.friendsDisplayCount = n;
+          p.featuredFriendIds = (p.featuredFriendIds || []).slice(0, n);
+        }
         var titleIn = root.querySelector("[data-tower-music-title]");
         var urlIn = root.querySelector("[data-tower-music-url]");
         var enIn = root.querySelector("[data-tower-music-enable]");
         var artistIn = root.querySelector("[data-tower-music-artist]");
         var skinIn = root.querySelector("[data-tower-music-skin]");
-        p.musicTitle = titleIn ? titleIn.value.trim().slice(0, 120) : "";
-        p.musicArtist = artistIn ? artistIn.value.trim().slice(0, 120) : "";
-        p.musicUrl = urlIn ? urlIn.value.trim().slice(0, 500) : "";
-        p.musicEnabled = enIn ? !!enIn.checked : true;
-        p.musicSkin = visibleMusicSkin(skinIn && skinIn.value ? skinIn.value : "classic");
+        if (titleIn) p.musicTitle = titleIn.value.trim().slice(0, 120);
+        if (artistIn) p.musicArtist = artistIn.value.trim().slice(0, 120);
+        if (urlIn) p.musicUrl = urlIn.value.trim().slice(0, 500);
+        if (enIn) p.musicEnabled = !!enIn.checked;
+        if (skinIn) p.musicSkin = visibleMusicSkin(skinIn.value || "classic");
         p.videoEnabled = false;
         p.videoUrl = "";
         if (p.musicYoutubeWidth == null) p.musicYoutubeWidth = 320;
@@ -6593,7 +6724,11 @@
         }
         /* keep widgetLayout as last dragged */
         if (!p.widgetLayout) p.widgetLayout = JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT));
-        p.publicWidgets = readPublicWidgetsFromForm(root);
+        if (root.querySelector("[data-tower-public-widget]")) {
+          p.publicWidgets = readPublicWidgetsFromForm(root);
+        }
+        p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
+        p.publicWidgets.social = profileHasSocialLinks(p);
         if (!TowerProfileStore.save(p)) {
           setProfileStatus("Could not save profile (storage full or blocked). Try a smaller photo.", true);
           return;
@@ -6606,6 +6741,17 @@
         window.setTimeout(function () {
           window.location.reload();
         }, 250);
+      });
+    }
+
+    if (!root.__cognationSocialFieldsBound) {
+      root.__cognationSocialFieldsBound = true;
+      root.querySelectorAll("[data-tower-social]").forEach(function (input) {
+        input.addEventListener("change", function () {
+          var id = input.getAttribute("data-tower-social");
+          if (!id) return;
+          commitSocialDraft(root, id, input.value);
+        });
       });
     }
 
@@ -6679,9 +6825,16 @@
       });
     }
 
-    function applyPolaroidFile(file, statusFn) {
+    function applyInstaxFile(file, statusFn) {
       readImageFile(file, statusFn, function (dataUrl) {
-        storeProfileImage(dataUrl, "polaroidDataUrl", statusFn, "Polaroid updated.", function (p) {
+        storeProfileImage(dataUrl, "polaroidDataUrl", statusFn, "Polaroid added.", function (p) {
+          if (!Array.isArray(p.polaroidPrints)) p.polaroidPrints = [];
+          var prior = p.polaroidDataUrl;
+          if (prior && prior.indexOf("data:image/") === 0 && p.polaroidPrints.indexOf(prior) === -1) {
+            p.polaroidPrints.push(prior);
+          }
+          p.polaroidPrints.push(dataUrl);
+          if (p.polaroidPrints.length > 6) p.polaroidPrints = p.polaroidPrints.slice(-6);
           p.polaroidRemoved = false;
         });
       });
@@ -6713,16 +6866,16 @@
         setTimeout(function () {
           pullChosenImage(root.querySelector("[data-tower-avatar-file]"), applyAvatarFile);
           pullChosenImage(root.querySelector("[data-tower-avatar-file-panel]"), applyAvatarFile);
-          var pol = root.querySelector("[data-tower-polaroid-file]");
-          pullChosenImage(pol, applyPolaroidFile);
+          pullChosenImage(root.querySelector("[data-tower-instax-file]"), applyInstaxFile);
         }, 0);
       });
     }
-    root.querySelectorAll("[data-tower-polaroid-file]").forEach(function (input) {
-      if (input.__cognationPolaroidBound) return;
-      input.__cognationPolaroidBound = true;
+    root.querySelectorAll("[data-tower-instax-file]").forEach(function (input) {
+      if (input.__cognationInstaxBound) return;
+      input.__cognationInstaxBound = true;
       input.addEventListener("change", function () {
-        pullChosenImage(input, applyPolaroidFile);
+        pullChosenImage(input, applyInstaxFile);
+        input.value = "";
       });
     });
     var clearAvatarBtn = root.querySelector("[data-tower-clear-avatar]");

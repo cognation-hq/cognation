@@ -594,105 +594,8 @@
                         </button>
                         <div class="tower-profile-edit-dropdown" id="tower-profile-edit-panel" data-tower-profile-edit-panel hidden>
                           <form class="tower-profile-form" data-tower-profile-form action="#" method="post">
-                        <div class="form-group">
-                          <label for="tower-display-name">Display name</label>
-                          <input id="tower-display-name" name="displayName" type="text" maxlength="80" placeholder="Your name" autocomplete="nickname">
-                          <label for="tower-name-size" class="tower-music-url-label">Name size (px)</label>
-                          <input id="tower-name-size" type="range" min="14" max="200" value="28" data-tower-name-size>
-                          <span class="form-hint">Drag the corner on the name sticker, or use this slider · up to 200px · live on Public</span>
-                        </div>
-                        <div class="form-group tower-photo-upload-fields">
-                          <label for="tower-profile-photo">Profile photo</label>
-                          <div class="tower-photo-choose-row">
-                            <input id="tower-profile-photo" type="file" accept="image/*" data-tower-avatar-file-panel>
-                            <button type="button" class="btn btn-secondary" data-tower-choose-avatar>Choose photo</button>
-                          </div>
-                          <span class="form-hint">Upload a picture for your public profile. You can also tap the camera on the photo itself.</span>
-                          <button type="button" class="btn btn-secondary" data-tower-clear-avatar style="margin-top:0.35rem;">Remove photo</button>
-                        </div>
-                        <div class="form-group tower-frame-fields">
-                          <p class="tower-frame-fields-label" id="tower-frame-label">Picture frame</p>
-                          <span class="form-hint">Photography-style frames around your profile photo</span>
-                          <div class="tower-frame-chips tower-frame-lx-clear" role="group" aria-labelledby="tower-frame-label" data-tower-frame-chips>
-                            <button type="button" class="tower-frame-chip is-selected" data-frame-id="none" aria-pressed="true" title="None" aria-label="None"><span class="tower-frame-chip-swatch tower-frame-lx-clear tower-frame-chip-swatch--none" aria-hidden="true"></span></button>
-                            <button type="button" class="tower-frame-chip" data-frame-id="ornate-gold" aria-pressed="false" title="Ornate gold oval" aria-label="Ornate gold oval"><span class="tower-frame-chip-swatch tower-frame-lx-clear tower-frame-chip-swatch--ornate-gold" aria-hidden="true"></span></button>
-                            <button type="button" class="tower-frame-chip" data-frame-id="baroque-magenta" aria-pressed="false" title="Magenta baroque" aria-label="Magenta baroque"><span class="tower-frame-chip-swatch tower-frame-lx-clear tower-frame-chip-swatch--baroque-magenta" aria-hidden="true"></span></button>
-                            <button type="button" class="tower-frame-chip" data-frame-id="squiggly" aria-pressed="false" title="Squiggly" aria-label="Squiggly"><span class="tower-frame-chip-swatch tower-frame-lx-clear tower-frame-chip-swatch--squiggly" aria-hidden="true"></span></button>
-                            <button type="button" class="tower-frame-chip" data-frame-id="gallery-gold" aria-pressed="false" title="Gallery gold" aria-label="Gallery gold"><span class="tower-frame-chip-swatch tower-frame-lx-clear tower-frame-chip-swatch--gallery-gold" aria-hidden="true"></span></button>
-                            <button type="button" class="tower-frame-chip" data-frame-id="walnut" aria-pressed="false" title="Walnut" aria-label="Walnut"><span class="tower-frame-chip-swatch tower-frame-lx-clear tower-frame-chip-swatch--walnut" aria-hidden="true"></span></button>
-                            <button type="button" class="tower-frame-chip" data-frame-id="polaroid" aria-pressed="false" title="Polaroid" aria-label="Polaroid"><span class="tower-frame-chip-swatch tower-frame-lx-clear tower-frame-chip-swatch--polaroid" aria-hidden="true"></span></button>
-                            <button type="button" class="tower-frame-chip" data-frame-id="matte-black" aria-pressed="false" title="Matte black" aria-label="Matte black"><span class="tower-frame-chip-swatch tower-frame-lx-clear tower-frame-chip-swatch--matte-black" aria-hidden="true"></span></button>
-                            <button type="button" class="tower-frame-chip" data-frame-id="cowboy-hat" aria-pressed="false" title="Cowboy hat" aria-label="Cowboy hat"><span class="tower-frame-chip-swatch tower-frame-lx-clear tower-frame-chip-swatch--cowboy-hat" aria-hidden="true"></span></button>
-                          </div>
-                          <input type="hidden" name="avatarFrame" value="none" data-tower-avatar-frame-input>
-                          <div class="tower-cowboy-color-fields" data-tower-cowboy-color-fields hidden>
-                            <p class="tower-frame-fields-label" id="tower-cowboy-color-label">Cowboy hat color</p>
-                            <span class="form-hint">Recolor the hat — Save frame to keep</span>
-                            <div class="tower-frame-chips tower-cowboy-color-chips" role="group" aria-labelledby="tower-cowboy-color-label" data-tower-cowboy-color-chips>
-                              <button type="button" class="tower-frame-chip is-selected" data-cowboy-color="tan" aria-pressed="true" title="Tan" aria-label="Tan"><span class="tower-cowboy-swatch tower-cowboy-swatch--tan" aria-hidden="true"></span></button>
-                              <button type="button" class="tower-frame-chip" data-cowboy-color="black" aria-pressed="false" title="Black" aria-label="Black"><span class="tower-cowboy-swatch tower-cowboy-swatch--black" aria-hidden="true"></span></button>
-                              <button type="button" class="tower-frame-chip" data-cowboy-color="white" aria-pressed="false" title="White" aria-label="White"><span class="tower-cowboy-swatch tower-cowboy-swatch--white" aria-hidden="true"></span></button>
-                              <button type="button" class="tower-frame-chip" data-cowboy-color="pink" aria-pressed="false" title="Pink" aria-label="Pink"><span class="tower-cowboy-swatch tower-cowboy-swatch--pink" aria-hidden="true"></span></button>
-                              <button type="button" class="tower-frame-chip" data-cowboy-color="red" aria-pressed="false" title="Red" aria-label="Red"><span class="tower-cowboy-swatch tower-cowboy-swatch--red" aria-hidden="true"></span></button>
-                              <button type="button" class="tower-frame-chip" data-cowboy-color="blue" aria-pressed="false" title="Blue" aria-label="Blue"><span class="tower-cowboy-swatch tower-cowboy-swatch--blue" aria-hidden="true"></span></button>
-                              <button type="button" class="tower-frame-chip" data-cowboy-color="green" aria-pressed="false" title="Green" aria-label="Green"><span class="tower-cowboy-swatch tower-cowboy-swatch--green" aria-hidden="true"></span></button>
-                              <button type="button" class="tower-frame-chip" data-cowboy-color="purple" aria-pressed="false" title="Purple" aria-label="Purple"><span class="tower-cowboy-swatch tower-cowboy-swatch--purple" aria-hidden="true"></span></button>
-                              <button type="button" class="tower-frame-chip" data-cowboy-color="gold" aria-pressed="false" title="Gold" aria-label="Gold"><span class="tower-cowboy-swatch tower-cowboy-swatch--gold" aria-hidden="true"></span></button>
-                            </div>
-                            <input type="hidden" name="cowboyHatColor" value="tan" data-tower-cowboy-color-input>
-                          </div>
-                          <div class="form-actions tower-frame-actions">
-                            <button type="button" class="btn btn-primary" data-tower-save-frame>Save frame</button>
-                            <span class="form-hint">Pick an image, then Save frame</span>
-                          </div>
-                        </div>
-                        <div class="form-group tower-ornament-fields">
-                          <p class="tower-frame-fields-label" id="tower-ornament-label">Photo ornament</p>
-                          <span class="form-hint">Elegant bow or bowtie stacked above or below your profile photo</span>
-                          <div class="tower-frame-chips tower-frame-lx-clear" role="group" aria-labelledby="tower-ornament-label" data-tower-ornament-chips>
-                            <button type="button" class="tower-frame-chip is-selected" data-ornament-id="none" aria-pressed="true" title="None"><span class="tower-frame-chip-swatch tower-frame-lx-clear tower-frame-chip-swatch--none" aria-hidden="true"></span><span>None</span></button>
-                            <button type="button" class="tower-frame-chip" data-ornament-id="elegant-bow" aria-pressed="false" title="Elegant bow"><span class="tower-frame-chip-swatch tower-frame-lx-clear tower-frame-chip-swatch--elegant-bow" aria-hidden="true"></span><span>Elegant bow</span></button>
-                            <button type="button" class="tower-frame-chip" data-ornament-id="bowtie" aria-pressed="false" title="Bowtie"><span class="tower-frame-chip-swatch tower-frame-lx-clear tower-frame-chip-swatch--bowtie" aria-hidden="true"></span><span>Bowtie</span></button>
-                          </div>
-                          <input type="hidden" name="avatarOrnament" value="none" data-tower-avatar-ornament-input>
-                          <p class="tower-frame-fields-label tower-ornament-pos-label" id="tower-ornament-pos-label">Ornament position</p>
-                          <div class="tower-frame-chips tower-frame-lx-clear" role="group" aria-labelledby="tower-ornament-pos-label" data-tower-ornament-pos-chips>
-                            <button type="button" class="tower-frame-chip is-selected" data-ornament-pos="above" aria-pressed="true" title="Above" disabled><span>Above</span></button>
-                            <button type="button" class="tower-frame-chip" data-ornament-pos="below" aria-pressed="false" title="Below" disabled><span>Below</span></button>
-                          </div>
-                          <input type="hidden" name="avatarOrnamentPos" value="above" data-tower-avatar-ornament-pos-input>
-                        </div>
-                        <div class="form-group">
-                          <label for="tower-handle">Handle</label>
-                          <input id="tower-handle" name="handle" type="text" maxlength="32" placeholder="yourhandle" autocomplete="username" data-tower-handle spellcheck="false">
-                          <span class="form-hint">Shows as @handle under your photo · used in NEWS links</span>
-                        </div>
-
-                        <div class="form-group tower-slogan-fields">
-                          <label for="tower-slogan">Quote or business slogan</label>
-                          <textarea
-                            id="tower-slogan"
-                            name="slogan"
-                            rows="2"
-                            maxlength="400"
-                            placeholder="e.g. Your health, our promise."
-                            data-tower-slogan
-                          ></textarea>
-                          <span class="form-hint">Shows as a scrapbook quote card on your public profile when filled in · max 400 characters</span>
-                        </div>
-
-                        <div class="form-group tower-public-url-fields" data-tower-public-url-fields>
-                          <label for="tower-public-url">Public profile URL</label>
-                          <div class="tower-public-url-row">
-                            <input id="tower-public-url" type="text" readonly data-tower-public-url spellcheck="false" aria-describedby="tower-public-url-hint">
-                            <button type="button" class="btn btn-secondary" data-tower-copy-public-url>Copy</button>
-                          </div>
-                          <span class="form-hint" id="tower-public-url-hint">Share this link — opens your public scrapbook (not My feed).</span>
-                        </div>
-
                         <div class="form-group tower-social-fields">
                           <p class="tower-social-fields-label">Social links</p>
-                          <span class="form-hint">Paste profile URLs — buttons appear under your photo after Save</span>
                           <label for="tower-social-x">X</label>
                           <input id="tower-social-x" name="socialX" type="url" maxlength="500" placeholder="https://x.com/…" data-tower-social="x" inputmode="url">
                           <label for="tower-social-meta">Meta</label>
@@ -708,70 +611,38 @@
                           <label for="tower-social-venmo">Venmo</label>
                           <input id="tower-social-venmo" name="socialVenmo" type="text" maxlength="500" placeholder="@handle or https://venmo.com/…" data-tower-social="venmo" autocomplete="off">
                         </div>
-                        <div class="form-group tower-music-fields">
-                          <label for="tower-music-title">Favorite song (profile player)</label>
-                          <input id="tower-music-title" name="musicTitle" type="text" maxlength="120" placeholder="Song title" data-tower-music-title>
-                          <label for="tower-music-artist" class="tower-music-url-label">Artist</label>
-                          <input id="tower-music-artist" name="musicArtist" type="text" maxlength="120" placeholder="Artist name" data-tower-music-artist>
-                          <label for="tower-music-url" class="tower-music-url-label">Song URL</label>
-                          <input id="tower-music-url" name="musicUrl" type="url" maxlength="500" placeholder="Paste YouTube or audio link…" data-tower-music-url inputmode="url" autocomplete="off">
-                          <span class="form-hint">One player only — paste a YouTube or audio link, Save profile, and it loads for everyone who opens your public Tower.</span>
-                          <label for="tower-music-skin">Player look</label>
-                          <select id="tower-music-skin" data-tower-music-skin>
-                            <option value="classic" selected>Pink</option>
-                            <option value="cd">Silver</option>
-                            <option value="none">None</option>
-                          </select>
-                          <label class="tower-music-enable">
-                            <input type="checkbox" data-tower-music-enable checked>
-                            <span>Play on my public Tower profile</span>
-                          </label>
-                          <span class="form-hint">Does not start on login or page load — visitors press Play / Sound on to listen.</span>
-                        </div>
-
-                        <div class="form-group">
-                          <label for="tower-profile-html">Custom profile HTML</label>
-                          <textarea
-                            id="tower-profile-html"
-                            name="profileHtml"
-                            rows="6"
-                            maxlength="8000"
-                            spellcheck="false"
-                            placeholder="Optional HTML the site will render on your profile (no scripts)."
-                            data-tower-profile-html
-                          ></textarea>
-                          <span class="form-hint">Paste your own markup to customize this profile. Scripts and event handlers are stripped.</span>
-                        </div>
-
-                        <div class="tower-profile-html-preview" data-tower-html-preview></div>
-
-
-                        <details class="tower-public-widgets" data-tower-public-widgets>
-                          <summary class="tower-public-widgets-summary">Public widgets</summary>
-                          <div class="tower-public-widgets-body">
-                            <span class="form-hint">Show or hide stickers on your public scrapbook. Avatar always stays on. Live preview · also saved with Save profile.</span>
-                            <label class="tower-public-widget-check"><input type="checkbox" data-tower-public-widget="identity" checked> <span>Name</span></label>
-                            <label class="tower-public-widget-check"><input type="checkbox" data-tower-public-widget="slogan" checked> <span>Quote / slogan</span></label>
-                            <label class="tower-public-widget-check"><input type="checkbox" data-tower-public-widget="social" checked> <span>Social links</span></label>
-                            <label class="tower-public-widget-check"><input type="checkbox" data-tower-public-widget="music" checked> <span>Music player</span></label>
-                            <label class="tower-public-widget-check"><input type="checkbox" data-tower-public-widget="badges" checked> <span>Badges</span></label>
-                            <label class="tower-public-widget-check"><input type="checkbox" data-tower-public-widget="friends" checked> <span>Friends</span></label>
-                            <label class="tower-public-widget-check"><input type="checkbox" data-tower-public-widget="html" checked> <span>Custom HTML</span></label>
-                            <label class="tower-public-widget-check"><input type="checkbox" data-tower-public-widget="calendar"> <span>Calendar</span></label>
+                        <div class="form-group tower-frame-fields">
+                          <p class="tower-frame-fields-label" id="tower-frame-label">Picture frame</p>
+                          <div class="tower-frame-chips" role="group" aria-labelledby="tower-frame-label" data-tower-frame-chips>
+                            <button type="button" class="tower-frame-chip is-selected" data-frame-id="none" aria-pressed="true" title="None" aria-label="None"><span class="tower-frame-chip-swatch tower-frame-chip-swatch--none" aria-hidden="true"></span><span class="tower-frame-chip-name">None</span></button>
+                            <button type="button" class="tower-frame-chip" data-frame-id="ornate-gold" aria-pressed="false" title="Ornate gold oval" aria-label="Ornate gold oval"><span class="tower-frame-chip-swatch tower-frame-chip-swatch--ornate-gold" aria-hidden="true"></span><span class="tower-frame-chip-name">Ornate gold</span></button>
+                            <button type="button" class="tower-frame-chip" data-frame-id="baroque-magenta" aria-pressed="false" title="Magenta baroque" aria-label="Magenta baroque"><span class="tower-frame-chip-swatch tower-frame-chip-swatch--baroque-magenta" aria-hidden="true"></span><span class="tower-frame-chip-name">Magenta baroque</span></button>
+                            <button type="button" class="tower-frame-chip" data-frame-id="squiggly" aria-pressed="false" title="Squiggly" aria-label="Squiggly"><span class="tower-frame-chip-swatch tower-frame-chip-swatch--squiggly" aria-hidden="true"></span><span class="tower-frame-chip-name">Squiggly</span></button>
+                            <button type="button" class="tower-frame-chip" data-frame-id="gallery-gold" aria-pressed="false" title="Gallery gold" aria-label="Gallery gold"><span class="tower-frame-chip-swatch tower-frame-chip-swatch--gallery-gold" aria-hidden="true"></span><span class="tower-frame-chip-name">Gallery gold</span></button>
+                            <button type="button" class="tower-frame-chip" data-frame-id="walnut" aria-pressed="false" title="Walnut" aria-label="Walnut"><span class="tower-frame-chip-swatch tower-frame-chip-swatch--walnut" aria-hidden="true"></span><span class="tower-frame-chip-name">Walnut</span></button>
+                            <button type="button" class="tower-frame-chip" data-frame-id="polaroid" aria-pressed="false" title="Polaroid" aria-label="Polaroid"><span class="tower-frame-chip-swatch tower-frame-chip-swatch--polaroid" aria-hidden="true"></span><span class="tower-frame-chip-name">Polaroid</span></button>
+                            <button type="button" class="tower-frame-chip" data-frame-id="matte-black" aria-pressed="false" title="Matte black" aria-label="Matte black"><span class="tower-frame-chip-swatch tower-frame-chip-swatch--matte-black" aria-hidden="true"></span><span class="tower-frame-chip-name">Matte black</span></button>
+                            <button type="button" class="tower-frame-chip" data-frame-id="cowboy-hat" aria-pressed="false" title="Cowboy hat" aria-label="Cowboy hat"><span class="tower-frame-chip-swatch tower-frame-chip-swatch--cowboy-hat" aria-hidden="true"></span><span class="tower-frame-chip-name">Cowboy hat</span></button>
                           </div>
-                        </details>
-
-                        <div class="form-group tower-account-phone" data-tower-account-phone>
-                          <label for="tower-account-phone">Account phone (demo)</label>
-                          <input id="tower-account-phone" type="tel" maxlength="20" placeholder="(312) 555-0147" data-tower-account-phone-input autocomplete="tel">
-                          <span class="form-hint">Required to claim a second page · max 2 profiles per phone · demo storage in-browser only</span>
-                        </div>
-                        <div class="form-actions">
-                          <button type="submit" class="btn btn-primary">Save profile</button>
-                        </div>
-                        <div class="tower-add-profile-row" data-tower-add-profile-row>
-                          <button type="button" class="btn btn-secondary" data-tower-add-profile hidden>Add professional page</button>
-                          <p class="commune-status" data-tower-add-profile-status hidden role="status" aria-live="polite"></p>
+                          <input type="hidden" name="avatarFrame" value="none" data-tower-avatar-frame-input>
+                          <div class="tower-cowboy-color-fields" data-tower-cowboy-color-fields hidden>
+                            <p class="tower-frame-fields-label" id="tower-cowboy-color-label">Cowboy hat color</p>
+                            <div class="tower-frame-chips tower-cowboy-color-chips" role="group" aria-labelledby="tower-cowboy-color-label" data-tower-cowboy-color-chips>
+                              <button type="button" class="tower-frame-chip is-selected" data-cowboy-color="tan" aria-pressed="true" title="Tan" aria-label="Tan"><span class="tower-cowboy-swatch tower-cowboy-swatch--tan" aria-hidden="true"></span><span class="tower-frame-chip-name">Tan</span></button>
+                              <button type="button" class="tower-frame-chip" data-cowboy-color="black" aria-pressed="false" title="Black" aria-label="Black"><span class="tower-cowboy-swatch tower-cowboy-swatch--black" aria-hidden="true"></span><span class="tower-frame-chip-name">Black</span></button>
+                              <button type="button" class="tower-frame-chip" data-cowboy-color="white" aria-pressed="false" title="White" aria-label="White"><span class="tower-cowboy-swatch tower-cowboy-swatch--white" aria-hidden="true"></span><span class="tower-frame-chip-name">White</span></button>
+                              <button type="button" class="tower-frame-chip" data-cowboy-color="pink" aria-pressed="false" title="Pink" aria-label="Pink"><span class="tower-cowboy-swatch tower-cowboy-swatch--pink" aria-hidden="true"></span><span class="tower-frame-chip-name">Pink</span></button>
+                              <button type="button" class="tower-frame-chip" data-cowboy-color="red" aria-pressed="false" title="Red" aria-label="Red"><span class="tower-cowboy-swatch tower-cowboy-swatch--red" aria-hidden="true"></span><span class="tower-frame-chip-name">Red</span></button>
+                              <button type="button" class="tower-frame-chip" data-cowboy-color="blue" aria-pressed="false" title="Blue" aria-label="Blue"><span class="tower-cowboy-swatch tower-cowboy-swatch--blue" aria-hidden="true"></span><span class="tower-frame-chip-name">Blue</span></button>
+                              <button type="button" class="tower-frame-chip" data-cowboy-color="green" aria-pressed="false" title="Green" aria-label="Green"><span class="tower-cowboy-swatch tower-cowboy-swatch--green" aria-hidden="true"></span><span class="tower-frame-chip-name">Green</span></button>
+                              <button type="button" class="tower-frame-chip" data-cowboy-color="purple" aria-pressed="false" title="Purple" aria-label="Purple"><span class="tower-cowboy-swatch tower-cowboy-swatch--purple" aria-hidden="true"></span><span class="tower-frame-chip-name">Purple</span></button>
+                              <button type="button" class="tower-frame-chip" data-cowboy-color="gold" aria-pressed="false" title="Gold" aria-label="Gold"><span class="tower-cowboy-swatch tower-cowboy-swatch--gold" aria-hidden="true"></span><span class="tower-frame-chip-name">Gold</span></button>
+                            </div>
+                            <input type="hidden" name="cowboyHatColor" value="tan" data-tower-cowboy-color-input>
+                          </div>
+                          <div class="form-actions tower-frame-actions">
+                            <button type="button" class="btn btn-primary" data-tower-save-frame>Save frame</button>
+                          </div>
                         </div>
                         <p class="commune-status" data-tower-profile-status hidden role="status" aria-live="polite"></p>
                       </form>
@@ -785,20 +656,22 @@
                       </div><div class="tower-sticker tower-sticker--music" data-tower-widget="music" data-sticker-label="Music"><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Music sticker" tabindex="-1" hidden>⋮⋮</button><div class="tower-music" data-tower-music data-music-skin="classic" hidden>
                         <audio data-tower-audio preload="metadata" playsinline></audio>
 
-                        <div class="tower-music-youtube" data-tower-youtube hidden>
-                          <div class="tower-music-youtube-frame" data-tower-youtube-frame>
-                            <button type="button" class="tower-youtube-resize" data-tower-youtube-resize aria-label="Drag to resize YouTube" title="Drag to resize"></button>
-                          </div>
-                          <div class="tower-music-youtube-bar">
-                            <button type="button" class="tower-music-toggle" data-tower-music-toggle aria-pressed="true">Sound on</button>
-                            <span class="tower-music-classic-line" data-tower-music-label>Song — Artist</span>
-                          </div>
-                        </div>
-
-                        <!-- classic one-line -->
                         <div class="tower-music-skin tower-music-skin--classic" data-music-face="classic">
-                          <button type="button" class="tower-music-toggle" data-tower-music-toggle aria-pressed="true">♪</button>
-                          <span class="tower-music-classic-line" data-tower-music-label>Song — Artist</span>
+                          <div class="tower-ipod" data-tower-ipod>
+                            <div class="tower-ipod-screen">
+                              <div class="tower-music-youtube" data-tower-youtube hidden>
+                                <div class="tower-music-youtube-frame" data-tower-youtube-frame></div>
+                              </div>
+                              <span class="tower-ipod-now" data-tower-music-label>Song — Artist</span>
+                            </div>
+                            <div class="tower-ipod-wheel">
+                              <span class="tower-ipod-menu">MENU</span>
+                              <button type="button" class="tower-ipod-skip tower-ipod-skip--prev" aria-label="Previous">◀◀</button>
+                              <button type="button" class="tower-music-toggle tower-ipod-center" data-tower-music-toggle data-music-face-btn aria-pressed="true" aria-label="Play">▶</button>
+                              <button type="button" class="tower-ipod-skip tower-ipod-skip--next" aria-label="Next">▶▶</button>
+                              <span class="tower-ipod-vol">VOL</span>
+                            </div>
+                          </div>
                         </div>
 
                         <!-- cd player -->
@@ -809,6 +682,18 @@
                               <span class="tower-cd-title" data-tower-music-label>Song — Artist</span>
                               <button type="button" class="tower-music-toggle" data-tower-music-toggle aria-pressed="true">Sound on</button>
                             </div>
+                          </div>
+                        </div>
+
+                        <div class="tower-music-owner" data-tower-music-owner>
+                          <label class="tower-music-url-label">
+                            <span class="visually-hidden">YouTube link</span>
+                            <input type="url" inputmode="url" maxlength="500" placeholder="Paste a YouTube link" data-tower-music-url-inline autocomplete="off">
+                          </label>
+                          <div class="tower-music-looks" role="group" aria-label="Player look">
+                            <button type="button" data-tower-music-look="classic" aria-pressed="true">Pink</button>
+                            <button type="button" data-tower-music-look="cd" aria-pressed="false">Silver</button>
+                            <button type="button" data-tower-music-look="none" aria-pressed="false">None</button>
                           </div>
                         </div>
 
@@ -836,12 +721,21 @@
                         <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Polaroid sticker" tabindex="-1" hidden>⋮⋮</button>
                         <div class="tower-avatar-wrap" data-tower-avatar-frame="polaroid" data-tower-polaroid>
                           <div class="tower-avatar" data-tower-polaroid-photo aria-hidden="true"></div>
-                          <label class="tower-avatar-upload" title="Upload polaroid">
-                            <span class="tower-avatar-upload-hint" aria-hidden="true">📷</span>
-                            <span class="visually-hidden">Upload polaroid</span>
-                            <input type="file" accept="image/*" data-tower-polaroid-file>
-                          </label>
                         </div>
+                      </div>
+
+                      <div class="tower-sticker tower-sticker--instax" data-tower-widget="instax" data-sticker-label="Camera">
+                        <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Camera sticker" tabindex="-1" hidden>⋮⋮</button>
+                        <label class="tower-instax" title="Upload a photo">
+                          <span class="visually-hidden">Upload a photo</span>
+                          <span class="tower-instax-body" aria-hidden="true">
+                            <span class="tower-instax-flash"></span>
+                            <span class="tower-instax-viewfinder"></span>
+                            <span class="tower-instax-lens"><span class="tower-instax-lens-glass"></span></span>
+                            <span class="tower-instax-shutter"></span>
+                          </span>
+                          <input type="file" accept="image/*" data-tower-instax-file>
+                        </label>
                       </div>
 
                       <div class="tower-sticker tower-sticker--calendar" data-tower-widget="calendar" data-sticker-label="Calendar" data-tower-calendar-personal>

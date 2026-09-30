@@ -81,6 +81,7 @@
     friends: { x: 2, y: 52, z: 4, tilt: 0 },
     html: { x: 22, y: 3, z: 3, tilt: 0 },
     calendar: { x: 55, y: 28, z: 5, tilt: 0 },
+    polaroid: { x: 40, y: 6, z: 6, tilt: 0 },
   };
   /* Old scrapbook leans and the ±15° nudges. Rotate clicks land on 90° steps. */
   var FACTORY_WIDGET_TILT = {
@@ -136,7 +137,7 @@
       });
     }
     if (changed) {
-      try { TowerProfileStore.save(p); } catch (eSettle) {}
+      try { TowerProfileStore.save(p, { geometry: true }); } catch (eSettle) {}
     }
     return changed;
   }
@@ -477,6 +478,98 @@
     };
   }
 
+  var SCRAPBOOK_LAYOUT_KEY = "cognation.scrapbookLayout.v1";
+
+  function scrapbookLayoutKeys(p) {
+    var keys = [];
+    function add(value) {
+      var key = value ? String(value).trim() : "";
+      if (!key || keys.indexOf(key) >= 0) return;
+      keys.push(key);
+    }
+    add(p && (p._profileId || p.id));
+    add(p && p.handle);
+    try {
+      var hash = String(location.hash || "").replace(/^#/, "");
+      if (hash.indexOf("tower-profile-") === 0) add(decodeURIComponent(hash.slice("tower-profile-".length)));
+    } catch (eHash) {}
+    if (!keys.length) keys.push("default");
+    return keys;
+  }
+
+  function readScrapbookLayouts() {
+    try {
+      var raw = localStorage.getItem(SCRAPBOOK_LAYOUT_KEY);
+      var doc = raw ? JSON.parse(raw) : {};
+      return doc && typeof doc === "object" ? doc : {};
+    } catch (eLayout) {
+      return {};
+    }
+  }
+
+  function readSavedScrapbook(p) {
+    var doc = readScrapbookLayouts();
+    var keys = scrapbookLayoutKeys(p);
+    var i;
+    for (i = 0; i < keys.length; i++) {
+      var hit = doc[keys[i]];
+      if (hit && hit.widgetLayout && typeof hit.widgetLayout === "object") return hit;
+    }
+    for (i = 0; i < keys.length; i++) {
+      if (doc[keys[i]] && typeof doc[keys[i]] === "object") return doc[keys[i]];
+    }
+    return null;
+  }
+
+  function writeScrapbookLayout(p) {
+    if (!p) return;
+    var doc = readScrapbookLayouts();
+    var prev = readSavedScrapbook(p) || {};
+    var nextLayout = p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : prev.widgetLayout || null;
+    var nextQuotes = Array.isArray(p.quoteStickers) && p.quoteStickers.length
+      ? p.quoteStickers
+      : (Array.isArray(prev.quoteStickers) ? prev.quoteStickers : []);
+    var record = { widgetLayout: nextLayout, quoteStickers: nextQuotes };
+    scrapbookLayoutKeys(p).forEach(function (key) {
+      doc[key] = record;
+    });
+    try {
+      localStorage.setItem(SCRAPBOOK_LAYOUT_KEY, JSON.stringify(doc));
+    } catch (eWrite) {}
+  }
+
+  /* Remote profiles do not store widget x/y, and a refresh often still carries
+     the spawn layout. The last drop on this profile wins over both. */
+  function mergeScrapbookLayout(p) {
+    if (!p) return p;
+    var saved = readSavedScrapbook(p);
+    if (!saved || typeof saved !== "object") return p;
+    if (saved.widgetLayout && typeof saved.widgetLayout === "object") {
+      var base = p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : {};
+      Object.keys(saved.widgetLayout).forEach(function (id) {
+        var pos = saved.widgetLayout[id];
+        if (!pos || typeof pos !== "object") return;
+        var cur = base[id] && typeof base[id] === "object" ? base[id] : {};
+        base[id] = {
+          x: layoutCoord(pos.x, layoutCoord(cur.x, 0)),
+          y: layoutCoord(pos.y, layoutCoord(cur.y, 0)),
+          z: layoutCoord(pos.z, layoutCoord(cur.z, 1)),
+          tilt: layoutCoord(pos.tilt, layoutCoord(cur.tilt, 0)),
+        };
+      });
+      p.widgetLayout = base;
+    }
+    if (Array.isArray(saved.quoteStickers) && saved.quoteStickers.length && (!Array.isArray(p.quoteStickers) || !p.quoteStickers.length)) {
+      p.quoteStickers = saved.quoteStickers;
+    }
+    return p;
+  }
+
+  function layoutCoord(value, fallback) {
+    var n = typeof value === "number" ? value : parseFloat(value);
+    return isNaN(n) ? fallback : n;
+  }
+
   var TowerProfileStore = {
     getActiveProfileId: resolveActiveProfileId,
     load: function () {
@@ -606,6 +699,7 @@
         if (!Array.isArray(p.calendarEvents)) p.calendarEvents = [];
         if (typeof p.calendarIcsUrl !== "string") p.calendarIcsUrl = "";
         if (p.calendarGoogleConnected == null) p.calendarGoogleConnected = false;
+        mergeScrapbookLayout(p);
         return p;
       }
       var before = p.awardedBadges;
@@ -615,6 +709,7 @@
       var calSeeded = seedCalendarEventsIfMissing(p);
       var visMig = normalizeBadgeVisibility(p);
       var afterLen = Array.isArray(p.awardedBadges) ? p.awardedBadges.length : -1;
+      mergeScrapbookLayout(p);
       if (created || before == null || afterLen > beforeLen || beforeVis == null || visMig.migrated || calSeeded) {
         try {
           this.save(p);
@@ -622,18 +717,31 @@
       }
       return p;
     },
-    save: function (data) {
+    save: function (data, opts) {
       /* Listeners of tower-profile-updated call get(), which can call save().
          A re-entrant save is what turned one profile read into a stack overflow. */
       if (this._saving) return false;
       this._saving = true;
       try {
       data = data || {};
+      opts = opts || {};
+      writeScrapbookLayout(data);
       var id = data._profileId || resolveActiveProfileId();
-      if (usingRemoteSocial() && id) {
+      /* A drop only changes x/y. Never PATCH the profile: that reload paints
+         the remote row, which has no sticker coordinates, and the widget
+         jumps back to its spawn point the moment the pointer goes up. */
+      if (!opts.geometry && usingRemoteSocial() && id) {
         var social = remoteSocial();
         var activeSession = getSessionObject();
+        var remoteRow = social && social.getProfile ? social.getProfile(id) : null;
+        var identityChanged = !remoteRow ||
+          String(data.displayName || "").trim() !== String(remoteRow.display_name || "").trim() ||
+          String(data.handle || "").trim() !== String(remoteRow.handle || "").trim() ||
+          String(data.slogan || "").trim() !== String(remoteRow.bio || "").trim();
+        /* A drop only changes x/y. Skip the profile PATCH so the page does not
+           reload the remote profile and snap the sticker back to its spawn point. */
         if (
+          identityChanged &&
           social &&
           social.updateCurrentProfile &&
           activeSession &&
@@ -651,6 +759,13 @@
         if (k.charAt(0) === "_") return;
         towerBlob[k] = data[k];
       });
+      if (opts.geometry) {
+        if (id && window.CognationAccounts && typeof window.CognationAccounts.updateProfileTower === "function") {
+          try { window.CognationAccounts.updateProfileTower(id, towerBlob); } catch (eGeo) {}
+        }
+        try { localStorage.setItem(TOWER_PROFILE_KEY, JSON.stringify(towerBlob)); } catch (eGeo2) {}
+        return true;
+      }
       if (id && window.CognationAccounts && typeof window.CognationAccounts.updateProfileTower === "function") {
         var result = window.CognationAccounts.updateProfileTower(id, towerBlob);
         if (result && result.ok) {
@@ -3230,7 +3345,7 @@
         tilt: tilt,
       };
       p.friendPinLayout = fl;
-      TowerProfileStore.save(p);
+      TowerProfileStore.save(p, { geometry: true });
       return;
     }
     var badgeId = el.getAttribute("data-tower-badge-pin");
@@ -3244,7 +3359,7 @@
         tilt: tilt,
       };
       p.badgePinLayout = bl;
-      TowerProfileStore.save(p);
+      TowerProfileStore.save(p, { geometry: true });
       return;
     }
     var wid = el.getAttribute("data-tower-widget");
@@ -3258,7 +3373,7 @@
       tilt: tilt,
     };
     p.widgetLayout = layout;
-    TowerProfileStore.save(p);
+    TowerProfileStore.save(p, { geometry: true });
   }
 
   /** delta: number degrees to add, or absolute via mode */
@@ -4419,23 +4534,66 @@
     stage.__cognationStickersReparented = true;
   }
 
+  function polaroidMarkup() {
+    return (
+      '<button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Polaroid sticker" tabindex="-1" hidden>⋮⋮</button>' +
+      '<div class="tower-avatar-wrap" data-tower-avatar-frame="polaroid" data-tower-polaroid>' +
+      '<div class="tower-avatar" data-tower-polaroid-photo aria-hidden="true"></div>' +
+      '<span class="tower-avatar-upload-hint" aria-hidden="true">📷</span>' +
+      "</div>"
+    );
+  }
+
+  /* One upright Polaroid on every personal profile. Professional pages stay without it. */
+  function ensurePersonalPolaroid(root, p) {
+    var stage = root.querySelector("[data-tower-scrapbook]");
+    if (!stage) return;
+    var nodes = Array.prototype.slice.call(stage.querySelectorAll('[data-tower-widget="polaroid"]'));
+    var personal = !p || p._profileKind !== "professional";
+    if (!personal) {
+      nodes.forEach(function (el) {
+        el.hidden = true;
+        el.classList.add("is-widget-off");
+      });
+      return;
+    }
+    while (nodes.length > 1) {
+      var extra = nodes.pop();
+      if (extra && extra.parentNode) extra.parentNode.removeChild(extra);
+    }
+    var el = nodes[0];
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "tower-sticker tower-sticker--polaroid";
+      el.setAttribute("data-tower-widget", "polaroid");
+      el.setAttribute("data-sticker-label", "Polaroid");
+      el.innerHTML = polaroidMarkup();
+      stage.appendChild(el);
+    }
+    el.hidden = false;
+    el.classList.remove("is-widget-off");
+  }
+
   function applyWidgetLayout(root, p) {
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (!stage) return;
     stage.classList.add("is-sticker-stage");
     ensureStickersOnStage(stage);
+    ensurePersonalPolaroid(root, p);
+    if (p) mergeScrapbookLayout(p);
     if (p) settleArrivalTilts(p);
     var layout = getWidgetLayout(p) || DEFAULT_WIDGET_LAYOUT;
     var zBase = 2;
     Object.keys(DEFAULT_WIDGET_LAYOUT).forEach(function (id) {
       if (id === "feed" || id === "messages") return;
       var el = stage.querySelector('[data-tower-widget="' + id + '"]');
-      if (!el) return;
+      if (!el || el.classList.contains("is-dragging")) return;
       var pos = layout[id] || DEFAULT_WIDGET_LAYOUT[id];
-      var x = typeof pos.x === "number" ? pos.x : DEFAULT_WIDGET_LAYOUT[id].x;
-      var y = typeof pos.y === "number" ? pos.y : DEFAULT_WIDGET_LAYOUT[id].y;
-      var z = typeof pos.z === "number" ? pos.z : DEFAULT_WIDGET_LAYOUT[id].z || zBase;
-      var tilt = typeof pos.tilt === "number" ? pos.tilt : 0;
+      var fallback = DEFAULT_WIDGET_LAYOUT[id] || { x: 8, y: 8, z: zBase, tilt: 0 };
+      var x = layoutCoord(pos && pos.x, fallback.x);
+      var y = layoutCoord(pos && pos.y, fallback.y);
+      var z = layoutCoord(pos && pos.z, fallback.z || zBase);
+      var tilt = layoutCoord(pos && pos.tilt, 0);
       el.style.setProperty("--sticker-x", x + "%");
       el.style.setProperty("--sticker-y", y + "%");
       el.style.setProperty("--sticker-z", String(z));
@@ -4909,7 +5067,7 @@
             tilt: typeof prevPin.tilt === "number" ? prevPin.tilt : 0,
           };
           p.friendPinLayout = pinLayout;
-          TowerProfileStore.save(p);
+          TowerProfileStore.save(p, { geometry: true });
         }
 
         document.addEventListener("pointermove", onMovePin);
@@ -4967,7 +5125,7 @@
             tilt: typeof prevBadge.tilt === "number" ? prevBadge.tilt : 0,
           };
           bp.badgePinLayout = badgeLayout;
-          TowerProfileStore.save(bp);
+          TowerProfileStore.save(bp, { geometry: true });
         }
 
         document.addEventListener("pointermove", onMoveBadge);
@@ -5020,18 +5178,34 @@
         sticker.setAttribute("data-sticker-z", String(stickerZCounter));
       }
 
+      var dropCommitted = false;
       function onUp() {
-        sticker.classList.remove("is-dragging");
+        if (dropCommitted) return;
+        dropCommitted = true;
         document.removeEventListener("pointermove", onMove);
         document.removeEventListener("pointerup", onUp);
         document.removeEventListener("pointercancel", onUp);
         document.removeEventListener("touchmove", onMove);
         document.removeEventListener("touchend", onUp);
-        if (!dragStarted) return;
+        window.removeEventListener("pointerup", onUp, true);
+        window.removeEventListener("pointercancel", onUp, true);
+        if (!dragStarted) {
+          sticker.classList.remove("is-dragging");
+          return;
+        }
+        /* Read the drop before get()/save(). A profile refresh inside save
+           repaints from the original layout and would otherwise record spawn. */
+        var dropX = parseFloat(sticker.getAttribute("data-sticker-x") || "0");
+        var dropY = parseFloat(sticker.getAttribute("data-sticker-y") || "0");
+        var dropZ = parseInt(sticker.getAttribute("data-sticker-z") || "1", 10);
+        var dropTilt = parseFloat(String(sticker.style.getPropertyValue("--sticker-tilt") || "0").replace("deg", "")) || 0;
         var p = TowerProfileStore.get();
         var layout = getWidgetLayout(p) || JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT));
         var id = sticker.getAttribute("data-tower-widget");
-        if (!id) return;
+        if (!id) {
+          sticker.classList.remove("is-dragging");
+          return;
+        }
         if (id === "quote") {
           var qid = sticker.getAttribute("data-tower-quote-id");
           var quotes = getQuoteStickers(p);
@@ -5040,29 +5214,38 @@
             return {
               id: q.id,
               text: q.text,
-              x: parseFloat(sticker.getAttribute("data-sticker-x") || "0"),
-              y: parseFloat(sticker.getAttribute("data-sticker-y") || "0"),
-              z: parseInt(sticker.getAttribute("data-sticker-z") || "10", 10),
-              tilt: parseFloat(sticker.style.getPropertyValue("--sticker-tilt") || "0") || 0,
+              x: dropX,
+              y: dropY,
+              z: dropZ,
+              tilt: dropTilt,
             };
           });
-          TowerProfileStore.save(p);
-          return;
+          TowerProfileStore.save(p, { geometry: true });
+        } else {
+          var prev = layout[id] || DEFAULT_WIDGET_LAYOUT[id] || { tilt: dropTilt };
+          layout[id] = {
+            x: dropX,
+            y: dropY,
+            z: dropZ,
+            tilt: typeof prev.tilt === "number" ? prev.tilt : dropTilt,
+          };
+          p.widgetLayout = layout;
+          TowerProfileStore.save(p, { geometry: true });
         }
-        var prev = layout[id] || DEFAULT_WIDGET_LAYOUT[id] || { tilt: 0 };
-        layout[id] = {
-          x: parseFloat(sticker.getAttribute("data-sticker-x") || "0"),
-          y: parseFloat(sticker.getAttribute("data-sticker-y") || "0"),
-          z: parseInt(sticker.getAttribute("data-sticker-z") || "1", 10),
-          tilt: typeof prev.tilt === "number" ? prev.tilt : 0,
-        };
-        p.widgetLayout = layout;
-        TowerProfileStore.save(p);
+        sticker.style.setProperty("--sticker-x", dropX + "%");
+        sticker.style.setProperty("--sticker-y", dropY + "%");
+        sticker.style.setProperty("--sticker-z", String(dropZ));
+        sticker.setAttribute("data-sticker-x", String(dropX));
+        sticker.setAttribute("data-sticker-y", String(dropY));
+        sticker.setAttribute("data-sticker-z", String(dropZ));
+        sticker.classList.remove("is-dragging");
       }
 
       document.addEventListener("pointermove", onMove);
       document.addEventListener("pointerup", onUp);
       document.addEventListener("pointercancel", onUp);
+      window.addEventListener("pointerup", onUp, true);
+      window.addEventListener("pointercancel", onUp, true);
       document.addEventListener("touchmove", onMove, { passive: false });
       document.addEventListener("touchend", onUp);
     }

@@ -82,7 +82,6 @@
     html: { x: 22, y: 3, z: 3, tilt: 0 },
     calendar: { x: 55, y: 28, z: 5, tilt: 0 },
     polaroid: { x: 40, y: 6, z: 6, tilt: 0 },
-    mp3: { x: 28, y: 70, z: 7, tilt: 0 },
   };
   /* Old scrapbook leans and the ±15° nudges. Rotate clicks land on 90° steps. */
   var FACTORY_WIDGET_TILT = {
@@ -2491,10 +2490,6 @@
     var audio = root.querySelector("[data-tower-audio]");
     if (!wrap || !audio) return;
 
-    var mp3Label = root.querySelector("[data-tower-mp3-label]");
-    if (mp3Label) {
-      mp3Label.textContent = (p.musicTitle || "").trim() ? formatSongLine(p) : "MP3 player";
-    }
     var url = (p.musicUrl || "").trim();
     var enabled = p.musicEnabled !== false && !!url;
     var skin = p.musicSkin || "classic";
@@ -2507,6 +2502,18 @@
       hideMusicSkins(root);
       clearYoutubeEmbed(root);
       clearTowerAudio(audio);
+      /* No track yet. The original MP3 face still belongs on a personal page.
+         Hiding it here is what left only the later stand-in on the scrapbook. */
+      if (p && p._profileKind !== "professional") {
+        var musicSticker = root.querySelector('[data-tower-widget="music"]');
+        var mp3Face = wrap.querySelector('[data-music-face="mp3"]');
+        if (musicSticker) {
+          musicSticker.hidden = false;
+          musicSticker.classList.remove("is-widget-off");
+        }
+        wrap.hidden = false;
+        if (mp3Face) mp3Face.hidden = false;
+      }
       return;
     }
 
@@ -3216,7 +3223,9 @@
       /* Auto-prune empty shells so ghost handles do not linger on personal scrapbooks */
       if (id === "html" && !htmlText) on = false;
       if (id === "social" && !profileHasSocialLinks(p)) on = false;
-      if (id === "music" && !musicOn) on = false;
+      /* Personal pages keep the original MP3 graphic even before a track is saved.
+         A professional page still hides the player until it has a real URL. */
+      if (id === "music" && !musicOn) on = !!(p && p._profileKind !== "professional");
       if (id === "friends" && (!friendIds || !friendIds.length)) on = false;
       if (id === "badges" && !profileHasVisibleBadges(p)) on = false;
       var el = root.querySelector('[data-tower-widget="' + id + '"]');
@@ -4718,58 +4727,16 @@
     el.classList.remove("is-widget-off");
   }
 
-  function mp3Markup() {
-    return (
-      '<button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move MP3 player sticker" tabindex="-1" hidden>⋮⋮</button>' +
-      '<div class="tower-mp3-face">' +
-      '<div class="tower-mp3-screen"><span data-tower-mp3-label>MP3 player</span></div>' +
-      '<div class="tower-mp3-buttons" aria-hidden="true"><b></b><b></b><b></b></div>' +
-      '<button type="button" class="tower-music-toggle" data-tower-music-toggle aria-pressed="true">Play</button>' +
-      "</div>"
-    );
-  }
-
-    /* One upright MP3 player on every personal profile. */
-  function ensurePersonalSticker(root, p, id, className, label, markup) {
-    var stage = root.querySelector("[data-tower-scrapbook]");
-    if (!stage) return;
-    var nodes = Array.prototype.slice.call(stage.querySelectorAll('[data-tower-widget="' + id + '"]'));
-    var personal = !p || p._profileKind !== "professional";
-    if (!personal) {
-      nodes.forEach(function (el) {
-        el.hidden = true;
-        el.classList.add("is-widget-off");
-      });
-      return;
-    }
-    while (nodes.length > 1) {
-      var extra = nodes.pop();
-      if (extra && extra.parentNode) extra.parentNode.removeChild(extra);
-    }
-    var el = nodes[0];
-    if (!el) {
-      el = document.createElement("div");
-      el.className = "tower-sticker " + className;
-      el.setAttribute("data-tower-widget", id);
-      el.setAttribute("data-sticker-label", label);
-      el.innerHTML = markup;
-      stage.appendChild(el);
-    }
-    el.hidden = false;
-    el.classList.remove("is-widget-off");
-  }
-
   function applyWidgetLayout(root, p) {
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (!stage) return;
     stage.classList.add("is-sticker-stage");
     ensureStickersOnStage(stage);
     ensurePersonalPolaroid(root, p);
-    ensurePersonalSticker(root, p, "mp3", "tower-sticker--mp3", "MP3 player", mp3Markup());
-    /* The generic camera sticker is not the Polaroid. Drop it if a previous session left one. */
+    /* Stand-in camera and MP3 stickers are not the original widgets. Drop them if a previous session left one. */
     var stageCam = root.querySelector("[data-tower-scrapbook]");
     if (stageCam) {
-      stageCam.querySelectorAll('[data-tower-widget="camera"]').forEach(function (el) {
+      stageCam.querySelectorAll('[data-tower-widget="camera"], [data-tower-widget="mp3"]').forEach(function (el) {
         el.remove();
       });
     }

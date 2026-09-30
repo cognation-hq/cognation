@@ -82,6 +82,64 @@
     html: { x: 22, y: 3, z: 3, tilt: 0 },
     calendar: { x: 55, y: 28, z: 5, tilt: 0 },
   };
+  /* Old scrapbook leans and the ±15° nudges. Rotate clicks land on 90° steps. */
+  var FACTORY_WIDGET_TILT = {
+    avatar: -2,
+    identity: 1,
+    slogan: -1,
+    music: -3,
+    badges: 2,
+    friends: -1,
+    html: 2,
+    calendar: -2,
+  };
+
+  function isUserRotateTilt(n) {
+    var norm = ((n % 360) + 360) % 360;
+    return norm === 0 || Math.abs(norm - 90) < 0.01 || Math.abs(norm - 180) < 0.01 || Math.abs(norm - 270) < 0.01;
+  }
+
+  function isArrivalTilt(id, tilt) {
+    var n = typeof tilt === "number" ? tilt : parseFloat(tilt);
+    if (isNaN(n) || n === 0) return false;
+    if (isUserRotateTilt(n)) return false;
+    if (id && FACTORY_WIDGET_TILT[id] === n) return true;
+    /* Scrapbook lean or a leftover ±15°, including a saved 15° calendar. */
+    return Math.abs(n) <= 15;
+  }
+
+  function settleArrivalTilts(p) {
+    if (!p) return false;
+    var changed = false;
+    function clearTilt(obj, id) {
+      if (!obj || typeof obj !== "object") return;
+      if (!isArrivalTilt(id, obj.tilt)) return;
+      obj.tilt = 0;
+      changed = true;
+    }
+    var layout = p.widgetLayout;
+    if (layout && typeof layout === "object") {
+      Object.keys(layout).forEach(function (id) {
+        clearTilt(layout[id], id);
+      });
+    }
+    ["friendPinLayout", "badgePinLayout"].forEach(function (key) {
+      var pins = p[key];
+      if (!pins || typeof pins !== "object") return;
+      Object.keys(pins).forEach(function (id) {
+        clearTilt(pins[id], null);
+      });
+    });
+    if (Array.isArray(p.quoteStickers)) {
+      p.quoteStickers.forEach(function (q) {
+        clearTilt(q, null);
+      });
+    }
+    if (changed) {
+      try { TowerProfileStore.save(p); } catch (eSettle) {}
+    }
+    return changed;
+  }
 
   var PUBLIC_WIDGET_IDS = ["identity", "slogan", "social", "music", "badges", "friends", "html", "calendar"];
   var DEFAULT_PUBLIC_WIDGETS = {
@@ -1699,6 +1757,7 @@
     stage.classList.add("is-sticker-stage");
     ensureStickersOnStage(stage);
     var p = profile || TowerProfileStore.get();
+    if (p) settleArrivalTilts(p);
     var widgets = normalizePublicWidgets(p && p.publicWidgets);
     stage.querySelectorAll("[data-tower-badge-pin]").forEach(function (el) {
       el.remove();
@@ -2617,6 +2676,7 @@
     if (!stage) return;
     stage.classList.add("is-sticker-stage");
     ensureStickersOnStage(stage);
+    if (p) settleArrivalTilts(p);
     var widgets = normalizePublicWidgets(p && p.publicWidgets);
     if (!widgets.friends) {
       stage.querySelectorAll("[data-tower-friend-pin]").forEach(function (el) {
@@ -4364,6 +4424,7 @@
     if (!stage) return;
     stage.classList.add("is-sticker-stage");
     ensureStickersOnStage(stage);
+    if (p) settleArrivalTilts(p);
     var layout = getWidgetLayout(p) || DEFAULT_WIDGET_LAYOUT;
     var zBase = 2;
     Object.keys(DEFAULT_WIDGET_LAYOUT).forEach(function (id) {
@@ -4541,6 +4602,7 @@
   function renderQuoteStickers(root, p) {
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (!stage) return;
+    if (p) settleArrivalTilts(p);
     stage.querySelectorAll("[data-tower-quote-id]").forEach(function (el) {
       el.remove();
     });

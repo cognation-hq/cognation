@@ -8695,6 +8695,12 @@
       page.appendChild(title);
       page.appendChild(layer);
     }
+    if (!page.querySelector(".circle-page-title")) {
+      var circleTitle = document.createElement("h3");
+      circleTitle.className = "circle-page-title";
+      circleTitle.textContent = "CIRCLE";
+      page.insertBefore(circleTitle, page.firstChild);
+    }
     var topbar = document.querySelector(".app-topbar");
     if (topbar && topbar.parentNode && page.previousElementSibling !== topbar) {
       topbar.parentNode.insertBefore(page, topbar.nextSibling);

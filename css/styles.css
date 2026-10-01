@@ -11847,12 +11847,20 @@ a.circle-fall-portrait {
 #panel-tower .tower-compose .tower-event-dropdown-summary::marker {
   content: "";
 }
-/* TOWER and CIRCLE titles sit in the page flow under the tab row, centered like NEWS and COMMUNE. */
-#panel-tower .tower-header {
+/* TOWER sits in the page flow under the tab row, centered like COMMUNE, above the reaction row. */
+#panel-tower > .tower-header {
+  position: static;
+  z-index: auto;
+  margin: 0.15rem 0 0.2rem;
+  padding: 0;
   text-align: center;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
 }
-#panel-tower .tower-private-side .tower-header .tower-title {
+#panel-tower > .tower-header .tower-title {
   display: block;
+  position: static;
   width: 100%;
   margin: 0.7rem 0 0.35rem;
   text-align: center;

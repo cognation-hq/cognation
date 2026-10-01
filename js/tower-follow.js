@@ -195,6 +195,16 @@
       }
     }
     if (!api) return;
+    /* Professional followers are unlimited. Do not route this click through the Tower friend cap. */
+    if (isProfessionalContext(btn) && window.CognationTowerFollowers && typeof window.CognationTowerFollowers.add === "function") {
+      var followerId = "";
+      try {
+        var rawSession = localStorage.getItem("cognation.session.v2");
+        var followSession = rawSession ? JSON.parse(rawSession) : null;
+        followerId = followSession && (followSession.username || followSession.activeProfileId) || "";
+      } catch (eFollow) {}
+      if (followerId) window.CognationTowerFollowers.add(String(followerId));
+    }
     api.toggleFollow(id);
     syncButton(btn);
     if (api.rebuild) {

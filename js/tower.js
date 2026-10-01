@@ -257,16 +257,8 @@
 
   function seedAwardedBadgesIfMissing(profile) {
     if (!profile) return profile;
-    if (!Array.isArray(profile.awardedBadges)) {
-      /* First-time: seed non-yearbook demos only. Yearbook pins are opt-in via Generate. */
-      profile.awardedBadges = DEMO_AWARDED_BADGES.filter(function (b) {
-        return b && b.kind !== "yearbook";
-      }).map(function (b) {
-        return JSON.parse(JSON.stringify(b));
-      });
-      return profile;
-    }
-    /* Preserve saved awardedBadges — do NOT auto-merge missing yearbook demos */
+    /* Uploaded images are the badges. Do not fill the panel with preset awards. */
+    if (!Array.isArray(profile.awardedBadges)) profile.awardedBadges = [];
     return profile;
   }
 
@@ -302,6 +294,7 @@
     if (profile.badgeVisibility == null || typeof profile.badgeVisibility !== "object") {
       var vis = {};
       owned.forEach(function (id) {
+        if (id === "founder-cap" || id === "founder-patch") return;
         vis[id] = true;
       });
       profile.badgeVisibility = vis;
@@ -605,6 +598,16 @@
         p.badgePinLayout = {};
       }
       p.emojiStickers = normalizeEmojiStickers(p.emojiStickers);
+      if (!Array.isArray(p.friendIds)) p.friendIds = [];
+      else {
+        p.friendIds = p.friendIds.map(function (id) { return String(id || ""); }).filter(Boolean);
+        if (p.friendIds.length > 6000) p.friendIds = p.friendIds.slice(0, 6000);
+      }
+      /* Professional followers are not the Tower friend roster and have no cap. */
+      if (!Array.isArray(p.followerIds)) p.followerIds = [];
+      else {
+        p.followerIds = p.followerIds.map(function (id) { return String(id || ""); }).filter(Boolean);
+      }
       if (!Array.isArray(p.featuredFriendIds)) p.featuredFriendIds = [];
       else {
         p.featuredFriendIds = p.featuredFriendIds
@@ -1982,11 +1985,6 @@
       box.appendChild(lab);
     }
 
-    if (isFounderOwner(profile)) {
-      addCheck("founder-cap", "Founder", isBadgeVisible(profile, "founder-cap"));
-      addCheck("founder-patch", "Founder patch", isBadgeVisible(profile, "founder-patch"));
-    }
-
     var list = profile.awardedBadges || [];
     list.forEach(function (badge) {
       if (!badge || !badge.id || badge.kind === "founder") return;
@@ -2255,6 +2253,32 @@
     if (yt) yt.hidden = true;
   }
 
+  function ensureProYoutubeIframe(root, videoId) {
+    var box = root.querySelector("[data-tower-pro-youtube]");
+    var frame = root.querySelector("[data-tower-pro-youtube-frame]");
+    if (!box || !frame) return null;
+    box.hidden = false;
+    if (!videoId) {
+      frame.innerHTML = "";
+      box.classList.remove("has-video");
+      return null;
+    }
+    box.classList.add("has-video");
+    var src = youtubeEmbedSrc(videoId, false, false);
+    var iframe = frame.querySelector("iframe");
+    if (!iframe) {
+      iframe = document.createElement("iframe");
+      iframe.setAttribute("title", "YouTube video");
+      iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
+      iframe.setAttribute("allowfullscreen", "");
+      iframe.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+      iframe.loading = "lazy";
+      frame.appendChild(iframe);
+    }
+    if (iframe.getAttribute("src") !== src) iframe.src = src;
+    return iframe;
+  }
+
   function ensureYoutubeIframe(root, videoId, muted, autoplay) {
     var yt = root.querySelector("[data-tower-youtube]");
     var frame = root.querySelector("[data-tower-youtube-frame]");
@@ -2475,13 +2499,42 @@
     var skin = visibleMusicSkin(p.musicSkin || "classic");
     var personal = !p || p._profileKind !== "professional";
     var ownerPublic = isTowerOwner(p) && root.getAttribute("data-tower-side") === "public";
-    var enabled = p.musicEnabled !== false && skin !== "none" && (personal || !!url);
+    var enabled = p.musicEnabled !== false && skin !== "none" && personal;
     var ytId = parseYoutubeVideoId(url);
     var inlineUrl = root.querySelector("[data-tower-music-url-inline]");
     if (inlineUrl && document.activeElement !== inlineUrl) inlineUrl.value = url;
     setAllMusicLabels(root, url ? formatSongLine(p) : "Song — Artist");
     bindMusicOwnerControls(root);
     syncMusicLookButtons(root, skin);
+    var proBox = root.querySelector("[data-tower-pro-youtube]");
+    var looks = root.querySelector(".tower-music-looks");
+    if (!personal) {
+      hideMusicSkins(root);
+      clearYoutubeEmbed(root);
+      clearTowerAudio(audio);
+      if (looks) looks.hidden = true;
+      wrap.setAttribute("data-music-skin", "pro");
+      if (!ytId && !ownerPublic) {
+        if (proBox) proBox.hidden = true;
+        wrap.hidden = true;
+        wrap.removeAttribute("data-music-mode");
+        showMusicSticker(root, false);
+        return;
+      }
+      showMusicSticker(root, true);
+      wrap.hidden = false;
+      wrap.setAttribute("data-music-mode", ytId ? "pro-youtube" : "pro-empty");
+      ensureProYoutubeIframe(root, ytId);
+      return;
+    }
+    if (proBox) {
+      proBox.hidden = true;
+      proBox.classList.remove("has-video");
+      var proFrame = proBox.querySelector("[data-tower-pro-youtube-frame]");
+      if (proFrame) proFrame.innerHTML = "";
+    }
+    if (looks) looks.hidden = false;
+    wrap.setAttribute("data-music-skin", skin);
 
     if (!enabled) {
       clearYoutubeEmbed(root);
@@ -2955,6 +3008,117 @@
     });
   }
 
+  var TOWER_FRIEND_CAP = 6000;
+
+  function isSelfFriend(friend, profile) {
+    if (!friend) return true;
+    if (friend.id === "alexa-thomas") return true;
+    var mine = String((profile && profile.handle) || "").trim().toLowerCase().replace(/^@/, "");
+    var handle = friendHandleFromId(friend.id);
+    if (mine && (handle === mine || friend.id === mine)) return true;
+    var name = String(friend.name || "").trim().toLowerCase();
+    var mineName = String((profile && profile.displayName) || "").trim().toLowerCase();
+    if (mineName && name === mineName) return true;
+    return false;
+  }
+
+  /* Tower friend roster. Adding stops at 6,000 and the page never paints the whole list. */
+  function addTowerFriend(id) {
+    id = String(id || "");
+    if (!id || id === "alexa-thomas") return { ok: false, error: "self" };
+    var p = TowerProfileStore.get();
+    if (!Array.isArray(p.friendIds)) p.friendIds = [];
+    if (p.friendIds.indexOf(id) >= 0) return { ok: true, already: true, count: p.friendIds.length };
+    if (p.friendIds.length >= TOWER_FRIEND_CAP) return { ok: false, full: true, count: p.friendIds.length };
+    p.friendIds.push(id);
+    if (!TowerProfileStore.save(p)) return { ok: false, error: "storage" };
+    return { ok: true, count: p.friendIds.length };
+  }
+
+  function professionalFollowerIsSelf(profile, followerId) {
+    var id = String(followerId || "").trim().toLowerCase();
+    if (!id || !profile) return true;
+    var handle = String(profile.handle || "").trim().toLowerCase();
+    if (handle && id === handle) return true;
+    if (profile._profileId && id === String(profile._profileId).toLowerCase()) return true;
+    try {
+      if (window.CognationAccounts && window.CognationAccounts.getProfileById) {
+        var rec = window.CognationAccounts.getProfileById(profile._profileId);
+        if (rec && String(rec.accountUsername || "").toLowerCase() === id) return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  /* Professional-page followers. No 6,000 cap — that limit is Tower friends only. */
+  function addProfessionalFollower(followerId) {
+    followerId = String(followerId || "").trim();
+    if (!followerId) return { ok: false, error: "missing" };
+    var p = TowerProfileStore.get();
+    if (!p || p._profileKind !== "professional") return { ok: false, error: "not-professional" };
+    if (professionalFollowerIsSelf(p, followerId)) return { ok: false, error: "self" };
+    if (!Array.isArray(p.followerIds)) p.followerIds = [];
+    if (p.followerIds.indexOf(followerId) >= 0) return { ok: true, already: true, count: p.followerIds.length };
+    p.followerIds.push(followerId);
+    if (!TowerProfileStore.save(p)) return { ok: false, error: "storage" };
+    return { ok: true, count: p.followerIds.length };
+  }
+
+  function renderProfessionalFollowers(root) {
+    var box = root.querySelector("[data-tower-followers]");
+    if (!box) return;
+    var p = TowerProfileStore.get();
+    var pro = !!(p && p._profileKind === "professional" && root.getAttribute("data-tower-side") === "public");
+    box.hidden = !pro;
+    if (!pro) return;
+    var ids = Array.isArray(p.followerIds) ? p.followerIds : [];
+    var note = box.querySelector("[data-tower-followers-note]");
+    var list = box.querySelector("[data-tower-followers-results]");
+    var input = box.querySelector("[data-tower-followers-find]");
+    var q = input ? String(input.value || "").trim().toLowerCase() : "";
+    if (list) list.innerHTML = "";
+    if (!q) {
+      if (note) {
+        note.textContent = ids.length
+          ? ids.length + " followers. Search to find someone."
+          : "No followers yet.";
+      }
+      return;
+    }
+    var matches = [];
+    for (var i = 0; i < ids.length && matches.length < 8; i++) {
+      var id = ids[i];
+      var friend = DEMO_FRIENDS.filter(function (entry) { return entry.id === id; })[0];
+      var label = friend ? friend.name : id;
+      if (String(label).toLowerCase().indexOf(q) === -1 && String(id).toLowerCase().indexOf(q) === -1) continue;
+      matches.push(label);
+    }
+    if (note) note.textContent = matches.length ? "" : "No matches";
+    if (!list) return;
+    matches.forEach(function (label) {
+      var li = document.createElement("li");
+      li.className = "tower-followers-hit";
+      li.textContent = label;
+      list.appendChild(li);
+    });
+  }
+
+  function initProfessionalFollowers(root) {
+    if (!root || root.__cognationFollowersBound) return;
+    root.__cognationFollowersBound = true;
+    var input = root.querySelector("[data-tower-followers-find]");
+    if (input && !input.__cognationFollowersBound) {
+      input.__cognationFollowersBound = true;
+      input.addEventListener("input", function () {
+        renderProfessionalFollowers(root);
+      });
+    }
+    document.addEventListener("cognation:tower-profile-updated", function () {
+      renderProfessionalFollowers(root);
+    });
+    renderProfessionalFollowers(root);
+  }
+
   function renderFriendsPicker(root, p) {
     var chips = root.querySelector("[data-tower-friends-chips]");
     var countSel = root.querySelector("[data-tower-friends-count]");
@@ -2962,124 +3126,33 @@
     if (!chips) return;
     var max = parseInt((countSel && countSel.value) || p.friendsDisplayCount || 3, 10);
     if ([3, 6, 8].indexOf(max) === -1) max = 3;
-    var selected = (p.featuredFriendIds || []).slice(0, max);
+    var selected = (p.featuredFriendIds || []).slice(0, max).filter(function (id) {
+      return id !== "alexa-thomas";
+    });
     chips.innerHTML = "";
 
-    var selectedFriends = [];
     selected.forEach(function (id) {
       var f = DEMO_FRIENDS.filter(function (x) { return x.id === id; })[0];
-      if (f) selectedFriends.push(f);
-    });
-    var unselectedFriends = DEMO_FRIENDS.filter(function (f) {
-      return selected.indexOf(f.id) < 0;
-    });
-    var ordered = selectedFriends.concat(unselectedFriends);
-    var chipDragFrom = null;
-    var chipDidDrag = false;
-
-    ordered.forEach(function (f) {
-      var rank = selected.indexOf(f.id);
-      var isOn = rank >= 0;
+      if (!f || isSelfFriend(f, p)) return;
       var btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "tower-friend-chip" + (isOn ? " is-selected" : "");
+      btn.className = "tower-friend-chip is-selected";
       btn.setAttribute("data-friend-id", f.id);
-      btn.setAttribute("aria-pressed", isOn ? "true" : "false");
-      if (isOn) {
-        btn.draggable = true;
-        btn.setAttribute("data-friend-rank", String(rank + 1));
-        var badge = document.createElement("span");
-        badge.className = "tower-friend-chip-rank";
-        badge.setAttribute("aria-hidden", "true");
-        badge.textContent = String(rank + 1);
-        btn.appendChild(badge);
-      }
+      btn.setAttribute("aria-label", "Remove " + f.name);
       var label = document.createElement("span");
       label.className = "tower-friend-chip-label";
       label.textContent = f.name;
       btn.appendChild(label);
-
+      var remove = document.createElement("span");
+      remove.setAttribute("aria-hidden", "true");
+      remove.textContent = " ×";
+      btn.appendChild(remove);
       btn.addEventListener("click", function () {
-        if (chipDidDrag) {
-          chipDidDrag = false;
-          return;
-        }
         var cur = TowerProfileStore.get();
-        var ids = (cur.featuredFriendIds || []).slice();
-        var ix = ids.indexOf(f.id);
-        if (ix >= 0) ids.splice(ix, 1);
-        else {
-          var lim = parseInt(
-            (root.querySelector("[data-tower-friends-count]") || {}).value || cur.friendsDisplayCount || 3,
-            10
-          );
-          if ([3, 6, 8].indexOf(lim) === -1) lim = 3;
-          if (ids.length >= lim) {
-            ids.shift();
-          }
-          ids.push(f.id);
-        }
-        cur.featuredFriendIds = ids;
+        cur.featuredFriendIds = (cur.featuredFriendIds || []).filter(function (fid) { return fid !== f.id; });
         TowerProfileStore.save(cur);
         renderFriendsPicker(root, cur);
-        var stPick = root.querySelector("[data-tower-friends-status]");
-        if (stPick) {
-          stPick.textContent = ids.length
-            ? "Selected " + ids.length + " — click Save top friends to keep on your page."
-            : "None selected — click Save top friends to clear pins.";
-        }
       });
-
-      if (isOn) {
-        btn.addEventListener("dragstart", function (e) {
-          chipDragFrom = f.id;
-          chipDidDrag = false;
-          btn.classList.add("is-chip-dragging");
-          try {
-            e.dataTransfer.effectAllowed = "move";
-            e.dataTransfer.setData("text/plain", f.id);
-          } catch (err) {}
-        });
-        btn.addEventListener("dragend", function () {
-          btn.classList.remove("is-chip-dragging");
-          chips.querySelectorAll(".tower-friend-chip.is-drop-target").forEach(function (el) {
-            el.classList.remove("is-drop-target");
-          });
-          chipDragFrom = null;
-        });
-        btn.addEventListener("dragover", function (e) {
-          if (!chipDragFrom || chipDragFrom === f.id) return;
-          e.preventDefault();
-          btn.classList.add("is-drop-target");
-          try {
-            e.dataTransfer.dropEffect = "move";
-          } catch (err) {}
-        });
-        btn.addEventListener("dragleave", function () {
-          btn.classList.remove("is-drop-target");
-        });
-        btn.addEventListener("drop", function (e) {
-          e.preventDefault();
-          btn.classList.remove("is-drop-target");
-          var fromId = chipDragFrom;
-          try {
-            fromId = e.dataTransfer.getData("text/plain") || chipDragFrom;
-          } catch (err) {}
-          if (!fromId || fromId === f.id) return;
-          chipDidDrag = true;
-          var cur = TowerProfileStore.get();
-          var ids = (cur.featuredFriendIds || []).slice();
-          var fromIx = ids.indexOf(fromId);
-          var toIx = ids.indexOf(f.id);
-          if (fromIx < 0 || toIx < 0) return;
-          ids.splice(fromIx, 1);
-          ids.splice(toIx, 0, fromId);
-          cur.featuredFriendIds = ids;
-          TowerProfileStore.save(cur);
-          renderFriendsPicker(root, cur);
-        });
-      }
-
       chips.appendChild(btn);
     });
 
@@ -3094,6 +3167,78 @@
     }
 
     renderFriendPins(root, p);
+    bindTopFriendSearch(root);
+  }
+
+  function bindTopFriendSearch(root) {
+    var input = root.querySelector("[data-tower-friends-search]");
+    var box = root.querySelector("[data-tower-friends-search-results]");
+    if (!input || !box || input.__cognationFriendSearchBound) return;
+    input.__cognationFriendSearchBound = true;
+    function paint() {
+      var q = String(input.value || "").trim().toLowerCase();
+      box.innerHTML = "";
+      if (!q) {
+        box.hidden = true;
+        return;
+      }
+      var cur = TowerProfileStore.get();
+      var selected = cur.featuredFriendIds || [];
+      var matches = [];
+      for (var i = 0; i < DEMO_FRIENDS.length && matches.length < 8; i++) {
+        var friend = DEMO_FRIENDS[i];
+        if (!friend || isSelfFriend(friend, cur)) continue;
+        if (selected.indexOf(friend.id) >= 0) continue;
+        var name = String(friend.name || "").toLowerCase();
+        if (name.indexOf(q) === -1 && String(friend.id).indexOf(q) === -1) continue;
+        matches.push(friend);
+      }
+      box.hidden = false;
+      if (!matches.length) {
+        var empty = document.createElement("p");
+        empty.className = "form-hint";
+        empty.textContent = "No matches";
+        box.appendChild(empty);
+        return;
+      }
+      matches.forEach(function (friend) {
+        var hit = document.createElement("button");
+        hit.type = "button";
+        hit.className = "tower-friends-search-hit";
+        hit.textContent = friend.name;
+        hit.addEventListener("click", function () {
+          var profile = TowerProfileStore.get();
+          var lim = parseInt(
+            (root.querySelector("[data-tower-friends-count]") || {}).value || profile.friendsDisplayCount || 3,
+            10
+          );
+          if ([3, 6, 8].indexOf(lim) === -1) lim = 3;
+          var ids = (profile.featuredFriendIds || []).slice();
+          var status = root.querySelector("[data-tower-friends-status]");
+          if (ids.indexOf(friend.id) === -1) {
+            if (ids.length >= lim) {
+              if (status) status.textContent = "Top friends is full. Remove one first.";
+              return;
+            }
+            var added = addTowerFriend(friend.id);
+            if (added && added.full) {
+              if (status) status.textContent = "This list is full.";
+              return;
+            }
+            ids.push(friend.id);
+            profile = TowerProfileStore.get();
+            profile.featuredFriendIds = ids;
+            TowerProfileStore.save(profile);
+          }
+          input.value = "";
+          box.hidden = true;
+          box.innerHTML = "";
+          renderFriendsPicker(root, TowerProfileStore.get());
+        });
+        box.appendChild(hit);
+      });
+    }
+    input.addEventListener("input", paint);
   }
 
 
@@ -3254,7 +3399,9 @@
     if (!sloganText) p.publicWidgets.slogan = false;
     if (!htmlText) p.publicWidgets.html = false;
     p.publicWidgets.social = profileHasSocialLinks(p);
-    if (visibleMusicSkin(p.musicSkin) === "none" || p.musicEnabled === false) p.publicWidgets.music = false;
+    if (p._profileKind !== "professional" && (visibleMusicSkin(p.musicSkin) === "none" || p.musicEnabled === false)) {
+      p.publicWidgets.music = false;
+    }
     if (!(p.featuredFriendIds && p.featuredFriendIds.length)) p.publicWidgets.friends = false;
     if (!profileHasVisibleBadges(p)) p.publicWidgets.badges = false;
     return p;
@@ -3276,10 +3423,13 @@
       if (id === "social") on = profileHasSocialLinks(p);
       if (id === "music") {
         var personalMusic = !p || p._profileKind !== "professional";
-        var skinChoice = visibleMusicSkin(p && p.musicSkin);
-        if (skinChoice === "none" || (p && p.musicEnabled === false)) on = false;
-        else if (personalMusic) on = true;
-        else on = on && musicOn;
+        if (!personalMusic) {
+          on = isTowerOwner(p) || !!parseYoutubeVideoId(musicUrl);
+        } else {
+          var skinChoice = visibleMusicSkin(p && p.musicSkin);
+          if (skinChoice === "none" || (p && p.musicEnabled === false)) on = false;
+          else on = true;
+        }
       }
       if (id === "friends" && (!friendIds || !friendIds.length)) on = false;
       if (id === "badges" && !profileHasVisibleBadges(p)) on = false;
@@ -4413,33 +4563,41 @@
   }
 
 
-  function renderFriendsBrowse(root) {
+  function renderFriendsBrowse(root, query) {
     var list = root.querySelector("[data-tower-friends-browse-list]");
     if (!list) return;
     list.innerHTML = "";
-    DEMO_FRIENDS.forEach(function (friend, index) {
-      if (!friend || friend.id === "alexa-thomas") return; /* skip self in browse list */
+    var p = TowerProfileStore.get();
+    var ids = (p && Array.isArray(p.friendIds)) ? p.friendIds : [];
+    var q = String(query || "").trim().toLowerCase();
+    if (!q) {
+      var note = document.createElement("li");
+      note.className = "tower-friends-browse-note";
+      note.textContent = ids.length
+        ? ids.length + " friends. Search to find someone."
+        : "No friends yet. Search members to connect.";
+      list.appendChild(note);
+      return;
+    }
+    var matches = [];
+    for (var i = 0; i < ids.length && matches.length < 8; i++) {
+      var id = ids[i];
+      var friend = DEMO_FRIENDS.filter(function (x) { return x.id === id; })[0];
+      var label = friend ? friend.name : id;
+      if (String(label).toLowerCase().indexOf(q) === -1 && String(id).toLowerCase().indexOf(q) === -1) continue;
+      matches.push({ id: id, name: label });
+    }
+    if (!matches.length) {
+      var empty = document.createElement("li");
+      empty.className = "tower-friends-browse-note";
+      empty.textContent = "No matches";
+      list.appendChild(empty);
+      return;
+    }
+    matches.forEach(function (match) {
       var li = document.createElement("li");
       li.className = "tower-friends-browse-item";
-      var a = document.createElement("a");
-      a.className = "tower-friends-browse-link tower-friend-avatar-link";
-      var handle = friendHandleFromId(friend.id);
-      a.href = "#tower-profile-" + handle;
-      a.setAttribute("data-tower-friend-open", handle);
-      a.setAttribute("data-tower-friend", friend.id);
-      /* Demo online: every other friend after first */
-      var online = index % 2 === 0;
-      a.setAttribute("data-online", online ? "true" : "false");
-      a.setAttribute("aria-label", "Open " + friend.name + " public Tower" + (online ? " (online)" : ""));
-      var av = document.createElement("span");
-      av.className = "tower-friends-browse-avatar tower-friend-avatar" + (online ? " is-online" : "");
-      av.setAttribute("aria-hidden", "true");
-      var style = friendAvatarStyle(friend, index);
-      av.style.background = style.background;
-      av.style.color = style.color;
-      av.textContent = style.initials;
-      a.appendChild(av);
-      li.appendChild(a);
+      li.textContent = match.name;
       list.appendChild(li);
     });
   }
@@ -4448,6 +4606,13 @@
     if (!root || root.__cognationFriendsBrowseBound) return;
     root.__cognationFriendsBrowseBound = true;
     renderFriendsBrowse(root);
+    var find = root.querySelector("[data-tower-friends-find]");
+    if (find && !find.__cognationFindBound) {
+      find.__cognationFindBound = true;
+      find.addEventListener("input", function () {
+        renderFriendsBrowse(root, find.value);
+      });
+    }
     var host = root.querySelector("[data-tower-friends], [data-tower-friends-browse]");
     if (!host) return;
     host.addEventListener("click", function (ev) {
@@ -5436,8 +5601,10 @@
       var el = t.closest(".tower-quote-card, .tower-slogan-card, [data-tower-profile-name], [data-tower-handle-badge]");
       if (!el || !root.contains(el) || recentDrag(el)) return;
       var isHandle = el.matches("[data-tower-handle-badge]");
-      if (isHandle) {
-        if (!canEditHandle()) return;
+      var isName = el.matches("[data-tower-profile-name]");
+      if (isHandle || isName) {
+        /* Professional name is the owner's label — a business or creator name — not the personal name. */
+        if (!ownerPublic()) return;
       } else if (!canEdit()) return;
       if (el.getAttribute("contenteditable") === "true") return;
       /* First click selects the sticker so Backspace can remove it. The next click edits. */
@@ -6777,6 +6944,7 @@
         : "Upload an image to use as the page background.";
     }
     applyAvatarFrame(root, p.avatarFrame || "none", p.cowboyHatColor || "tan");
+    renderProfessionalFollowers(root);
     applyAvatarOrnament(root, p.avatarOrnament || "none", p.avatarOrnamentPos || "above");
     if (preview) {
       preview.innerHTML = sanitizeProfileHtml(p.customHtml || "");
@@ -6873,6 +7041,7 @@
     initProfileKindToggle(root);
     initAddProfile(root);
     initFriendsBrowse(root);
+    initProfessionalFollowers(root);
     initTowerCalendar(root);
 
     var profileForm = root.querySelector("[data-tower-profile-form]");
@@ -7245,6 +7414,84 @@
       });
     }
 
+    var badgeFile = root.querySelector("[data-tower-badge-file]");
+    if (badgeFile && !badgeFile.__cognationBadgeFileBound) {
+      badgeFile.__cognationBadgeFileBound = true;
+      badgeFile.addEventListener("change", function () {
+        var file = badgeFile.files && badgeFile.files[0];
+        badgeFile.value = "";
+        if (!file) return;
+        if (file.type && file.type.indexOf("image/") !== 0) {
+          setBadgeDisplayStatus(root, "Choose an image file.");
+          return;
+        }
+        var reader = new FileReader();
+        reader.onload = function () {
+          var raw = String(reader.result || "");
+          var img = new Image();
+          img.onload = function () {
+            var maxEdge = 256;
+            var scale = Math.min(1, maxEdge / Math.max(img.width || 1, img.height || 1));
+            var cw = Math.max(1, Math.round((img.width || 1) * scale));
+            var ch = Math.max(1, Math.round((img.height || 1) * scale));
+            var canvas = document.createElement("canvas");
+            canvas.width = cw;
+            canvas.height = ch;
+            var ctx = canvas.getContext("2d");
+            var dataUrl = raw;
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, cw, ch);
+              try { dataUrl = canvas.toDataURL("image/jpeg", 0.82); } catch (eUrl) {}
+            }
+            if (!dataUrl || dataUrl.indexOf("data:image/") !== 0) {
+              setBadgeDisplayStatus(root, "Could not read that image.");
+              return;
+            }
+            var title = String(file.name || "Badge").replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim().slice(0, 48) || "Badge";
+            var p = TowerProfileStore.get();
+            if (!Array.isArray(p.awardedBadges)) p.awardedBadges = [];
+            var badge = {
+              id: "badge-upload-" + Date.now().toString(36),
+              title: title,
+              kind: "upload",
+              imageUrl: dataUrl,
+              awardedAt: new Date().toISOString(),
+            };
+            p.awardedBadges.push(badge);
+            if (!p.badgeVisibility || typeof p.badgeVisibility !== "object") p.badgeVisibility = {};
+            p.badgeVisibility[badge.id] = true;
+            p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
+            p.publicWidgets.badges = true;
+            ensureBadgePinPositions(p, [badge.id]);
+            if (!TowerProfileStore.save(p)) {
+              setBadgeDisplayStatus(root, "Could not save badge (storage full). Try a smaller image.");
+              return;
+            }
+            var stored = TowerProfileStore.get();
+            var kept = stored && Array.isArray(stored.awardedBadges) && stored.awardedBadges.some(function (b) {
+              return b && b.id === badge.id && b.imageUrl === dataUrl;
+            });
+            if (!kept) {
+              setBadgeDisplayStatus(root, "Could not save badge (storage full). Try a smaller image.");
+              return;
+            }
+            renderAwardedBadgeShelf(root, stored);
+            applyPublicWidgets(root, stored);
+            syncBadgeVisibilityUi(root, stored);
+            setBadgeDisplayStatus(root, "Badge uploaded");
+          };
+          img.onerror = function () {
+            setBadgeDisplayStatus(root, "Could not read that image.");
+          };
+          img.src = raw;
+        };
+        reader.onerror = function () {
+          setBadgeDisplayStatus(root, "Could not read that image.");
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
     var saveBadgesBtn = root.querySelector("[data-tower-save-badges]");
     if (saveBadgesBtn && !saveBadgesBtn.__cognationBadgesSaveBound) {
       saveBadgesBtn.__cognationBadgesSaveBound = true;
@@ -7342,6 +7589,13 @@
     });
   }
 
+  window.CognationTowerFriends = {
+    cap: TOWER_FRIEND_CAP,
+    add: addTowerFriend,
+  };
+  window.CognationTowerFollowers = {
+    add: addProfessionalFollower,
+  };
   window.CognationTowerIsFounderOwner = isFounderOwner;
   window.CognationTowerApplySide = function (side) {
     document.querySelectorAll("[data-tower-app]").forEach(function (root) {

@@ -115,21 +115,31 @@
           }
           return;
         }
-        var ids = loadAdded();
-        if (ids.indexOf(id) === -1) ids.push(id);
-        saveAdded(ids);
-        /* Also offer into Tower featured friends if profile store exists */
-        if (window.CognationTowerProfileStore) {
-          var prof = window.CognationTowerProfileStore.get();
-          prof.featuredFriendIds = prof.featuredFriendIds || [];
-          if (prof.featuredFriendIds.indexOf(id) === -1) {
-            var max = parseInt(prof.friendsDisplayCount || 3, 10);
-            if ([3, 6, 8].indexOf(max) === -1) max = 3;
-            if (prof.featuredFriendIds.length >= max) prof.featuredFriendIds.shift();
-            prof.featuredFriendIds.push(id);
-            window.CognationTowerProfileStore.save(prof);
-            document.dispatchEvent(new CustomEvent("cognation:tower-profile-updated", { detail: prof }));
+        if (window.CognationTowerFriends && typeof window.CognationTowerFriends.add === "function") {
+          var addedFriend = window.CognationTowerFriends.add(id);
+          if (addedFriend && addedFriend.full) {
+            btn.textContent = "List is full";
+            btn.disabled = true;
+            var fullNote = document.createElement("p");
+            fullNote.className = "people-search-empty";
+            fullNote.textContent = "This list is full.";
+            if (btn.parentNode) btn.parentNode.appendChild(fullNote);
+            return;
           }
+        } else {
+          var ids = loadAdded();
+          if (ids.length >= 6000 && ids.indexOf(id) === -1) {
+            btn.textContent = "List is full";
+            btn.disabled = true;
+            return;
+          }
+          if (ids.indexOf(id) === -1) ids.push(id);
+          saveAdded(ids);
+        }
+        var idsNow = loadAdded();
+        if (idsNow.indexOf(id) === -1 && idsNow.length < 6000) {
+          idsNow.push(id);
+          saveAdded(idsNow);
         }
         btn.textContent = "Added";
         btn.disabled = true;

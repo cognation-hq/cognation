@@ -340,8 +340,10 @@
                             <option value="8">Top 8</option>
                           </select>
                           <fieldset class="tower-friends-pick" data-tower-friends-pick>
-                            <legend class="visually-hidden">Pick friends to feature</legend>
-                            <p class="form-hint">Tap to feature (demo neighbors). Drag selected chips to set rank 1…n:</p>
+                            <legend class="visually-hidden">Search friends to feature</legend>
+                            <label class="tower-friends-search-label" for="tower-friends-search">Search friends</label>
+                            <input id="tower-friends-search" type="search" data-tower-friends-search placeholder="Type a name" autocomplete="off">
+                            <div class="tower-friends-search-results" data-tower-friends-search-results hidden></div>
                             <div class="tower-friends-chips" data-tower-friends-chips></div>
                             <div class="tower-friends-save-row" style="margin-top:0.5rem;display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;">
                               <button type="button" class="btn btn-primary tower-btn-compact" data-tower-save-friends>Save</button>
@@ -357,6 +359,10 @@
                       <div class="tower-private-theme-body">
                         <p class="form-hint">Show as pins on Public</p>
                         <div class="tower-badge-visibility" data-tower-badge-visibility></div>
+                        <label class="tower-badge-upload">
+                          Upload a badge image
+                          <input type="file" accept="image/*" data-tower-badge-file aria-label="Upload a badge image">
+                        </label>
                         <div class="tower-friends-save-row" style="margin-top:0.65rem;display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;">
                           <button type="button" class="btn btn-primary tower-btn-compact" data-tower-save-badges>Save</button>
                           <span class="form-hint" data-tower-badges-status role="status" aria-live="polite"></span>
@@ -420,6 +426,8 @@
                       </section>
                       <div class="tower-friends-browse" data-tower-friends-browse data-tower-friends aria-label="Friends">
                         <h4 class="tower-friends-browse-heading">Friends</h4>
+                        <label class="visually-hidden" for="tower-friends-find">Search friends</label>
+                        <input id="tower-friends-find" class="tower-friends-find" type="search" data-tower-friends-find placeholder="Search friends" autocomplete="off">
                         <ul class="tower-friends-browse-list" data-tower-friends-browse-list role="list"></ul>
                       </div>
                       <div class="tower-personal-calendar" data-tower-calendar-personal>
@@ -540,6 +548,12 @@
                             aria-label="Add this person as a friend"
                           >Add friend</button>
                         </div>
+                        <div class="tower-followers" data-tower-followers hidden>
+                          <p class="tower-followers-note" data-tower-followers-note>No followers yet.</p>
+                          <label class="visually-hidden" for="tower-followers-find">Search followers</label>
+                          <input id="tower-followers-find" class="tower-followers-find" type="search" data-tower-followers-find placeholder="Search followers" autocomplete="off">
+                          <ul class="tower-followers-results" data-tower-followers-results role="list"></ul>
+                        </div>
                         <button type="button" class="tower-go-live-btn" data-go-live aria-label="Go live">Go live</button>
                       </div>
                       </div>
@@ -650,6 +664,10 @@
 
                       </div><div class="tower-sticker tower-sticker--music" data-tower-widget="music" data-sticker-label="Music"><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Music sticker" tabindex="-1" hidden>⋮⋮</button><div class="tower-music" data-tower-music data-music-skin="classic" hidden>
                         <audio data-tower-audio preload="metadata" playsinline></audio>
+
+                        <div class="tower-pro-youtube" data-tower-pro-youtube hidden>
+                          <div class="tower-pro-youtube-screen" data-tower-pro-youtube-frame></div>
+                        </div>
 
                         <div class="tower-music-skin tower-music-skin--classic" data-music-face="classic">
                           <div class="tower-ipod" data-tower-ipod>

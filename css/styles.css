@@ -3666,7 +3666,52 @@ body.login-gate-open .app-topbar {
 }
 
 
-/* Tower public featured friends — picker chips + free-position pins */
+/* Tower public featured friends — search, chosen chips, free-position pins */
+#panel-tower .tower-friends-search-label {
+  display: block;
+  margin: 0.35rem 0 0.2rem;
+  color: #111 !important;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+#panel-tower .tower-friends-pick input[type="search"],
+#panel-tower .tower-friends-find {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 0.35rem;
+  padding: 0.35rem 0.5rem !important;
+  background: #fff !important;
+  color: #111 !important;
+  border: 1px solid #111 !important;
+  border-radius: 0.35rem !important;
+  box-shadow: none !important;
+}
+#panel-tower .tower-friends-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0 0 0.4rem;
+  background: #fff !important;
+  color: #111 !important;
+  border: 1px solid #111;
+  border-radius: 0.35rem;
+  padding: 0.3rem;
+}
+#panel-tower .tower-friends-search-results[hidden] { display: none !important; }
+#panel-tower .tower-friends-search-hit {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem;
+  background: #fff !important;
+  color: #111 !important;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 0.2rem 0.25rem;
+}
 .tower-friends-chips {
   display: flex;
   flex-wrap: wrap;
@@ -7534,6 +7579,41 @@ body { padding-top: 0 !important; }
 [data-tower-app][data-tower-side="public"] .tower-private-badges {
   display: none !important;
 }
+#panel-tower .tower-badge-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+  padding: 0.7rem 0.8rem;
+  background: #fff !important;
+  color: #111 !important;
+  border: 1px solid #111;
+  border-radius: 0.45rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+#panel-tower .tower-badge-upload input[type="file"] {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  color: #111 !important;
+  background: #fff !important;
+  border: 1px solid #111 !important;
+  border-radius: 0.35rem !important;
+  box-shadow: none !important;
+  font-weight: 500;
+}
+#panel-tower .tower-badge-upload input[type="file"]::file-selector-button,
+#panel-tower .tower-badge-upload input[type="file"]::-webkit-file-upload-button {
+  color: #111 !important;
+  background: #fff !important;
+  border: 1px solid #111 !important;
+  border-radius: 0.3rem;
+  padding: 0.25rem 0.55rem;
+  margin-right: 0.55rem;
+  font-weight: 650;
+}
 
 /* Avatar frame resize — YouTube-style corner handle */
 .tower-avatar-resize {
@@ -8639,6 +8719,39 @@ body { padding-top: 0 !important; }
   padding: 0;
 }
 
+.tower-followers {
+  width: 100%;
+  max-width: 16rem;
+  text-align: left;
+}
+.tower-followers[hidden] { display: none !important; }
+.tower-followers-note,
+.tower-followers-hit {
+  margin: 0 0 0.3rem;
+  font-size: 0.78rem;
+  word-break: normal;
+  overflow-wrap: normal;
+  color: #111;
+}
+#panel-tower .tower-followers-find {
+  width: 100%;
+  box-sizing: border-box;
+  background: #fff !important;
+  color: #111 !important;
+  border: 1px solid #111 !important;
+  border-radius: 6px;
+  padding: 0.28rem 0.45rem;
+  font-size: 0.82rem;
+}
+#panel-tower .tower-followers-find::placeholder {
+  color: #444 !important;
+}
+.tower-followers-results {
+  list-style: none;
+  margin: 0.3rem 0 0;
+  padding: 0;
+}
+
 /* ===== CGN-007 Signup mode UX ===== */
 .login-signup-fields {
   display: grid;
@@ -9120,22 +9233,57 @@ body { padding-top: 0 !important; }
   border-style: solid;
 }
 
-/* 3-up: narrow left / wide center feed / tight messages */
+/* Friends and calendar share a readable column. Posts and messages share the center. */
 .tower-private-main-grid {
   display: grid !important;
-  grid-template-columns: minmax(5.5rem, 7.25rem) minmax(0, 1fr) minmax(9rem, 12rem) !important;
-  gap: 0.65rem 0.85rem !important;
+  grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr) !important;
+  grid-template-areas:
+    "rail feed"
+    "rail messages" !important;
+  gap: 0.75rem 1rem !important;
   align-items: start;
   margin-top: 0.55rem;
 }
-@media (max-width: 960px) {
-  .tower-private-main-grid {
-    grid-template-columns: minmax(5.5rem, 7rem) minmax(0, 1fr) !important;
-  }
-  .tower-private-messages { grid-column: 1 / -1; }
+.tower-private-main-grid > .tower-left-rail {
+  grid-area: rail;
+  width: 100%;
+  min-width: 0;
 }
-@media (max-width: 720px) {
-  .tower-private-main-grid { grid-template-columns: 1fr !important; }
+.tower-private-main-grid > .tower-feed {
+  grid-area: feed;
+  width: 100%;
+  min-width: 0;
+}
+.tower-private-main-grid > .tower-private-messages {
+  grid-area: messages;
+  position: static;
+  top: auto;
+  width: 100%;
+  max-height: none;
+  min-width: 0;
+}
+.tower-feed[data-tower-feed] .commune-empty {
+  display: block;
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+}
+.tower-friends-browse,
+.tower-friends-browse-note,
+.tower-personal-calendar,
+.tower-cal-mini-grid,
+.tower-private-messages {
+  word-break: normal;
+  overflow-wrap: normal;
+}
+@media (max-width: 800px) {
+  .tower-private-main-grid {
+    grid-template-columns: 1fr !important;
+    grid-template-areas:
+      "rail"
+      "feed"
+      "messages" !important;
+  }
 }
 
 .tower-left-rail,
@@ -9164,8 +9312,37 @@ body { padding-top: 0 !important; }
 }
 .tower-compose--compact textarea,
 .tower-compose textarea {
-  min-height: 2.75rem;
-  font-size: 0.92rem;
+  min-height: 2.2rem !important;
+  height: 2.2rem;
+  padding: 0.32rem 0.55rem !important;
+  line-height: 1.3;
+  font-size: 0.88rem;
+  resize: vertical;
+}
+.tower-compose.tower-compose--compact {
+  gap: 0.35rem;
+  padding: 0.45rem 0.6rem 0.5rem;
+  margin-bottom: 0.65rem;
+}
+.tower-compose--compact .form-group {
+  margin-bottom: 0;
+}
+.tower-compose--compact .form-group label {
+  margin-bottom: 0.12rem;
+  font-size: 0.75rem;
+}
+.tower-compose--compact .tower-upload-row {
+  gap: 0.4rem;
+  align-items: end;
+}
+.tower-compose--compact .form-actions {
+  margin-top: 0;
+}
+.tower-compose--compact select,
+.tower-compose--compact input[type="file"] {
+  padding: 0.22rem 0.4rem !important;
+  min-height: 0;
+  font-size: 0.78rem;
 }
 .tower-block-heading[data-tower-block-heading] {
   margin: 0 0 0.35rem;
@@ -10738,6 +10915,41 @@ body.cognation-demo-on {
   border: 1px solid #000 !important;
   font-size: 0.75rem !important;
   box-shadow: none !important;
+}
+
+/* Professional page: an empty box. A pasted YouTube link plays here, with no MP3 face. */
+.tower-music[data-music-skin="pro"] .tower-music-skin,
+.tower-music[data-music-skin="pro"] .tower-ipod,
+.tower-music[data-music-skin="pro"] .tower-music-looks {
+  display: none !important;
+}
+.tower-music[data-music-skin="pro"] .tower-pro-youtube {
+  display: block !important;
+}
+.tower-pro-youtube {
+  width: 18.5rem;
+  max-width: 100%;
+}
+.tower-pro-youtube-screen {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 8rem;
+  border-radius: 0.45rem;
+  background: rgba(5, 8, 28, 0.55);
+  border: 1px solid rgba(209, 241, 255, 0.35);
+  overflow: hidden;
+}
+.tower-pro-youtube-screen iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.tower-music[data-music-skin="pro"] .tower-music-owner {
+  width: 18.5rem;
+  max-width: 100%;
 }
 
 /* Pink click-wheel player. The black screen holds a normal YouTube embed. */

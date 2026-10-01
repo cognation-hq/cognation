@@ -9274,6 +9274,10 @@ body { padding-top: 0 !important; }
   min-width: 0;
   align-self: start;
 }
+/* The Friends card stays off the Tower news feed. The personal profile keeps its own column. */
+.tower-private-main-grid .tower-friends-browse {
+  display: none !important;
+}
 .tower-private-main-grid > .tower-feed {
   width: 100%;
   max-width: 15rem;
@@ -9461,7 +9465,7 @@ body { padding-top: 0 !important; }
   box-shadow: 0 0 0 2px #22c55e;
 }
 
-/* Personal calendar widget */
+/* Calendar widget */
 .tower-personal-calendar[data-tower-calendar-personal],
 [data-tower-calendar-personal] {
   background: rgba(255, 245, 249, 0.72);
@@ -11337,12 +11341,24 @@ body.cognation-demo-on {
   pointer-events: none;
 }
 
-/* Circle page: blank field, site top bar, friend portraits only. */
-body.is-circle-open .site-header,
-body.is-circle-open .cognation-masthead,
+/* Circle page: header and tabs stay. Commune, News, and Tower stay off the body. */
 body.is-circle-open .tab-panels,
+body.is-circle-open #panel-tower,
+body.is-circle-open #panel-news,
+body.is-circle-open #panel-commune,
+body.is-circle-open #panel-pages,
+body.is-circle-open .commune-swipe-shell,
+body.is-circle-open .commune-paper,
 body.is-circle-open .site-footer {
   display: none !important;
+}
+body.is-circle-open .site-header,
+body.is-circle-open .cognation-masthead {
+  display: block !important;
+}
+body.is-circle-open .app-topbar {
+  position: relative;
+  z-index: 40;
 }
 body.is-circle-open .app-topbar-shortcut[data-tower-anchor="circle"] {
   border-bottom-color: var(--cgn-cyan) !important;
@@ -11350,10 +11366,14 @@ body.is-circle-open .app-topbar-shortcut[data-tower-anchor="circle"] {
 }
 .circle-fall {
   position: fixed;
-  inset: 0;
-  z-index: 30;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: 0;
+  z-index: 20;
   overflow: hidden;
   pointer-events: none;
+  background: #101229;
 }
 a.circle-fall-portrait {
   position: absolute;

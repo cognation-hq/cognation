@@ -11313,3 +11313,43 @@ body.cognation-demo-on {
   pointer-events: none;
 }
 
+/* Circle page: blank field, site top bar, friend portraits only. */
+body.is-circle-open .site-header,
+body.is-circle-open .cognation-masthead,
+body.is-circle-open .tab-panels,
+body.is-circle-open .site-footer {
+  display: none !important;
+}
+body.is-circle-open .app-topbar-shortcut[data-tower-anchor="circle"] {
+  border-bottom-color: var(--cgn-cyan) !important;
+  color: #fff !important;
+}
+.circle-fall {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  overflow: hidden;
+  pointer-events: none;
+}
+a.circle-fall-portrait {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 22px rgba(12, 16, 40, 0.28);
+  overflow: hidden;
+  pointer-events: auto;
+  text-decoration: none;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: #4a2c3a !important;
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+}
+

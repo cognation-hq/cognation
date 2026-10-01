@@ -7604,6 +7604,370 @@
     });
   }
 
+  /* Friends rain on the Circle page. Not followers. Capped so a full roster stays smooth. */
+  var CIRCLE_FALL_CAP = 36;
+  var circleFallState = null;
+
+  function circleFriendRecord(id) {
+    var friend = null;
+    for (var i = 0; i < DEMO_FRIENDS.length; i++) {
+      if (DEMO_FRIENDS[i].id === id) {
+        friend = DEMO_FRIENDS[i];
+        break;
+      }
+    }
+    if (friend) return friend;
+    return { id: id, name: friendSideLabel(id) };
+  }
+
+  function circleLastContact(ids) {
+    var map = {};
+    var allowed = {};
+    var nameToId = {};
+    ids.forEach(function (id) {
+      allowed[id] = true;
+      nameToId[String(id).toLowerCase()] = id;
+      nameToId[friendHandleFromId(id)] = id;
+      var friend = circleFriendRecord(id);
+      if (friend.name) nameToId[String(friend.name).trim().toLowerCase()] = id;
+    });
+    var store = window.CognationMessageStore;
+    if (!store || typeof store.listConversations !== "function") return map;
+    var convos = [];
+    try { convos = store.listConversations() || []; } catch (e) { return map; }
+    convos.forEach(function (conv) {
+      var latest = 0;
+      (conv.messages || []).forEach(function (msg) {
+        var t = Date.parse(msg && msg.createdAt);
+        if (!isNaN(t) && t > latest) latest = t;
+      });
+      if (!latest) return;
+      var keys = [];
+      if (conv && conv.title) keys.push(String(conv.title).trim().toLowerCase());
+      (conv.participants || []).forEach(function (person) {
+        if (!person || person.id === "you") return;
+        if (person.name) keys.push(String(person.name).trim().toLowerCase());
+        if (person.id) keys.push(String(person.id).trim().toLowerCase());
+      });
+      keys.forEach(function (key) {
+        var id = nameToId[key];
+        if (!id || !allowed[id]) return;
+        if (map[id] == null || latest > map[id]) map[id] = latest;
+      });
+    });
+    return map;
+  }
+
+  function circleFriendIds() {
+    var p = TowerProfileStore.get() || {};
+    var source = Array.isArray(p.friendIds) ? p.friendIds.slice() : [];
+    if (!source.length) {
+      DEMO_FRIENDS.forEach(function (friend) {
+        if (friend && friend.id) source.push(friend.id);
+      });
+    }
+    var ids = [];
+    var seen = {};
+    source.forEach(function (raw) {
+      var id = String(raw || "");
+      if (!id || seen[id]) return;
+      var friend = circleFriendRecord(id);
+      if (id === "alexa-thomas" || isSelfFriend(friend, p)) return;
+      seen[id] = true;
+      ids.push(id);
+    });
+    var contact = circleLastContact(ids);
+    var any = false;
+    ids.forEach(function (id) { if (contact[id] != null) any = true; });
+    if (any) {
+      ids.sort(function (a, b) {
+        var ta = contact[a] == null ? -1 : contact[a];
+        var tb = contact[b] == null ? -1 : contact[b];
+        if (ta === tb) return 0;
+        return ta < tb ? -1 : 1;
+      });
+    }
+    return ids.slice(0, CIRCLE_FALL_CAP);
+  }
+
+  function circleEdgePad(b) {
+    var rad = ((b.rot || 0) * Math.PI) / 180;
+    var span = Math.abs(Math.sin(rad)) + Math.abs(Math.cos(rad));
+    return Math.max(0, (b.size * span - b.size) / 2);
+  }
+
+  function circleFloor(b) {
+    var h = window.innerHeight || 600;
+    return h - b.size - 6 - circleEdgePad(b);
+  }
+
+  function circleMaxX(b) {
+    var w = window.innerWidth || 800;
+    return w - b.size - 6 - circleEdgePad(b);
+  }
+
+  function separateCircles(a, b) {
+    var dx = (b.x + b.r) - (a.x + a.r);
+    var dy = (b.y + b.r) - (a.y + a.r);
+    var distSq = dx * dx + dy * dy;
+    var min = a.r + b.r;
+    if (distSq >= min * min) return;
+    var dist = Math.sqrt(distSq) || 0.01;
+    var nx = dx / dist;
+    var ny = dy / dist;
+    var overlap = min - dist;
+    if (a.sleep && b.sleep) {
+      a.x -= nx * overlap * 0.5;
+      a.y -= ny * overlap * 0.5;
+      b.x += nx * overlap * 0.5;
+      b.y += ny * overlap * 0.5;
+      return;
+    }
+    if (a.sleep) {
+      b.x += nx * overlap;
+      b.y += ny * overlap;
+      var into = b.vx * nx + b.vy * ny;
+      if (into < 0) {
+        b.vx -= into * nx;
+        b.vy -= into * ny * 1.02;
+        b.vr *= 0.82;
+      }
+      return;
+    }
+    if (b.sleep) {
+      a.x -= nx * overlap;
+      a.y -= ny * overlap;
+      var intoA = a.vx * nx + a.vy * ny;
+      if (intoA > 0) {
+        a.vx -= intoA * nx;
+        a.vy -= intoA * ny * 1.02;
+        a.vr *= 0.82;
+      }
+      return;
+    }
+    a.x -= nx * overlap * 0.5;
+    a.y -= ny * overlap * 0.5;
+    b.x += nx * overlap * 0.5;
+    b.y += ny * overlap * 0.5;
+    var rel = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+    if (rel < 0) {
+      var push = -rel * 0.45;
+      a.vx -= push * nx;
+      a.vy -= push * ny;
+      b.vx += push * nx;
+      b.vy += push * ny;
+      a.vr *= 0.9;
+      b.vr *= 0.9;
+    }
+  }
+
+  function integrateCircles(bodies, dt) {
+    var g = 1900;
+    var i;
+    for (i = 0; i < bodies.length; i++) {
+      var b = bodies[i];
+      if (b.sleep) continue;
+      b.vy += g * dt;
+      b.vx *= 0.994;
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.rot += b.vr * dt;
+      var minX = 6 + circleEdgePad(b);
+      if (b.x < minX) { b.x = minX; b.vx = Math.abs(b.vx) * 0.2; }
+      var maxX = circleMaxX(b);
+      if (b.x > maxX) { b.x = maxX; b.vx = -Math.abs(b.vx) * 0.2; }
+    }
+    var iter;
+    for (iter = 0; iter < 5; iter++) {
+      for (i = 0; i < bodies.length; i++) {
+        var j;
+        for (j = i + 1; j < bodies.length; j++) separateCircles(bodies[i], bodies[j]);
+      }
+      for (i = 0; i < bodies.length; i++) {
+        var body = bodies[i];
+        var floor = circleFloor(body);
+        if (body.y > floor) {
+          body.y = floor;
+          if (body.vy > 0) body.vy *= -0.1;
+          body.vx *= 0.35;
+          body.vr *= 0.28;
+        }
+        var edge = 6 + circleEdgePad(body);
+        if (body.x < edge) body.x = edge;
+        var right = circleMaxX(body);
+        if (body.x > right) body.x = right;
+      }
+    }
+    for (i = 0; i < bodies.length; i++) {
+      var one = bodies[i];
+      if (one.sleep) continue;
+      var ground = circleFloor(one);
+      var slow = Math.abs(one.vy) < 30 && Math.abs(one.vx) < 20;
+      if (!slow) continue;
+      var supported = one.y >= ground - 1.5;
+      if (!supported) {
+        var m;
+        for (m = 0; m < bodies.length; m++) {
+          var other = bodies[m];
+          if (other === one) continue;
+          var dx = (other.x + other.r) - (one.x + one.r);
+          var dy = (other.y + other.r) - (one.y + one.r);
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < one.r + other.r + 2.5 && dy > 0 && other.sleep && Math.abs(dx) < (one.r + other.r) * 0.8) {
+            supported = true;
+          }
+        }
+      }
+      if (!supported) continue;
+      one.vx = 0;
+      one.vy = 0;
+      one.vr = 0;
+      one.sleep = true;
+      if (one.y > ground) one.y = ground;
+    }
+  }
+
+  function paintCircleBody(b) {
+    b.el.style.transform = "translate3d(" + b.x.toFixed(2) + "px," + b.y.toFixed(2) + "px,0) rotate(" + b.rot.toFixed(2) + "deg)";
+  }
+
+  function stopCircleFall() {
+    if (circleFallState && circleFallState.raf) cancelAnimationFrame(circleFallState.raf);
+    circleFallState = null;
+    var layer = document.querySelector("[data-circle-fall]");
+    if (layer && layer.parentNode) layer.parentNode.removeChild(layer);
+    document.body.classList.remove("is-circle-open");
+    var shortcut = document.querySelector('[data-tower-anchor="circle"]');
+    if (shortcut) shortcut.setAttribute("aria-pressed", "false");
+  }
+
+  function startCircleFall() {
+    stopCircleFall();
+    var ids = circleFriendIds();
+    var layer = document.createElement("div");
+    layer.className = "circle-fall";
+    layer.setAttribute("data-circle-fall", "");
+    layer.setAttribute("data-circle-count", String(ids.length));
+    document.body.appendChild(layer);
+    document.body.classList.add("is-circle-open");
+    document.querySelectorAll(".app-topbar [role='tab']").forEach(function (tab) {
+      tab.setAttribute("aria-selected", "false");
+      tab.tabIndex = -1;
+    });
+    document.querySelectorAll(".tab-panels > [role='tabpanel']").forEach(function (panel) {
+      panel.hidden = true;
+    });
+    var shortcut = document.querySelector('[data-tower-anchor="circle"]');
+    if (shortcut) shortcut.setAttribute("aria-pressed", "true");
+
+    var w = window.innerWidth || 800;
+    var bodies = [];
+    ids.forEach(function (id, i) {
+      var friend = circleFriendRecord(id);
+      var friendIndex = 0;
+      DEMO_FRIENDS.forEach(function (entry, idx) {
+        if (entry.id === id) friendIndex = idx;
+      });
+      var size = 46 + ((i * 17) % 42);
+      var handle = friendHandleFromId(id);
+      var el = document.createElement("a");
+      el.className = "circle-fall-portrait";
+      el.href = "#tower-profile-" + handle;
+      el.setAttribute("data-circle-fall-portrait", id);
+      el.setAttribute("data-friend-handle", handle);
+      el.setAttribute("aria-label", "Open " + friend.name + " tower");
+      el.style.width = size + "px";
+      el.style.height = size + "px";
+      el.style.fontSize = Math.max(13, Math.round(size * 0.32)) + "px";
+      paintFriendPicture(el, friend, friendIndex || i);
+      el.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        try { location.hash = "tower-profile-" + handle; } catch (e) {}
+      });
+      layer.appendChild(el);
+      var spread = Math.min(w * 0.58, 680);
+      var t = ids.length <= 1 ? 0.5 : i / (ids.length - 1);
+      var x = (w - spread) / 2 + t * spread - size / 2 + Math.sin(i * 2.2) * 22;
+      var maxX = w - size - 2;
+      if (x < 2) x = 2;
+      if (x > maxX) x = maxX;
+      bodies.push({
+        el: el,
+        id: id,
+        x: x,
+        y: -size - 12 - i * 46,
+        vx: Math.sin(i * 1.7) * 34,
+        vy: 20 + (i % 4) * 12,
+        rot: Math.sin(i * 1.3) * 16,
+        vr: Math.cos(i * 0.9) * 26,
+        size: size,
+        r: size / 2,
+        sleep: false
+      });
+    });
+
+    circleFallState = {
+      bodies: bodies,
+      raf: 0,
+      last: performance.now(),
+      started: performance.now()
+    };
+    function frame(now) {
+      var st = circleFallState;
+      if (!st || st.bodies !== bodies) return;
+      var dt = Math.min(0.034, (now - st.last) / 1000);
+      if (!dt || dt < 0) dt = 0.016;
+      st.last = now;
+      integrateCircles(bodies, dt / 2);
+      integrateCircles(bodies, dt / 2);
+      if (now - st.started > 7000) {
+        bodies.forEach(function (b) {
+          var floor = circleFloor(b);
+          var edge = 6 + circleEdgePad(b);
+          var maxX = circleMaxX(b);
+          if (b.y > floor) b.y = floor;
+          if (b.x < edge) b.x = edge;
+          if (b.x > maxX) b.x = maxX;
+          b.vx = 0;
+          b.vy = 0;
+          b.vr = 0;
+          b.sleep = true;
+        });
+      }
+      var asleep = true;
+      bodies.forEach(function (b) {
+        paintCircleBody(b);
+        if (!b.sleep) asleep = false;
+      });
+      if (!asleep) st.raf = requestAnimationFrame(frame);
+      else st.raf = 0;
+    }
+    circleFallState.raf = requestAnimationFrame(frame);
+  }
+
+  if (window && typeof window.addEventListener === "function" && !window.__cognationCircleResize) {
+    window.__cognationCircleResize = true;
+    window.addEventListener("resize", function () {
+      if (!circleFallState) return;
+      circleFallState.bodies.forEach(function (b) {
+        var floor = circleFloor(b);
+        var edge = 6 + circleEdgePad(b);
+        var maxX = circleMaxX(b);
+        if (b.y > floor) b.y = floor;
+        if (b.x < edge) b.x = edge;
+        if (b.x > maxX) b.x = maxX;
+        paintCircleBody(b);
+      });
+    });
+  }
+
+  window.CognationCircleFall = {
+    start: startCircleFall,
+    stop: stopCircleFall,
+    cap: CIRCLE_FALL_CAP,
+    friendIds: circleFriendIds
+  };
+
   window.CognationTowerFriends = {
     cap: TOWER_FRIEND_CAP,
     add: addTowerFriend,

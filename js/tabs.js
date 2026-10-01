@@ -22,6 +22,9 @@
     if (!tabs.length || tabs.length !== panels.length) return;
 
     function activate(index, focusTab) {
+      if (window.CognationCircleFall && typeof window.CognationCircleFall.stop === "function") {
+        window.CognationCircleFall.stop();
+      }
       tabs.forEach(function (tab, i) {
         var selected = i === index;
         tab.setAttribute("aria-selected", selected ? "true" : "false");
@@ -72,6 +75,13 @@
   }
 
   function openTowerAnchor(name) {
+    if (name === "circle") {
+      if (window.CognationCircleFall && typeof window.CognationCircleFall.start === "function") {
+        window.CognationCircleFall.start();
+      }
+      return;
+    }
+
     var towerTab = document.getElementById("tab-tower");
     if (towerTab) towerTab.click();
 

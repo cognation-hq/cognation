@@ -3,6 +3,7 @@
  * One card is one item. Types are interleaved so none runs in a row.
  * Dating is local, opt-in, and at least five other cards apart.
  * Professional ads open that profile. People-you-may-know sends a friend request.
+ * A pass hides that card for this viewer after refresh. Other viewers still see it.
  * No seeded people, businesses, or events.
  */
 (function () {
@@ -193,8 +194,53 @@
     return out;
   }
 
-  function getDismissed() { return asIds(readJson(sessionStorage, DISMISSED_KEY, [])); }
-  function setDismissed(ids) { writeJson(sessionStorage, DISMISSED_KEY, asIds(ids)); }
+  function stableCardId(id) {
+    return String(id || "").replace(/-r\d+$/, "");
+  }
+  function passStore() {
+    var doc = readJson(localStorage, DISMISSED_KEY, null);
+    if (!doc || typeof doc !== "object" || Array.isArray(doc)) return {};
+    return doc;
+  }
+  function absorbLegacySessionPasses() {
+    var legacy = asIds(readJson(sessionStorage, DISMISSED_KEY, []));
+    if (!legacy.length) return;
+    var doc = passStore();
+    var key = currentProfileId();
+    var ids = asIds(doc[key]);
+    legacy.forEach(function (id) {
+      id = stableCardId(id);
+      if (id && ids.indexOf(id) < 0) ids.push(id);
+    });
+    doc[key] = ids;
+    writeJson(localStorage, DISMISSED_KEY, doc);
+    try { sessionStorage.removeItem(DISMISSED_KEY); } catch (e) {}
+  }
+  function getDismissed() {
+    absorbLegacySessionPasses();
+    return asIds(passStore()[currentProfileId()]).map(stableCardId);
+  }
+  function setDismissed(ids) {
+    var doc = passStore();
+    var unique = [];
+    asIds(ids).forEach(function (id) {
+      id = stableCardId(id);
+      if (id && unique.indexOf(id) < 0) unique.push(id);
+    });
+    doc[currentProfileId()] = unique;
+    writeJson(localStorage, DISMISSED_KEY, doc);
+  }
+  function passedSet() {
+    var passed = {};
+    getDismissed().forEach(function (id) { passed[stableCardId(id)] = true; });
+    return passed;
+  }
+  function omitPassed(cards) {
+    var passed = passedSet();
+    return (cards || []).filter(function (card) {
+      return card && card.id && !passed[stableCardId(card.id)];
+    });
+  }
   function getLikes() { return asIds(readJson(localStorage, LIKES_KEY, [])); }
   function setLikes(ids) { writeJson(localStorage, LIKES_KEY, asIds(ids)); }
   function getFollows() { return asIds(readJson(localStorage, FOLLOWS_KEY, [])); }
@@ -631,12 +677,10 @@
     lanes[TYPE.FRIEND] = friendShareCards();
     lanes[TYPE.EVENT] = publicEvents();
     lanes[TYPE.KNOW] = peopleYouMayKnow();
-    var dismissed = {};
-    getDismissed().forEach(function (id) { dismissed[id] = true; });
     Object.keys(lanes).forEach(function (type) {
-      lanes[type] = lanes[type].filter(function (card) { return card && card.id && !dismissed[card.id]; });
+      lanes[type] = omitPassed(lanes[type]);
     });
-    var dating = datingPool().filter(function (card) { return card && !dismissed[card.id]; });
+    var dating = omitPassed(datingPool());
     return { lanes: lanes, dating: dating };
   }
 
@@ -971,8 +1015,10 @@
   }
 
   function dismiss(card) {
+    if (!card || !card.id) return;
     var ids = getDismissed();
-    if (ids.indexOf(card.id) < 0) ids.push(card.id);
+    var id = stableCardId(card.id);
+    if (id && ids.indexOf(id) < 0) ids.push(id);
     setDismissed(ids);
   }
   function like(card) {
@@ -1071,12 +1117,27 @@
   }
 
   function finishSwipe() {
-    state.cards.splice(state.index, 1);
+    var passed = passedSet();
+    var dropAt = state.index;
+    var kept = [];
+    var removedBefore = 0;
+    state.cards.forEach(function (card, idx) {
+      var stable = stableCardId(card && card.id);
+      var drop = idx === dropAt || !!(stable && passed[stable]);
+      if (drop) {
+        if (idx < dropAt) removedBefore += 1;
+        return;
+      }
+      kept.push(card);
+    });
+    state.cards = kept;
+    state.index = Math.max(0, dropAt - removedBefore);
     state.seen += 1;
     if (state.cards.length < 4) {
-      var more = sampleDeck(8);
+      var more = omitPassed(sampleDeck(8));
       more.forEach(function (card) {
-        var dup = state.cards.some(function (c) { return c.id === card.id; });
+        var stable = stableCardId(card.id);
+        var dup = state.cards.some(function (c) { return stableCardId(c.id) === stable; });
         if (!dup) state.cards.push(card);
       });
     }
@@ -1110,45 +1171,55 @@
     state.busy = true;
     if (active) active.classList.add(dir === "left" ? "is-exit-left" : "is-exit-right");
     window.setTimeout(function () {
-      if (dir === "left") {
-        dismiss(card);
-        setStatus("Passed.");
-      } else if (card.type === TYPE.DATING) {
-        like(card);
-        var me = currentProfileId();
-        markDatingRight(me, card.profileId);
-        var self = selfDatingRecord();
-        if (self) deliverDatingCard(self, card.profileId);
-        if (hasDatingRight(card.profileId, me)) {
-          var store = window.CognationMessageStore;
-          if (store && typeof store.openMatch === "function") {
-            store.openMatch(
-              { id: me, name: (self && self.displayName) || "You" },
-              { id: card.profileId, name: card.name || "Member" }
-            );
-          }
-          writeNotice(me, "match", "It's a match. A message is open in Tower.");
-          writeNotice(card.profileId, "match", "It's a match. A message is open in Tower.");
-          renderNotices();
-          setStatus("It's a match. A message is open in Tower.");
-        } else {
-          setStatus("Your card is on their Commune.");
-        }
-      } else if (card.type === TYPE.AD) {
-        recordShare(card);
-        setStatus("Shared with friends who share this interest.");
-      } else if (card.type === TYPE.KNOW) {
-        /* status already set */
-      } else if (card.type === TYPE.FRIEND || card.type === TYPE.EVENT || card.type === TYPE.FACT || card.type === TYPE.WELLNESS || card.type === TYPE.CHAT) {
-        like(card);
-        if (card.type !== TYPE.CHAT) recordShare(card);
-        setStatus("Kept.");
-      } else {
-        like(card);
-        setStatus("Kept.");
-      }
+      settleSwipe(card, dir);
       finishSwipe();
     }, 220);
+  }
+
+  function settleSwipe(card, dir) {
+    if (!card) return;
+    if (dir === "left") {
+      dismiss(card);
+      setStatus("Passed.");
+      return;
+    }
+    if (card.type === TYPE.DATING) {
+      like(card);
+      var me = currentProfileId();
+      markDatingRight(me, card.profileId);
+      var self = selfDatingRecord();
+      if (self) deliverDatingCard(self, card.profileId);
+      if (hasDatingRight(card.profileId, me)) {
+        var store = window.CognationMessageStore;
+        if (store && typeof store.openMatch === "function") {
+          store.openMatch(
+            { id: me, name: (self && self.displayName) || "You" },
+            { id: card.profileId, name: card.name || "Member" }
+          );
+        }
+        writeNotice(me, "match", "It's a match. A message is open in Tower.");
+        writeNotice(card.profileId, "match", "It's a match. A message is open in Tower.");
+        renderNotices();
+        setStatus("It's a match. A message is open in Tower.");
+      } else {
+        setStatus("Your card is on their Commune.");
+      }
+      return;
+    }
+    if (card.type === TYPE.AD) {
+      recordShare(card);
+      setStatus("Shared with friends who share this interest.");
+      return;
+    }
+    if (card.type === TYPE.KNOW) return;
+    if (card.type === TYPE.FRIEND || card.type === TYPE.EVENT || card.type === TYPE.FACT || card.type === TYPE.WELLNESS || card.type === TYPE.CHAT) {
+      like(card);
+      if (card.type !== TYPE.CHAT) recordShare(card);
+      setStatus("Kept.");
+      return;
+    }
+    like(card);
+    setStatus("Kept.");
   }
 
   function rebuildDeck() {
@@ -1287,6 +1358,8 @@
     ratingSentence: ratingSentence,
     paceDeck: paceDeck,
     sampleDeck: sampleDeck,
+    settleSwipe: settleSwipe,
+    omitPassed: omitPassed,
     sendPersonalFriendRequest: sendPersonalFriendRequest,
     FOLLOWS_KEY: FOLLOWS_KEY,
     SEE_DATING_KEY: SEE_DATING_KEY,

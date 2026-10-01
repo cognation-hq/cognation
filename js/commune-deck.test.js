@@ -274,9 +274,138 @@ function testAdsAndNoInventedCafe() {
   assert.ok(shown.some(function (card) { return card.type === "ad" && card.handle === "studio" && card.videoUrl; }));
 }
 
+function stableId(id) {
+  return String(id || "").replace(/-r\d+$/, "");
+}
+
+function deckHas(deck, id) {
+  return deck.some(function (card) { return stableId(card.id) === id; });
+}
+
+function sessionFor(id) {
+  return JSON.stringify({ username: id, activeProfileId: id, source: "demo" });
+}
+
+function testPassStaysHiddenForViewer() {
+  var local = memoryStorage();
+  local.setItem("cognation.session.v2", sessionFor("ada"));
+  var session = memoryStorage();
+  var api = loadSwipe(local, session);
+
+  api.settleSwipe({ id: "fact-hearts", type: "fact", title: "A public fact", body: "Hearts." }, "left");
+  assert.strictEqual(deckHas(api.sampleDeck(24), "fact-hearts"), false);
+  assert.deepStrictEqual(api.omitPassed([
+    { id: "fact-hearts" },
+    { id: "fact-hearts-r6" },
+    { id: "fact-honey" },
+  ]).map(function (card) { return card.id; }), ["fact-honey"]);
+
+  var refreshed = loadSwipe(local, memoryStorage());
+  assert.strictEqual(deckHas(refreshed.sampleDeck(24), "fact-hearts"), false);
+  assert.strictEqual(deckHas(refreshed.sampleDeck(24), "fact-honey"), true);
+
+  api.settleSwipe({ id: "fact-trees-r4", type: "fact" }, "left");
+  assert.strictEqual(deckHas(loadSwipe(local, memoryStorage()).sampleDeck(24), "fact-trees"), false);
+
+  api.settleSwipe({
+    id: "fact-honey",
+    type: "fact",
+    title: "A public fact",
+    body: "Honey lasts.",
+  }, "right");
+  var kept = loadSwipe(local, memoryStorage());
+  assert.strictEqual(deckHas(kept.sampleDeck(24), "fact-honey"), true);
+  var passes = JSON.parse(local.getItem("cognation.commune.swipe.dismissed.v1"));
+  assert.ok(passes.ada.indexOf("fact-honey") === -1);
+  assert.ok(passes.ada.indexOf("fact-hearts") !== -1);
+
+  local.setItem("cognation.session.v2", sessionFor("bea"));
+  var other = loadSwipe(local, memoryStorage());
+  assert.strictEqual(deckHas(other.sampleDeck(24), "fact-hearts"), true);
+  assert.strictEqual(deckHas(other.sampleDeck(24), "fact-trees"), true);
+  other.settleSwipe({ id: "well-walk", type: "wellness" }, "left");
+  assert.strictEqual(deckHas(other.sampleDeck(24), "well-walk"), false);
+
+  local.setItem("cognation.session.v2", sessionFor("ada"));
+  var adaAgain = loadSwipe(local, memoryStorage());
+  assert.strictEqual(deckHas(adaAgain.sampleDeck(24), "fact-hearts"), false);
+  assert.strictEqual(deckHas(adaAgain.sampleDeck(24), "well-walk"), true);
+}
+
+function testLegacySessionPassBelongsToViewer() {
+  var local = memoryStorage();
+  local.setItem("cognation.session.v2", sessionFor("ada"));
+  var session = memoryStorage();
+  session.setItem("cognation.commune.swipe.dismissed.v1", JSON.stringify(["fact-banana", "room-site-moms-r2"]));
+  var api = loadSwipe(local, session);
+  assert.strictEqual(deckHas(api.sampleDeck(24), "fact-banana"), false);
+  assert.strictEqual(session.getItem("cognation.commune.swipe.dismissed.v1"), null);
+  var stored = JSON.parse(local.getItem("cognation.commune.swipe.dismissed.v1"));
+  assert.deepStrictEqual(stored.ada.slice().sort(), ["fact-banana", "room-site-moms"]);
+
+  local.setItem("cognation.session.v2", sessionFor("bea"));
+  var bea = loadSwipe(local, memoryStorage());
+  assert.strictEqual(deckHas(bea.sampleDeck(24), "fact-banana"), true);
+}
+
+function testRightSwipeStillKeeps() {
+  var local = memoryStorage();
+  local.setItem("cognation.session.v2", sessionFor("ada"));
+  local.setItem("cognation.profiles.v1", JSON.stringify({
+    profiles: {
+      ada: { id: "ada", kind: "personal", displayName: "Ada", friendIds: ["friend"] },
+      friend: { id: "friend", kind: "personal", displayName: "Friend", friendIds: ["ada", "sam"] },
+      sam: { id: "sam", kind: "personal", displayName: "Sam", friendIds: ["friend"] },
+      pro: {
+        id: "pro",
+        kind: "professional",
+        handle: "studio",
+        displayName: "Studio",
+        marketingAd: { title: "Evening class", body: "A placed class.", interests: ["class"] },
+      },
+    },
+  }));
+  var api = loadSwipe(local, memoryStorage());
+  assert.strictEqual(deckHas(api.sampleDeck(18), "ad-pro-0"), true);
+  assert.strictEqual(deckHas(api.sampleDeck(18), "know-sam"), true);
+
+  api.settleSwipe({
+    id: "ad-pro-0",
+    type: "ad",
+    title: "Evening class",
+    body: "A placed class.",
+    interests: ["class"],
+    profileId: "pro",
+    handle: "studio",
+  }, "right");
+  var shares = JSON.parse(local.getItem("cognation.commune.friend-shares.v1"));
+  assert.ok(shares.some(function (share) { return share.adId === "ad-pro-0" && share.swiperId === "ada"; }));
+  assert.strictEqual(deckHas(loadSwipe(local, memoryStorage()).sampleDeck(18), "ad-pro-0"), true);
+
+  api.settleSwipe({ id: "know-sam", type: "know", profileId: "sam", title: "Sam" }, "right");
+  assert.strictEqual(deckHas(api.sampleDeck(18), "know-sam"), true);
+
+  api.settleSwipe({ id: "ad-pro-0", type: "ad", title: "Evening class" }, "left");
+  api.settleSwipe({ id: "know-sam", type: "know", profileId: "sam" }, "left");
+  var after = loadSwipe(local, memoryStorage());
+  assert.strictEqual(deckHas(after.sampleDeck(18), "ad-pro-0"), false);
+  assert.strictEqual(deckHas(after.sampleDeck(18), "know-sam"), false);
+
+  var profiles = JSON.parse(local.getItem("cognation.profiles.v1"));
+  profiles.profiles.bea = { id: "bea", kind: "personal", displayName: "Bea", friendIds: ["friend"] };
+  local.setItem("cognation.profiles.v1", JSON.stringify(profiles));
+  local.setItem("cognation.session.v2", sessionFor("bea"));
+  var bea = loadSwipe(local, memoryStorage());
+  assert.strictEqual(deckHas(bea.sampleDeck(18), "ad-pro-0"), true);
+  assert.strictEqual(deckHas(bea.sampleDeck(18), "know-sam"), true);
+}
+
 testRatingSentences();
 testPace();
 testFullFriendList();
 testSiteRooms();
 testAdsAndNoInventedCafe();
+testPassStaysHiddenForViewer();
+testLegacySessionPassBelongsToViewer();
+testRightSwipeStillKeeps();
 console.log("commune-deck.test.js ok");

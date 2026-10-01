@@ -40,28 +40,24 @@
   REPEATABLE[TYPE.FACT] = true;
   REPEATABLE[TYPE.WELLNESS] = true;
 
+  var SITE_ROOM_BODY = "Cognation hosts this room.";
   var SITE_ROOMS = [
-    {
-      id: "room-site-wellness",
-      title: "Wellness check-in",
-      body: "A quiet room the site hosts for rest, movement, and how the week feels.",
-      topic: "wellness",
-      minAge: 0,
-    },
-    {
-      id: "room-site-local",
-      title: "Local happenings",
-      body: "Public notes on classes, markets, and what is open nearby.",
-      topic: "local happenings",
-      minAge: 0,
-    },
-    {
-      id: "room-site-board",
-      title: "Neighborhood board",
-      body: "A shared board for local questions and community listings.",
-      topic: "local happenings",
-      minAge: 0,
-    },
+    { id: "room-site-18-21", title: "18–21", topic: "18–21", gate: "age-18-21" },
+    { id: "room-site-highschool", title: "Highschool", topic: "highschool", gate: "highschool" },
+    { id: "room-site-moms", title: "Moms", topic: "moms", gate: "interest", interests: ["mom", "moms", "mother", "mothers"] },
+    { id: "room-site-tech-ai", title: "Tech/AI", topic: "tech/ai", gate: "interest", interests: ["tech", "technology", "ai", "artificial intelligence"] },
+    { id: "room-site-speed-dating", title: "Speed dating", topic: "speed dating", gate: "speed-dating" },
+    { id: "room-site-21", title: "21+", topic: "21+", gate: "age-21" },
+    { id: "room-site-disability", title: "Disability help", topic: "disability help", gate: "interest", interests: ["disability", "disabilities", "disability help"] },
+    { id: "room-site-mental-health", title: "Mental health", topic: "mental health", gate: "interest", interests: ["mental health"] },
+    { id: "room-site-military", title: "Military", topic: "military", gate: "interest", interests: ["military", "veteran", "veterans"] },
+    { id: "room-site-lgbtq", title: "LGBTQ", topic: "lgbtq", gate: "interest", interests: ["lgbtq", "lgbtq+", "lgbt"] },
+    { id: "room-site-public-policy", title: "Public policy", topic: "public policy", gate: "interest", interests: ["public policy"] },
+    { id: "room-site-gamers", title: "Gamers", topic: "gamers", gate: "interest", interests: ["gamer", "gamers", "gaming"] },
+    { id: "room-site-jobs", title: "Jobs", topic: "jobs", gate: "interest", interests: ["job", "jobs"] },
+    { id: "room-site-garage-sale", title: "Garage sale", topic: "garage sale", gate: "interest", interests: ["garage sale"] },
+    { id: "room-site-reality", title: "Reality shows", topic: "reality shows", gate: "interest", interests: ["reality show", "reality shows", "reality tv"] },
+    { id: "room-site-insurance", title: "Insurance", topic: "insurance", gate: "interest", interests: ["insurance"] },
   ];
 
   var FACTS = [
@@ -322,6 +318,67 @@
     return personal && Array.isArray(personal.friendIds) ? personal.friendIds.map(String) : [];
   }
 
+  function isHighschoolMember() {
+    var age = getMemberAge();
+    return age != null && age >= 14 && age <= 18;
+  }
+  function viewerInterestTokens() {
+    var chunks = [];
+    function add(value) {
+      if (value == null || value === "") return;
+      if (Array.isArray(value)) {
+        value.forEach(add);
+        return;
+      }
+      chunks.push(String(value));
+    }
+    var member = getMemberProfile();
+    add(member.interests);
+    add(member.interest);
+    var personal = viewerPersonal();
+    if (personal) {
+      add(personal.interests);
+      add(personal.interest);
+      if (personal.badges) add(personal.badges.interest);
+    }
+    var tokens = [];
+    chunks.join(" ").toLowerCase().split(/[^a-z0-9+]+/).forEach(function (token) {
+      if (token && tokens.indexOf(token) < 0) tokens.push(token);
+    });
+    return tokens;
+  }
+  function hasInterest(needles) {
+    var tokens = viewerInterestTokens();
+    var blob = " " + tokens.join(" ") + " ";
+    return (needles || []).some(function (needle) {
+      var parts = String(needle || "").toLowerCase().split(/[^a-z0-9+]+/).filter(Boolean);
+      if (!parts.length) return false;
+      if (parts.length > 1) return blob.indexOf(" " + parts.join(" ") + " ") !== -1;
+      return tokens.indexOf(parts[0]) !== -1;
+    });
+  }
+  function roomVisible(room) {
+    if (!room) return false;
+    var age = getMemberAge();
+    if (room.gate === "age-18-21") return age != null && age >= 18 && age <= 21;
+    if (room.gate === "age-21") return age != null && age >= 21 && !isHighschoolMember();
+    if (room.gate === "highschool") return isHighschoolMember();
+    if (room.gate === "speed-dating") return !isHighschoolMember() && datingAllowed();
+    if (room.gate === "interest") return hasInterest(room.interests);
+    return false;
+  }
+  function roomCard(room) {
+    return {
+      id: room.id,
+      type: TYPE.CHAT,
+      title: room.title,
+      body: SITE_ROOM_BODY,
+      topic: room.topic,
+      gate: room.gate,
+      host: "Cognation",
+    };
+  }
+
   function youtubeId(url) {
     var m = String(url || "").match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{6,})/);
     return m ? m[1] : "";
@@ -562,16 +619,7 @@
 
   function ensureSiteRooms() {
     writeJson(localStorage, ROOMS_KEY, { host: "Cognation", rooms: SITE_ROOMS });
-    return SITE_ROOMS.map(function (room) {
-      return {
-        id: room.id,
-        type: TYPE.CHAT,
-        title: room.title,
-        body: room.body,
-        topic: room.topic,
-        minAge: room.minAge || 0,
-      };
-    });
+    return SITE_ROOMS.filter(roomVisible).map(roomCard);
   }
 
   function buildLanes() {
@@ -1234,6 +1282,8 @@
     setSeeDating: setSeeDating,
     datingAllowed: datingAllowed,
     seedDemoFollows: function () { return getFollows(); },
+    siteRoomCatalog: function () { return SITE_ROOMS.map(roomCard); },
+    visibleSiteRooms: ensureSiteRooms,
     ratingSentence: ratingSentence,
     paceDeck: paceDeck,
     sampleDeck: sampleDeck,

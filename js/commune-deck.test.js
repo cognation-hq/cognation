@@ -149,6 +149,91 @@ function testFullFriendList() {
   assert.strictEqual(local.getItem("cognation.friend.requests.v1"), null);
 }
 
+function titles(rooms) {
+  return Array.prototype.map.call(rooms, function (room) { return String(room.title); });
+}
+
+function testSiteRooms() {
+  var api = loadSwipe(memoryStorage(), memoryStorage());
+  var catalog = titles(api.siteRoomCatalog());
+  assert.deepStrictEqual(catalog, [
+    "18–21",
+    "Highschool",
+    "Moms",
+    "Tech/AI",
+    "Speed dating",
+    "21+",
+    "Disability help",
+    "Mental health",
+    "Military",
+    "LGBTQ",
+    "Public policy",
+    "Gamers",
+    "Jobs",
+    "Garage sale",
+    "Reality shows",
+    "Insurance",
+  ]);
+  api.siteRoomCatalog().forEach(function (room) {
+    assert.strictEqual(room.type, "chatroom");
+    assert.strictEqual(room.host, "Cognation");
+    assert.strictEqual(room.body, "Cognation hosts this room.");
+  });
+
+  var interests = [
+    "moms", "tech", "ai", "disability help", "mental health", "military", "lgbtq",
+    "public policy", "gamers", "jobs", "garage sale", "reality shows", "insurance",
+  ];
+
+  api.setMemberProfile({ age: 16, interests: interests });
+  api.setSeeDating(true);
+  var school = titles(api.visibleSiteRooms());
+  assert.ok(school.indexOf("Highschool") !== -1);
+  assert.ok(school.indexOf("Moms") !== -1);
+  assert.ok(school.indexOf("Tech/AI") !== -1);
+  assert.strictEqual(school.indexOf("Speed dating"), -1);
+  assert.strictEqual(school.indexOf("21+"), -1);
+  assert.strictEqual(school.indexOf("18–21"), -1);
+
+  api.setMemberProfile({ age: 19, interests: [] });
+  api.setSeeDating(false);
+  assert.deepStrictEqual(titles(api.visibleSiteRooms()), ["18–21"]);
+  api.setSeeDating(true);
+  assert.deepStrictEqual(titles(api.visibleSiteRooms()), ["18–21", "Speed dating"]);
+
+  api.setMemberProfile({ age: 21, interests: interests });
+  api.setSeeDating(true);
+  var adult = titles(api.visibleSiteRooms());
+  assert.ok(adult.indexOf("18–21") !== -1);
+  assert.ok(adult.indexOf("21+") !== -1);
+  assert.ok(adult.indexOf("Speed dating") !== -1);
+  assert.ok(adult.indexOf("Insurance") !== -1);
+  assert.strictEqual(adult.indexOf("Highschool"), -1);
+  assert.strictEqual(adult.length, 15);
+
+  api.setMemberProfile({ age: 30, interests: ["insurance"] });
+  api.setSeeDating(false);
+  assert.deepStrictEqual(titles(api.visibleSiteRooms()), ["21+", "Insurance"]);
+
+  api.setMemberProfile({ age: 40, interests: [] });
+  assert.deepStrictEqual(titles(api.visibleSiteRooms()), ["21+"]);
+
+  var lanes = {
+    ad: [],
+    chatroom: api.visibleSiteRooms(),
+    fact: [{ id: "f1", title: "Fact" }],
+    wellness: [{ id: "w1", title: "Note" }],
+    friend: [],
+    event: [],
+    know: [],
+  };
+  var paced = api.paceDeck(lanes, [], 18);
+  assertPaced(paced);
+  var chatRun = 0;
+  paced.forEach(function (card) { if (card.type === "chatroom") chatRun += 1; });
+  assert.ok(chatRun > 0 && chatRun <= 8);
+}
+
 function testAdsAndNoInventedCafe() {
   var source = fs.readFileSync(path.join(root, "js/commune-swipe.js"), "utf8");
   var html = fs.readFileSync(path.join(root, "index.html"), "utf8");
@@ -192,5 +277,6 @@ function testAdsAndNoInventedCafe() {
 testRatingSentences();
 testPace();
 testFullFriendList();
+testSiteRooms();
 testAdsAndNoInventedCafe();
 console.log("commune-deck.test.js ok");

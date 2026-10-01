@@ -142,7 +142,6 @@
       handle: profile.handle,
       slogan: profile.bio,
       socialLinks: {},
-      avatarDataUrl: "",
       badges: { role: "", interest: "", status: "" },
       featuredFriendIds: [],
       friendsDisplayCount: 3,

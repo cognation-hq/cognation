@@ -490,10 +490,25 @@
     if (professional) ids.push(professional.id);
     upsertAccount(DEMO_ALEXA.username, DEMO_ALEXA.phone, ids);
 
-    /* Keep legacy key in sync with personal for older code paths */
+    /* Keep legacy key in sync with personal for older code paths.
+       A later seed must not wipe a photo, YouTube link, or pin map that
+       the personal record does not have yet. */
     if (personal) {
       try {
-        localStorage.setItem(LEGACY_PROFILE_KEY, JSON.stringify(stripMeta(personal)));
+        var legacyNow = readLegacyProfile();
+        var legacyRicher = !!(legacyNow && (
+          (legacyNow.avatarDataUrl &&
+            String(legacyNow.avatarDataUrl).indexOf("data:image/") === 0 &&
+            (!personal.avatarDataUrl || String(personal.avatarDataUrl).indexOf("data:image/") !== 0)) ||
+          (String(legacyNow.musicUrl || "").trim() && !String(personal.musicUrl || "").trim()) ||
+          (legacyNow.friendPinLayout &&
+            typeof legacyNow.friendPinLayout === "object" &&
+            Object.keys(legacyNow.friendPinLayout).length &&
+            (!personal.friendPinLayout || !Object.keys(personal.friendPinLayout).length))
+        ));
+        if (!legacyRicher) {
+          localStorage.setItem(LEGACY_PROFILE_KEY, JSON.stringify(stripMeta(personal)));
+        }
       } catch (e2) {}
     }
 

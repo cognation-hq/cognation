@@ -11762,3 +11762,73 @@ a.circle-fall-portrait {
   box-shadow: none !important;
 }
 
+/* One feed set: slim type, shared card corners, and one control shape.
+   Spacing stays as it is. Edit Profile and the white add-event form are not in this set. */
+#panel-tower .tower-private-side :is(
+  .tower-title,
+  .tower-block-heading,
+  .tower-private-theme-summary,
+  .tower-messages-heading,
+  .tower-author,
+  .tower-compose label,
+  .tower-compose .btn,
+  .tower-compose .tower-event-dropdown-summary
+) {
+  font-weight: 400 !important;
+  letter-spacing: 0.02em !important;
+  text-shadow: none !important;
+}
+
+#panel-tower .tower-private-side :is(
+  .tower-compose,
+  .tower-private-theme,
+  .tower-private-messages
+) {
+  background: rgba(16, 19, 48, 0.42) !important;
+  border: 1px solid rgba(209, 241, 255, 0.28) !important;
+  border-radius: 1.15rem !important;
+  color: #f7f9ff !important;
+}
+
+#panel-tower .tower-compose :is(.tower-event-dropdown-summary, button.btn-primary, #tower-files) {
+  background: rgba(16, 19, 48, 0.55) !important;
+  color: #f7f9ff !important;
+  -webkit-text-fill-color: #f7f9ff !important;
+  border: 1px solid rgba(209, 241, 255, 0.4) !important;
+  border-radius: 999px !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.12) !important;
+  text-shadow: none !important;
+  font-family: var(--cgn-ui) !important;
+  font-weight: 400 !important;
+  font-size: 0.82rem !important;
+  letter-spacing: 0.02em !important;
+  line-height: 1.25 !important;
+  padding: 0.28rem 0.65rem !important;
+}
+#panel-tower .tower-compose .tower-event-dropdown-summary {
+  list-style: none;
+  min-height: 0;
+}
+#panel-tower .tower-compose .tower-event-dropdown-summary::marker {
+  content: "";
+}
+#panel-tower .tower-compose #tower-files::file-selector-button,
+#panel-tower .tower-compose #tower-files::-webkit-file-upload-button {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent !important;
+  color: #f7f9ff !important;
+  -webkit-text-fill-color: #f7f9ff !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 0.45rem 0 0 !important;
+  margin: 0 !important;
+  font-family: var(--cgn-ui) !important;
+  font-weight: 400 !important;
+  font-size: 0.82rem !important;
+  letter-spacing: 0.02em !important;
+  line-height: 1.25 !important;
+  cursor: pointer;
+}
+

@@ -3876,6 +3876,30 @@ body.login-gate-open .app-topbar {
   word-break: break-word;
 }
 
+.tower-friend-pin-remove {
+  display: none;
+}
+
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-friend-pin.is-arrangeable .tower-friend-pin-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: -0.35rem;
+  right: -0.35rem;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #4a2c3a;
+  color: #fff;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 2;
+}
+
 [data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-friend-pin.is-arrangeable {
   cursor: grab;
 }

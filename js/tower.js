@@ -658,6 +658,12 @@
       if ((!local.friendPinLayout || !Object.keys(local.friendPinLayout).length) && legacy.friendPinLayout) {
         local.friendPinLayout = legacy.friendPinLayout;
       }
+      if (!Array.isArray(local.removedFriendPinIds) && Array.isArray(legacy.removedFriendPinIds)) {
+        local.removedFriendPinIds = legacy.removedFriendPinIds;
+      }
+      if ((!Array.isArray(local.featuredFriendIds) || !local.featuredFriendIds.length) && Array.isArray(legacy.featuredFriendIds) && legacy.featuredFriendIds.length) {
+        local.featuredFriendIds = legacy.featuredFriendIds;
+      }
     }
     if (!local || !Object.keys(local).length) return p;
     if (
@@ -707,6 +713,17 @@
         if (!pos || typeof pos.x !== "number" || typeof pos.y !== "number") return;
         if (!cur || typeof cur.x !== "number" || typeof cur.y !== "number") p.friendPinLayout[fid] = pos;
       });
+    }
+    /* Remote rows do not store who was removed. The saved personal list wins. */
+    if (Array.isArray(local.removedFriendPinIds) && local.removedFriendPinIds.length) {
+      if (!Array.isArray(p.removedFriendPinIds) || !p.removedFriendPinIds.length) {
+        p.removedFriendPinIds = local.removedFriendPinIds.slice();
+      }
+    }
+    if (Array.isArray(local.featuredFriendIds) && local.featuredFriendIds.length) {
+      if (!Array.isArray(p.featuredFriendIds) || !p.featuredFriendIds.length) {
+        p.featuredFriendIds = local.featuredFriendIds.slice();
+      }
     }
     var savedDoc = readScrapbookLayouts();
     var savedId = p._profileId || p.id || "";
@@ -870,10 +887,11 @@
           .map(function (id) { return String(id || ""); })
           .filter(Boolean);
       }
-      var fdc = parseInt(p.friendsDisplayCount, 10);
-      if ([3, 6, 8].indexOf(fdc) === -1) fdc = 3;
+      var fdc = normalizeFriendsDisplayCount(p.friendsDisplayCount);
       p.friendsDisplayCount = fdc;
-      p.featuredFriendIds = p.featuredFriendIds.slice(0, fdc);
+      if (p.featuredFriendIds.length > TOP_FRIEND_CAP) {
+        p.featuredFriendIds = p.featuredFriendIds.slice(0, TOP_FRIEND_CAP);
+      }
       p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
       if (!p.backgroundCollage || typeof p.backgroundCollage !== "object") {
         p.backgroundCollage = { layoutId: "none", cells: [] };
@@ -3424,40 +3442,100 @@
     pin.setAttribute("data-sticker-z", String(z));
   }
 
-  var TOP_FRIEND_VISIBLE = 3;
+  var TOP_FRIEND_AUTO = 3;
+  var TOP_FRIEND_CAP = 36;
+
+  function normalizeFriendsDisplayCount(value) {
+    var n = parseInt(value, 10);
+    if (isNaN(n) || n < 1) return TOP_FRIEND_AUTO;
+    if (n > TOP_FRIEND_CAP) return TOP_FRIEND_CAP;
+    return n;
+  }
 
   function profileIsProfessional(p) {
     return !!(p && (p._profileKind === "professional" || p.kind === "professional"));
   }
 
-  function resolveTopFriendIds(p) {
-    if (profileIsProfessional(p)) return [];
+  function removedTopFriendSet(p) {
     var removed = {};
     ((p && p.removedFriendPinIds) || []).forEach(function (id) {
       removed[String(id)] = true;
     });
-    function keep(id) {
-      id = String(id || "");
-      return !!id && id !== "alexa-thomas" && !removed[id];
-    }
+    return removed;
+  }
+
+  function keepTopFriendId(id, removed) {
+    id = String(id || "");
+    return !!id && id !== "alexa-thomas" && !removed[id];
+  }
+
+  function knownTopFriendIds() {
     var known = {};
     DEMO_FRIENDS.forEach(function (friend) {
       if (friend && friend.id) known[friend.id] = true;
     });
-    var ranked = ((p && p.featuredFriendIds) || []).filter(function (id) {
-      return known[id] && keep(id);
+    return known;
+  }
+
+  function autoTopFriendIds(p) {
+    var removed = removedTopFriendSet(p);
+    var known = knownTopFriendIds();
+    var limit = normalizeFriendsDisplayCount(p && p.friendsDisplayCount);
+    var pool = [];
+    ((p && p.friendIds) || []).forEach(function (id) {
+      id = String(id || "");
+      if (known[id] && keepTopFriendId(id, removed) && pool.indexOf(id) < 0) pool.push(id);
     });
-    var stored = ((p && p.friendIds) || []).filter(function (id) {
-      return known[id] && keep(id);
-    });
-    var pool = ranked.length ? ranked : stored;
     if (!pool.length) {
-      pool = [];
       DEMO_FRIENDS.forEach(function (friend) {
-        if (friend && keep(friend.id)) pool.push(friend.id);
+        if (friend && keepTopFriendId(friend.id, removed) && pool.indexOf(friend.id) < 0) pool.push(friend.id);
       });
     }
-    return pool.slice(0, TOP_FRIEND_VISIBLE).filter(keep);
+    return pool.slice(0, limit);
+  }
+
+  /**
+   * Personal top friends. The saved featured list is the displayed set.
+   * Auto-display fills that list once (starts at 3, never past 36).
+   * Removing one friend shrinks the set. It does not pull the next friend
+   * into the default dock.
+   */
+  function resolveTopFriendIds(p) {
+    if (profileIsProfessional(p)) return [];
+    var removed = removedTopFriendSet(p);
+    var known = knownTopFriendIds();
+    var featured = ((p && p.featuredFriendIds) || []).filter(function (id) {
+      return known[id] && keepTopFriendId(id, removed);
+    });
+    if (featured.length || ((p && p.removedFriendPinIds) || []).length) {
+      return featured.slice(0, TOP_FRIEND_CAP);
+    }
+    return autoTopFriendIds(p);
+  }
+
+  /** Freeze the first auto-display so a later refresh cannot swap in a new friend. */
+  function lockAutoTopFriends(p) {
+    if (!p || profileIsProfessional(p) || p._directoryFriend) return false;
+    if (typeof isTowerOwner === "function" && !isTowerOwner(p)) return false;
+    if (p.featuredFriendIds && p.featuredFriendIds.length) return false;
+    if (p.removedFriendPinIds && p.removedFriendPinIds.length) return false;
+    var selected = resolveTopFriendIds(p);
+    if (!selected.length) return false;
+    p.featuredFriendIds = selected.slice();
+    return true;
+  }
+
+  /** Drop one displayed friend. Other saved pin positions stay put. */
+  function removeTopFriendPin(p, friendId) {
+    if (!p || profileIsProfessional(p)) return false;
+    friendId = String(friendId || "");
+    if (!friendId) return false;
+    var remaining = resolveTopFriendIds(p).filter(function (id) { return id !== friendId; });
+    p.featuredFriendIds = remaining;
+    if (!Array.isArray(p.removedFriendPinIds)) p.removedFriendPinIds = [];
+    if (p.removedFriendPinIds.indexOf(friendId) < 0) p.removedFriendPinIds.push(friendId);
+    if (p.friendPinLayout && p.friendPinLayout[friendId]) delete p.friendPinLayout[friendId];
+    return true;
   }
 
   function renderFriendPins(root, p) {
@@ -3475,10 +3553,10 @@
       return;
     }
     if (p) settleArrivalTilts(p);
+    var pinsChanged = lockAutoTopFriends(p);
     var selected = resolveTopFriendIds(p);
-    if (ensureFriendPinPositions(p, selected)) {
-      TowerProfileStore.save(p);
-    }
+    if (ensureFriendPinPositions(p, selected)) pinsChanged = true;
+    if (pinsChanged) TowerProfileStore.save(p);
     var pinLayout = getFriendPinLayout(p);
 
     stage.querySelectorAll("[data-tower-friend-pin]").forEach(function (el) {
@@ -3509,8 +3587,14 @@
         var nm = document.createElement("span");
         nm.className = "tower-friend-pin-name";
         nm.textContent = friend.name;
+        var removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "tower-friend-pin-remove";
+        removeBtn.setAttribute("data-tower-friend-remove", "");
+        removeBtn.textContent = "×";
         pin.appendChild(av);
         pin.appendChild(nm);
+        pin.appendChild(removeBtn);
         pin.addEventListener("click", function (ev) {
           if (pin.__cognationDidDrag) {
             ev.preventDefault();
@@ -3521,6 +3605,16 @@
       }
       pin.href = "#" + profileHash;
       pin.setAttribute("aria-label", friend.name + " tower profile");
+      var removeBtnEl = pin.querySelector("[data-tower-friend-remove]");
+      if (!removeBtnEl) {
+        removeBtnEl = document.createElement("button");
+        removeBtnEl.type = "button";
+        removeBtnEl.className = "tower-friend-pin-remove";
+        removeBtnEl.setAttribute("data-tower-friend-remove", "");
+        removeBtnEl.textContent = "×";
+        pin.appendChild(removeBtnEl);
+      }
+      removeBtnEl.setAttribute("aria-label", "Remove " + friend.name);
       var avEl = pin.querySelector(".tower-friend-pin-avatar");
       var nmEl = pin.querySelector(".tower-friend-pin-name");
       if (nmEl) nmEl.textContent = friend.name;
@@ -3733,8 +3827,11 @@
     var countSel = root.querySelector("[data-tower-friends-count]");
     var publicEl = root.querySelector("[data-tower-friends-public]");
     if (!chips) return;
-    var max = parseInt((countSel && countSel.value) || p.friendsDisplayCount || 3, 10);
-    if ([3, 6, 8].indexOf(max) === -1) max = 3;
+    if (lockAutoTopFriends(p)) {
+      ensureFriendPinPositions(p, resolveTopFriendIds(p));
+      TowerProfileStore.save(p);
+    }
+    var max = normalizeFriendsDisplayCount((countSel && countSel.value) || (p && p.friendsDisplayCount));
     var selected = (p.featuredFriendIds || []).slice(0, max).filter(function (id) {
       return id !== "alexa-thomas";
     });
@@ -3758,9 +3855,10 @@
       btn.appendChild(remove);
       btn.addEventListener("click", function () {
         var cur = TowerProfileStore.get();
-        cur.featuredFriendIds = (cur.featuredFriendIds || []).filter(function (fid) { return fid !== f.id; });
+        removeTopFriendPin(cur, f.id);
         TowerProfileStore.save(cur);
         renderFriendsPicker(root, cur);
+        renderFriendPins(root, cur);
       });
       chips.appendChild(btn);
     });
@@ -3821,11 +3919,12 @@
             (root.querySelector("[data-tower-friends-count]") || {}).value || profile.friendsDisplayCount || 3,
             10
           );
-          if ([3, 6, 8].indexOf(lim) === -1) lim = 3;
+          lim = normalizeFriendsDisplayCount(lim);
+          if (lim > TOP_FRIEND_CAP) lim = TOP_FRIEND_CAP;
           var ids = (profile.featuredFriendIds || []).slice();
           var status = root.querySelector("[data-tower-friends-status]");
           if (ids.indexOf(friend.id) === -1) {
-            if (ids.length >= lim) {
+            if (ids.length >= lim || ids.length >= TOP_FRIEND_CAP) {
               if (status) status.textContent = "Top friends is full. Remove one first.";
               return;
             }
@@ -3837,6 +3936,9 @@
             ids.push(friend.id);
             profile = TowerProfileStore.get();
             profile.featuredFriendIds = ids;
+            profile.removedFriendPinIds = (profile.removedFriendPinIds || []).filter(function (id) {
+              return id !== friend.id;
+            });
             TowerProfileStore.save(profile);
           }
           input.value = "";
@@ -6673,19 +6775,19 @@
       }
       if (entry.type === "friend") {
         var fp = TowerProfileStore.get();
+        fp.removedFriendPinIds = (fp.removedFriendPinIds || []).filter(function (id) {
+          return id !== entry.id;
+        });
         var ids = (fp.featuredFriendIds || []).slice();
         if (ids.indexOf(entry.id) < 0) {
-          var max = fp.friendsDisplayCount || 3;
-          if (ids.length >= max) {
-            /* bump count if needed so restore can fit */
-            if (max < 8) {
-              fp.friendsDisplayCount = ids.length + 1 <= 6 ? 6 : 8;
-              max = fp.friendsDisplayCount;
-            }
+          var max = normalizeFriendsDisplayCount(fp.friendsDisplayCount);
+          if (ids.length >= max && max < TOP_FRIEND_CAP) {
+            fp.friendsDisplayCount = Math.min(TOP_FRIEND_CAP, ids.length + 1);
+            max = fp.friendsDisplayCount;
           }
           if (ids.length < max) ids.push(entry.id);
         }
-        fp.featuredFriendIds = ids.slice(0, fp.friendsDisplayCount || 8);
+        fp.featuredFriendIds = ids.slice(0, TOP_FRIEND_CAP);
         if (entry.layout) {
           if (!fp.friendPinLayout || typeof fp.friendPinLayout !== "object") fp.friendPinLayout = {};
           fp.friendPinLayout[entry.id] = entry.layout;
@@ -6722,6 +6824,16 @@
         p.publicWidgets = JSON.parse(JSON.stringify(DEFAULT_PUBLIC_WIDGETS));
         p.polaroidRemoved = false;
         p.removedFriendPinIds = [];
+        p.friendsDisplayCount = TOP_FRIEND_AUTO;
+        p.featuredFriendIds = [];
+        p.friendPinLayout = {};
+        var seededFriends = resolveTopFriendIds(p);
+        p.featuredFriendIds = seededFriends.slice();
+        seededFriends.forEach(function (id, index) {
+          p.friendPinLayout[id] = defaultFriendPinPos(p, index);
+        });
+        var resetCount = root.querySelector("[data-tower-friends-count]");
+        if (resetCount) resetCount.value = String(TOP_FRIEND_AUTO);
         TowerProfileStore.save(p);
         applyWidgetLayout(root, p);
         applyPublicWidgets(root, p);
@@ -6746,6 +6858,7 @@
 
     function onPointerDown(ev) {
       if (!ownerOnPublic()) return;
+      if (ev.target.closest("[data-tower-friend-remove]")) return;
 
       var friendPin = ev.target.closest("[data-tower-friend-pin]");
       if (friendPin && stage.contains(friendPin)) {
@@ -7006,6 +7119,14 @@
         return;
       }
       if (ev.target.closest(".tower-avatar-upload, [data-tower-avatar-file], [data-tower-avatar-file-panel]")) return;
+      var friendRemove = ev.target.closest("[data-tower-friend-remove]");
+      if (friendRemove && stage.contains(friendRemove)) {
+        ev.preventDefault();
+        var removePin = friendRemove.closest("[data-tower-friend-pin]");
+        var removeId = removePin && removePin.getAttribute("data-tower-friend-pin");
+        if (removeId) dismissFriendPin(removeId);
+        return;
+      }
       /* Pins are <a> — select before the generic interactive early-return */
       var friendSel = ev.target.closest("[data-tower-friend-pin]");
       if (friendSel && stage.contains(friendSel)) {
@@ -7051,6 +7172,23 @@
       }
     });
 
+    function dismissFriendPin(friendId) {
+      friendId = String(friendId || "");
+      if (!friendId) return;
+      clearWidgetSelection(stage);
+      var fp = TowerProfileStore.get();
+      var savedFriendLayout =
+        fp.friendPinLayout && fp.friendPinLayout[friendId]
+          ? JSON.parse(JSON.stringify(fp.friendPinLayout[friendId]))
+          : null;
+      pushWidgetUndo({ type: "friend", id: friendId, layout: savedFriendLayout });
+      removeTopFriendPin(fp, friendId);
+      TowerProfileStore.save(fp);
+      renderFriendsPicker(root, fp);
+      renderFriendPins(root, fp);
+      setProfileStatusSafe("Friend pin removed — Undo to restore.", false);
+    }
+
     /* Keyboard: [ ] rotate selected; Backspace / Delete removes */
     if (!root.__cognationWidgetKeyBound) {
       root.__cognationWidgetKeyBound = true;
@@ -7077,22 +7215,7 @@
         /* Individual friend pin */
         var friendId = selected.getAttribute("data-tower-friend-pin");
         if (friendId) {
-          clearWidgetSelection(stage);
-          var fp = TowerProfileStore.get();
-          var savedFriendLayout =
-            fp.friendPinLayout && fp.friendPinLayout[friendId]
-              ? JSON.parse(JSON.stringify(fp.friendPinLayout[friendId]))
-              : null;
-          pushWidgetUndo({ type: "friend", id: friendId, layout: savedFriendLayout });
-          if (!Array.isArray(fp.removedFriendPinIds)) fp.removedFriendPinIds = [];
-          if (fp.removedFriendPinIds.indexOf(friendId) < 0) fp.removedFriendPinIds.push(friendId);
-          if (fp.friendPinLayout && fp.friendPinLayout[friendId]) {
-            delete fp.friendPinLayout[friendId];
-          }
-          TowerProfileStore.save(fp);
-          renderFriendsPicker(root, fp);
-          renderFriendPins(root, fp);
-          setProfileStatusSafe("Friend pin removed — Undo to restore.", false);
+          dismissFriendPin(friendId);
           return;
         }
 
@@ -8052,7 +8175,7 @@
         var countSel = root.querySelector("[data-tower-friends-count]");
         if (countSel) {
           var n = parseInt(countSel.value ? countSel.value : "3", 10);
-          if ([3, 6, 8].indexOf(n) === -1) n = 3;
+          n = normalizeFriendsDisplayCount(n);
           p.friendsDisplayCount = n;
           p.featuredFriendIds = (p.featuredFriendIds || []).slice(0, n);
         }
@@ -8370,7 +8493,7 @@
       friendsCount.addEventListener("change", function () {
         var cur = TowerProfileStore.get();
         var n = parseInt(friendsCount.value, 10);
-        if ([3, 6, 8].indexOf(n) === -1) n = 3;
+        n = normalizeFriendsDisplayCount(n);
         cur.friendsDisplayCount = n;
         cur.featuredFriendIds = (cur.featuredFriendIds || []).slice(0, n);
         TowerProfileStore.save(cur);
@@ -8385,7 +8508,7 @@
         var cur = TowerProfileStore.get();
         var countSel = root.querySelector("[data-tower-friends-count]");
         var n = parseInt(countSel && countSel.value ? countSel.value : cur.friendsDisplayCount || 3, 10);
-        if ([3, 6, 8].indexOf(n) === -1) n = 3;
+        n = normalizeFriendsDisplayCount(n);
         var ids = (cur.featuredFriendIds || []).slice();
         /* Prefer live selected chips if present */
         var chips = root.querySelectorAll("[data-tower-friends-chips] .tower-friend-chip.is-selected[data-friend-id]");

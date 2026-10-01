@@ -33,6 +33,10 @@
   }
 
   function isProfessionalContext(btn) {
+    var root = btn && btn.closest && btn.closest("[data-tower-app]");
+    var viewKind = root && root.getAttribute("data-view-kind");
+    if (viewKind === "professional") return true;
+    if (viewKind === "personal") return false;
     var p = activeProfile();
     if (p && (p._profileKind === "professional" || p.kind === "professional")) return true;
     if (p && (p._directoryFriend || p._profileKind === "personal" || p.kind === "personal")) return false;

@@ -8,9 +8,9 @@
  * Dual profiles: Personal | Professional (max 2 per phone)
  * Public deep-link: #tower-profile-{handle}
  * Attachment kinds: photo | note | video | art | document
- * Calendar: profile.calendarEvents on active Tower profile (localStorage via CognationAccounts)
- *   · My feed private month CRUD · public scrapbook widget data-tower-widget="calendar"
- *   · Friends schedule requests (pending/accepted) · Google Connect + ICS URL stubs
+ * Calendar: one shared calendarEvents list for personal, professional, Tower, and Circle.
+ *   · Public sticker is labeled Calendar on both profile pages.
+ *   · The owner sees titles and notes. A visitor on either page sees busy blocks only.
  */
 (function () {
   "use strict";
@@ -81,6 +81,7 @@
     friends: { x: 2, y: 52, z: 4, tilt: 0 },
     html: { x: 22, y: 3, z: 3, tilt: 0 },
     calendar: { x: 55, y: 28, z: 5, tilt: 0 },
+    "going-live": { x: 60, y: 74, z: 18, tilt: 0 },
     polaroid: { x: 40, y: 6, z: 6, tilt: 0 },
     instax: { x: 62, y: 4, z: 7, tilt: 0 },
   };
@@ -135,6 +136,13 @@
       p.quoteStickers.forEach(function (q) {
         clearTilt(q, null);
       });
+    }
+    var live = p.widgetLayout && p.widgetLayout["going-live"];
+    if (live && live.x === 34 && live.y === 58) {
+      live.x = DEFAULT_WIDGET_LAYOUT["going-live"].x;
+      live.y = DEFAULT_WIDGET_LAYOUT["going-live"].y;
+      live.z = DEFAULT_WIDGET_LAYOUT["going-live"].z;
+      changed = true;
     }
     if (changed) {
       try { TowerProfileStore.save(p, { geometry: true }); } catch (eSettle) {}
@@ -685,6 +693,12 @@
           .map(function (id) { return String(id || ""); })
           .filter(Boolean);
       }
+      if (!Array.isArray(p.removedFriendPinIds)) p.removedFriendPinIds = [];
+      else {
+        p.removedFriendPinIds = p.removedFriendPinIds
+          .map(function (id) { return String(id || ""); })
+          .filter(Boolean);
+      }
       var fdc = parseInt(p.friendsDisplayCount, 10);
       if ([3, 6, 8].indexOf(fdc) === -1) fdc = 3;
       p.friendsDisplayCount = fdc;
@@ -839,8 +853,9 @@
           if (slim.backgroundHtml && String(slim.backgroundHtml).length > 12000) {
             slim.backgroundHtml = String(slim.backgroundHtml).slice(0, 8000);
           }
-          if (slim.backgroundImageDataUrl && String(slim.backgroundImageDataUrl).length > 500000) {
-            slim.backgroundImageDataUrl = "";
+          /* A polaroid upload must not erase the page background to free quota. */
+          if (Array.isArray(slim.polaroidPrints) && slim.polaroidPrints.length > 1) {
+            slim.polaroidPrints = slim.polaroidPrints.slice(-1);
           }
           if (id && window.CognationAccounts && window.CognationAccounts.updateProfileTower) {
             window.CognationAccounts.updateProfileTower(id, slim);
@@ -2378,13 +2393,34 @@
     return "";
   }
 
+  function looksLikeYoutubeUrl(raw) {
+    var href = safeHttpUrl(raw);
+    if (!href) return false;
+    try {
+      var host = new URL(href).hostname.replace(/^www\./i, "").toLowerCase();
+      return (
+        host === "youtu.be" ||
+        host === "youtube.com" ||
+        host === "m.youtube.com" ||
+        host === "music.youtube.com" ||
+        host === "youtube-nocookie.com" ||
+        host.slice(-12) === ".youtube.com"
+      );
+    } catch (eYt) {
+      return false;
+    }
+  }
+
   function youtubeEmbedSrc(videoId, muted, autoplay) {
+    var origin = "";
+    try { origin = window.location.origin || ""; } catch (eOrigin) {}
     var q =
       "enablejsapi=1&playsinline=1&rel=0&modestbranding=1&autoplay=" +
       (autoplay ? "1" : "0") +
       "&mute=" +
       (muted ? "1" : "0");
-    return "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(videoId) + "?" + q;
+    if (origin) q += "&origin=" + encodeURIComponent(origin);
+    return "https://www.youtube.com/embed/" + encodeURIComponent(videoId) + "?" + q;
   }
 
   function postYoutubeCommand(iframe, func) {
@@ -2413,30 +2449,14 @@
     if (yt) yt.hidden = true;
   }
 
-  function ensureProYoutubeIframe(root, videoId) {
+  /* Professional page: the box stays empty. The pink player is the only embed. */
+  function showEmptyProYoutube(root) {
     var box = root.querySelector("[data-tower-pro-youtube]");
     var frame = root.querySelector("[data-tower-pro-youtube-frame]");
-    if (!box || !frame) return null;
+    if (frame) frame.innerHTML = "";
+    if (!box) return;
     box.hidden = false;
-    if (!videoId) {
-      frame.innerHTML = "";
-      box.classList.remove("has-video");
-      return null;
-    }
-    box.classList.add("has-video");
-    var src = youtubeEmbedSrc(videoId, false, false);
-    var iframe = frame.querySelector("iframe");
-    if (!iframe) {
-      iframe = document.createElement("iframe");
-      iframe.setAttribute("title", "YouTube video");
-      iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
-      iframe.setAttribute("allowfullscreen", "");
-      iframe.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
-      iframe.loading = "lazy";
-      frame.appendChild(iframe);
-    }
-    if (iframe.getAttribute("src") !== src) iframe.src = src;
-    return iframe;
+    box.classList.remove("has-video");
   }
 
   function ensureYoutubeIframe(root, videoId, muted, autoplay) {
@@ -2444,6 +2464,7 @@
     var frame = root.querySelector("[data-tower-youtube-frame]");
     if (!yt || !frame) return null;
     yt.hidden = false;
+    yt.removeAttribute("hidden");
     var src = youtubeEmbedSrc(videoId, muted, !!autoplay);
     var iframe = frame.querySelector("iframe");
     if (!iframe) {
@@ -2452,12 +2473,92 @@
       iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
       iframe.setAttribute("allowfullscreen", "");
       iframe.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
-      iframe.loading = "lazy";
+      iframe.loading = "eager";
       frame.appendChild(iframe);
     }
-    if (iframe.getAttribute("src") !== src) iframe.src = src;
+    var already = iframe.getAttribute("data-yt-id") === videoId && iframe.getAttribute("src");
+    if (!already && iframe.getAttribute("src") !== src) iframe.src = src;
     iframe.setAttribute("data-yt-id", videoId);
     return iframe;
+  }
+
+  function loadYoutubeApi(done) {
+    if (window.YT && window.YT.Player) {
+      done();
+      return;
+    }
+    var queue = window.__cognationYtQueue || (window.__cognationYtQueue = []);
+    queue.push(done);
+    if (window.__cognationYtApiLoading) return;
+    window.__cognationYtApiLoading = true;
+    var prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = function () {
+      if (typeof prev === "function") prev();
+      var pending = window.__cognationYtQueue || [];
+      window.__cognationYtQueue = [];
+      pending.forEach(function (fn) {
+        try { fn(); } catch (eApi) {}
+      });
+    };
+    var script = document.createElement("script");
+    script.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(script);
+  }
+
+  function attachYoutubePlayer(root, iframe, videoId) {
+    var wrap = root.querySelector("[data-tower-music]");
+    if (!wrap || !iframe) return;
+    wrap.__ytIframe = iframe;
+    if (wrap.__ytBoundId === videoId && wrap.__ytPlayer) return;
+    wrap.__ytId = videoId;
+    wrap.__ytBoundId = videoId;
+    loadYoutubeApi(function () {
+      if (!window.YT || !window.YT.Player) return;
+      if (wrap.__ytId !== videoId) return;
+      try {
+        wrap.__ytPlayer = new YT.Player(iframe, {
+          events: {
+            onReady: function (ev) {
+              wrap.__ytPlayer = ev.target;
+            },
+          },
+        });
+      } catch (ePlayer) {}
+    });
+  }
+
+  function bindIpodWheel(root) {
+    function currentPlayer() {
+      var wrap = root.querySelector("[data-tower-music]");
+      return wrap && wrap.__ytPlayer;
+    }
+    function seek(delta) {
+      var player = currentPlayer();
+      if (player && player.getCurrentTime && player.seekTo) {
+        var t = 0;
+        try { t = player.getCurrentTime() || 0; } catch (eTime) {}
+        try { player.seekTo(Math.max(0, t + delta), true); } catch (eSeek) {}
+        return;
+      }
+      var iframe = root.querySelector("[data-tower-youtube-frame] iframe");
+      if (!iframe) return;
+      var vid = iframe.getAttribute("data-yt-id") || "";
+      if (!vid) return;
+      var start = parseInt(iframe.getAttribute("data-yt-start") || "0", 10);
+      if (isNaN(start)) start = 0;
+      start = Math.max(0, start + delta);
+      iframe.setAttribute("data-yt-start", String(start));
+      iframe.src = youtubeEmbedSrc(vid, false, true) + "&start=" + start;
+    }
+    root.querySelectorAll(".tower-ipod-skip").forEach(function (btn) {
+      if (btn.__cognationIpodSkip) return;
+      btn.__cognationIpodSkip = true;
+      btn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        seek(btn.classList.contains("tower-ipod-skip--prev") ? -10 : 10);
+      });
+    });
   }
 
   /* Green MP3 and wood radio are not personal-profile looks. Pink is the classic note, silver is the CD. None hides the player. */
@@ -2525,18 +2626,32 @@
         syncMusicToggleUi(root, off);
         if (off) {
           if (media.audio) media.audio.pause();
-          if (media.youtubeIframe) {
-            postYoutubeCommand(media.youtubeIframe, "mute");
+          var wrapOff = root.querySelector("[data-tower-music]");
+          var playerOff = wrapOff && wrapOff.__ytPlayer;
+          if (playerOff && playerOff.pauseVideo) {
+            try { playerOff.pauseVideo(); } catch (ePause) {}
+          } else if (media.youtubeIframe) {
             postYoutubeCommand(media.youtubeIframe, "pauseVideo");
           }
         } else if (media.youtubeIframe) {
-          /* Explicit user gesture: allow autoplay unmute+play */
-          var vid = media.youtubeIframe.getAttribute("data-yt-id") || "";
-          if (vid) {
-            media.youtubeIframe.src = youtubeEmbedSrc(vid, false, true);
-          } else {
-            postYoutubeCommand(media.youtubeIframe, "unMute");
-            postYoutubeCommand(media.youtubeIframe, "playVideo");
+          /* Explicit user gesture: play the embed that is already in the pink screen. */
+          var wrapPlay = root.querySelector("[data-tower-music]");
+          var player = wrapPlay && wrapPlay.__ytPlayer;
+          if (player && player.playVideo) {
+            try {
+              player.unMute();
+              player.playVideo();
+            } catch (ePlay) {
+              player = null;
+            }
+          }
+          if (!player || !player.playVideo) {
+            var vid = media.youtubeIframe.getAttribute("data-yt-id") || "";
+            if (vid) media.youtubeIframe.src = youtubeEmbedSrc(vid, false, true);
+            else {
+              postYoutubeCommand(media.youtubeIframe, "unMute");
+              postYoutubeCommand(media.youtubeIframe, "playVideo");
+            }
           }
         } else if (media.audio) {
           media.audio.muted = false;
@@ -2673,18 +2788,11 @@
       clearYoutubeEmbed(root);
       clearTowerAudio(audio);
       if (looks) looks.hidden = true;
-      wrap.setAttribute("data-music-skin", "pro");
-      if (!ytId && !ownerPublic) {
-        if (proBox) proBox.hidden = true;
-        wrap.hidden = true;
-        wrap.removeAttribute("data-music-mode");
-        showMusicSticker(root, false);
-        return;
-      }
-      showMusicSticker(root, true);
       wrap.hidden = false;
-      wrap.setAttribute("data-music-mode", ytId ? "pro-youtube" : "pro-empty");
-      ensureProYoutubeIframe(root, ytId);
+      wrap.setAttribute("data-music-skin", "pro");
+      wrap.setAttribute("data-music-mode", "pro-empty");
+      showEmptyProYoutube(root);
+      showMusicSticker(root, true);
       return;
     }
     if (proBox) {
@@ -2726,31 +2834,31 @@
     wrap.hidden = false;
 
     if (ytId && skin === "classic") {
-      /* The pink click-wheel stays up. The video plays inside its black screen. */
+      /* Pink click-wheel. The saved video stays in the screen as a normal embed. */
       wrap.setAttribute("data-music-mode", "youtube");
       applyMusicSkin(root, "classic");
       clearTowerAudio(audio);
-      var iframe = ensureYoutubeIframe(root, ytId, true, false);
-      if (iframe) {
-        postYoutubeCommand(iframe, "mute");
-        postYoutubeCommand(iframe, "pauseVideo");
-      }
-      /* Start paused until the viewer presses the pink center — avoids login autoplay. */
-      if (!viewerWantsMusicOff()) {
-        try {
+      var iframe = ensureYoutubeIframe(root, ytId, false, false);
+      attachYoutubePlayer(root, iframe, ytId);
+      bindIpodWheel(root);
+      /* First visit starts paused so the center button plays. Later visits keep that choice. */
+      try {
+        if (sessionStorage.getItem(VIEWER_MUSIC_OFF_KEY) == null) {
           sessionStorage.setItem(VIEWER_MUSIC_OFF_KEY, "1");
-        } catch (eMute) {}
-      }
+        }
+      } catch (eMute) {}
       bindMusicToggles(root, { youtubeIframe: iframe });
-      syncMusicToggleUi(root, true);
+      syncMusicToggleUi(root, viewerWantsMusicOff());
       return;
     }
 
-    if (ytId) {
+    if (ytId || looksLikeYoutubeUrl(url)) {
+      /* A YouTube link never becomes a file download. Silver keeps the CD face. */
       wrap.setAttribute("data-music-mode", "audio");
       clearYoutubeEmbed(root);
       clearTowerAudio(audio);
       applyMusicSkin(root, skin);
+      bindIpodWheel(root);
       bindMusicToggles(root, {});
       syncMusicToggleUi(root, true);
       return;
@@ -3085,20 +3193,40 @@
     pin.setAttribute("data-sticker-z", String(z));
   }
 
+  var TOP_FRIEND_VISIBLE = 3;
+
+  function profileIsProfessional(p) {
+    return !!(p && (p._profileKind === "professional" || p.kind === "professional"));
+  }
+
   function resolveTopFriendIds(p) {
+    if (profileIsProfessional(p)) return [];
+    var removed = {};
+    ((p && p.removedFriendPinIds) || []).forEach(function (id) {
+      removed[String(id)] = true;
+    });
+    function keep(id) {
+      id = String(id || "");
+      return !!id && id !== "alexa-thomas" && !removed[id];
+    }
     var known = {};
     DEMO_FRIENDS.forEach(function (friend) {
       if (friend && friend.id) known[friend.id] = true;
     });
-    var ranked = ((p && p.featuredFriendIds) || []).filter(function (id) { return known[id]; });
-    if (ranked.length) {
-      var max = parseInt((p && p.friendsDisplayCount) || 3, 10);
-      if ([3, 6, 8].indexOf(max) === -1) max = 3;
-      return ranked.slice(0, max);
+    var ranked = ((p && p.featuredFriendIds) || []).filter(function (id) {
+      return known[id] && keep(id);
+    });
+    var stored = ((p && p.friendIds) || []).filter(function (id) {
+      return known[id] && keep(id);
+    });
+    var pool = ranked.length ? ranked : stored;
+    if (!pool.length) {
+      pool = [];
+      DEMO_FRIENDS.forEach(function (friend) {
+        if (friend && keep(friend.id)) pool.push(friend.id);
+      });
     }
-    return DEMO_FRIENDS.filter(function (friend) {
-      return friend && friend.id && friend.id !== "alexa-thomas";
-    }).map(function (friend) { return friend.id; });
+    return pool.slice(0, TOP_FRIEND_VISIBLE).filter(keep);
   }
 
   function renderFriendPins(root, p) {
@@ -3106,6 +3234,15 @@
     if (!stage) return;
     stage.classList.add("is-sticker-stage");
     ensureStickersOnStage(stage);
+    if (profileIsProfessional(p)) {
+      stage.querySelectorAll("[data-tower-friend-pin]").forEach(function (el) { el.remove(); });
+      var friendsWidget = stage.querySelector('[data-tower-widget="friends"]');
+      if (friendsWidget) {
+        friendsWidget.hidden = true;
+        friendsWidget.classList.add("is-widget-off");
+      }
+      return;
+    }
     if (p) settleArrivalTilts(p);
     var selected = resolveTopFriendIds(p);
     if (ensureFriendPinPositions(p, selected)) {
@@ -3665,7 +3802,7 @@
       if (id === "music") {
         var personalMusic = !p || p._profileKind !== "professional";
         if (!personalMusic) {
-          on = isTowerOwner(p) || !!parseYoutubeVideoId(musicUrl);
+          on = true;
         } else {
           var skinChoice = visibleMusicSkin(p && p.musicSkin);
           if (skinChoice === "none" || (p && p.musicEnabled === false)) on = false;
@@ -3674,6 +3811,8 @@
       }
       if (id === "friends" && (!friendIds || !friendIds.length)) on = false;
       if (id === "badges" && !profileHasVisibleBadges(p)) on = false;
+      /* The same Calendar sticker stays on the personal page and the professional page. */
+      if (id === "calendar") on = true;
       var el = root.querySelector('[data-tower-widget="' + id + '"]');
       if (!el) return;
       el.hidden = !on;
@@ -4209,6 +4348,17 @@
               : e.source === "friend"
               ? '<span class="tower-cal-badge">Friend</span>'
               : "";
+          if (opts.busyOnly || e.busy) {
+            return (
+              '<li class="tower-cal-event is-busy" data-calendar-busy="true">' +
+              '<div class="tower-cal-event-main">' +
+              '<span class="tower-cal-event-time">' +
+              escapeHtml(formatEventTime(e.time) || "—") +
+              "</span>" +
+              '<span class="tower-cal-event-title">Busy</span>' +
+              "</div></li>"
+            );
+          }
           var who =
             e.requesterName && e.source === "friend"
               ? '<span class="tower-cal-event-who">from ' + escapeHtml(e.requesterName) + "</span>"
@@ -4257,11 +4407,173 @@
     );
   }
 
+  function accountProfilesFor(profile) {
+    var accounts = window.CognationAccounts;
+    if (!accounts || !profile) return [];
+    var full = profile._profileId && accounts.getProfileById
+      ? accounts.getProfileById(profile._profileId)
+      : null;
+    var username = full && full.accountUsername;
+    if (username && accounts.getProfilesForUsername) {
+      return accounts.getProfilesForUsername(username) || [];
+    }
+    return full ? [full] : [];
+  }
+
+  /* One calendar for personal, professional, Tower, and Circle. Personal events win on the same id. */
+  function sharedCalendarEvents(profile) {
+    var recs = accountProfilesFor(profile).slice().sort(function (a, b) {
+      if (a && a.kind === "personal") return -1;
+      if (b && b.kind === "personal") return 1;
+      return 0;
+    });
+    var seen = {};
+    var list = [];
+    recs.forEach(function (rec) {
+      (rec && rec.calendarEvents || []).forEach(function (ev) {
+        if (!ev || !ev.id || seen[ev.id]) return;
+        seen[ev.id] = true;
+        list.push(ev);
+      });
+    });
+    if (!list.length && profile && Array.isArray(profile.calendarEvents)) return profile.calendarEvents.slice();
+    return list;
+  }
+
+  function writeSharedCalendar(profile, events) {
+    var accounts = window.CognationAccounts;
+    var recs = accountProfilesFor(profile);
+    if (profile) profile.calendarEvents = events;
+    if (!accounts || typeof accounts.saveProfileRecord !== "function" || !recs.length) return;
+    recs.forEach(function (rec) {
+      if (!rec) return;
+      rec.calendarEvents = events;
+      try { accounts.saveProfileRecord(rec); } catch (eCal) {}
+    });
+  }
+
+  /* A visitor on a personal or professional page sees blocked times only. */
+  function busyBlocksOnly(events) {
+    return (events || []).filter(function (e) {
+      return e && e.status !== "pending";
+    }).map(function (e) {
+      return {
+        id: "busy-" + e.id,
+        date: e.date,
+        time: e.time || "",
+        title: "Busy",
+        notes: "",
+        status: "accepted",
+        source: "owner",
+        busy: true
+      };
+    });
+  }
+
+  function normalizeGoingLive(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    var when = String(raw.when || raw.liveAt || "").trim().slice(0, 16);
+    var where = String(raw.where || "").trim().slice(0, 120);
+    var what = String(raw.what || raw.title || "").trim().slice(0, 240);
+    if (!what) what = String(raw.details || raw.notes || "").trim().slice(0, 240);
+    if (!what || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(when)) return null;
+    return { id: "going-live", when: when, where: where, what: what };
+  }
+
+  function sharedGoingLive(profile) {
+    var own = normalizeGoingLive(profile && profile.goingLive);
+    if (own) return own;
+    var recs = accountProfilesFor(profile);
+    var i;
+    for (i = 0; i < recs.length; i++) {
+      var found = normalizeGoingLive(recs[i] && recs[i].goingLive);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  /* One going-live notice on the personal page and the professional page, plus the shared calendar. */
+  function publishGoingLive(live) {
+    live = normalizeGoingLive(live);
+    if (!live) return null;
+    var p = TowerProfileStore.get();
+    var events = sharedCalendarEvents(p).filter(function (e) {
+      return e && e.id !== "going-live";
+    });
+    var parts = live.when.split("T");
+    events.push({
+      id: "going-live",
+      title: live.what,
+      date: parts[0],
+      time: parts[1] || "",
+      notes: live.where || "",
+      status: "accepted",
+      source: "owner",
+    });
+    events = normalizeCalendarEventsList(events);
+    p.goingLive = live;
+    p.calendarEvents = events;
+    var accounts = window.CognationAccounts;
+    var recs = accountProfilesFor(p);
+    if (accounts && typeof accounts.saveProfileRecord === "function") {
+      recs.forEach(function (rec) {
+        if (!rec) return;
+        rec.goingLive = live;
+        rec.calendarEvents = events;
+        try { accounts.saveProfileRecord(rec); } catch (eLive) {}
+      });
+    }
+    TowerProfileStore.save(p);
+    return live;
+  }
+
+  function renderGoingLiveWidget(root) {
+    var sticker = root.querySelector('[data-tower-widget="going-live"]');
+    if (!sticker) return;
+    var body = sticker.querySelector("[data-tower-going-live-body]");
+    var p = TowerProfileStore.get();
+    var live = sharedGoingLive(p);
+    if (!live) {
+      sticker.hidden = true;
+      sticker.classList.add("is-widget-off");
+      if (body) body.innerHTML = "";
+      return;
+    }
+    sticker.hidden = false;
+    sticker.classList.remove("is-widget-off");
+    if (!body) return;
+    var owner = isTowerOwner(p);
+    var parts = live.when.split("T");
+    var whenText = parts[0] + (parts[1] ? " · " + formatEventTime(parts[1]) : "");
+    if (owner && sticker.getAttribute("data-editing") === "true") {
+      body.innerHTML =
+        '<form class="tower-going-live-edit" data-tower-going-live-edit action="#" method="post">' +
+        '<label for="tower-going-live-when">when:</label>' +
+        '<input id="tower-going-live-when" type="datetime-local" required value="' + escapeHtml(live.when) + '" data-going-live-when>' +
+        '<label for="tower-going-live-where">where:</label>' +
+        '<input id="tower-going-live-where" type="text" maxlength="120" value="' + escapeHtml(live.where || "") + '" data-going-live-where>' +
+        '<label for="tower-going-live-what">what:</label>' +
+        '<input id="tower-going-live-what" type="text" maxlength="240" required value="' + escapeHtml(live.what) + '" data-going-live-what>' +
+        '<div class="form-actions">' +
+        '<button type="submit" class="btn btn-primary">Save</button>' +
+        '<button type="button" class="btn btn-secondary" data-going-live-cancel>Cancel</button>' +
+        "</div></form>";
+      return;
+    }
+    body.innerHTML =
+      '<p class="tower-going-live-when"><span class="tower-going-live-kicker">when:</span> ' + escapeHtml(whenText) + "</p>" +
+      '<p class="tower-going-live-where"><span class="tower-going-live-kicker">where:</span> ' + escapeHtml(live.where || "") + "</p>" +
+      '<p class="tower-going-live-what"><span class="tower-going-live-kicker">what:</span> ' + escapeHtml(live.what) + "</p>" +
+      (owner ? '<button type="button" class="btn btn-secondary" data-going-live-edit>Edit</button>' : "");
+  }
+
   function saveCalendarToProfile(mutator, opts) {
     var p = TowerProfileStore.get();
+    p.calendarEvents = sharedCalendarEvents(p);
     seedCalendarEventsIfMissing(p);
     mutator(p);
     p.calendarEvents = normalizeCalendarEventsList(p.calendarEvents);
+    writeSharedCalendar(p, p.calendarEvents);
     TowerProfileStore.save(p, opts && opts.geometry ? { geometry: true } : undefined);
     return p;
   }
@@ -4308,7 +4620,9 @@
   function renderSchedulerPanel(events, iso) {
     var slots = suggestHangoutTimes(events, iso);
     var dayEvents = eventsForDate(events, iso);
-    var busyNote = dayEvents.length
+    var busyNote = dayEvents.some(function (e) { return e && e.busy; })
+      ? "Some times on this day are blocked."
+      : dayEvents.length
       ? "Already on this day: " + dayEvents.map(function (e) {
           return escapeHtml(e.title) + (e.time ? " at " + escapeHtml(formatEventTime(e.time)) : "");
         }).join(", ") + "."
@@ -4335,9 +4649,11 @@
     var host = root.querySelector("[data-tower-cal-private]");
     if (!host) return;
     var p = TowerProfileStore.get();
+    p.calendarEvents = sharedCalendarEvents(p);
     seedCalendarEventsIfMissing(p);
     var view = getCalendarViewState(root, "private");
-    var events = p.calendarEvents || [];
+    var ownerFeed = isTowerOwner(p);
+    var events = ownerFeed ? (p.calendarEvents || []) : busyBlocksOnly(p.calendarEvents || []);
     var selected = view.selected;
     var editingId = host.getAttribute("data-editing-id") || "";
     var editing = null;
@@ -4350,14 +4666,7 @@
     var formDate = editing ? editing.date : selected;
     var formTime = editing ? editing.time || "" : "";
     var formNotes = editing ? editing.notes || "" : "";
-    host.innerHTML =
-      renderTowerMonthGrid(view, events, { gridLabel: "My calendar" }) +
-      '<div class="tower-cal-day-panel">' +
-      '<h5 class="tower-cal-day-heading">Events · ' +
-      escapeHtml(selected) +
-      "</h5>" +
-      renderDayEventList(events, selected, { ownerControls: true }) +
-      "</div>" +
+    var editorHtml = ownerFeed ? (
       '<form class="tower-cal-editor" data-tower-cal-editor action="#" method="post">' +
       "<h5>" +
       (editing ? "Edit event" : "Add event") +
@@ -4391,7 +4700,18 @@
         : "") +
       "</div>" +
       '<p class="commune-status" data-tower-cal-editor-status hidden role="status" aria-live="polite"></p>' +
-      "</form>";
+      "</form>"
+    ) : "";
+    host.innerHTML =
+      renderTowerMonthGrid(view, events, { gridLabel: ownerFeed ? "My calendar" : "Calendar" }) +
+      '<div class="tower-cal-day-panel">' +
+      '<h5 class="tower-cal-day-heading">' +
+      (ownerFeed ? "Events · " : "Busy · ") +
+      escapeHtml(selected) +
+      "</h5>" +
+      renderDayEventList(events, selected, { ownerControls: ownerFeed, busyOnly: !ownerFeed }) +
+      "</div>" +
+      editorHtml;
 
     var icsInput = root.querySelector("[data-tower-cal-ics-url]");
     if (icsInput && document.activeElement !== icsInput) {
@@ -4418,26 +4738,43 @@
     var body = root.querySelector("[data-tower-cal-public-body]");
     if (!body) return;
     var p = TowerProfileStore.get();
+    p.calendarEvents = sharedCalendarEvents(p);
     seedCalendarEventsIfMissing(p);
     var view = getCalendarViewState(root, "public");
     var owner = isTowerOwner(p);
-    /* Visitors see accepted (+ their pending still visible to owner); public scrapbook shows accepted always, pending only for owner */
-    var events = (p.calendarEvents || []).filter(function (e) {
-      if (!e) return false;
-      if (e.status === "accepted") return true;
-      return owner && e.status === "pending";
-    });
+    var shared = p.calendarEvents || [];
+    /* Owner sees details on personal and professional. A visitor sees busy blocks on both. */
+    var events = owner
+      ? shared.filter(function (e) {
+          if (!e) return false;
+          if (e.status === "accepted") return true;
+          return e.status === "pending";
+        })
+      : busyBlocksOnly(shared);
     var selected = view.selected;
-    var schedulerHtml = view.schedulerOpen
-      ? renderSchedulerPanel(p.calendarEvents || [], selected)
+    var schedulerHtml = owner && view.schedulerOpen
+      ? renderSchedulerPanel(shared, selected)
       : "";
+    var calRoot = root.querySelector('[data-tower-widget="calendar"]');
+    if (calRoot) {
+      calRoot.hidden = false;
+      calRoot.classList.remove("is-widget-off");
+      calRoot.setAttribute("data-calendar-audience", owner ? "owner" : "visitor");
+      calRoot.setAttribute("data-calendar-kind", profileIsProfessional(p) ? "professional" : "personal");
+    }
+    var publicCal = root.querySelector("[data-tower-cal-public]");
+    if (publicCal) {
+      publicCal.setAttribute("aria-label", "Calendar");
+      publicCal.setAttribute("data-calendar-busy", owner ? "false" : "true");
+    }
     body.innerHTML =
-      renderTowerMonthGrid(view, events, { gridLabel: "Public calendar" }) +
+      renderTowerMonthGrid(view, events, { gridLabel: "Calendar" }) +
       '<div class="tower-cal-day-panel">' +
-      '<h5 class="tower-cal-day-heading">On ' +
+      '<h5 class="tower-cal-day-heading">' +
+      (owner ? "On " : "Busy · ") +
       escapeHtml(selected) +
       "</h5>" +
-      renderDayEventList(events, selected, { ownerControls: owner }) +
+      renderDayEventList(events, selected, { ownerControls: owner, busyOnly: !owner }) +
       "</div>" +
       schedulerHtml;
     var dateInput = root.querySelector("[data-tower-cal-friend-date]");
@@ -4461,7 +4798,7 @@
     var host = root.querySelector("[data-tower-cal-personal-mini], [data-tower-calendar-personal] .tower-cal");
     if (!host) return;
     var p = TowerProfileStore.get() || {};
-    var events = Array.isArray(p.calendarEvents) ? p.calendarEvents : [];
+    var events = sharedCalendarEvents(p);
     var now = new Date();
     var y = now.getFullYear();
     var m0 = now.getMonth();
@@ -5271,6 +5608,7 @@
     var nodes = Array.prototype.slice.call(stage.querySelectorAll('[data-tower-widget="polaroid"]'));
     var personal = !p || p._profileKind !== "professional";
     var cam = stage.querySelector('[data-tower-widget="instax"]');
+    var prints = polaroidPrintList(p);
     if (!personal || (p && p.polaroidRemoved)) {
       nodes.forEach(function (el) {
         el.hidden = true;
@@ -5281,9 +5619,30 @@
         el.classList.add("is-widget-off");
       });
       if (cam) {
-        cam.hidden = true;
-        cam.classList.add("is-widget-off");
+        cam.hidden = !personal || !!(p && p.polaroidRemoved);
+        cam.classList.toggle("is-widget-off", cam.hidden);
       }
+      return;
+    }
+    if (!prints.length) {
+      nodes.forEach(function (el) {
+        el.hidden = true;
+        el.classList.add("is-widget-off");
+      });
+      stage.querySelectorAll("[data-tower-polaroid-extra]").forEach(function (el) {
+        el.hidden = true;
+        el.classList.add("is-widget-off");
+      });
+      if (!cam) {
+        cam = document.createElement("div");
+        cam.className = "tower-sticker tower-sticker--instax";
+        cam.setAttribute("data-tower-widget", "instax");
+        cam.setAttribute("data-sticker-label", "Camera");
+        cam.innerHTML = instaxMarkup();
+        stage.appendChild(cam);
+      }
+      cam.hidden = false;
+      cam.classList.remove("is-widget-off");
       return;
     }
     while (nodes.length > 1) {
@@ -6130,6 +6489,7 @@
         if (p.widgetLayout && p.widgetLayout.messages) delete p.widgetLayout.messages;
         p.publicWidgets = JSON.parse(JSON.stringify(DEFAULT_PUBLIC_WIDGETS));
         p.polaroidRemoved = false;
+        p.removedFriendPinIds = [];
         TowerProfileStore.save(p);
         applyWidgetLayout(root, p);
         applyPublicWidgets(root, p);
@@ -6272,7 +6632,7 @@
       }
 
       /* Drag from anywhere on the sticker. Real controls keep their clicks. */
-      if (ev.target.closest("a, button, input, textarea, select, label, summary, [contenteditable='true'], [data-tower-rotate], [data-tower-avatar-resize], [data-tower-name-resize], [data-tower-emoji-resize]")) {
+      if (ev.target.closest("a, button, input, textarea, select, label, summary, iframe, [contenteditable='true'], [data-tower-rotate], [data-tower-avatar-resize], [data-tower-name-resize], [data-tower-emoji-resize]")) {
         return;
       }
       var sticker = ev.target.closest("[data-tower-widget]");
@@ -6492,9 +6852,8 @@
               ? JSON.parse(JSON.stringify(fp.friendPinLayout[friendId]))
               : null;
           pushWidgetUndo({ type: "friend", id: friendId, layout: savedFriendLayout });
-          fp.featuredFriendIds = (fp.featuredFriendIds || []).filter(function (id) {
-            return id !== friendId;
-          });
+          if (!Array.isArray(fp.removedFriendPinIds)) fp.removedFriendPinIds = [];
+          if (fp.removedFriendPinIds.indexOf(friendId) < 0) fp.removedFriendPinIds.push(friendId);
           if (fp.friendPinLayout && fp.friendPinLayout[friendId]) {
             delete fp.friendPinLayout[friendId];
           }
@@ -7270,10 +7629,96 @@
     applyTowerTheme(root, p);
     applyPrivateFeedTheme(root, p.privateFeedTheme);
     syncPublicUrlFields(root, p);
+    root.setAttribute("data-view-kind", profileIsProfessional(p) ? "professional" : "personal");
+    var followBtn = root.querySelector("[data-tower-follow]");
+    if (followBtn && profileIsProfessional(p)) {
+      followBtn.textContent = "Follow";
+      followBtn.setAttribute("aria-label", "Follow this professional page");
+    } else if (followBtn && followBtn.textContent === "Follow") {
+      followBtn.textContent = "Add friend";
+      followBtn.setAttribute("aria-label", "Add this person as a friend");
+    }
     try { syncProfileKindToggle(root); } catch (eKind) {}
     try { syncAddProfileUi(root); } catch (eAdd) {}
     try { syncRotateToolbar(root); } catch (eRot) {}
     try { refreshTowerCalendars(root); } catch (eCal) {}
+    try { renderGoingLiveWidget(root); } catch (eLive) {}
+  }
+
+  function initGoingLive(root) {
+    if (!root || root.__cognationGoingLiveBound) return;
+    root.__cognationGoingLiveBound = true;
+    var postBtn = root.querySelector("[data-tower-event-post]");
+    if (postBtn) {
+      postBtn.addEventListener("click", function () {
+        var whenIn = root.querySelector("[data-tower-event-when]");
+        var whereIn = root.querySelector("[data-tower-event-where]");
+        var whatIn = root.querySelector("[data-tower-event-what]");
+        var status = root.querySelector("[data-tower-event-status]");
+        function say(msg, isError) {
+          if (!status) return;
+          status.hidden = !msg;
+          status.textContent = msg || "";
+          status.classList.toggle("is-error", !!isError);
+        }
+        var live = normalizeGoingLive({
+          when: whenIn ? whenIn.value : "",
+          where: whereIn ? whereIn.value : "",
+          what: whatIn ? whatIn.value : "",
+        });
+        if (!live) {
+          say("Add when and what.", true);
+          return;
+        }
+        if (!publishGoingLive(live)) {
+          say("Could not post that event.", true);
+          return;
+        }
+        if (whenIn) whenIn.value = "";
+        if (whereIn) whereIn.value = "";
+        if (whatIn) whatIn.value = "";
+        var drop = root.querySelector("[data-tower-event-dropdown]");
+        if (drop) drop.open = false;
+        say("Posted on your personal and professional pages.", false);
+        renderGoingLiveWidget(root);
+        refreshTowerCalendars(root);
+      });
+    }
+    root.addEventListener("click", function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      if (t.closest("[data-going-live-edit]")) {
+        var sticker = root.querySelector('[data-tower-widget="going-live"]');
+        if (!sticker || !isTowerOwner(TowerProfileStore.get())) return;
+        sticker.setAttribute("data-editing", "true");
+        renderGoingLiveWidget(root);
+        return;
+      }
+      if (t.closest("[data-going-live-cancel]")) {
+        var stickerCancel = root.querySelector('[data-tower-widget="going-live"]');
+        if (stickerCancel) stickerCancel.removeAttribute("data-editing");
+        renderGoingLiveWidget(root);
+      }
+    });
+    root.addEventListener("submit", function (ev) {
+      var form = ev.target && ev.target.closest ? ev.target.closest("[data-tower-going-live-edit]") : null;
+      if (!form || !root.contains(form)) return;
+      ev.preventDefault();
+      var whenIn = form.querySelector("[data-going-live-when]");
+      var whereIn = form.querySelector("[data-going-live-where]");
+      var whatIn = form.querySelector("[data-going-live-what]");
+      var live = normalizeGoingLive({
+        when: whenIn ? whenIn.value : "",
+        where: whereIn ? whereIn.value : "",
+        what: whatIn ? whatIn.value : "",
+      });
+      if (!live) return;
+      publishGoingLive(live);
+      var sticker = root.querySelector('[data-tower-widget="going-live"]');
+      if (sticker) sticker.removeAttribute("data-editing");
+      renderGoingLiveWidget(root);
+      refreshTowerCalendars(root);
+    });
   }
 
   function initTower(root) {
@@ -7317,6 +7762,7 @@
     initFriendsBrowse(root);
     initProfessionalFollowers(root);
     initTowerCalendar(root);
+    initGoingLive(root);
 
     var profileForm = root.querySelector("[data-tower-profile-form]");
     var avatarFile = root.querySelector("[data-tower-avatar-file]");
@@ -7524,13 +7970,22 @@
 
     function applyInstaxFile(file, statusFn) {
       readImageFile(file, statusFn, function (dataUrl) {
+        var before = TowerProfileStore.get() || {};
+        var keptBg = typeof before.backgroundImageDataUrl === "string" ? before.backgroundImageDataUrl : "";
+        var keptMode = before.backgroundMode;
+        var keptHtml = before.backgroundHtml;
+        var keptCollage = before.backgroundCollage;
         storeProfileImage(dataUrl, "polaroidDataUrl", statusFn, "Polaroid added.", function (p) {
+          if (keptBg.indexOf("data:image/") === 0) p.backgroundImageDataUrl = keptBg;
+          if (keptMode) p.backgroundMode = keptMode;
+          if (typeof keptHtml === "string") p.backgroundHtml = keptHtml;
+          if (keptCollage && typeof keptCollage === "object") p.backgroundCollage = keptCollage;
           if (!Array.isArray(p.polaroidPrints)) p.polaroidPrints = [];
           var prior = p.polaroidDataUrl;
-          if (prior && prior.indexOf("data:image/") === 0 && p.polaroidPrints.indexOf(prior) === -1) {
+          if (prior && prior.indexOf("data:image/") === 0 && prior !== dataUrl && p.polaroidPrints.indexOf(prior) === -1) {
             p.polaroidPrints.push(prior);
           }
-          p.polaroidPrints.push(dataUrl);
+          if (p.polaroidPrints.indexOf(dataUrl) === -1) p.polaroidPrints.push(dataUrl);
           if (p.polaroidPrints.length > 6) p.polaroidPrints = p.polaroidPrints.slice(-6);
           p.polaroidRemoved = false;
         });
@@ -7799,7 +8254,7 @@
         e.preventDefault();
         var attachments = [];
         var files = fileInput && fileInput.files ? Array.prototype.slice.call(fileInput.files) : [];
-        var kind = (kindSelect && kindSelect.value) || "document";
+        var kind = (kindSelect && kindSelect.value) || "photo";
         files.forEach(function (f) {
           attachments.push({
             kind: kind,
@@ -7955,14 +8410,33 @@
     return Math.max(0, (b.size * span - b.size) / 2);
   }
 
-  function circleFloor(b) {
+  function placeCircleFallLayer(layer) {
+    if (!layer) return;
+    var bar = document.querySelector(".app-topbar");
+    var top = 0;
+    if (bar && bar.getBoundingClientRect) {
+      top = Math.max(0, Math.round(bar.getBoundingClientRect().bottom));
+    }
+    layer.style.top = top + "px";
+  }
+
+  function circleStageSize() {
+    var layer = document.querySelector("[data-circle-fall]");
+    var w = window.innerWidth || 800;
     var h = window.innerHeight || 600;
-    return h - b.size - 6 - circleEdgePad(b);
+    if (layer) {
+      if (layer.clientWidth) w = layer.clientWidth;
+      if (layer.clientHeight) h = layer.clientHeight;
+    }
+    return { w: w, h: h };
+  }
+
+  function circleFloor(b) {
+    return circleStageSize().h - b.size - 6 - circleEdgePad(b);
   }
 
   function circleMaxX(b) {
-    var w = window.innerWidth || 800;
-    return w - b.size - 6 - circleEdgePad(b);
+    return circleStageSize().w - b.size - 6 - circleEdgePad(b);
   }
 
   function separateCircles(a, b) {
@@ -8047,9 +8521,10 @@
         var floor = circleFloor(body);
         if (body.y > floor) {
           body.y = floor;
-          if (body.vy > 0) body.vy *= -0.1;
-          body.vx *= 0.35;
-          body.vr *= 0.28;
+          if (body.vy > 70) body.vy = -body.vy * 0.46;
+          else if (body.vy > 0) body.vy = -Math.max(42, body.vy * 0.62);
+          body.vx *= 0.9;
+          body.vr *= 0.92;
         }
         var edge = 6 + circleEdgePad(body);
         if (body.x < edge) body.x = edge;
@@ -8078,10 +8553,14 @@
         }
       }
       if (!supported) continue;
-      one.vx = 0;
-      one.vy = 0;
-      one.vr = 0;
-      one.sleep = true;
+      var nowHop = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+      if (!one.fidgetAt || nowHop >= one.fidgetAt) {
+        one.sleep = false;
+        one.vy = -58 - (one.size % 22);
+        one.vx += Math.sin((one.x + one.size) * 0.04) * 14;
+        one.vr = (one.size % 2 ? 16 : -16);
+        one.fidgetAt = nowHop + 720 + (one.size % 380);
+      }
       if (one.y > ground) one.y = ground;
     }
   }
@@ -8480,6 +8959,7 @@
     layer.setAttribute("data-circle-refresh-ms", String(CIRCLE_REFRESH_MS));
     document.body.appendChild(layer);
     document.body.classList.add("is-circle-open");
+    placeCircleFallLayer(layer);
     document.querySelectorAll(".app-topbar [role='tab']").forEach(function (tab) {
       tab.setAttribute("aria-selected", "false");
       tab.tabIndex = -1;
@@ -8552,25 +9032,23 @@
     function frame(now) {
       var st = circleFallState;
       if (!st || st.bodies !== bodies) return;
+      if (!st.layerPlaced) {
+        placeCircleFallLayer(layer);
+        st.layerPlaced = true;
+      }
       var dt = Math.min(0.034, (now - st.last) / 1000);
       if (!dt || dt < 0) dt = 0.016;
       st.last = now;
       integrateCircles(bodies, dt / 2);
       integrateCircles(bodies, dt / 2);
-      if (now - st.started > 7000) {
-        bodies.forEach(function (b) {
-          var floor = circleFloor(b);
-          var edge = 6 + circleEdgePad(b);
-          var maxX = circleMaxX(b);
-          if (b.y > floor) b.y = floor;
-          if (b.x < edge) b.x = edge;
-          if (b.x > maxX) b.x = maxX;
-          b.vx = 0;
-          b.vy = 0;
-          b.vr = 0;
-          b.sleep = true;
-        });
-      }
+      bodies.forEach(function (b) {
+        var floor = circleFloor(b);
+        var edge = 6 + circleEdgePad(b);
+        var maxX = circleMaxX(b);
+        if (b.y > floor) b.y = floor;
+        if (b.x < edge) { b.x = edge; if (b.vx < 0) b.vx = Math.abs(b.vx) * 0.4; }
+        if (b.x > maxX) { b.x = maxX; if (b.vx > 0) b.vx = -Math.abs(b.vx) * 0.4; }
+      });
       bodies.forEach(function (b) {
         paintCircleBody(b);
       });
@@ -8584,6 +9062,7 @@
     window.__cognationCircleResize = true;
     window.addEventListener("resize", function () {
       if (!circleFallState) return;
+      placeCircleFallLayer(document.querySelector("[data-circle-fall]"));
       circleFallState.bodies.forEach(function (b) {
         var floor = circleFloor(b);
         var edge = 6 + circleEdgePad(b);

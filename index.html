@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <!-- Start the uncached config request during HTML parse. The classic script
        below still runs before js/supabase-client.js so auth sees the values. -->
   <link rel="preload" href="/runtime-config" as="script">
@@ -394,14 +395,19 @@
                       </div>
                       <div class="tower-upload-row">
                         <div class="form-group">
-                          <label for="tower-attach-kind">Type</label>
-                          <select id="tower-attach-kind" name="attachKind">
-                            <option value="photo">Picture</option>
-                            <option value="note">Notes</option>
-                            <option value="video">Video</option>
-                            <option value="art">Creative</option>
-                            <option value="document">Document</option>
-                          </select>
+                          <details class="tower-event-dropdown" data-tower-event-dropdown>
+                            <summary class="tower-event-dropdown-summary">Event</summary>
+                            <div class="tower-event-fields" data-tower-event-fields>
+                              <label for="tower-event-when">when:</label>
+                              <input id="tower-event-when" type="datetime-local" required data-tower-event-when>
+                              <label for="tower-event-where">where:</label>
+                              <input id="tower-event-where" type="text" maxlength="120" placeholder="Place" data-tower-event-where>
+                              <label for="tower-event-what">what:</label>
+                              <input id="tower-event-what" type="text" maxlength="240" required placeholder="What's happening" data-tower-event-what>
+                              <button type="button" class="btn btn-primary" data-tower-event-post>Post event</button>
+                              <p class="commune-status" data-tower-event-status hidden role="status" aria-live="polite"></p>
+                            </div>
+                          </details>
                         </div>
                         <div class="form-group">
                           <label for="tower-files">Files</label>
@@ -423,15 +429,15 @@
                       <div data-remote-notifications></div>
                     </section>
                     <aside class="tower-side-friends" aria-label="Friends and calendar">
-                      <div class="tower-friends-browse" data-tower-friends-browse data-tower-friends aria-label="Friends">
+                      <div class="tower-friends-browse" data-tower-friends-browse data-tower-friends aria-label="Friends" hidden>
                         <h4 class="tower-friends-browse-heading">Friends</h4>
                         <label class="visually-hidden" for="tower-friends-find">Search friends</label>
                         <input id="tower-friends-find" class="tower-friends-find" type="search" data-tower-friends-find placeholder="Search friends" autocomplete="off">
                         <ul class="tower-friends-browse-list" data-tower-friends-browse-list role="list"></ul>
                       </div>
                       <div class="tower-personal-calendar" data-tower-calendar-personal>
-                        <h4 class="tower-personal-calendar-heading">Personal calendar</h4>
-                        <div class="tower-cal tower-cal--mini" data-tower-cal-personal-mini aria-label="Personal calendar mini">
+                        <h4 class="tower-personal-calendar-heading">Calendar</h4>
+                        <div class="tower-cal tower-cal--mini" data-tower-cal-personal-mini aria-label="Calendar">
                           <div class="tower-cal-mini-stub">
                             <span class="tower-cal-mini-month">Sep 2026</span>
                             <div class="tower-cal-mini-grid" aria-hidden="true">
@@ -748,9 +754,16 @@
                       <input type="file" accept="image/*" data-tower-avatar-file class="tower-offscreen-file" tabindex="-1" aria-label="Upload profile photo">
                       <input type="file" accept="image/*" data-tower-instax-file class="tower-offscreen-file" tabindex="-1" aria-label="Upload a photo">
 
+                      <div class="tower-sticker tower-sticker--going-live" data-tower-widget="going-live" data-sticker-label="Going live" hidden>
+                        <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Going live sticker" tabindex="-1" hidden>⋮⋮</button>
+                        <div class="tower-going-live" data-tower-going-live>
+                          <h4 class="tower-going-live-kicker">Going live</h4>
+                          <div data-tower-going-live-body></div>
+                        </div>
+                      </div>
                       <div class="tower-sticker tower-sticker--calendar" data-tower-widget="calendar" data-sticker-label="Calendar" data-tower-calendar-personal>
                         <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Calendar sticker" tabindex="-1" hidden>⋮⋮</button>
-                        <div class="tower-cal tower-cal--public" data-tower-cal-public data-tower-calendar-personal aria-label="Personal calendar">
+                        <div class="tower-cal tower-cal--public" data-tower-cal-public data-tower-calendar-personal aria-label="Calendar">
                           <h4 class="tower-cal-public-title">Calendar</h4>
                           <div data-tower-cal-public-body></div>
                           <details class="tower-cal-friend-dropdown" data-tower-cal-friend-dropdown>

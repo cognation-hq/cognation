@@ -2958,6 +2958,15 @@ body.login-gate-open .app-topbar {
   appearance: none;
   cursor: pointer;
 }
+.tower-avatar-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
+  pointer-events: none;
+  grid-area: 1 / 1;
+}
 [data-tower-app]:not([data-tower-is-owner="true"]) .tower-avatar {
   cursor: default;
 }
@@ -8152,6 +8161,19 @@ body { padding-top: 0 !important; }
   max-width: min(22rem, 92%);
   z-index: 5;
 }
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker.tower-sticker--calendar {
+  width: min(22rem, 92%);
+  min-width: min(22rem, 92%);
+  max-width: min(22rem, 92%);
+  box-sizing: border-box;
+}
+.tower-sticker--calendar .tower-cal--public,
+.tower-sticker--calendar .tower-cal-scheduler,
+.tower-sticker--calendar .tower-cal-day-panel {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
 .tower-cal-public-title {
   margin: 0 0 0.35rem;
   font-size: 1rem;
@@ -11204,6 +11226,9 @@ body.cognation-demo-on {
   border: 0;
 }
 .tower-music[data-music-skin="pro"] .tower-music-owner {
+  display: flex !important;
+}
+.tower-music[data-music-skin="pro"] .tower-music-looks {
   display: none !important;
 }
 .tower-public-side:has(.tower-music[data-music-mode="youtube"]),

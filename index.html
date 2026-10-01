@@ -329,6 +329,39 @@
                       <h3 class="tower-title">TOWER</h3>
                     </header>
 
+                    <form class="tower-compose tower-compose--compact" data-tower-compose action="#" method="post">
+                      <h4 class="tower-block-heading" data-tower-block-heading>On the block</h4>
+                      <div class="form-group">
+                        <label class="visually-hidden" for="tower-body">Update</label>
+                        <textarea id="tower-body" name="body" rows="2" maxlength="2000" placeholder="Share something…"></textarea>
+                      </div>
+                      <div class="tower-upload-row">
+                        <div class="form-group">
+                          <details class="tower-event-dropdown" data-tower-event-dropdown>
+                            <summary class="tower-event-dropdown-summary">Event</summary>
+                            <div class="tower-event-fields" data-tower-event-fields>
+                              <label for="tower-event-when">when:</label>
+                              <input id="tower-event-when" type="datetime-local" required data-tower-event-when>
+                              <label for="tower-event-where">where:</label>
+                              <input id="tower-event-where" type="text" maxlength="120" placeholder="Place" data-tower-event-where>
+                              <label for="tower-event-what">what:</label>
+                              <input id="tower-event-what" type="text" maxlength="240" required placeholder="What's happening" data-tower-event-what>
+                              <button type="button" class="btn btn-primary" data-tower-event-post>Post event</button>
+                              <p class="commune-status" data-tower-event-status hidden role="status" aria-live="polite"></p>
+                            </div>
+                          </details>
+                        </div>
+                        <div class="form-group">
+                          <label for="tower-files">Files</label>
+                          <input id="tower-files" name="files" type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif,.webp,.mp4,.mov">
+                        </div>
+                      </div>
+                      <p class="commune-status" data-tower-status hidden role="status" aria-live="polite"></p>
+                      <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Post</button>
+                      </div>
+                    </form>
+
                     <details class="tower-private-theme tower-private-friends tower-compact-block" data-tower-private-friends data-tower-top-friends>
                       <summary class="tower-private-theme-summary">Top friends</summary>
                       <div class="tower-private-theme-body">
@@ -371,11 +404,8 @@
                       </div>
                     </details>
 
-                    <details class="tower-private-theme tower-private-calendar tower-compact-block" data-tower-private-calendar data-tower-calendar>
-                      <summary class="tower-private-theme-summary">
-                        Calendar
-                        <span class="cgn-deferral" role="note">Demo / local only — not live backend</span>
-                      </summary>
+                    <details class="tower-private-theme tower-private-calendar tower-compact-block" data-tower-private-calendar data-tower-calendar open>
+                      <summary class="tower-private-theme-summary">Calendar</summary>
                       <div class="tower-private-theme-body">
                         <div class="tower-cal tower-cal--private tower-cal--compact" data-tower-cal-private></div>
                         <div class="tower-cal-google" data-tower-cal-google>
@@ -387,68 +417,6 @@
                       </div>
                     </details>
 
-                    <form class="tower-compose tower-compose--compact" data-tower-compose action="#" method="post">
-                      <h4 class="tower-block-heading" data-tower-block-heading>On the block</h4>
-                      <div class="form-group">
-                        <label class="visually-hidden" for="tower-body">Update</label>
-                        <textarea id="tower-body" name="body" rows="2" maxlength="2000" placeholder="Share something…"></textarea>
-                      </div>
-                      <div class="tower-upload-row">
-                        <div class="form-group">
-                          <details class="tower-event-dropdown" data-tower-event-dropdown>
-                            <summary class="tower-event-dropdown-summary">Event</summary>
-                            <div class="tower-event-fields" data-tower-event-fields>
-                              <label for="tower-event-when">when:</label>
-                              <input id="tower-event-when" type="datetime-local" required data-tower-event-when>
-                              <label for="tower-event-where">where:</label>
-                              <input id="tower-event-where" type="text" maxlength="120" placeholder="Place" data-tower-event-where>
-                              <label for="tower-event-what">what:</label>
-                              <input id="tower-event-what" type="text" maxlength="240" required placeholder="What's happening" data-tower-event-what>
-                              <button type="button" class="btn btn-primary" data-tower-event-post>Post event</button>
-                              <p class="commune-status" data-tower-event-status hidden role="status" aria-live="polite"></p>
-                            </div>
-                          </details>
-                        </div>
-                        <div class="form-group">
-                          <label for="tower-files">Files</label>
-                          <input id="tower-files" name="files" type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif,.webp,.mp4,.mov">
-                        </div>
-                      </div>
-                      <p class="commune-status" data-tower-status hidden role="status" aria-live="polite"></p>
-                      <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">Post</button>
-                      </div>
-                    </form>
-
-                    <div class="paper-rule-block" aria-hidden="true"></div>
-                    <div class="tower-private-main-grid tower-private-workspace" data-tower-workspace>
-
-                    <section class="tower-remote-social" data-remote-social hidden aria-label="Connections">
-                      <h4 class="tower-friends-browse-heading">Connections</h4>
-                      <div data-remote-friend-requests></div>
-                      <div data-remote-notifications></div>
-                    </section>
-                    <aside class="tower-side-friends" aria-label="Friends and calendar">
-                      <div class="tower-friends-browse" data-tower-friends-browse data-tower-friends aria-label="Friends" hidden>
-                        <h4 class="tower-friends-browse-heading">Friends</h4>
-                        <label class="visually-hidden" for="tower-friends-find">Search friends</label>
-                        <input id="tower-friends-find" class="tower-friends-find" type="search" data-tower-friends-find placeholder="Search friends" autocomplete="off">
-                        <ul class="tower-friends-browse-list" data-tower-friends-browse-list role="list"></ul>
-                      </div>
-                      <div class="tower-personal-calendar" data-tower-calendar-personal>
-                        <h4 class="tower-personal-calendar-heading">Calendar</h4>
-                        <div class="tower-cal tower-cal--mini" data-tower-cal-personal-mini aria-label="Calendar">
-                          <div class="tower-cal-mini-stub">
-                            <span class="tower-cal-mini-month">Sep 2026</span>
-                            <div class="tower-cal-mini-grid" aria-hidden="true">
-                              <span></span><span></span><span></span><span></span><span></span><span></span><span class="is-today">17</span>
-                              <span>18</span><span>19</span><span>20</span><span>21</span><span>22</span><span>23</span><span>24</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </aside>
-                    <div class="tower-feed" data-tower-feed role="feed" aria-label="Tower posts"></div>
                     <aside
                       class="tower-private-messages"
                       data-tower-private-messages
@@ -497,6 +465,24 @@
                         </div>
                       </details>
                     </aside>
+
+                    <div class="paper-rule-block" aria-hidden="true"></div>
+                    <div class="tower-private-main-grid tower-private-workspace" data-tower-workspace>
+
+                    <section class="tower-remote-social" data-remote-social hidden aria-label="Connections">
+                      <h4 class="tower-friends-browse-heading">Connections</h4>
+                      <div data-remote-friend-requests></div>
+                      <div data-remote-notifications></div>
+                    </section>
+                    <aside class="tower-side-friends" aria-label="Friends">
+                      <div class="tower-friends-browse" data-tower-friends-browse data-tower-friends aria-label="Friends" hidden>
+                        <h4 class="tower-friends-browse-heading">Friends</h4>
+                        <label class="visually-hidden" for="tower-friends-find">Search friends</label>
+                        <input id="tower-friends-find" class="tower-friends-find" type="search" data-tower-friends-find placeholder="Search friends" autocomplete="off">
+                        <ul class="tower-friends-browse-list" data-tower-friends-browse-list role="list"></ul>
+                      </div>
+                    </aside>
+                    <div class="tower-feed" data-tower-feed role="feed" aria-label="Tower posts"></div>
 
                     </div>
 

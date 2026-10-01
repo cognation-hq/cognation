@@ -4795,7 +4795,7 @@
   }
 
   function renderPersonalMiniCalendar(root) {
-    var host = root.querySelector("[data-tower-cal-personal-mini], [data-tower-calendar-personal] .tower-cal");
+    var host = root.querySelector("[data-tower-cal-personal-mini]");
     if (!host) return;
     var p = TowerProfileStore.get() || {};
     var events = sharedCalendarEvents(p);
@@ -8412,12 +8412,11 @@
 
   function placeCircleFallLayer(layer) {
     if (!layer) return;
-    var bar = document.querySelector(".app-topbar");
-    var top = 0;
-    if (bar && bar.getBoundingClientRect) {
-      top = Math.max(0, Math.round(bar.getBoundingClientRect().bottom));
+    layer.style.top = "";
+    var main = document.getElementById("main");
+    if (main && main.parentNode && layer.previousElementSibling !== main) {
+      main.parentNode.insertBefore(layer, main.nextSibling);
     }
-    layer.style.top = top + "px";
   }
 
   function circleStageSize() {
@@ -8604,14 +8603,87 @@
     return named;
   }
 
-  /* Five spots on a tilted ring. Front is lowest and largest. Back is highest and smallest. */
+  /* Five spots on a lightning ring tilted like water coming toward the viewer.
+     90° is stage center (near, lowest, largest). The back spots stay high and small. */
+  var CIRCLE_TILT = 80 * Math.PI / 180;
+  var CIRCLE_RING_R = 320;
+  var CIRCLE_PERSPECTIVE = 500;
+  var CIRCLE_SCALE = 0.6;
   var CIRCLE_SPOTS = [
-    { id: "left", x: -300, y: 6, s: 0.8 },
-    { id: "center", x: 0, y: 124, s: 1.4 },
-    { id: "right", x: 300, y: 6, s: 0.8 },
-    { id: "back-right", x: 156, y: -156, s: 0.44 },
-    { id: "back-left", x: -156, y: -156, s: 0.44 }
+    { id: "left", angle: 176 },
+    { id: "center", angle: 90 },
+    { id: "right", angle: 4 },
+    { id: "back-right", angle: -46 },
+    { id: "back-left", angle: -134 }
   ];
+
+  function circleProjectRadius(angleDeg, radius) {
+    var t = angleDeg * Math.PI / 180;
+    var x = Math.cos(t) * radius;
+    var y = Math.sin(t) * radius;
+    var depth = CIRCLE_PERSPECTIVE / (CIRCLE_PERSPECTIVE - y * Math.sin(CIRCLE_TILT));
+    return {
+      x: x * depth,
+      y: y * Math.cos(CIRCLE_TILT) * depth,
+      s: depth * CIRCLE_SCALE
+    };
+  }
+
+  function circleProject(angleDeg) {
+    return circleProjectRadius(angleDeg, CIRCLE_RING_R);
+  }
+
+  function circleGlowColor(turn) {
+    var purple = 0.4 + 0.2 * Math.sin(turn * Math.PI * 2);
+    var blue = 0.34 + 0.2 * Math.sin(turn * Math.PI * 2 + 2.2);
+    var pink = 0.36 + 0.2 * Math.sin(turn * Math.PI * 2 + 4.15);
+    var sum = purple + blue + pink;
+    purple /= sum;
+    blue /= sum;
+    pink /= sum;
+    return {
+      r: Math.round(176 * purple + 70 * blue + 255 * pink),
+      g: Math.round(80 * purple + 205 * blue + 90 * pink),
+      b: Math.round(255 * purple + 255 * blue + 220 * pink)
+    };
+  }
+
+  function paintCircleLightning(ring) {
+    var canvas = document.createElement("canvas");
+    canvas.className = "circle-lightning";
+    canvas.setAttribute("data-circle-lightning", "");
+    canvas.width = 1040;
+    canvas.height = 520;
+    var ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.filter = "blur(14px)";
+    function glowAt(x, y, radius, color, alpha) {
+      if (radius < 2 || alpha <= 0) return;
+      var gx = x + 520;
+      var gy = y + 260;
+      if (gx < -radius || gy < -radius || gx > canvas.width + radius || gy > canvas.height + radius) return;
+      var g = ctx.createRadialGradient(gx, gy, 0, gx, gy, radius);
+      g.addColorStop(0, "rgba(" + color.r + "," + color.g + "," + color.b + "," + alpha.toFixed(3) + ")");
+      g.addColorStop(0.5, "rgba(" + color.r + "," + color.g + "," + color.b + "," + (alpha * 0.28).toFixed(3) + ")");
+      g.addColorStop(1, "rgba(" + color.r + "," + color.g + "," + color.b + ",0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(gx, gy, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    var steps = 260;
+    var i;
+    for (i = 0; i < steps; i++) {
+      var turn = i / steps;
+      var wobble = Math.sin(i * 0.77 + 0.4) * 0.6 + Math.sin(i * 1.83 + 1.1) * 0.3;
+      var p = circleProjectRadius(turn * 360, CIRCLE_RING_R + wobble * 8);
+      var depth = p.s / CIRCLE_SCALE;
+      var flicker = 0.8 + 0.2 * Math.sin(i * 1.35);
+      glowAt(p.x, p.y, 34 * depth, circleGlowColor(turn), 0.06 * flicker);
+    }
+    ring.appendChild(canvas);
+  }
 
   var CIRCLE_REFRESH_MS = 15 * 60 * 1000;
   var CIRCLE_ROOMS = [
@@ -8834,11 +8906,15 @@
 
   function paintCircleRing(layer) {
     var topics = circleShownTopics.slice();
-    if (!topics.length) return;
     var ring = document.createElement("div");
     ring.className = "circle-ring";
     ring.setAttribute("data-circle-ring", "");
     ring.setAttribute("data-circle-topics", String(topics.length));
+    paintCircleLightning(ring);
+    if (!topics.length) {
+      layer.appendChild(ring);
+      return;
+    }
     var spin = document.createElement("div");
     spin.className = "circle-ring-spin";
     topics.forEach(function (topic) {
@@ -8880,11 +8956,14 @@
     var mix = wrapped - index;
     var from = CIRCLE_SPOTS[index];
     var to = CIRCLE_SPOTS[(index + 1) % count];
+    var toAngle = to.angle;
+    if (toAngle > from.angle) toAngle -= 360;
+    var p = circleProject(from.angle + (toAngle - from.angle) * mix);
     return {
       id: mix < 0.5 ? from.id : to.id,
-      x: from.x + (to.x - from.x) * mix,
-      y: from.y + (to.y - from.y) * mix,
-      s: from.s + (to.s - from.s) * mix
+      x: p.x,
+      y: p.y,
+      s: p.s
     };
   }
 
@@ -8929,7 +9008,7 @@
     });
     window.setTimeout(function () {
       var row = document.querySelector('[data-tower-private-side] [data-event-id="' + eventId + '"]');
-      var target = row || document.querySelector("[data-tower-private-side] [data-tower-calendar-personal]");
+      var target = row || document.querySelector("[data-tower-private-side] [data-tower-private-calendar]");
       if (target && target.scrollIntoView) target.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 50);
     return true;

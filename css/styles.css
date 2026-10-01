@@ -9278,11 +9278,24 @@ body { padding-top: 0 !important; }
 .tower-private-main-grid .tower-friends-browse {
   display: none !important;
 }
+/* The compact side calendar is gone. Do not keep an empty column beside the shared Calendar. */
+.tower-private-main-grid > .tower-side-friends:not(:has(.tower-personal-calendar)) {
+  display: none;
+}
+.tower-private-main-grid:not(:has(.tower-personal-calendar)) {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+.tower-private-side .tower-private-calendar,
+.tower-private-side .tower-private-messages {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
 .tower-private-main-grid > .tower-feed {
   width: 100%;
-  max-width: 15rem;
+  max-width: none;
   min-width: 0;
-  justify-self: center;
+  justify-self: stretch;
   align-self: start;
 }
 .tower-private-main-grid > .tower-private-messages {
@@ -9598,6 +9611,93 @@ body { padding-top: 0 !important; }
   font-size: 0.82rem;
 }
 .tower-cal-ics-row { display: none !important; }
+
+/* Month grid sits in the center with room between days. The list and editor under it stay short. */
+.tower-private-calendar .tower-private-theme-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.tower-private-calendar .tower-cal--private,
+.tower-private-calendar .tower-cal--compact {
+  width: min(100%, 24rem);
+  max-width: 24rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+.tower-private-calendar .tower-cal-month {
+  width: 100%;
+}
+.tower-private-calendar .tower-cal-dows,
+.tower-private-calendar .tower-cal-grid {
+  gap: 0.38rem 0.42rem;
+}
+.tower-private-calendar .tower-cal-cell,
+.tower-private-calendar .tower-cal-cell--empty {
+  min-height: 2.15rem;
+  padding: 0.28rem 0.12rem 0.32rem;
+}
+.tower-private-calendar .tower-cal-day-panel {
+  margin: 0.12rem 0 0.15rem;
+}
+.tower-private-calendar .tower-cal-day-heading,
+.tower-private-calendar .tower-cal-editor h5 {
+  margin: 0 0 0.1rem;
+  font-size: 0.74rem;
+  line-height: 1.15;
+}
+.tower-private-calendar .tower-cal-event-list {
+  gap: 0.14rem;
+}
+.tower-private-calendar .tower-cal-event {
+  padding: 0.14rem 0.32rem;
+  gap: 0.1rem 0.25rem;
+}
+.tower-private-calendar .tower-cal-editor {
+  margin-top: 0.18rem;
+  padding: 0.28rem 0.4rem 0.32rem;
+  background: #fff;
+  color: #000;
+  border: 1px solid #000;
+  border-radius: 6px;
+}
+.tower-private-calendar .tower-cal-editor h5,
+.tower-private-calendar .tower-cal-editor label {
+  color: #000;
+}
+.tower-private-calendar .tower-cal-editor .form-group {
+  margin: 0 0 0.16rem;
+}
+.tower-private-calendar .tower-cal-editor label {
+  margin: 0 0 0.02rem;
+  font-size: 0.7rem;
+  font-weight: 650;
+  line-height: 1.1;
+}
+.tower-private-calendar .tower-cal-editor input {
+  padding: 0.08rem 0.32rem;
+  min-height: 0;
+  font-size: 0.74rem;
+  line-height: 1.2;
+  color: #000;
+  background: #fff;
+  border: 1px solid #222;
+  border-radius: 0.28rem;
+}
+.tower-private-calendar .tower-cal-editor .tower-cal-friend-row {
+  gap: 0.16rem 0.28rem;
+}
+.tower-private-calendar .tower-cal-editor .form-actions {
+  margin-top: 0.04rem;
+}
+#panel-tower .tower-private-calendar .tower-cal-editor .btn {
+  padding: 0.14rem 0.42rem !important;
+  font-size: 0.72rem !important;
+  background: #fff !important;
+  color: #000 !important;
+  border: 1px solid #000 !important;
+  box-shadow: none !important;
+}
 
 /* Messages closed accordion */
 .tower-private-messages[data-tower-messages],
@@ -11471,6 +11571,13 @@ body.is-circle-open .site-header,
 body.is-circle-open .cognation-masthead {
   display: block !important;
 }
+body.is-circle-open {
+  padding-top: 0;
+  overflow-y: auto;
+}
+body.is-circle-open #main .tabs-section {
+  margin-top: 0.75rem;
+}
 body.is-circle-open .app-topbar {
   position: relative;
   z-index: 40;
@@ -11480,15 +11587,19 @@ body.is-circle-open .app-topbar-shortcut[data-tower-anchor="circle"] {
   color: #fff !important;
 }
 .circle-fall {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  top: 0;
-  z-index: 20;
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  width: 100%;
+  height: 100vh;
+  min-height: 100vh;
+  z-index: 1;
   overflow: hidden;
   pointer-events: none;
   background: #101229;
+  flex: 0 0 auto;
 }
 a.circle-fall-portrait {
   position: absolute;
@@ -11526,9 +11637,19 @@ a.circle-fall-portrait {
 .circle-ring-spin {
   position: absolute;
   left: 50%;
-  top: 40%;
+  top: 48%;
   width: 0;
   height: 0;
+}
+.circle-lightning {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  width: 1040px;
+  height: 520px;
+  transform: translate(-50%, -50%);
+  overflow: visible;
+  pointer-events: none;
 }
 .circle-topic {
   position: absolute;
@@ -11593,5 +11714,131 @@ a.circle-fall-portrait {
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 0.14em;
+}
+
+/* Pull the My feed stack together. The controls stay; only the empty gaps shrink. */
+.tower-private-side .tower-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.tower-private-side .tower-main > .tower-header,
+.tower-private-side .tower-main > .tower-compose,
+.tower-private-side .tower-main > .tower-private-theme,
+.tower-private-side .tower-main > .tower-private-friends,
+.tower-private-side .tower-main > .tower-private-messages,
+.tower-private-side .tower-main > .paper-rule-block,
+.tower-private-side .tower-main > .tower-private-main-grid {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+.tower-private-side .tower-private-theme {
+  padding-top: 0.12rem !important;
+  padding-bottom: 0.15rem !important;
+}
+.tower-private-side .paper-rule-block {
+  margin: 0 !important;
+}
+
+/* Add event stays short, with black type on a white card. Edit Profile is untouched. */
+#panel-tower .tower-private-calendar .tower-cal-editor {
+  background: #fff !important;
+  color: #000 !important;
+  border: 1px solid #000 !important;
+}
+#panel-tower .tower-private-calendar .tower-cal-editor :is(h5, label, p, span, .form-hint) {
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+#panel-tower .tower-private-calendar .tower-cal-editor :is(input, textarea) {
+  background: #fff !important;
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  border: 1px solid #222 !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+  font-size: 0.82rem !important;
+}
+#panel-tower .tower-private-calendar .tower-cal-editor .btn {
+  background: #fff !important;
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  border: 1px solid #000 !important;
+  box-shadow: none !important;
+}
+
+/* One feed set: slim type, shared card corners, and one control shape.
+   Spacing stays as it is. Edit Profile and the white add-event form are not in this set. */
+#panel-tower .tower-private-side :is(
+  .tower-title,
+  .tower-block-heading,
+  .tower-private-theme-summary,
+  .tower-messages-heading,
+  .tower-author,
+  .tower-compose label,
+  .tower-compose .btn,
+  .tower-compose .tower-event-dropdown-summary
+) {
+  font-weight: 400 !important;
+  letter-spacing: 0.02em !important;
+  text-shadow: none !important;
+}
+
+#panel-tower .tower-private-side :is(
+  .tower-compose,
+  .tower-private-theme,
+  .tower-private-messages
+) {
+  background: rgba(16, 19, 48, 0.42) !important;
+  border: 1px solid rgba(209, 241, 255, 0.28) !important;
+  border-radius: 1.15rem !important;
+  color: #f7f9ff !important;
+}
+
+#panel-tower .tower-compose :is(.tower-event-dropdown-summary, button.btn-primary, #tower-files) {
+  background: rgba(16, 19, 48, 0.55) !important;
+  color: #f7f9ff !important;
+  -webkit-text-fill-color: #f7f9ff !important;
+  border: 1px solid rgba(209, 241, 255, 0.4) !important;
+  border-radius: 999px !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.12) !important;
+  text-shadow: none !important;
+  font-family: var(--cgn-ui) !important;
+  font-weight: 400 !important;
+  font-size: 0.82rem !important;
+  letter-spacing: 0.02em !important;
+  line-height: 1.25 !important;
+  padding: 0.28rem 0.65rem !important;
+}
+#panel-tower .tower-compose .tower-event-dropdown-summary {
+  list-style: none;
+  min-height: 0;
+}
+#panel-tower .tower-compose .tower-event-dropdown-summary::marker {
+  content: "";
+}
+#panel-tower .tower-compose #tower-files::file-selector-button,
+#panel-tower .tower-compose #tower-files::-webkit-file-upload-button {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent !important;
+  color: #f7f9ff !important;
+  -webkit-text-fill-color: #f7f9ff !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 0.45rem 0 0 !important;
+  margin: 0 !important;
+  font-family: var(--cgn-ui) !important;
+  font-weight: 400 !important;
+  font-size: 0.82rem !important;
+  letter-spacing: 0.02em !important;
+  line-height: 1.25 !important;
+  cursor: pointer;
 }
 

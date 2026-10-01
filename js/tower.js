@@ -4563,6 +4563,13 @@
   }
 
 
+  var FRIEND_SIDE_PREVIEW = 5;
+
+  function friendSideLabel(id) {
+    var friend = DEMO_FRIENDS.filter(function (entry) { return entry.id === id; })[0];
+    return friend ? friend.name : String(id || "");
+  }
+
   function renderFriendsBrowse(root, query) {
     var list = root.querySelector("[data-tower-friends-browse-list]");
     if (!list) return;
@@ -4570,36 +4577,44 @@
     var p = TowerProfileStore.get();
     var ids = (p && Array.isArray(p.friendIds)) ? p.friendIds : [];
     var q = String(query || "").trim().toLowerCase();
-    if (!q) {
+    function addNote(text) {
       var note = document.createElement("li");
       note.className = "tower-friends-browse-note";
-      note.textContent = ids.length
-        ? ids.length + " friends. Search to find someone."
-        : "No friends yet. Search members to connect.";
+      note.textContent = text;
       list.appendChild(note);
+    }
+    function addName(label) {
+      var li = document.createElement("li");
+      li.className = "tower-friends-browse-item";
+      li.textContent = label;
+      list.appendChild(li);
+    }
+    if (!q) {
+      if (!ids.length) {
+        addNote("No friends yet. Search members to connect.");
+        return;
+      }
+      /* A short set only. The rest of a tower, up to 6,000, stays behind search. */
+      ids.slice(0, FRIEND_SIDE_PREVIEW).forEach(function (id) {
+        addName(friendSideLabel(id));
+      });
+      if (ids.length > FRIEND_SIDE_PREVIEW) {
+        addNote(ids.length + " friends. Search to find someone.");
+      }
       return;
     }
     var matches = [];
     for (var i = 0; i < ids.length && matches.length < 8; i++) {
       var id = ids[i];
-      var friend = DEMO_FRIENDS.filter(function (x) { return x.id === id; })[0];
-      var label = friend ? friend.name : id;
-      if (String(label).toLowerCase().indexOf(q) === -1 && String(id).toLowerCase().indexOf(q) === -1) continue;
-      matches.push({ id: id, name: label });
+      var label = friendSideLabel(id);
+      if (label.toLowerCase().indexOf(q) === -1 && String(id).toLowerCase().indexOf(q) === -1) continue;
+      matches.push(label);
     }
     if (!matches.length) {
-      var empty = document.createElement("li");
-      empty.className = "tower-friends-browse-note";
-      empty.textContent = "No matches";
-      list.appendChild(empty);
+      addNote("No matches");
       return;
     }
-    matches.forEach(function (match) {
-      var li = document.createElement("li");
-      li.className = "tower-friends-browse-item";
-      li.textContent = match.name;
-      list.appendChild(li);
-    });
+    matches.forEach(addName);
   }
 
   function initFriendsBrowse(root) {

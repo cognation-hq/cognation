@@ -33,16 +33,38 @@
   }
 
   function isProfessionalContext(btn) {
-    var root = btn.closest("[data-tower-root], [data-tower-app], #panel-tower") || document;
-    var kindBtn = root.querySelector('[data-tower-profile-kind="professional"][aria-selected="true"]');
-    if (kindBtn) return true;
     var p = activeProfile();
     if (p && (p._profileKind === "professional" || p.kind === "professional")) return true;
-    /* When the public page selector is visible, it is the source of truth.
-       The signed-in profile can remain professional while viewing Personal. */
-    if (root.querySelector("[data-tower-profile-kind]")) return false;
-    /* Show follow on public professional pages even if personal selected? Prefer kind from profile */
-    return !!(p && p._profileKind === "professional");
+    if (p && (p._directoryFriend || p._profileKind === "personal" || p.kind === "personal")) return false;
+    var root = (btn && btn.closest && btn.closest("[data-tower-root], [data-tower-app], #panel-tower")) || document;
+    var kindBtn = root.querySelector('[data-tower-profile-kind="professional"][aria-selected="true"]');
+    return !!kindBtn;
+  }
+
+  function viewerFollowerId() {
+    try {
+      var raw = localStorage.getItem("cognation.session.v2");
+      var session = raw ? JSON.parse(raw) : null;
+      return (session && (session.username || session.activeProfileId)) || "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function alreadyFollowing(profile) {
+    if (!profile) return false;
+    var viewer = String(viewerFollowerId() || "");
+    var ids = Array.isArray(profile.followerIds) ? profile.followerIds : [];
+    if (viewer && ids.indexOf(viewer) >= 0) return true;
+    var api = swipeApi();
+    return !!(api && profile._profileId && api.isFollowing(profile._profileId));
+  }
+
+  function alreadyFriend(profile) {
+    var friendId = profile && profile._friendId;
+    if (!friendId) return false;
+    var friends = window.CognationTowerFriends;
+    return !!(friends && typeof friends.has === "function" && friends.has(friendId));
   }
 
   function renderRemoteState(btn, pro, state) {
@@ -137,21 +159,21 @@
       if (syncRemoteButton(btn, graph, id, pro) !== false) return;
     }
     btn.disabled = false;
-    if (!id || !api) {
-      btn.setAttribute("aria-pressed", "false");
-      btn.classList.remove("is-following");
-      btn.textContent = pro ? "Follow" : "Add friend";
+    var viewed = activeProfile();
+    if (pro) {
+      var following = alreadyFollowing(viewed);
+      btn.setAttribute("aria-pressed", following ? "true" : "false");
+      btn.classList.toggle("is-following", following);
+      btn.textContent = following ? "Following" : "Follow";
+      btn.setAttribute("aria-label", following ? "You follow this professional page" : "Follow this professional page");
       return;
     }
-    var following = api.isFollowing(id);
-    btn.setAttribute("aria-pressed", following ? "true" : "false");
-    btn.classList.toggle("is-following", following);
-    btn.textContent = pro
-      ? (following ? "Following" : "Follow")
-      : (following ? "Friend added" : "Add friend");
-    btn.setAttribute("aria-label", pro
-      ? (following ? "Unfollow this professional profile" : "Follow this professional profile")
-      : (following ? "Remove this friend" : "Add this person as a friend"));
+    var friends = alreadyFriend(viewed);
+    btn.setAttribute("aria-pressed", friends ? "true" : "false");
+    btn.classList.remove("is-following");
+    btn.textContent = friends ? "Friends" : "Add friend";
+    btn.setAttribute("aria-label", friends ? "You are friends" : "Add this person as a friend");
+    if (!id && !viewed) return;
   }
 
   function syncAll() {
@@ -194,26 +216,29 @@
       return;
       }
     }
-    if (!api) return;
-    /* Professional followers are unlimited. Do not route this click through the Tower friend cap. */
-    if (isProfessionalContext(btn) && window.CognationTowerFollowers && typeof window.CognationTowerFollowers.add === "function") {
-      var followerId = "";
-      try {
-        var rawSession = localStorage.getItem("cognation.session.v2");
-        var followSession = rawSession ? JSON.parse(rawSession) : null;
-        followerId = followSession && (followSession.username || followSession.activeProfileId) || "";
-      } catch (eFollow) {}
-      if (followerId) window.CognationTowerFollowers.add(String(followerId));
+    var viewed = activeProfile();
+    var pro = isProfessionalContext(btn);
+    if (pro) {
+      if (window.CognationTowerFollowers && typeof window.CognationTowerFollowers.add === "function") {
+        var followerId = viewerFollowerId();
+        if (followerId) window.CognationTowerFollowers.add(String(followerId));
+      }
+      if (api && id) api.toggleFollow(id);
+      syncButton(btn);
+      if (api && api.rebuild) {
+        try { api.rebuild(); } catch (e) {}
+      }
+      return;
     }
-    api.toggleFollow(id);
+    var friendId = viewed && viewed._friendId;
+    if (friendId && window.CognationTowerFriends && typeof window.CognationTowerFriends.add === "function") {
+      window.CognationTowerFriends.add(friendId);
+    }
     syncButton(btn);
-    if (api.rebuild) {
-      try {
-        api.rebuild();
-      } catch (e) {}
-    }
   });
 
+  document.addEventListener("cognation:tower-view-changed", syncAll);
+  document.addEventListener("cognation:people-added", syncAll);
   document.addEventListener("cognation:commune-follows-changed", syncAll);
   document.addEventListener("cognation:session-started", syncAll);
   document.addEventListener("cognation:tower-profile-updated", syncAll);

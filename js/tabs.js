@@ -115,6 +115,39 @@
       openTowerAnchor(hash);
       return;
     }
+    if (hash.indexOf("commune-room-") === 0) {
+      var communeTab = document.getElementById("tab-commune");
+      if (communeTab) communeTab.click();
+      var roomId = hash.slice("commune-room-".length);
+      window.setTimeout(function () {
+        if (window.CognationCommuneSwipe && typeof window.CognationCommuneSwipe.openRoom === "function") {
+          window.CognationCommuneSwipe.openRoom(roomId);
+        }
+      }, 40);
+      return;
+    }
+    if (hash.indexOf("tower-post-") === 0) {
+      var towerForPost = document.getElementById("tab-tower");
+      if (towerForPost) towerForPost.click();
+      var postId = hash.slice("tower-post-".length);
+      window.setTimeout(function () {
+        if (typeof window.CognationTowerOpenPost === "function") {
+          window.CognationTowerOpenPost(postId);
+        }
+      }, 40);
+      return;
+    }
+    if (hash.indexOf("tower-event-") === 0) {
+      var towerForEvent = document.getElementById("tab-tower");
+      if (towerForEvent) towerForEvent.click();
+      var eventId = hash.slice("tower-event-".length);
+      window.setTimeout(function () {
+        if (typeof window.CognationTowerOpenEvent === "function") {
+          window.CognationTowerOpenEvent(eventId);
+        }
+      }, 40);
+      return;
+    }
     var tabIdMap = {
       news: "tab-news",
       "panel-news": "tab-news",

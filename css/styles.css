@@ -4343,8 +4343,32 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  width: 100%;
   padding: 0.45rem 0.5rem;
+  border: 0 !important;
   border-radius: var(--radius-sm);
+  background: transparent !important;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.people-search-kind {
+  display: inline-block;
+  margin-top: 0.12rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #f7fbff !important;
+}
+
+.people-search-open {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #f7fbff !important;
 }
 
 .people-search-row:hover {
@@ -11335,6 +11359,7 @@ a.circle-fall-portrait {
   position: absolute;
   left: 0;
   top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -11351,5 +11376,87 @@ a.circle-fall-portrait {
   background-size: cover;
   background-position: center;
   cursor: pointer;
+}
+
+.circle-ring {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  perspective: 1200px;
+}
+.circle-ring-spin {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  width: 0;
+  height: 0;
+}
+.circle-topic {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 17rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  text-align: center;
+  pointer-events: none;
+}
+.circle-topic-people {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+.circle-topic-photo {
+  width: 4.4rem;
+  height: 4.4rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 18px rgba(8, 12, 32, 0.28);
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1;
+  color: #4a2c3a !important;
+  background-size: cover;
+  background-position: center;
+}
+.circle-topic-people.is-three .circle-topic-photo {
+  width: 3.35rem;
+  height: 3.35rem;
+  font-size: 0.82rem;
+}
+.circle-topic-plus {
+  color: #f7fbff !important;
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1;
+  text-shadow: 0 2px 8px rgba(6, 10, 30, 0.55);
+}
+.circle-topic p,
+.circle-topic a {
+  color: #f7fbff !important;
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.35;
+  text-shadow: 0 2px 12px rgba(6, 10, 30, 0.7);
+}
+.circle-topic a {
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.14em;
 }
 

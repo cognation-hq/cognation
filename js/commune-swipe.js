@@ -307,6 +307,36 @@
     return out;
   }
 
+  function viewerInterestBlob() {
+    var parts = [];
+    var profile = getMemberProfile();
+    ["country", "bio", "interests", "vibe"].forEach(function (key) {
+      var value = profile && profile[key];
+      if (Array.isArray(value)) {
+        value.forEach(function (item) { if (item) parts.push(item); });
+      } else if (value) {
+        parts.push(value);
+      }
+    });
+    try {
+      var country = localStorage.getItem("cognation.member.country.v1");
+      if (country) parts.push(country);
+    } catch (e) {}
+    getFollows().forEach(function (id) { parts.push(id); });
+    return parts.join(" ").toLowerCase();
+  }
+
+  function interestScore(card, blob) {
+    var text = [card.title, card.body, card.fromName, card.host, card.name, card.profileId, card.roomKind]
+      .join(" ")
+      .toLowerCase();
+    var score = card.type === TYPE.FEATURED ? 4 : 0;
+    String(blob || "").split(/[^a-z0-9@+]+/).forEach(function (term) {
+      if (term.length > 2 && text.indexOf(term) !== -1) score += 2;
+    });
+    return score;
+  }
+
   function buildDeckCards() {
     ensureInboundLikes();
     var dismissed = {};
@@ -368,10 +398,14 @@
       });
     });
 
-    pool = shuffle(pool).filter(function (c) {
+    var interestBlob = viewerInterestBlob();
+    pool = pool.filter(function (c) {
       if (!c || !c.id || dismissed[c.id]) return false;
       if (c.type === TYPE.FACT && c.verified === false) return false;
       return true;
+    });
+    pool.sort(function (a, b) {
+      return interestScore(b, interestBlob) - interestScore(a, interestBlob);
     });
 
     var ads = shuffle(DEMO_ADS);
@@ -1186,6 +1220,7 @@
       } catch (e) {}
     }
     state.shell = shell;
+    shell.setAttribute("data-commune-source", "interest");
     state.deck = shell.querySelector("[data-commune-deck]");
     state.statusEl = shell.querySelector("[data-commune-swipe-status]");
     bindInteractions(shell);
@@ -1198,8 +1233,31 @@
     });
   }
 
+  function openRoom(roomId) {
+    roomId = String(roomId || "");
+    if (!state.cards || !state.cards.length) rebuildDeck();
+    var idx = -1;
+    for (var i = 0; i < state.cards.length; i++) {
+      if (state.cards[i] && state.cards[i].id === roomId) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx < 0) return false;
+    state.index = idx;
+    paintDeck();
+    var card = state.cards[idx];
+    var front = state.deck && state.deck.querySelector("[data-commune-card]");
+    if (card && front && card.type === TYPE.CHAT) enterSim(card, front);
+    if (state.shell && state.shell.scrollIntoView) {
+      state.shell.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    return true;
+  }
+
   window.CognationCommuneSwipe = {
     rebuild: rebuildDeck,
+    openRoom: openRoom,
     getFollows: getFollows,
     setFollows: setFollows,
     isFollowing: isFollowing,

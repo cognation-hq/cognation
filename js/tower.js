@@ -339,6 +339,40 @@
     return null;
   }
 
+  function directoryPeople() {
+    var directory = window.CognationPeopleDirectory;
+    if (!directory || typeof directory.all !== "function") return [];
+    try { return directory.all() || []; } catch (e) { return []; }
+  }
+
+  function directoryFriendById(id) {
+    id = String(id || "");
+    var people = directoryPeople();
+    for (var i = 0; i < people.length; i++) {
+      if (people[i] && people[i].id === id) return people[i];
+    }
+    return null;
+  }
+
+  function directoryFriendBySlug(slug) {
+    slug = String(slug || "").trim().toLowerCase().replace(/^@/, "");
+    if (!slug) return null;
+    var people = directoryPeople();
+    for (var i = 0; i < people.length; i++) {
+      var person = people[i];
+      if (!person) continue;
+      if (String(person.handle || "").toLowerCase() === slug) return person;
+      if (String(person.id || "").toLowerCase() === slug) return person;
+    }
+    return null;
+  }
+
+  function personalProfileHandle(friendId) {
+    var person = directoryFriendById(friendId);
+    if (person && person.handle) return String(person.handle).replace(/^@/, "");
+    return friendHandleFromId(friendId);
+  }
+
   function resolveActiveProfileId() {
     var social = remoteSocial();
     if (social && social.getViewedProfileId) {
@@ -348,13 +382,19 @@
     if (window.CognationAccounts && typeof window.CognationAccounts.ensureSeeded === "function") {
       try { window.CognationAccounts.ensureSeeded(); } catch (e) {}
     }
+    if (window.CognationAccounts && typeof window.CognationAccounts.ensureDemoProfessionals === "function") {
+      try { window.CognationAccounts.ensureDemoProfessionals(); } catch (ePro) {}
+    }
     var hash = (location.hash || "").replace(/^#/, "");
     if (hash.indexOf("tower-profile-") === 0) {
       var slug = hash.slice("tower-profile-".length);
+      try { slug = decodeURIComponent(slug); } catch (eSlug) {}
       if (window.CognationAccounts && window.CognationAccounts.getProfileByHandle) {
         var byHash = window.CognationAccounts.getProfileByHandle(slug);
         if (byHash) return byHash.id;
       }
+      var friend = directoryFriendBySlug(slug);
+      if (friend) return "directory-" + friend.id;
     }
     var session = getSessionObject();
     if (session && session.activeProfileId) return session.activeProfileId;
@@ -516,10 +556,41 @@
     return isNaN(n) ? fallback : n;
   }
 
+  function directoryFriendProfile(person) {
+    var blob = defaultEmptyProfileBlob();
+    blob._profileId = "directory-" + person.id;
+    blob._profileKind = "personal";
+    blob._directoryFriend = true;
+    blob._friendId = person.id;
+    blob.displayName = (String(person.first || "") + " " + String(person.last || "")).trim() || person.handle;
+    blob.handle = person.handle;
+    blob.friendIds = [];
+    blob.followerIds = [];
+    blob.featuredFriendIds = [];
+    blob.awardedBadges = [];
+    blob.badgeVisibility = {};
+    blob.calendarEvents = [];
+    blob.publicWidgets = {
+      identity: true,
+      slogan: false,
+      social: false,
+      music: false,
+      badges: false,
+      friends: false,
+      html: false,
+      calendar: false
+    };
+    return blob;
+  }
+
   var TowerProfileStore = {
     getActiveProfileId: resolveActiveProfileId,
     load: function () {
       var id = resolveActiveProfileId();
+      if (id && String(id).indexOf("directory-") === 0) {
+        var person = directoryFriendById(String(id).slice("directory-".length));
+        if (person) return directoryFriendProfile(person);
+      }
       var social = remoteSocial();
       if (social && social.getTowerProfile) {
         var remote = social.getTowerProfile(id);
@@ -652,6 +723,16 @@
          cognation:tower-profile-updated. tower-follow syncAll calls get()
          again, which overflowed the stack and flooded PATCH /profiles the
          moment Sign in closed the gate. Render remote profiles as-is. */
+      if (p._directoryFriend) {
+        p._profileKind = "personal";
+        p.friendIds = [];
+        p.followerIds = [];
+        p.featuredFriendIds = [];
+        if (!Array.isArray(p.awardedBadges)) p.awardedBadges = [];
+        if (!Array.isArray(p.calendarEvents)) p.calendarEvents = [];
+        mergeScrapbookLayout(p);
+        return p;
+      }
       if (usingRemoteSocial() || p._remote) {
         if (!Array.isArray(p.awardedBadges)) p.awardedBadges = [];
         if (!p.badgeVisibility || typeof p.badgeVisibility !== "object") p.badgeVisibility = {};
@@ -863,6 +944,61 @@
     }
   }
 
+  function newsReactionScore(post) {
+    var score = Number(post && post.likes) || 0;
+    var reactions = post && post.reactions;
+    if (reactions && typeof reactions === "object") {
+      Object.keys(reactions).forEach(function (face) {
+        var list = reactions[face];
+        if (Array.isArray(list)) score += list.length;
+      });
+    }
+    return score;
+  }
+
+  /* NEWS stays inside what Tower already treats as appropriate. */
+  function newsPostAppropriate(post) {
+    if (!post) return false;
+    if ((Number(post.minAge) || 0) >= 18) return false;
+    if (post.audience === "21+" || post.roomKind === "21+") return false;
+    var blob = String(post.title || "") + " " + String(post.body || "");
+    if (/\b(21\+|nsfw|explicit)\b/i.test(blob)) return false;
+    return true;
+  }
+
+  function newsProfessionalPosts() {
+    var out = [];
+    try {
+      if (window.CognationAccounts && typeof window.CognationAccounts.ensureDemoProfessionals === "function") {
+        window.CognationAccounts.ensureDemoProfessionals();
+      }
+      var raw = localStorage.getItem("cognation.profiles.v1");
+      var doc = raw ? JSON.parse(raw) : null;
+      var profiles = doc && doc.profiles ? doc.profiles : {};
+      Object.keys(profiles).forEach(function (id) {
+        var rec = profiles[id];
+        if (!rec || rec.kind !== "professional") return;
+        var posts = Array.isArray(rec.featuredPosts) ? rec.featuredPosts : [];
+        posts.forEach(function (post, idx) {
+          if (!post) return;
+          out.push({
+            id: "pro-" + id + "-" + (post.id || idx),
+            authorName: rec.displayName || rec.handle || "Professional",
+            handle: rec.handle || "",
+            title: post.title || "",
+            body: post.body || post.title || "",
+            createdAt: post.createdAt || "",
+            likes: Number(post.likes) || 0,
+            reactions: post.reactions || {},
+            towerKind: "professional",
+            minAge: post.minAge || 0
+          });
+        });
+      });
+    } catch (e) {}
+    return out;
+  }
+
   function clearLegacyReactionSelections(data) {
     try {
       if (localStorage.getItem(REACTION_CLEANUP_KEY)) return false;
@@ -920,6 +1056,23 @@
       if (clearLegacyReactionSelections(data)) this.save(data);
       return data.posts.slice().sort(function (a, b) {
         return String(b.createdAt).localeCompare(String(a.createdAt));
+      });
+    },
+    /* NEWS reads this: most reacted personal and professional tower posts. */
+    newsList: function () {
+      var personal = this.list().map(function (post) {
+        var copy = {};
+        Object.keys(post || {}).forEach(function (key) { copy[key] = post[key]; });
+        copy.towerKind = copy.profileKind === "professional" || copy.towerKind === "professional"
+          ? "professional"
+          : "personal";
+        return copy;
+      });
+      var professional = newsProfessionalPosts();
+      return personal.concat(professional).filter(newsPostAppropriate).sort(function (a, b) {
+        var delta = newsReactionScore(b) - newsReactionScore(a);
+        if (delta) return delta;
+        return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
       });
     },
     setRemotePosts: function (posts) {
@@ -988,6 +1141,11 @@
         handle: (window.CognationTowerProfileStore
           ? normalizeHandle(window.CognationTowerProfileStore.get().handle || "")
           : ""),
+        profileKind: (window.CognationTowerProfileStore &&
+          window.CognationTowerProfileStore.get() &&
+          window.CognationTowerProfileStore.get()._profileKind === "professional")
+          ? "professional"
+          : "personal",
       };
       data.posts.unshift(post);
       if (!this.save(data)) return { ok: false, error: "Could not save post." };
@@ -1458,6 +1616,8 @@
     window.addEventListener("hashchange", function () {
       if (hashRequestsPublicSide()) {
         applyTowerSide(root, "public");
+        renderProfileChrome(root);
+        document.dispatchEvent(new CustomEvent("cognation:tower-view-changed"));
       }
     });
 
@@ -2968,7 +3128,7 @@
       DEMO_FRIENDS.forEach(function (entry, entryIndex) {
         if (entry.id === id) friendIndex = entryIndex;
       });
-      var profileHash = "tower-profile-" + friendHandleFromId(id);
+      var profileHash = "tower-profile-" + personalProfileHandle(id);
       if (!pin) {
         pin = document.createElement("a");
         pin.className = "tower-friend-pin";
@@ -3022,17 +3182,44 @@
     return false;
   }
 
-  /* Tower friend roster. Adding stops at 6,000 and the page never paints the whole list. */
+  function viewerPersonalRecord() {
+    var accounts = window.CognationAccounts;
+    var session = getSessionObject();
+    if (!accounts || !session || !session.username) return null;
+    if (typeof accounts.ensureSeeded === "function") {
+      try { accounts.ensureSeeded(); } catch (e) {}
+    }
+    var list = accounts.getProfilesForUsername(session.username) || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].kind === "personal") return list[i];
+    }
+    return null;
+  }
+
+  /* Tower friend roster. Friends live on the personal profile and stop at 6,000. */
   function addTowerFriend(id) {
     id = String(id || "");
     if (!id || id === "alexa-thomas") return { ok: false, error: "self" };
-    var p = TowerProfileStore.get();
-    if (!Array.isArray(p.friendIds)) p.friendIds = [];
-    if (p.friendIds.indexOf(id) >= 0) return { ok: true, already: true, count: p.friendIds.length };
-    if (p.friendIds.length >= TOWER_FRIEND_CAP) return { ok: false, full: true, count: p.friendIds.length };
-    p.friendIds.push(id);
-    if (!TowerProfileStore.save(p)) return { ok: false, error: "storage" };
-    return { ok: true, count: p.friendIds.length };
+    var personal = viewerPersonalRecord();
+    if (!personal || personal.kind === "professional") return { ok: false, error: "not-personal" };
+    if (!Array.isArray(personal.friendIds)) personal.friendIds = [];
+    if (personal.friendIds.indexOf(id) >= 0) return { ok: true, already: true, count: personal.friendIds.length };
+    if (personal.friendIds.length >= TOWER_FRIEND_CAP) return { ok: false, full: true, count: personal.friendIds.length };
+    personal.friendIds.push(id);
+    if (!personal.friendSince || typeof personal.friendSince !== "object") personal.friendSince = {};
+    if (!personal.friendSince[id]) personal.friendSince[id] = new Date().toISOString();
+    var accounts = window.CognationAccounts;
+    if (!accounts || typeof accounts.saveProfileRecord !== "function" || !accounts.saveProfileRecord(personal)) {
+      return { ok: false, error: "storage" };
+    }
+    document.dispatchEvent(new CustomEvent("cognation:people-added", { detail: { id: id } }));
+    return { ok: true, count: personal.friendIds.length };
+  }
+
+  function viewerHasFriend(id) {
+    var personal = viewerPersonalRecord();
+    if (!personal || !Array.isArray(personal.friendIds)) return false;
+    return personal.friendIds.indexOf(String(id || "")) >= 0;
   }
 
   function professionalFollowerIsSelf(profile, followerId) {
@@ -3095,12 +3282,55 @@
     }
     if (note) note.textContent = matches.length ? "" : "No matches";
     if (!list) return;
-    matches.forEach(function (label) {
+    matches.forEach(function (label, index) {
+      var id = "";
+      for (var n = 0; n < ids.length; n++) {
+        var friend = DEMO_FRIENDS.filter(function (entry) { return entry.id === ids[n]; })[0];
+        var name = friend ? friend.name : ids[n];
+        if (name === label) {
+          id = ids[n];
+          break;
+        }
+      }
       var li = document.createElement("li");
       li.className = "tower-followers-hit";
-      li.textContent = label;
+      var handle = professionalHandleForFollower(id);
+      if (handle) {
+        var link = document.createElement("a");
+        link.href = "#tower-profile-" + handle;
+        link.setAttribute("data-tower-follower-open", handle);
+        link.textContent = label;
+        li.appendChild(link);
+      } else {
+        li.textContent = label;
+      }
       list.appendChild(li);
+      if (index < 0) return;
     });
+  }
+
+  function professionalHandleForFollower(id) {
+    id = String(id || "").trim();
+    if (!id || !window.CognationAccounts) return "";
+    var accounts = window.CognationAccounts;
+    if (typeof accounts.ensureDemoProfessionals === "function") {
+      try { accounts.ensureDemoProfessionals(); } catch (e) {}
+    }
+    var rec = typeof accounts.getProfileById === "function" ? accounts.getProfileById(id) : null;
+    if (rec && rec.kind === "professional" && rec.handle) return String(rec.handle).replace(/^@/, "");
+    if (typeof accounts.getProfileByHandle === "function") {
+      rec = accounts.getProfileByHandle(id);
+      if (rec && rec.kind === "professional" && rec.handle) return String(rec.handle).replace(/^@/, "");
+    }
+    if (typeof accounts.getProfilesForUsername === "function") {
+      var list = accounts.getProfilesForUsername(id) || [];
+      for (var i = 0; i < list.length; i++) {
+        if (list[i] && list[i].kind === "professional" && list[i].handle) {
+          return String(list[i].handle).replace(/^@/, "");
+        }
+      }
+    }
+    return "";
   }
 
   function initProfessionalFollowers(root) {
@@ -3116,6 +3346,17 @@
     document.addEventListener("cognation:tower-profile-updated", function () {
       renderProfessionalFollowers(root);
     });
+    var box = root.querySelector("[data-tower-followers]");
+    if (box && !box.__cognationFollowerOpen) {
+      box.__cognationFollowerOpen = true;
+      box.addEventListener("click", function (ev) {
+        var link = ev.target && ev.target.closest("[data-tower-follower-open]");
+        if (!link || !box.contains(link)) return;
+        ev.preventDefault();
+        var handle = link.getAttribute("data-tower-follower-open");
+        if (handle && window.CognationTowerOpenProfile) window.CognationTowerOpenProfile(handle);
+      });
+    }
     renderProfessionalFollowers(root);
   }
 
@@ -3761,7 +4002,7 @@
     if (!ev || typeof ev !== "object") return null;
     var status = ev.status === "pending" ? "pending" : "accepted";
     var source = ev.source === "friend" || ev.source === "google-ics" ? ev.source : "owner";
-    return {
+    var normalized = {
       id: String(ev.id || newCalendarEventId()),
       title: String(ev.title || "Event").trim().slice(0, 120) || "Event",
       date: String(ev.date || "").slice(0, 10),
@@ -3771,6 +4012,11 @@
       source: source,
       requesterName: ev.requesterName ? String(ev.requesterName).slice(0, 80) : "",
     };
+    if (Array.isArray(ev.signupFriendIds) && ev.signupFriendIds.length) {
+      normalized.signupFriendIds = ev.signupFriendIds.map(function (id) { return String(id || ""); }).filter(Boolean);
+    }
+    if (ev.hostHandle) normalized.hostHandle = String(ev.hostHandle).replace(/^@/, "").slice(0, 80);
+    return normalized;
   }
 
   function normalizeCalendarEventsList(list) {
@@ -4583,10 +4829,15 @@
       note.textContent = text;
       list.appendChild(note);
     }
-    function addName(label) {
+    function addName(id) {
       var li = document.createElement("li");
       li.className = "tower-friends-browse-item";
-      li.textContent = label;
+      var handle = personalProfileHandle(id);
+      var link = document.createElement("a");
+      link.href = "#tower-profile-" + handle;
+      link.setAttribute("data-tower-friend-open", handle);
+      link.textContent = friendSideLabel(id);
+      li.appendChild(link);
       list.appendChild(li);
     }
     if (!q) {
@@ -4596,7 +4847,7 @@
       }
       /* A short set only. The rest of a tower, up to 6,000, stays behind search. */
       ids.slice(0, FRIEND_SIDE_PREVIEW).forEach(function (id) {
-        addName(friendSideLabel(id));
+        addName(id);
       });
       if (ids.length > FRIEND_SIDE_PREVIEW) {
         addNote(ids.length + " friends. Search to find someone.");
@@ -4608,7 +4859,7 @@
       var id = ids[i];
       var label = friendSideLabel(id);
       if (label.toLowerCase().indexOf(q) === -1 && String(id).toLowerCase().indexOf(q) === -1) continue;
-      matches.push(label);
+      matches.push(id);
     }
     if (!matches.length) {
       addNote("No matches");
@@ -4628,6 +4879,9 @@
         renderFriendsBrowse(root, find.value);
       });
     }
+    document.addEventListener("cognation:people-added", function () {
+      renderFriendsBrowse(root, find ? find.value : "");
+    });
     var host = root.querySelector("[data-tower-friends], [data-tower-friends-browse]");
     if (!host) return;
     host.addEventListener("click", function (ev) {
@@ -4636,10 +4890,15 @@
       ev.preventDefault();
       var handle = link.getAttribute("data-tower-friend-open");
       if (!handle) return;
+      if (window.CognationTowerOpenProfile) {
+        window.CognationTowerOpenProfile(handle);
+        return;
+      }
       try {
         location.hash = "tower-profile-" + handle;
       } catch (e) {}
       applyTowerSide(root, "public");
+      renderProfileChrome(root);
       /* Demo friends are not full dual-profile accounts — show public scrapbook side */
       try {
         var tabTower = document.getElementById("tab-tower");
@@ -7832,13 +8091,383 @@
   }
 
   function stopCircleFall() {
-    if (circleFallState && circleFallState.raf) cancelAnimationFrame(circleFallState.raf);
+    if (circleFallState) {
+      if (circleFallState.raf) cancelAnimationFrame(circleFallState.raf);
+      if (circleFallState.refreshTimer) clearInterval(circleFallState.refreshTimer);
+    }
     circleFallState = null;
     var layer = document.querySelector("[data-circle-fall]");
     if (layer && layer.parentNode) layer.parentNode.removeChild(layer);
     document.body.classList.remove("is-circle-open");
     var shortcut = document.querySelector('[data-tower-anchor="circle"]');
     if (shortcut) shortcut.setAttribute("aria-pressed", "false");
+  }
+
+  function circleAt(name) {
+    var first = String(name || "").trim().split(/\s+/)[0] || "Friend";
+    return "@" + first.replace(/^@/, "");
+  }
+
+  function circleNamedFriends() {
+    var p = TowerProfileStore.get() || {};
+    var roster = Array.isArray(p.friendIds) && p.friendIds.length ? p.friendIds : null;
+    function collect(requireRoster) {
+      var list = [];
+      DEMO_FRIENDS.forEach(function (friend) {
+        if (!friend || !friend.id || friend.id === "alexa-thomas" || isSelfFriend(friend, p)) return;
+        if (requireRoster && roster && roster.indexOf(friend.id) < 0) return;
+        list.push(friend);
+      });
+      return list;
+    }
+    var named = roster ? collect(true) : collect(false);
+    if (!named.length) named = collect(false);
+    return named;
+  }
+
+  /* Five spots on a tilted ring. Front is lowest and largest. Back is highest and smallest. */
+  var CIRCLE_SPOTS = [
+    { id: "left", x: -300, y: 6, s: 0.8 },
+    { id: "center", x: 0, y: 124, s: 1.4 },
+    { id: "right", x: 300, y: 6, s: 0.8 },
+    { id: "back-right", x: 156, y: -156, s: 0.44 },
+    { id: "back-left", x: -156, y: -156, s: 0.44 }
+  ];
+
+  var CIRCLE_REFRESH_MS = 15 * 60 * 1000;
+  var CIRCLE_ROOMS = [
+    { id: "room-tech", title: "Tech workshop world" },
+    { id: "room-21", title: "21+ lounge world" },
+    { id: "room-intl", title: "International plaza" },
+    { id: "room-oss", title: "Open-source garden" }
+  ];
+  var circleShownTopics = [];
+  var circleTopicsRefreshedAt = 0;
+
+  function circleFriendById(id) {
+    var profile = TowerProfileStore.get() || {};
+    for (var i = 0; i < DEMO_FRIENDS.length; i++) {
+      if (DEMO_FRIENDS[i].id === id && !isSelfFriend(DEMO_FRIENDS[i], profile)) return DEMO_FRIENDS[i];
+    }
+    return null;
+  }
+
+  function circleTopicKey(topic) {
+    return [topic.kind, topic.target, (topic.people || []).map(function (person) { return person.id; }).join(",")].join("|");
+  }
+
+  function circlePostByAuthor(name) {
+    var want = String(name || "").trim().toLowerCase();
+    if (!want) return null;
+    var posts = [];
+    try { posts = TowerStore.list() || []; } catch (e) { return null; }
+    for (var i = 0; i < posts.length; i++) {
+      if (String(posts[i].authorName || "").trim().toLowerCase() === want) return posts[i];
+    }
+    return null;
+  }
+
+  function circleProfessionalByHandle(handle) {
+    handle = String(handle || "").replace(/^@/, "");
+    var accounts = window.CognationAccounts;
+    if (!handle || !accounts || typeof accounts.getProfileByHandle !== "function") return null;
+    if (typeof accounts.ensureDemoProfessionals === "function") {
+      try { accounts.ensureDemoProfessionals(); } catch (e) {}
+    }
+    var rec = accounts.getProfileByHandle(handle);
+    if (!rec || rec.kind !== "professional") return null;
+    return rec;
+  }
+
+  function circleProfileRecords() {
+    try {
+      var raw = localStorage.getItem("cognation.profiles.v1");
+      var doc = raw ? JSON.parse(raw) : null;
+      var profiles = doc && doc.profiles ? doc.profiles : {};
+      return Object.keys(profiles).map(function (id) { return profiles[id]; });
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /* Only activity already stored. Example names are not written here. */
+  function circleCollectRealActivity() {
+    var topics = [];
+    var personal = viewerPersonalRecord() || {};
+    var me = { id: "alexa-thomas", name: personal.displayName || "Alexa" };
+    var since = personal.friendSince && typeof personal.friendSince === "object" ? personal.friendSince : {};
+    Object.keys(since).forEach(function (id) {
+      if (!since[id]) return;
+      var friend = circleFriendById(id);
+      if (!friend) return;
+      var post = circlePostByAuthor(friend.name);
+      if (!post || !post.id) return;
+      topics.push({
+        kind: "friends",
+        target: post.id,
+        href: "#tower-post-" + post.id,
+        people: [me, friend],
+        plus: true,
+        text: circleAt(me.name) + " + " + circleAt(friend.name) + " just became friends on COGNATION! ",
+        action: "Congratulate them",
+        at: Date.parse(since[id]) || 0
+      });
+    });
+    var named = {};
+    var roster = Array.isArray(personal.friendIds) ? personal.friendIds : [];
+    roster.forEach(function (id) {
+      var friend = circleFriendById(id);
+      if (friend) named[friend.id] = friend;
+    });
+    circleProfileRecords().forEach(function (rec) {
+      if (!rec || rec.kind !== "professional" || !rec.handle) return;
+      var people = [];
+      (Array.isArray(rec.followerIds) ? rec.followerIds : []).forEach(function (id) {
+        if (named[id] && people.length < 3) people.push(named[id]);
+      });
+      if (people.length < 3) return;
+      var handle = String(rec.handle).replace(/^@/, "");
+      topics.push({
+        kind: "follow",
+        target: handle,
+        href: "#tower-profile-" + handle,
+        people: people,
+        plus: false,
+        text: people.map(function (friend) { return circleAt(friend.name); }).join(" ") + " all just followed @" + handle + ". ",
+        action: "See whats new here",
+        at: Number(rec.updatedAt) || 0
+      });
+    });
+    (Array.isArray(personal.calendarEvents) ? personal.calendarEvents : []).forEach(function (ev) {
+      if (!ev || !ev.hostHandle || !Array.isArray(ev.signupFriendIds) || ev.signupFriendIds.length < 2) return;
+      var host = circleProfessionalByHandle(ev.hostHandle);
+      if (!host || !host.handle || !ev.title) return;
+      var people = [];
+      ev.signupFriendIds.forEach(function (id) {
+        var friend = circleFriendById(id);
+        if (friend && people.length < 2) people.push(friend);
+      });
+      if (people.length < 2) return;
+      var handle = String(host.handle).replace(/^@/, "");
+      topics.push({
+        kind: "signup",
+        target: ev.id,
+        href: "#tower-event-" + ev.id,
+        people: people,
+        plus: true,
+        text: circleAt(people[0].name) + " + " + circleAt(people[1].name) + " both signed up for an upcoming " + ev.title + " hosted by @" + handle + ". ",
+        action: "Schedule now",
+        at: Date.parse(ev.date) || 0
+      });
+    });
+    var rooms = {};
+    try {
+      var rawRooms = localStorage.getItem("cognation.commune.room-members.v1");
+      if (rawRooms) rooms = JSON.parse(rawRooms) || {};
+    } catch (eRooms) { rooms = {}; }
+    CIRCLE_ROOMS.forEach(function (room) {
+      var entry = rooms[room.id];
+      if (!entry) return;
+      var ids = Array.isArray(entry) ? entry : Object.keys(entry);
+      var people = [];
+      var at = 0;
+      ids.forEach(function (id) {
+        var friend = circleFriendById(id);
+        if (!friend || people.length >= 2) return;
+        people.push(friend);
+        if (!Array.isArray(entry) && entry[id]) {
+          var stamp = Date.parse(entry[id]);
+          if (!isNaN(stamp) && stamp > at) at = stamp;
+        }
+      });
+      if (people.length < 2) return;
+      topics.push({
+        kind: "room",
+        target: room.id,
+        href: "#commune-room-" + room.id,
+        people: people,
+        plus: true,
+        text: circleAt(people[0].name) + " + " + circleAt(people[1].name) + " join heated discussion in " + room.title + ". ",
+        action: "Join now",
+        at: at
+      });
+    });
+    topics.sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+    return topics;
+  }
+
+  function circleResolveTopics() {
+    var fresh = circleCollectRealActivity();
+    if (!circleShownTopics.length) {
+      circleShownTopics = fresh.slice(0, 5);
+      return circleShownTopics.slice();
+    }
+    var known = {};
+    circleShownTopics.forEach(function (topic) { known[circleTopicKey(topic)] = true; });
+    var hasNew = false;
+    fresh.forEach(function (topic) {
+      if (!known[circleTopicKey(topic)]) hasNew = true;
+    });
+    if (!hasNew) return circleShownTopics.slice();
+    var seen = {};
+    var next = [];
+    fresh.concat(circleShownTopics).forEach(function (topic) {
+      var key = circleTopicKey(topic);
+      if (seen[key] || next.length >= 5) return;
+      seen[key] = true;
+      next.push(topic);
+    });
+    circleShownTopics = next;
+    return next.slice();
+  }
+
+  function circleRefreshDue() {
+    return !circleTopicsRefreshedAt || (Date.now() - circleTopicsRefreshedAt) >= CIRCLE_REFRESH_MS;
+  }
+
+  function applyCircleTopics(force) {
+    if (!force && !circleRefreshDue()) return false;
+    var before = circleShownTopics.map(circleTopicKey).join("\n");
+    circleResolveTopics();
+    circleTopicsRefreshedAt = Date.now();
+    return before !== circleShownTopics.map(circleTopicKey).join("\n");
+  }
+
+  function repaintCircleRing() {
+    var layer = document.querySelector("[data-circle-fall]");
+    if (!layer) return;
+    var old = layer.querySelector("[data-circle-ring]");
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    paintCircleRing(layer);
+  }
+
+  function circleTopicPhoto(friend) {
+    var face = document.createElement("span");
+    face.className = "circle-topic-photo";
+    face.setAttribute("aria-hidden", "true");
+    var index = 0;
+    DEMO_FRIENDS.forEach(function (entry, entryIndex) {
+      if (entry.id === friend.id) index = entryIndex;
+    });
+    paintFriendPicture(face, friend, index);
+    return face;
+  }
+
+  function paintCircleRing(layer) {
+    var topics = circleShownTopics.slice();
+    if (!topics.length) return;
+    var ring = document.createElement("div");
+    ring.className = "circle-ring";
+    ring.setAttribute("data-circle-ring", "");
+    ring.setAttribute("data-circle-topics", String(topics.length));
+    var spin = document.createElement("div");
+    spin.className = "circle-ring-spin";
+    topics.forEach(function (topic) {
+      var item = document.createElement("div");
+      item.className = "circle-topic";
+      item.setAttribute("data-circle-topic", topic.kind);
+      item.setAttribute("data-circle-target", topic.target);
+      var people = document.createElement("div");
+      people.className = "circle-topic-people" + (topic.people.length > 2 ? " is-three" : "");
+      topic.people.forEach(function (friend, index) {
+        if (topic.plus && index > 0) {
+          var plus = document.createElement("span");
+          plus.className = "circle-topic-plus";
+          plus.setAttribute("aria-hidden", "true");
+          plus.textContent = "+";
+          people.appendChild(plus);
+        }
+        people.appendChild(circleTopicPhoto(friend));
+      });
+      var copy = document.createElement("p");
+      copy.appendChild(document.createTextNode(topic.text));
+      var link = document.createElement("a");
+      link.href = topic.href;
+      link.textContent = topic.action;
+      link.setAttribute("data-circle-action", topic.action);
+      copy.appendChild(link);
+      item.appendChild(people);
+      item.appendChild(copy);
+      spin.appendChild(item);
+    });
+    ring.appendChild(spin);
+    layer.appendChild(ring);
+  }
+
+  function circleSpotAt(phase) {
+    var count = CIRCLE_SPOTS.length;
+    var wrapped = ((phase % count) + count) % count;
+    var index = Math.floor(wrapped);
+    var mix = wrapped - index;
+    var from = CIRCLE_SPOTS[index];
+    var to = CIRCLE_SPOTS[(index + 1) % count];
+    return {
+      id: mix < 0.5 ? from.id : to.id,
+      x: from.x + (to.x - from.x) * mix,
+      y: from.y + (to.y - from.y) * mix,
+      s: from.s + (to.s - from.s) * mix
+    };
+  }
+
+  function placeCircleTopics() {
+    if (!circleFallState) return;
+    var topics = document.querySelectorAll("[data-circle-topic]");
+    if (!topics.length) return;
+    var shift = ((performance.now() - circleFallState.ringStarted) / 28000) * CIRCLE_SPOTS.length;
+    var nearest = 0;
+    for (var i = 0; i < topics.length; i++) {
+      var spot = circleSpotAt(i + shift);
+      if (spot.s > nearest) nearest = spot.s;
+      topics[i].style.transform = "translate(-50%, -50%) translate(" + spot.x.toFixed(1) + "px," + spot.y.toFixed(1) + "px) scale(" + spot.s.toFixed(3) + ")";
+      topics[i].style.zIndex = String(Math.round(spot.s * 100));
+      topics[i].setAttribute("data-circle-spot", spot.id);
+    }
+    for (var j = 0; j < topics.length; j++) {
+      var scale = parseFloat((topics[j].style.transform.match(/scale\(([^)]+)\)/) || [])[1] || "0");
+      topics[j].style.pointerEvents = scale > nearest * 0.9 ? "auto" : "none";
+    }
+  }
+
+  function openTowerEvent(eventId) {
+    eventId = String(eventId || "");
+    if (typeof window.CognationTowerApplySide === "function") {
+      window.CognationTowerApplySide("private");
+    }
+    var p = TowerProfileStore.get();
+    seedCalendarEventsIfMissing(p);
+    var ev = null;
+    (p.calendarEvents || []).forEach(function (item) {
+      if (item && item.id === eventId) ev = item;
+    });
+    if (!ev) return false;
+    document.querySelectorAll("[data-tower-app]").forEach(function (root) {
+      var view = getCalendarViewState(root, "private");
+      var parts = String(ev.date || "").split("-");
+      view.year = parseInt(parts[0], 10);
+      view.month0 = parseInt(parts[1], 10) - 1;
+      view.selected = ev.date;
+      refreshTowerCalendars(root);
+    });
+    window.setTimeout(function () {
+      var row = document.querySelector('[data-tower-private-side] [data-event-id="' + eventId + '"]');
+      var target = row || document.querySelector("[data-tower-private-side] [data-tower-calendar-personal]");
+      if (target && target.scrollIntoView) target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+    return true;
+  }
+
+  function openTowerPost(postId) {
+    postId = String(postId || "");
+    if (typeof window.CognationTowerApplySide === "function") {
+      window.CognationTowerApplySide("private");
+    }
+    window.setTimeout(function () {
+      var post = document.querySelector('[data-tower-private-side] [data-tower-post="' + postId + '"]');
+      var heart = post && post.querySelector('[data-tower-react="❤️"]');
+      var target = heart || post || document.querySelector("[data-tower-private-side] [data-tower-feed]");
+      if (target && target.scrollIntoView) target.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+    return true;
   }
 
   function startCircleFall() {
@@ -7848,6 +8477,7 @@
     layer.className = "circle-fall";
     layer.setAttribute("data-circle-fall", "");
     layer.setAttribute("data-circle-count", String(ids.length));
+    layer.setAttribute("data-circle-refresh-ms", String(CIRCLE_REFRESH_MS));
     document.body.appendChild(layer);
     document.body.classList.add("is-circle-open");
     document.querySelectorAll(".app-topbar [role='tab']").forEach(function (tab) {
@@ -7869,7 +8499,7 @@
         if (entry.id === id) friendIndex = idx;
       });
       var size = 46 + ((i * 17) % 42);
-      var handle = friendHandleFromId(id);
+      var handle = personalProfileHandle(id);
       var el = document.createElement("a");
       el.className = "circle-fall-portrait";
       el.href = "#tower-profile-" + handle;
@@ -7906,11 +8536,18 @@
       });
     });
 
+    applyCircleTopics(circleRefreshDue());
+    paintCircleRing(layer);
+
     circleFallState = {
       bodies: bodies,
       raf: 0,
       last: performance.now(),
-      started: performance.now()
+      started: performance.now(),
+      ringStarted: performance.now(),
+      refreshTimer: window.setInterval(function () {
+        if (applyCircleTopics(true)) repaintCircleRing();
+      }, CIRCLE_REFRESH_MS)
     };
     function frame(now) {
       var st = circleFallState;
@@ -7934,13 +8571,11 @@
           b.sleep = true;
         });
       }
-      var asleep = true;
       bodies.forEach(function (b) {
         paintCircleBody(b);
-        if (!b.sleep) asleep = false;
       });
-      if (!asleep) st.raf = requestAnimationFrame(frame);
-      else st.raf = 0;
+      placeCircleTopics();
+      st.raf = requestAnimationFrame(frame);
     }
     circleFallState.raf = requestAnimationFrame(frame);
   }
@@ -7961,16 +8596,42 @@
     });
   }
 
+  window.CognationTowerOpenEvent = openTowerEvent;
+  window.CognationTowerOpenPost = openTowerPost;
+
   window.CognationCircleFall = {
     start: startCircleFall,
     stop: stopCircleFall,
     cap: CIRCLE_FALL_CAP,
-    friendIds: circleFriendIds
+    friendIds: circleFriendIds,
+    refreshMs: CIRCLE_REFRESH_MS,
+    refresh: function () {
+      if (applyCircleTopics(true)) repaintCircleRing();
+      return circleShownTopics.map(function (topic) {
+        return { kind: topic.kind, target: topic.target, text: topic.text, action: topic.action, href: topic.href };
+      });
+    }
+  };
+
+  window.CognationTowerOpenProfile = function (handle) {
+    handle = String(handle || "").trim().replace(/^@/, "");
+    if (!handle) return false;
+    var hash = "tower-profile-" + handle;
+    if (String(location.hash || "") !== "#" + hash) {
+      try { location.hash = hash; } catch (e) {}
+    }
+    document.querySelectorAll("[data-tower-app]").forEach(function (root) {
+      applyTowerSide(root, "public");
+      renderProfileChrome(root);
+    });
+    document.dispatchEvent(new CustomEvent("cognation:tower-view-changed"));
+    return true;
   };
 
   window.CognationTowerFriends = {
     cap: TOWER_FRIEND_CAP,
     add: addTowerFriend,
+    has: viewerHasFriend,
   };
   window.CognationTowerFollowers = {
     add: addProfessionalFollower,

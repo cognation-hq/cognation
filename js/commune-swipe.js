@@ -1,41 +1,80 @@
 /**
- * CGN-007 — COMMUNE swipe feed (demo / localStorage).
- * Wires HTML Coder shell hooks only.
- *
- * Hooks:
- *   [data-commune-shell], [data-commune-deck]
- *   [data-commune-card] + data-card-type
- *     (featured-service|ad|live-video|speed-dating|chatroom|random-fact)
- *   [data-commune-swipe="left|right"], [data-commune-enter-sim]
- *   [data-commune-see-dating] / [data-commune-dating-toggle]
- *   shell [data-dating-visible="true"] when age>18 AND toggle on
- *   Dating: [data-dating-photo], [data-dating-name],
- *     input[data-dating-rate], [data-dating-rate-value], [data-dating-rate-output],
- *     card [data-rating-selected="true"]
- * Leaves NEWS / js/commune.js alone.
+ * COMMUNE — paced public swipe deck.
+ * One card is one item. Types are interleaved so none runs in a row.
+ * Dating is local, opt-in, and at least five other cards apart.
+ * Professional ads open that profile. People-you-may-know sends a friend request.
+ * No seeded people, businesses, or events.
  */
 (function () {
   "use strict";
 
   var DISMISSED_KEY = "cognation.commune.swipe.dismissed.v1";
   var LIKES_KEY = "cognation.commune.swipe.likes.v1";
-  var SHARES_KEY = "cognation.commune.swipe.shares.v1";
   var FOLLOWS_KEY = "cognation.commune.follows.v1";
   var SEE_DATING_KEY = "cognation.commune.seeDating.v1";
   var MEMBER_PROFILE_KEY = "cognation.member.profile.v1";
   var RATINGS_KEY = "cognation.commune.dating.ratings.v1";
-  var DATING_LIKES_KEY = "cognation.commune.dating.likes.v1";
-  var DATING_INBOUND_KEY = "cognation.commune.dating.inbound.v1";
-  var AD_EVERY = 15;
+  var DATING_RIGHT_KEY = "cognation.commune.dating.rights.v1";
+  var INBOUND_KEY = "cognation.commune.dating.inbound.v1";
+  var NOTICES_KEY = "cognation.commune.notices.v1";
+  var SHARES_KEY = "cognation.commune.friend-shares.v1";
+  var ROOMS_KEY = "cognation.commune.site-rooms.v1";
+  var ROOM_CHAT_KEY = "cognation.commune.room-chat.v1";
+  var REQUESTS_KEY = "cognation.friend.requests.v1";
+  var FRIEND_CAP = 6000;
 
   var TYPE = {
-    FEATURED: "featured-service",
     AD: "ad",
-    LIVE: "live-video",
-    DATING: "speed-dating",
     CHAT: "chatroom",
-    FACT: "random-fact",
+    FACT: "fact",
+    WELLNESS: "wellness",
+    FRIEND: "friend",
+    EVENT: "event",
+    KNOW: "know",
+    DATING: "dating",
   };
+
+  var LANE_ORDER = [TYPE.AD, TYPE.CHAT, TYPE.FACT, TYPE.WELLNESS, TYPE.FRIEND, TYPE.EVENT, TYPE.KNOW];
+  var REPEATABLE = {};
+  REPEATABLE[TYPE.CHAT] = true;
+  REPEATABLE[TYPE.FACT] = true;
+  REPEATABLE[TYPE.WELLNESS] = true;
+
+  var SITE_ROOM_BODY = "Cognation hosts this room.";
+  var SITE_ROOMS = [
+    { id: "room-site-18-21", title: "18–21", topic: "18–21", gate: "age-18-21" },
+    { id: "room-site-highschool", title: "Highschool", topic: "highschool", gate: "highschool" },
+    { id: "room-site-moms", title: "Moms", topic: "moms", gate: "interest", interests: ["mom", "moms", "mother", "mothers"] },
+    { id: "room-site-tech-ai", title: "Tech/AI", topic: "tech/ai", gate: "interest", interests: ["tech", "technology", "ai", "artificial intelligence"] },
+    { id: "room-site-speed-dating", title: "Speed dating", topic: "speed dating", gate: "speed-dating" },
+    { id: "room-site-21", title: "21+", topic: "21+", gate: "age-21" },
+    { id: "room-site-disability", title: "Disability help", topic: "disability help", gate: "interest", interests: ["disability", "disabilities", "disability help"] },
+    { id: "room-site-mental-health", title: "Mental health", topic: "mental health", gate: "interest", interests: ["mental health"] },
+    { id: "room-site-military", title: "Military", topic: "military", gate: "interest", interests: ["military", "veteran", "veterans"] },
+    { id: "room-site-lgbtq", title: "LGBTQ", topic: "lgbtq", gate: "interest", interests: ["lgbtq", "lgbtq+", "lgbt"] },
+    { id: "room-site-public-policy", title: "Public policy", topic: "public policy", gate: "interest", interests: ["public policy"] },
+    { id: "room-site-gamers", title: "Gamers", topic: "gamers", gate: "interest", interests: ["gamer", "gamers", "gaming"] },
+    { id: "room-site-jobs", title: "Jobs", topic: "jobs", gate: "interest", interests: ["job", "jobs"] },
+    { id: "room-site-garage-sale", title: "Garage sale", topic: "garage sale", gate: "interest", interests: ["garage sale"] },
+    { id: "room-site-reality", title: "Reality shows", topic: "reality shows", gate: "interest", interests: ["reality show", "reality shows", "reality tv"] },
+    { id: "room-site-insurance", title: "Insurance", topic: "insurance", gate: "interest", interests: ["insurance"] },
+  ];
+
+  var FACTS = [
+    { id: "fact-hearts", title: "A public fact", body: "Octopuses have three hearts. Two pump blood through the gills, and one pumps it through the rest of the body. Source: Smithsonian Ocean." },
+    { id: "fact-honey", title: "A public fact", body: "Sealed honey can last indefinitely. Edible honey has been recovered from ancient Egyptian tombs. Source: Smithsonian Magazine." },
+    { id: "fact-trees", title: "A public fact", body: "A 2015 Nature estimate put Earth’s trees near three trillion. Source: Crowther et al., Nature." },
+    { id: "fact-banana", title: "A public fact", body: "Botanically, bananas are berries. Strawberries are aggregate accessory fruits. Source: university extension explainers." },
+    { id: "fact-war", title: "A public fact", body: "The Anglo-Zanzibar War of 1896 lasted about 38 minutes. Source: Britannica." },
+  ];
+
+  var WELLNESS = [
+    { id: "well-walk", title: "A wellness note", body: "A short walk can lift mood. Public-health guidance treats even brief movement as useful on an ordinary day. Source: CDC physical activity basics." },
+    { id: "well-breath", title: "A wellness note", body: "Slow breathing, around six breaths a minute, is a common calm-down practice in stress-management classes." },
+    { id: "well-sleep", title: "A wellness note", body: "Sleep and mood travel together. Adults are generally advised to aim for seven or more hours. Source: CDC." },
+    { id: "well-name", title: "A wellness note", body: "Naming a feeling can make the next small step easier to choose. That is a basic idea in psychoeducation." },
+    { id: "well-light", title: "A wellness note", body: "Morning daylight helps set the body clock. Many wellness classes start with a few minutes outside." },
+  ];
 
   function readJson(store, key, fallback) {
     try {
@@ -57,16 +96,6 @@
   function asIds(v) {
     return Array.isArray(v) ? v.filter(Boolean).map(String) : [];
   }
-  function shuffle(arr) {
-    var a = arr.slice();
-    for (var i = a.length - 1; i > 0; i--) {
-      var j = Math.floor(Math.random() * (i + 1));
-      var t = a[i];
-      a[i] = a[j];
-      a[j] = t;
-    }
-    return a;
-  }
   function escapeHtml(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;")
@@ -74,39 +103,106 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
   }
+  function emit(name, detail) {
+    try {
+      document.dispatchEvent(new CustomEvent(name, { detail: detail || {} }));
+    } catch (e) {}
+  }
+  function clone(card) {
+    var copy = {};
+    if (!card) return copy;
+    Object.keys(card).forEach(function (key) {
+      copy[key] = card[key];
+    });
+    return copy;
+  }
+  function norm(value) {
+    return String(value || "").trim().toLowerCase();
+  }
+  function terms(value) {
+    if (Array.isArray(value)) {
+      return value.map(norm).filter(function (t) { return t.length > 2; });
+    }
+    return norm(value).split(/[^a-z0-9+]+/).filter(function (t) { return t.length > 2; });
+  }
+  function overlap(a, b) {
+    var set = {};
+    (a || []).forEach(function (t) { if (t) set[norm(t)] = true; });
+    return (b || []).some(function (t) { return set[norm(t)]; });
+  }
 
-  function getDismissed() {
-    return asIds(readJson(sessionStorage, DISMISSED_KEY, []));
+  function ratingSentence(avg) {
+    var n = Math.round(Number(avg) * 10) / 10;
+    if (!isFinite(n)) return "";
+    var whole = Math.abs(n - Math.round(n)) < 0.001;
+    var shown = whole ? String(Math.round(n)) : n.toFixed(1);
+    var head = Math.floor(Math.abs(n) + 0.001);
+    var article = head === 8 || head === 11 || head === 18 || (head >= 80 && head <= 89) ? "an" : "a";
+    return "You've been rated " + article + " " + shown;
   }
-  function setDismissed(ids) {
-    writeJson(sessionStorage, DISMISSED_KEY, asIds(ids));
+
+  function paceDeck(lanes, dating, count) {
+    var cursors = {};
+    var out = [];
+    var rot = 0;
+    var last = "";
+    var sinceDating = 99;
+    var datingAt = 0;
+    var guard = 0;
+    var target = count || 24;
+    dating = dating || [];
+    function take(type) {
+      var list = (lanes && lanes[type]) || [];
+      if (!list.length) return null;
+      var i = cursors[type] || 0;
+      if (!REPEATABLE[type] && i >= list.length) return null;
+      var src = list[i % list.length];
+      cursors[type] = i + 1;
+      var card = clone(src);
+      card.type = type;
+      if (i >= list.length) card.id = String(src.id || type) + "-r" + i;
+      return card;
+    }
+    while (out.length < target && guard < target * 8) {
+      guard += 1;
+      if (out.length >= 5 && sinceDating >= 5 && datingAt < dating.length && last !== TYPE.DATING) {
+        var dated = clone(dating[datingAt]);
+        dated.type = TYPE.DATING;
+        datingAt += 1;
+        out.push(dated);
+        last = TYPE.DATING;
+        sinceDating = 0;
+        continue;
+      }
+      var placed = false;
+      var n;
+      for (n = 0; n < LANE_ORDER.length; n++) {
+        var type = LANE_ORDER[(rot + n) % LANE_ORDER.length];
+        if (type === last) continue;
+        var card = take(type);
+        if (!card) continue;
+        out.push(card);
+        last = type;
+        sinceDating += 1;
+        rot = (LANE_ORDER.indexOf(type) + 1) % LANE_ORDER.length;
+        placed = true;
+        break;
+      }
+      if (!placed) break;
+    }
+    return out;
   }
-  function getLikes() {
-    return asIds(readJson(localStorage, LIKES_KEY, []));
-  }
-  function setLikes(ids) {
-    writeJson(localStorage, LIKES_KEY, asIds(ids));
-  }
-  function getShares() {
-    return asIds(readJson(localStorage, SHARES_KEY, []));
-  }
-  function setShares(ids) {
-    writeJson(localStorage, SHARES_KEY, asIds(ids));
-  }
-  function getFollows() {
-    return asIds(readJson(localStorage, FOLLOWS_KEY, []));
-  }
+
+  function getDismissed() { return asIds(readJson(sessionStorage, DISMISSED_KEY, [])); }
+  function setDismissed(ids) { writeJson(sessionStorage, DISMISSED_KEY, asIds(ids)); }
+  function getLikes() { return asIds(readJson(localStorage, LIKES_KEY, [])); }
+  function setLikes(ids) { writeJson(localStorage, LIKES_KEY, asIds(ids)); }
+  function getFollows() { return asIds(readJson(localStorage, FOLLOWS_KEY, [])); }
   function setFollows(ids) {
     writeJson(localStorage, FOLLOWS_KEY, asIds(ids));
-    document.dispatchEvent(
-      new CustomEvent("cognation:commune-follows-changed", {
-        detail: { profileIds: getFollows() },
-      })
-    );
+    emit("cognation:commune-follows-changed", { profileIds: getFollows() });
   }
-  function isFollowing(id) {
-    return getFollows().indexOf(String(id || "")) >= 0;
-  }
+  function isFollowing(id) { return getFollows().indexOf(String(id || "")) >= 0; }
   function toggleFollow(id) {
     id = String(id || "");
     if (!id) return false;
@@ -118,6 +214,23 @@
     return ids.indexOf(id) >= 0;
   }
 
+  function currentSession() {
+    var session = readJson(localStorage, "cognation.session.v2", null);
+    return session && typeof session === "object" ? session : null;
+  }
+  function currentProfileId() {
+    var session = currentSession();
+    if (session && session.activeProfileId) return String(session.activeProfileId);
+    if (session && session.username) return String(session.username);
+    return "you";
+  }
+  function viewerIds() {
+    var ids = [currentProfileId(), "you"];
+    var session = currentSession();
+    if (session && session.username) ids.push(String(session.username));
+    if (session && session.activeProfileId) ids.push(String(session.activeProfileId));
+    return ids;
+  }
   function getMemberProfile() {
     var p = readJson(localStorage, MEMBER_PROFILE_KEY, null);
     if (!p || typeof p !== "object") p = {};
@@ -130,320 +243,406 @@
     return p;
   }
   function setMemberProfile(fields) {
-    var next = Object.assign({}, getMemberProfile(), fields || {});
+    var next = {};
+    var prev = getMemberProfile();
+    Object.keys(prev).forEach(function (k) { next[k] = prev[k]; });
+    Object.keys(fields || {}).forEach(function (k) { next[k] = fields[k]; });
     writeJson(localStorage, MEMBER_PROFILE_KEY, next);
     if (next.country) {
-      try {
-        localStorage.setItem("cognation.member.country.v1", String(next.country));
-      } catch (e) {}
+      try { localStorage.setItem("cognation.member.country.v1", String(next.country)); } catch (e) {}
       if (window.CognationMemberCountry && window.CognationMemberCountry.set) {
-        try {
-          window.CognationMemberCountry.set(next.country);
-        } catch (e2) {}
+        try { window.CognationMemberCountry.set(next.country); } catch (e2) {}
       }
     }
-    document.dispatchEvent(
-      new CustomEvent("cognation:member-profile-updated", { detail: next })
-    );
+    emit("cognation:member-profile-updated", next);
     return next;
   }
   function getMemberAge() {
     var n = parseInt(getMemberProfile().age, 10);
     return !isNaN(n) && n > 0 ? n : null;
   }
-
   function getSeeDating() {
-    try {
-      return localStorage.getItem(SEE_DATING_KEY) === "1";
-    } catch (e) {
-      return false;
-    }
+    try { return localStorage.getItem(SEE_DATING_KEY) === "1"; } catch (e) { return false; }
   }
   function setSeeDating(on) {
-    try {
-      localStorage.setItem(SEE_DATING_KEY, on ? "1" : "0");
-    } catch (e) {}
+    try { localStorage.setItem(SEE_DATING_KEY, on ? "1" : "0"); } catch (e) {}
   }
-  /** Dating cards only when age > 18 AND toggle on. */
   function datingAllowed() {
     var age = getMemberAge();
     return !!(getSeeDating() && age != null && age > 18);
   }
 
-  function getRatingsDoc() {
-    var d = readJson(localStorage, RATINGS_KEY, null);
-    if (!d || typeof d !== "object") d = { byProfile: {} };
-    if (!d.byProfile || typeof d.byProfile !== "object") d.byProfile = {};
-    return d;
+  function eachProfile(fn) {
+    var doc = readJson(localStorage, "cognation.profiles.v1", null);
+    var profiles = doc && doc.profiles ? doc.profiles : {};
+    Object.keys(profiles).forEach(function (id) { fn(profiles[id], id); });
   }
-  function saveRating(profileId, raterId, score) {
-    var doc = getRatingsDoc();
-    if (!doc.byProfile[profileId]) doc.byProfile[profileId] = [];
-    var list = doc.byProfile[profileId].filter(function (r) {
-      return r && r.raterId !== raterId;
+  function profileById(id) {
+    var accounts = window.CognationAccounts;
+    if (accounts && typeof accounts.getProfileById === "function") {
+      try { return accounts.getProfileById(id); } catch (e) {}
+    }
+    var found = null;
+    eachProfile(function (rec, pid) {
+      if (pid === id || (rec && rec.id === id)) found = rec;
     });
-    list.push({ raterId: raterId, score: score, at: Date.now() });
-    doc.byProfile[profileId] = list;
-    writeJson(localStorage, RATINGS_KEY, doc);
-    return averageRating(profileId);
+    return found;
   }
-  function averageRating(profileId) {
-    var list = (getRatingsDoc().byProfile || {})[profileId] || [];
-    if (!list.length) return null;
-    var sum = 0;
-    list.forEach(function (r) {
-      sum += Number(r.score) || 0;
+  function viewerPersonal() {
+    var accounts = window.CognationAccounts;
+    var session = currentSession();
+    if (accounts && session && session.username && typeof accounts.getProfilesForUsername === "function") {
+      var list = accounts.getProfilesForUsername(session.username) || [];
+      for (var i = 0; i < list.length; i++) {
+        if (list[i] && list[i].kind !== "professional") return list[i];
+      }
+    }
+    if (session && session.activeProfileId) {
+      var active = profileById(session.activeProfileId);
+      if (active && active.kind !== "professional") return active;
+    }
+    return null;
+  }
+  function viewerInterests() {
+    var parts = [];
+    var member = getMemberProfile();
+    parts = parts.concat(terms(member.interests), terms(member.bio));
+    var personal = viewerPersonal();
+    if (personal) parts = parts.concat(terms(personal.interests), terms(personal.bio));
+    var unique = [];
+    parts.forEach(function (t) { if (unique.indexOf(t) < 0) unique.push(t); });
+    return unique;
+  }
+  function friendIds() {
+    var personal = viewerPersonal();
+    return personal && Array.isArray(personal.friendIds) ? personal.friendIds.map(String) : [];
+  }
+
+  function isHighschoolMember() {
+    var age = getMemberAge();
+    return age != null && age >= 14 && age <= 18;
+  }
+  function viewerInterestTokens() {
+    var chunks = [];
+    function add(value) {
+      if (value == null || value === "") return;
+      if (Array.isArray(value)) {
+        value.forEach(add);
+        return;
+      }
+      chunks.push(String(value));
+    }
+    var member = getMemberProfile();
+    add(member.interests);
+    add(member.interest);
+    var personal = viewerPersonal();
+    if (personal) {
+      add(personal.interests);
+      add(personal.interest);
+      if (personal.badges) add(personal.badges.interest);
+    }
+    var tokens = [];
+    chunks.join(" ").toLowerCase().split(/[^a-z0-9+]+/).forEach(function (token) {
+      if (token && tokens.indexOf(token) < 0) tokens.push(token);
     });
-    return Math.round((sum / list.length) * 10) / 10;
+    return tokens;
+  }
+  function hasInterest(needles) {
+    var tokens = viewerInterestTokens();
+    var blob = " " + tokens.join(" ") + " ";
+    return (needles || []).some(function (needle) {
+      var parts = String(needle || "").toLowerCase().split(/[^a-z0-9+]+/).filter(Boolean);
+      if (!parts.length) return false;
+      if (parts.length > 1) return blob.indexOf(" " + parts.join(" ") + " ") !== -1;
+      return tokens.indexOf(parts[0]) !== -1;
+    });
+  }
+  function roomVisible(room) {
+    if (!room) return false;
+    var age = getMemberAge();
+    if (room.gate === "age-18-21") return age != null && age >= 18 && age <= 21;
+    if (room.gate === "age-21") return age != null && age >= 21 && !isHighschoolMember();
+    if (room.gate === "highschool") return isHighschoolMember();
+    if (room.gate === "speed-dating") return !isHighschoolMember() && datingAllowed();
+    if (room.gate === "interest") return hasInterest(room.interests);
+    return false;
+  }
+  function roomCard(room) {
+    return {
+      id: room.id,
+      type: TYPE.CHAT,
+      title: room.title,
+      body: SITE_ROOM_BODY,
+      topic: room.topic,
+      gate: room.gate,
+      host: "Cognation",
+    };
   }
 
-  function getDatingLikes() {
-    return asIds(readJson(localStorage, DATING_LIKES_KEY, []));
+  function youtubeId(url) {
+    var m = String(url || "").match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{6,})/);
+    return m ? m[1] : "";
   }
-  function addDatingLike(profileId) {
-    var ids = getDatingLikes();
-    if (ids.indexOf(profileId) < 0) ids.push(profileId);
-    writeJson(localStorage, DATING_LIKES_KEY, ids);
-  }
-  function ensureInboundLikes() {
-    var inbound = readJson(localStorage, DATING_INBOUND_KEY, null);
-    inbound = asIds(inbound);
-    if (inbound.length) return inbound;
-    inbound = ["date-jordan-lee", "date-sam-okonkwo"];
-    writeJson(localStorage, DATING_INBOUND_KEY, inbound);
-    return inbound;
-  }
-  function isMutual(profileId) {
-    return (
-      getDatingLikes().indexOf(profileId) >= 0 &&
-      ensureInboundLikes().indexOf(profileId) >= 0
-    );
-  }
-  function currentRaterId() {
-    try {
-      var s =
-        window.CognationAuth &&
-        window.CognationAuth.getSession &&
-        window.CognationAuth.getSession();
-      if (s && s.username) return String(s.username);
-    } catch (e) {}
-    return "you";
+  function videoHtml(url) {
+    url = String(url || "").trim();
+    if (!url) return "";
+    var yt = youtubeId(url);
+    if (yt) {
+      return '<div class="commune-ad-video" aria-hidden="true"><iframe src="https://www.youtube.com/embed/' +
+        escapeHtml(yt) + '" title="Marketing video" tabindex="-1"></iframe></div>';
+    }
+    return '<video class="commune-ad-video" src="' + escapeHtml(url) + '" muted playsinline preload="metadata" tabindex="-1"></video>';
   }
 
-  var DEMO_ADS = [
-    { id: "ad-tea", title: "Rosehip evening tea", body: "Sponsored · Soft focus blend for wind-down nights. Demo ad — no checkout.", cta: "Learn more (stub)" },
-    { id: "ad-boost", title: "Boost your Tower Pro page", body: "Sponsored · Put community services in neighbors' COMMUNE mix.", cta: "See plans (stub)" },
-    { id: "ad-market", title: "Saturday block market", body: "Sponsored · Peach stand + live strings. Local demo placement.", cta: "Save date (stub)" },
-  ];
-  var DEMO_LIVE = [
-    { id: "live-yoga", title: "Live stretch circle", body: "Host Mira is live in the lobby · stub video chat — no camera opens.", host: "Mira Chen" },
-    { id: "live-study", title: "Late study hall", body: "Quiet co-work stream · tap to pretend-join (demo).", host: "Jordan Lee" },
-    { id: "live-kitchen", title: "Soup night kitchen cam", body: "Community cook-along stub. No real stream.", host: "Alex Rivera" },
-  ];
-  var DEMO_DATING = [
-    { id: "date-jordan-lee", name: "Jordan Lee", photo: "assets/logo.svg", body: "Coffee walks · indie bookstores · dog parks.", vibe: "Casual" },
-    { id: "date-sam-okonkwo", name: "Sam Okonkwo", photo: "assets/logo.svg", body: "Trail runs before brunch. Looking for kind energy.", vibe: "Outdoorsy" },
-    { id: "date-mira-chen", name: "Mira Chen", photo: "assets/logo.svg", body: "Gallery nights and quiet playlists.", vibe: "Artsy" },
-    { id: "date-riley-nguyen", name: "Riley Nguyen", photo: "assets/logo.svg", body: "Board-game cafés · low-key first meets.", vibe: "Playful" },
-  ];
-  var DEMO_ROOMS = [
-    { id: "room-tech", title: "Tech workshop world", body: "Build figurines, debug aloud, stroll the circuit plaza.", roomKind: "tech", minAge: 0 },
-    { id: "room-21", title: "21+ lounge world", body: "Age-gated hangout with walk-and-talk figurines (UI stub).", roomKind: "21+", minAge: 21 },
-    { id: "room-intl", title: "International plaza", body: "Time-zone friendly commons · stub 3D figurine space.", roomKind: "international", minAge: 0 },
-    { id: "room-oss", title: "Open-source garden", body: "Pair-programming pavilion in the tech world (demo).", roomKind: "tech", minAge: 0 },
-  ];
-  var DEMO_FACTS = [
-    { id: "fact-1", body: "Octopuses have three hearts — two pump blood to the gills, one to the rest of the body. Source: aquarium / marine biology primers (Smithsonian Ocean)." },
-    { id: "fact-2", body: "Sealed honey can last indefinitely; edible honey has been recovered from ancient Egyptian tombs. Source: Smithsonian Magazine / National Geographic explainers." },
-    { id: "fact-3", body: "A group of flamingos is called a flamboyance. Source: collective-noun usage in major dictionaries / birding references." },
-    { id: "fact-4", body: "The shortest recorded war — the Anglo-Zanzibar War of 1896 — lasted about 38–45 minutes. Source: Britannica; Wikipedia (Anglo-Zanzibar War)." },
-    { id: "fact-5", body: "Botanically, bananas are berries; strawberries are not (they are aggregate accessory fruits). Source: botanical definitions / university extension explainers." },
-    { id: "fact-6", body: "Earth holds ~3 trillion trees (2015 Nature estimate) vs roughly 100–400 billion stars in the Milky Way — so trees outnumber galactic stars on current estimates. Source: Crowther et al., Nature 2015; NASA star-count ranges; Snopes fact-check." },
-    { id: "fact-7", body: "Wombat droppings are cube-shaped, which helps them mark territory without the pellets rolling away. Source: peer-reviewed wombat morphology coverage / science explainers." },
-    { id: "fact-8", body: "“Steady” Ed Headrick — father of the modern Frisbee and disc golf — had his ashes molded into memorial flying discs after his 2002 death. Source: BBC News; PDGA; Wikipedia (Ed Headrick)." },
-  ];
-
-  var FALLBACK_SERVICES = [
-    { id: "svc-demo-yoga", profileId: "prof-demo-mira-pro", fromName: "Mira Chen · Wellness", title: "Neighborhood stretch drop-in", body: "Saturday mornings on the green · sliding scale." },
-    { id: "svc-demo-legal", profileId: "prof-demo-jordan-pro", fromName: "Jordan Lee · Civic Help", title: "Zoning packet office hours", body: "Free 20-minute consults for block petitions." },
-  ];
-
-  function featuredFromFollows() {
-    var follows = getFollows();
+  function placedAds() {
     var out = [];
-    var accts = window.CognationAccounts;
-    if (accts && typeof accts.getProfileById === "function") {
-      follows.forEach(function (pid) {
-        var rec = accts.getProfileById(pid);
-        if (!rec) return;
-        var posts = Array.isArray(rec.featuredPosts) ? rec.featuredPosts : [];
-        posts.forEach(function (post, idx) {
-          if (!post) return;
-          out.push({
-            id: "svc-" + pid + "-" + (post.id || idx),
-            type: TYPE.FEATURED,
-            profileId: pid,
-            fromName: rec.displayName || rec.displayName || rec.handle || "Professional",
-            title: post.title || "Community service",
-            body: post.body || "",
-            likeable: post.likeable !== false,
-          });
-        });
+    eachProfile(function (rec) {
+      if (!rec || rec.kind !== "professional" || !rec.handle) return;
+      var lists = [];
+      ["marketingAds", "advertisements", "ads"].forEach(function (key) {
+        if (Array.isArray(rec[key])) lists = lists.concat(rec[key]);
       });
-    }
-    if (!out.length) {
-      FALLBACK_SERVICES.forEach(function (s) {
+      if (rec.marketingAd && typeof rec.marketingAd === "object") lists.push(rec.marketingAd);
+      (Array.isArray(rec.featuredPosts) ? rec.featuredPosts : []).forEach(function (post) {
+        if (!post) return;
+        if (post.kind === "ad" || post.kind === "advertisement" || post.advertisement === true || post.marketingVideo || post.videoUrl) {
+          lists.push(post);
+        }
+      });
+      lists.forEach(function (ad, idx) {
+        if (!ad) return;
+        var title = String(ad.title || ad.line || ad.headline || "").trim();
+        var body = String(ad.body || ad.text || "").trim();
+        var videoUrl = String(ad.videoUrl || ad.marketingVideo || ad.video || "").trim();
+        if (!title && !body && !videoUrl) return;
         out.push({
-          id: s.id,
-          type: TYPE.FEATURED,
-          profileId: s.profileId,
-          fromName: s.fromName,
-          title: s.title,
-          body: s.body,
-          likeable: true,
+          id: "ad-" + rec.id + "-" + (ad.id || idx),
+          type: TYPE.AD,
+          profileId: rec.id,
+          handle: String(rec.handle || "").replace(/^@/, ""),
+          fromName: rec.displayName || rec.handle,
+          title: title || (rec.displayName || "Professional page"),
+          body: body,
+          videoUrl: videoUrl,
+          interests: terms(ad.interests || ad.tags || (title + " " + body)),
         });
       });
-    }
+    });
     return out;
   }
 
-  function viewerInterestBlob() {
-    var parts = [];
-    var profile = getMemberProfile();
-    ["country", "bio", "interests", "vibe"].forEach(function (key) {
-      var value = profile && profile[key];
-      if (Array.isArray(value)) {
-        value.forEach(function (item) { if (item) parts.push(item); });
-      } else if (value) {
-        parts.push(value);
-      }
+  function publicEvents() {
+    var out = [];
+    var now = Date.now();
+    eachProfile(function (rec) {
+      if (!rec || rec.kind !== "professional") return;
+      var lists = [];
+      ["publicListings", "publicEvents", "listings"].forEach(function (key) {
+        if (Array.isArray(rec[key])) lists = lists.concat(rec[key]);
+      });
+      (Array.isArray(rec.calendarEvents) ? rec.calendarEvents : []).forEach(function (ev) {
+        if (!ev) return;
+        if (ev.public === true || ev.visibility === "public" || ev.listing === true) lists.push(ev);
+      });
+      if (rec.goingLive && typeof rec.goingLive === "object") lists.push(rec.goingLive);
+      lists.forEach(function (ev, idx) {
+        if (!ev) return;
+        var id = String(ev.id || "");
+        if (id.indexOf("cal-demo") === 0) return;
+        var title = String(ev.title || ev.what || "").trim();
+        if (!title) return;
+        var when = String(ev.when || ((ev.date || "") + (ev.time ? "T" + ev.time : ""))).trim();
+        if (when && !isNaN(Date.parse(when)) && Date.parse(when) < now - 36e5) return;
+        var where = String(ev.where || ev.notes || "").trim();
+        out.push({
+          id: "event-" + rec.id + "-" + (id || idx),
+          type: TYPE.EVENT,
+          profileId: rec.id,
+          handle: String(rec.handle || "").replace(/^@/, ""),
+          fromName: rec.displayName || rec.handle || "",
+          title: title,
+          body: [when, where].filter(Boolean).join(" · "),
+          interests: terms(ev.interests || title + " " + where),
+        });
+      });
     });
-    try {
-      var country = localStorage.getItem("cognation.member.country.v1");
-      if (country) parts.push(country);
-    } catch (e) {}
-    getFollows().forEach(function (id) { parts.push(id); });
-    return parts.join(" ").toLowerCase();
+    return out;
   }
 
-  function interestScore(card, blob) {
-    var text = [card.title, card.body, card.fromName, card.host, card.name, card.profileId, card.roomKind]
-      .join(" ")
-      .toLowerCase();
-    var score = card.type === TYPE.FEATURED ? 4 : 0;
-    String(blob || "").split(/[^a-z0-9@+]+/).forEach(function (term) {
-      if (term.length > 2 && text.indexOf(term) !== -1) score += 2;
+  function isLocal(rec) {
+    var viewer = getMemberProfile();
+    var personal = viewerPersonal();
+    var vCity = norm(viewer.city || viewer.locality || (personal && (personal.city || personal.locality)));
+    var vState = norm(viewer.state || (personal && personal.state));
+    var vCountry = norm(viewer.country || (personal && personal.country));
+    var city = norm(rec.city || rec.locality);
+    var state = norm(rec.state);
+    var country = norm(rec.country);
+    if (vCity && city) return city === vCity && (!vState || !state || state === vState);
+    if (vState && state) return state === vState && (!vCountry || !country || country === vCountry);
+    return false;
+  }
+  function datingOptIn(rec) {
+    return !!(rec && (rec.datingContent === true || rec.datingEnabled === true || rec.showDatingContent === true));
+  }
+  function profilePhoto(rec) {
+    var url = rec && (rec.avatarDataUrl || rec.photo || rec.avatarUrl);
+    url = String(url || "");
+    if (url.indexOf("data:image/") === 0 || /^https?:\/\//.test(url)) return url;
+    return "";
+  }
+  function datingMinAge(rec) {
+    var n = parseInt(rec && (rec.datingMinAge || rec.minAge), 10);
+    if (!isNaN(n) && n >= 21) return 21;
+    if (rec && (rec.audience === "21+" || rec.datingAudience === "21+")) return 21;
+    return 18;
+  }
+  function viewerCanSeeDating(rec) {
+    if (!datingAllowed() || !datingOptIn(rec) || !isLocal(rec)) return false;
+    var photo = profilePhoto(rec);
+    if (!photo) return false;
+    var age = getMemberAge();
+    if (datingMinAge(rec) >= 21 && !(age != null && age >= 21)) return false;
+    var mine = viewerIds();
+    if (mine.indexOf(String(rec.id)) >= 0) return false;
+    return true;
+  }
+  function datingCardFrom(rec, extra) {
+    extra = extra || {};
+    return {
+      id: extra.id || ("date-" + rec.id),
+      type: TYPE.DATING,
+      profileId: rec.id,
+      name: rec.displayName || rec.handle || "Member",
+      title: rec.displayName || rec.handle || "Member",
+      photo: extra.photo || profilePhoto(rec),
+      body: "Open to meeting someone local.",
+      handle: rec.handle || "",
+      dating: true,
+      minAge: datingMinAge(rec),
+    };
+  }
+  function datingPool() {
+    if (!datingAllowed()) return [];
+    var out = [];
+    var seen = {};
+    eachProfile(function (rec) {
+      if (!viewerCanSeeDating(rec)) return;
+      seen[rec.id] = true;
+      out.push(datingCardFrom(rec));
     });
-    return score;
+    var inbound = readJson(localStorage, INBOUND_KEY, {});
+    var mine = currentProfileId();
+    var cards = inbound && inbound[mine] ? inbound[mine] : [];
+    (Array.isArray(cards) ? cards : []).forEach(function (card) {
+      if (!card || !card.profileId || seen[card.profileId]) return;
+      var rec = profileById(card.profileId);
+      if (rec && !viewerCanSeeDating(rec)) return;
+      if (!rec && !card.photo) return;
+      seen[card.profileId] = true;
+      out.push({
+        id: "date-in-" + card.profileId,
+        type: TYPE.DATING,
+        profileId: card.profileId,
+        name: card.name || "Member",
+        title: card.name || "Member",
+        photo: card.photo,
+        body: "Open to meeting someone local.",
+        dating: true,
+        minAge: card.minAge || 18,
+      });
+    });
+    return out;
   }
 
-  function buildDeckCards() {
-    ensureInboundLikes();
+  function peopleYouMayKnow() {
+    var me = viewerPersonal();
+    if (!me || !Array.isArray(me.friendIds) || !me.friendIds.length) return [];
+    var mine = {};
+    me.friendIds.forEach(function (id) { mine[String(id)] = true; });
+    mine[String(me.id)] = true;
+    viewerIds().forEach(function (id) { mine[String(id)] = true; });
+    var pending = readJson(localStorage, REQUESTS_KEY, { outgoing: [] });
+    (pending.outgoing || []).forEach(function (req) {
+      if (req && viewerIds().indexOf(String(req.fromId)) >= 0) mine[String(req.toId)] = true;
+    });
+    var seen = {};
+    var out = [];
+    me.friendIds.forEach(function (fid) {
+      var friend = profileById(fid);
+      var ids = friend && Array.isArray(friend.friendIds) ? friend.friendIds : [];
+      ids.forEach(function (id) {
+        id = String(id || "");
+        if (!id || mine[id] || seen[id]) return;
+        var rec = profileById(id);
+        if (!rec || rec.kind === "professional" || !rec.displayName) return;
+        seen[id] = true;
+        out.push({
+          id: "know-" + rec.id,
+          type: TYPE.KNOW,
+          profileId: rec.id,
+          title: rec.displayName,
+          body: "A personal profile you may know.",
+          handle: rec.handle || "",
+        });
+      });
+    });
+    return out;
+  }
+
+  function friendShareCards() {
+    var shares = readJson(localStorage, SHARES_KEY, []);
+    if (!Array.isArray(shares)) return [];
+    var friends = {};
+    friendIds().forEach(function (id) { friends[String(id)] = true; });
+    var interests = viewerInterests();
+    var out = [];
+    shares.forEach(function (share) {
+      if (!share || !share.swiperId || !friends[String(share.swiperId)]) return;
+      if (viewerIds().indexOf(String(share.swiperId)) >= 0) return;
+      var tags = terms(share.interests);
+      if (!tags.length || !overlap(interests, tags)) return;
+      out.push({
+        id: "friend-" + (share.id || share.adId || share.title),
+        type: TYPE.FRIEND,
+        title: share.title || "A friend kept this",
+        body: share.body || "",
+        videoUrl: share.videoUrl || "",
+        fromName: share.fromName || "A friend",
+        handle: share.handle || "",
+        profileId: share.profileId || "",
+        interests: tags,
+      });
+    });
+    return out;
+  }
+
+  function ensureSiteRooms() {
+    writeJson(localStorage, ROOMS_KEY, { host: "Cognation", rooms: SITE_ROOMS });
+    return SITE_ROOMS.filter(roomVisible).map(roomCard);
+  }
+
+  function buildLanes() {
+    var lanes = {};
+    lanes[TYPE.AD] = placedAds();
+    lanes[TYPE.CHAT] = ensureSiteRooms();
+    lanes[TYPE.FACT] = FACTS.map(function (f) { return { id: f.id, type: TYPE.FACT, title: f.title, body: f.body }; });
+    lanes[TYPE.WELLNESS] = WELLNESS.map(function (f) { return { id: f.id, type: TYPE.WELLNESS, title: f.title, body: f.body }; });
+    lanes[TYPE.FRIEND] = friendShareCards();
+    lanes[TYPE.EVENT] = publicEvents();
+    lanes[TYPE.KNOW] = peopleYouMayKnow();
     var dismissed = {};
-    getDismissed().forEach(function (id) {
-      dismissed[id] = true;
+    getDismissed().forEach(function (id) { dismissed[id] = true; });
+    Object.keys(lanes).forEach(function (type) {
+      lanes[type] = lanes[type].filter(function (card) { return card && card.id && !dismissed[card.id]; });
     });
-    var pool = [];
+    var dating = datingPool().filter(function (card) { return card && !dismissed[card.id]; });
+    return { lanes: lanes, dating: dating };
+  }
 
-    featuredFromFollows().forEach(function (c) {
-      pool.push(c);
-    });
-    DEMO_LIVE.forEach(function (c) {
-      pool.push({
-        id: c.id,
-        type: TYPE.LIVE,
-        title: c.title,
-        body: c.body,
-        host: c.host,
-        likeable: true,
-      });
-    });
-    if (datingAllowed()) {
-      DEMO_DATING.forEach(function (c) {
-        pool.push({
-          id: c.id,
-          type: TYPE.DATING,
-          title: c.name,
-          name: c.name,
-          photo: c.photo,
-          body: c.body,
-          vibe: c.vibe,
-          profileId: c.id,
-          likeable: true,
-          dating: true,
-        });
-      });
-    }
-    DEMO_ROOMS.forEach(function (c) {
-      pool.push({
-        id: c.id,
-        type: TYPE.CHAT,
-        title: c.title,
-        body: c.body,
-        roomKind: c.roomKind,
-        minAge: c.minAge || 0,
-        likeable: false,
-      });
-    });
-    DEMO_FACTS.forEach(function (c) {
-      /* CGN-011: only News-desk true / fact-checked statements (DEMO_FACTS curated) */
-      if (c && c.verified === false) return;
-      pool.push({
-        id: c.id,
-        type: TYPE.FACT,
-        title: "Stumble fact",
-        body: c.body,
-        likeable: true,
-        verified: true,
-      });
-    });
-
-    var interestBlob = viewerInterestBlob();
-    pool = pool.filter(function (c) {
-      if (!c || !c.id || dismissed[c.id]) return false;
-      if (c.type === TYPE.FACT && c.verified === false) return false;
-      return true;
-    });
-    pool.sort(function (a, b) {
-      return interestScore(b, interestBlob) - interestScore(a, interestBlob);
-    });
-
-    var ads = shuffle(DEMO_ADS);
-    var adIdx = 0;
-    var withAds = [];
-    for (var i = 0; i < pool.length; i++) {
-      withAds.push(pool[i]);
-      if (withAds.length % AD_EVERY === 0) {
-        var ad = ads[adIdx % ads.length];
-        adIdx += 1;
-        var adCard = {
-          id: ad.id + "-slot-" + withAds.length,
-          type: TYPE.AD,
-          title: ad.title,
-          body: ad.body,
-          cta: ad.cta,
-          likeable: false,
-        };
-        if (!dismissed[adCard.id]) withAds.push(adCard);
-      }
-    }
-    if (withAds.length && withAds.length < AD_EVERY) {
-      var hasAd = withAds.some(function (c) {
-        return c.type === TYPE.AD;
-      });
-      if (!hasAd) {
-        var extra = ads[0];
-        withAds.push({
-          id: extra.id + "-bonus",
-          type: TYPE.AD,
-          title: extra.title,
-          body: extra.body,
-          cta: extra.cta,
-          likeable: false,
-        });
-      }
-    }
-    return withAds;
+  function sampleDeck(count) {
+    var built = buildLanes();
+    return paceDeck(built.lanes, built.dating, count || 18);
   }
 
   var state = {
@@ -452,27 +651,23 @@
     statusEl: null,
     cards: [],
     index: 0,
-    swipeCount: 0,
-    pointer: null,
+    seen: 0,
     busy: false,
+    pointer: null,
+    roomId: "",
   };
 
   function typeLabel(t) {
     switch (t) {
-      case TYPE.FEATURED:
-        return "Featured service";
-      case TYPE.AD:
-        return "Sponsored";
-      case TYPE.LIVE:
-        return "Live video";
-      case TYPE.DATING:
-        return "Speed dating";
-      case TYPE.CHAT:
-        return "Chatroom";
-      case TYPE.FACT:
-        return "Random fact";
-      default:
-        return "COMMUNE";
+      case TYPE.AD: return "Advertisement";
+      case TYPE.CHAT: return "Chatroom";
+      case TYPE.FACT: return "Fact";
+      case TYPE.WELLNESS: return "Wellness";
+      case TYPE.FRIEND: return "From a friend";
+      case TYPE.EVENT: return "Public event";
+      case TYPE.KNOW: return "People you may know";
+      case TYPE.DATING: return "Dating";
+      default: return "Commune";
     }
   }
 
@@ -481,10 +676,7 @@
     var allowed = datingAllowed();
     if (allowed) state.shell.setAttribute("data-dating-visible", "true");
     else state.shell.removeAttribute("data-dating-visible");
-
-    var toggle = state.shell.querySelector(
-      "[data-commune-see-dating], [data-commune-dating-toggle]"
-    );
+    var toggle = state.shell.querySelector("[data-commune-see-dating], [data-commune-dating-toggle]");
     if (toggle && toggle.type === "checkbox") {
       var age = getMemberAge();
       var blocked = age != null && age <= 18;
@@ -498,23 +690,12 @@
       }
       toggle.setAttribute("aria-checked", toggle.checked ? "true" : "false");
     }
-    var hint = state.shell.querySelector(
-      ".commune-dating-toggle-hint, #commune-dating-toggle-hint"
-    );
+    var hint = state.shell.querySelector(".commune-dating-toggle-hint, #commune-dating-toggle-hint");
     if (hint) {
       var age2 = getMemberAge();
-      if (age2 != null && age2 <= 18) {
-        hint.textContent =
-          "Dating content is unavailable under 19. Your profile age is " + age2 + ".";
-      } else if (!getSeeDating()) {
-        hint.textContent =
-          "Off by default. Dating cards show only when this is on and you're over 18.";
-      } else {
-        hint.textContent =
-          "Dating content on · age " +
-          (age2 != null ? age2 : "?") +
-          " · rate before swipe-right.";
-      }
+      if (age2 != null && age2 <= 18) hint.textContent = "Dating cards stay off under 19.";
+      else if (!getSeeDating()) hint.textContent = "Off until you turn it on. Dating cards stay hidden, and they only appear for someone local.";
+      else hint.textContent = "Dating is on. A local card shows now and then, after other cards.";
     }
   }
 
@@ -526,7 +707,6 @@
         state.statusEl.className = "commune-swipe-status";
         state.statusEl.setAttribute("data-commune-swipe-status", "");
         state.statusEl.setAttribute("role", "status");
-        state.statusEl.setAttribute("aria-live", "polite");
         state.shell.appendChild(state.statusEl);
       }
     }
@@ -536,593 +716,467 @@
     }
   }
 
-  function updateIndexUi() {
-    var total = state.cards.length;
-    var n = total ? Math.min(state.index + 1, total) : 0;
-    var idx = state.shell && state.shell.querySelector("[data-commune-index]");
-    if (idx) idx.textContent = total ? "Card " + n + " of " + total : "Deck clear";
-    var dots = state.shell && state.shell.querySelector("[data-commune-dots]");
-    if (!dots) return;
-    var buttons = dots.querySelectorAll("[data-commune-dot]");
-    if (buttons.length !== total) {
-      dots.innerHTML = "";
-      for (var i = 0; i < total; i++) {
-        var b = document.createElement("button");
-        b.type = "button";
-        b.className = "commune-swipe-dot" + (i === state.index ? " is-active" : "");
-        b.setAttribute("role", "tab");
-        b.setAttribute("aria-selected", i === state.index ? "true" : "false");
-        b.setAttribute("aria-label", "Card " + (i + 1));
-        b.setAttribute("data-commune-dot", String(i));
-        dots.appendChild(b);
-      }
-    } else {
-      buttons.forEach(function (b, i) {
-        var on = i === state.index;
-        b.classList.toggle("is-active", on);
-        b.setAttribute("aria-selected", on ? "true" : "false");
-      });
+  function noticesFor(profileId) {
+    var doc = readJson(localStorage, NOTICES_KEY, { byProfile: {} });
+    var list = doc.byProfile && doc.byProfile[profileId];
+    return Array.isArray(list) ? list : [];
+  }
+  function writeNotice(profileId, kind, body) {
+    var doc = readJson(localStorage, NOTICES_KEY, { byProfile: {} });
+    if (!doc.byProfile) doc.byProfile = {};
+    var list = Array.isArray(doc.byProfile[profileId]) ? doc.byProfile[profileId] : [];
+    var kept = list.filter(function (n) { return n && n.kind !== kind; });
+    kept.unshift({ id: kind + "-" + profileId, kind: kind, body: body, at: Date.now() });
+    doc.byProfile[profileId] = kept.slice(0, 8);
+    writeJson(localStorage, NOTICES_KEY, doc);
+  }
+  function renderNotices() {
+    if (!state.shell) return;
+    var el = state.shell.querySelector("[data-commune-notices]");
+    if (!el) return;
+    var mine = noticesFor(currentProfileId());
+    el.innerHTML = "";
+    if (!mine.length) {
+      el.hidden = true;
+      return;
     }
+    el.hidden = false;
+    mine.forEach(function (notice) {
+      var p = document.createElement("p");
+      p.className = "commune-private-notice";
+      p.setAttribute("data-notice-kind", notice.kind || "");
+      p.textContent = notice.body || "";
+      el.appendChild(p);
+    });
   }
 
-  function currentCard() {
-    return state.cards[state.index] || null;
+  function averageRating(profileId) {
+    var doc = readJson(localStorage, RATINGS_KEY, { byProfile: {} });
+    var list = (doc.byProfile && doc.byProfile[profileId]) || [];
+    if (!list.length) return null;
+    var sum = 0;
+    list.forEach(function (r) { sum += Number(r.score) || 0; });
+    return Math.round((sum / list.length) * 10) / 10;
+  }
+  function saveRating(profileId, raterId, score) {
+    var doc = readJson(localStorage, RATINGS_KEY, { byProfile: {} });
+    if (!doc.byProfile) doc.byProfile = {};
+    var list = Array.isArray(doc.byProfile[profileId]) ? doc.byProfile[profileId] : [];
+    list = list.filter(function (r) { return r && r.raterId !== raterId; });
+    list.push({ raterId: raterId, score: score, at: Date.now() });
+    doc.byProfile[profileId] = list;
+    writeJson(localStorage, RATINGS_KEY, doc);
+    var sum = 0;
+    list.forEach(function (r) { sum += Number(r.score) || 0; });
+    var avg = Math.round((sum / list.length) * 10) / 10;
+    writeNotice(profileId, "rating-average", ratingSentence(avg));
+    if (profileId === currentProfileId()) renderNotices();
+    return avg;
   }
 
-  function syncLikeButtonGate() {
+  function currentCard() { return state.cards[state.index] || null; }
+
+  function syncActionLabels() {
     var card = currentCard();
-    var likeBtn =
-      state.shell && state.shell.querySelector('[data-commune-swipe="right"]');
-    var active =
-      state.deck &&
-      state.deck.querySelector(
-        "[data-commune-card].is-active, .commune-card.is-active"
-      );
+    var pass = state.shell && state.shell.querySelector('[data-commune-swipe="left"]');
+    var keep = state.shell && state.shell.querySelector('[data-commune-swipe="right"]');
+    var dating = !!(card && card.type === TYPE.DATING);
+    if (pass) pass.textContent = dating ? "Pass" : "Pass";
+    if (keep) keep.textContent = dating ? "Share card" : "Keep";
+    var active = state.deck && state.deck.querySelector("[data-commune-card].is-active");
     var rated = active && active.getAttribute("data-rating-selected") === "true";
-    var needs = !!(card && card.type === TYPE.DATING && !rated);
-    if (state.shell) {
-      state.shell.classList.toggle("is-dating-needs-rating", needs);
+    var needs = dating && !rated;
+    if (state.shell) state.shell.classList.toggle("is-dating-needs-rating", needs);
+    if (keep) {
+      keep.disabled = needs;
+      keep.setAttribute("aria-disabled", needs ? "true" : "false");
     }
-    if (likeBtn) {
-      if (card && card.type === TYPE.DATING) {
-        likeBtn.disabled = !rated;
-        likeBtn.setAttribute("aria-disabled", rated ? "false" : "true");
-      } else {
-        likeBtn.disabled = false;
-        likeBtn.setAttribute("aria-disabled", "false");
-      }
-    }
+    var idx = state.shell && state.shell.querySelector("[data-commune-index]");
+    if (idx) idx.textContent = state.cards.length ? "Card " + (state.seen + 1) : "";
+    var dots = state.shell && state.shell.querySelector("[data-commune-dots]");
+    if (dots) dots.innerHTML = "";
   }
 
-  function renderCard(card, isFront) {
+  function renderCard(card) {
     var el = document.createElement("article");
-    el.className = "commune-card" + (isFront ? " is-active" : "");
+    el.className = "commune-card is-active";
     el.setAttribute("data-commune-card", "");
-    el.setAttribute("data-card-type", card.type);
+    el.setAttribute("data-card-type", card.type === TYPE.DATING ? "speed-dating" : card.type);
     el.setAttribute("data-card-id", card.id);
-    if (card.type === TYPE.FACT) {
-      if (card.verified === false) {
-        el.hidden = true;
-        el.setAttribute("data-fact-verified", "false");
-        return el;
-      }
-      el.setAttribute("data-fact-verified", "true");
-      el.classList.add("commune-card--fact");
-    }
-    if (card.dating) {
+    if (card.type === TYPE.DATING) {
       el.setAttribute("data-dating-content", "true");
       el.setAttribute("data-dating-opt-in", "true");
     }
-    if (!isFront) {
-      el.hidden = true;
-      el.setAttribute("aria-hidden", "true");
-    } else {
-      el.setAttribute("tabindex", "0");
-      el.setAttribute(
-        "aria-label",
-        typeLabel(card.type) +
-          ", card " +
-          (state.index + 1) +
-          " of " +
-          state.cards.length
-      );
+    if (card.type === TYPE.AD && card.handle) {
+      el.setAttribute("data-professional-handle", card.handle);
     }
-
-    var html = "";
-    html +=
-      '<p class="commune-card-kicker">' +
-      escapeHtml(typeLabel(card.type)) +
-      (card.type === TYPE.FACT
-        ? ' <span class="commune-fact-verified" aria-label="Verified">✓ Verified</span>'
-        : "") +
-      "</p>";
-
+    el.setAttribute("tabindex", "0");
+    var html = '<p class="commune-card-kicker">' + escapeHtml(typeLabel(card.type)) + "</p>";
     if (card.type === TYPE.DATING) {
-      html +=
-        '<h4 class="commune-card-title" data-dating-name>' +
-        escapeHtml(card.name || card.title) +
-        "</h4>";
-      html +=
-        '<figure class="commune-dating-photo"><img data-dating-photo src="' +
-        escapeHtml(card.photo || "assets/logo.svg") +
-        '" alt="Profile photo of ' +
-        escapeHtml(card.name || "member") +
-        '" width="320" height="320"></figure>';
-      html +=
-        '<p class="commune-card-body">' +
-        escapeHtml(card.body || "") +
-        (card.vibe ? " · " + escapeHtml(card.vibe) : "") +
-        "</p>";
-      var avg = averageRating(card.profileId || card.id);
-      html +=
-        '<div class="commune-dating-rate" data-dating-rate-wrap>' +
-        '<label class="commune-dating-rate-label">Your rating <span class="req" aria-hidden="true">*</span></label>' +
-        '<p class="form-hint">Required before Like / swipe right' +
-        (avg != null ? " · community avg " + avg : "") +
-        "</p>" +
+      html += '<h4 class="commune-card-title" data-dating-name>' + escapeHtml(card.name || card.title) + "</h4>";
+      html += '<figure class="commune-dating-photo"><img data-dating-photo src="' + escapeHtml(card.photo) + '" alt="Profile photo" width="320" height="320"></figure>';
+      html += '<p class="commune-card-body">' + escapeHtml(card.body || "") + "</p>";
+      html += '<div class="commune-dating-rate" data-dating-rate-wrap>' +
+        '<label class="commune-dating-rate-label">Rate this photo</label>' +
+        '<p class="form-hint">Move the scale if you want to. Left passes. Right shares your card.</p>' +
         '<div class="commune-dating-rate-row">' +
-        '<input type="range" min="1" max="10" step="1" value="5" data-dating-rate data-dating-rate-value aria-valuemin="1" aria-valuemax="10">' +
+        '<input type="range" min="1" max="10" step="1" value="5" data-dating-rate aria-valuemin="1" aria-valuemax="10">' +
         '<output class="commune-dating-rate-output" data-dating-rate-output>5</output>' +
         "</div>" +
-        '<p class="commune-dating-rate-status" data-dating-rate-status hidden role="status" aria-live="polite"></p>' +
+        '<p class="commune-dating-rate-status" data-dating-rate-status hidden role="status"></p>' +
         "</div>";
-      html += '<span class="commune-card-badge">Opt-in</span>';
     } else {
-      html +=
-        '<h4 class="commune-card-title">' + escapeHtml(card.title || "") + "</h4>";
-      if (card.fromName) {
-        html +=
-          '<p class="commune-card-meta">From ' +
-          escapeHtml(card.fromName) +
-          "</p>";
-      }
-      if (card.host) {
-        html +=
-          '<p class="commune-card-meta">Host · ' + escapeHtml(card.host) + "</p>";
-      }
-      if (card.type === TYPE.LIVE) {
-        html +=
-          '<div class="commune-live-chrome" aria-hidden="true">' +
-          '<button type="button" class="commune-live-play" tabindex="-1" disabled>▶</button>' +
-          '<span class="commune-live-pulse"></span><span class="commune-live-label">LIVE</span></div>';
-      }
-      html +=
-        '<p class="commune-card-body">' + escapeHtml(card.body || "") + "</p>";
-      if (card.roomKind) {
-        html +=
-          '<p class="commune-card-meta">Room · ' +
-          escapeHtml(card.roomKind) +
-          (card.minAge >= 21 ? " · 21+" : "") +
-          "</p>";
+      html += '<h4 class="commune-card-title">' + escapeHtml(card.title || "") + "</h4>";
+      if (card.fromName) html += '<p class="commune-card-meta">' + escapeHtml(card.fromName) + "</p>";
+      if (card.videoUrl) html += videoHtml(card.videoUrl);
+      if (card.body) html += '<p class="commune-card-body">' + escapeHtml(card.body) + "</p>";
+      if (card.type === TYPE.AD && card.handle) {
+        html += '<button type="button" class="btn btn-secondary" data-commune-open-profile>Open their page</button>';
+        html += '<p class="commune-card-meta">Book on the calendar, or follow this professional page.</p>';
       }
       if (card.type === TYPE.CHAT) {
-        html +=
-          '<button type="button" class="btn btn-primary commune-enter-sim" data-commune-enter-sim>Enter sim-world</button>' +
-          '<p class="commune-sim-msg" data-commune-sim-msg hidden role="status"></p>';
+        html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room</button>';
       }
-      if (card.type === TYPE.AD && card.cta) {
-        html +=
-          '<button type="button" class="btn btn-secondary" data-commune-ad-cta>' +
-          escapeHtml(card.cta) +
-          "</button>";
-      }
-      if (card.type === TYPE.LIVE) {
-        html +=
-          '<button type="button" class="btn btn-secondary" data-commune-live-join>Join stub room</button>' +
-          '<p class="cgn-deferral" role="note">Demo / local only</p>';
-      }
-      if (card.type === TYPE.FEATURED) {
-        html += '<span class="commune-card-badge">Featured</span>';
-      }
-      if (card.type === TYPE.AD) {
-        html +=
-          '<span class="commune-card-badge commune-card-badge--ad">Ad</span>';
-      }
+      if (card.type === TYPE.KNOW) html += '<span class="commune-card-badge commune-card-badge--ad">Ad</span>';
+      if (card.type === TYPE.AD) html += '<span class="commune-card-badge commune-card-badge--ad">Ad</span>';
     }
-
     el.innerHTML = html;
     return el;
   }
 
-  function bindCardActions(el, card) {
+  function bindCard(el, card) {
     var range = el.querySelector("input[data-dating-rate]");
     var out = el.querySelector("[data-dating-rate-output]");
-    var status = el.querySelector("[data-dating-rate-status]");
     if (range) {
-      var markRated = function () {
+      var commit = function () {
         el.setAttribute("data-rating-selected", "true");
         var v = String(range.value);
-        range.setAttribute("data-dating-rate-value", v);
         range.setAttribute("aria-valuenow", v);
         if (out) out.textContent = v;
-        /* also support dual attr on same input */
-        if (range.hasAttribute("data-dating-rate-value")) {
-          range.setAttribute("data-dating-rate-value", v);
-        }
-        var valEl = el.querySelector("[data-dating-rate-value]:not(input)");
-        if (valEl) valEl.textContent = v;
+        saveRating(card.profileId || card.id, currentProfileId(), parseInt(v, 10) || 1);
+        var status = el.querySelector("[data-dating-rate-status]");
         if (status) {
           status.hidden = false;
-          status.textContent = "Rated " + v + " — you can swipe right.";
-          status.classList.remove("is-error");
+          status.textContent = "You can swipe right.";
         }
-        syncLikeButtonGate();
+        syncActionLabels();
       };
-      range.addEventListener("input", markRated);
-      range.addEventListener("change", markRated);
+      range.addEventListener("input", commit);
+      range.addEventListener("change", commit);
     }
-
     var sim = el.querySelector("[data-commune-enter-sim]");
-    if (sim) {
-      sim.addEventListener("click", function (ev) {
-        ev.stopPropagation();
-        enterSim(card, el);
-      });
-    }
-    var live = el.querySelector("[data-commune-live-join]");
-    if (live) {
-      live.addEventListener("click", function (ev) {
-        ev.stopPropagation();
-        setStatus("Live video stub — no camera or WebRTC in this demo.");
-      });
-    }
-    var ad = el.querySelector("[data-commune-ad-cta]");
-    if (ad) {
-      ad.addEventListener("click", function (ev) {
-        ev.stopPropagation();
-        setStatus("Ad CTA stub — nothing purchased.");
+    if (sim) sim.addEventListener("click", function (ev) { ev.stopPropagation(); openRoom(card.id, true); });
+    var open = el.querySelector("[data-commune-open-profile]");
+    if (open) open.addEventListener("click", function (ev) { ev.stopPropagation(); openProfessionalPage(card); });
+    if (card.type === TYPE.AD && card.handle) {
+      el.addEventListener("click", function (ev) {
+        if (ev.target.closest("button, a, input, video, iframe")) return;
+        openProfessionalPage(card);
       });
     }
   }
 
-  function enterSim(card, el) {
-    var msg = el.querySelector("[data-commune-sim-msg]");
-    var minAge = card.minAge || 0;
-    var age = getMemberAge();
-    if (minAge >= 21) {
-      if (age == null) {
-        if (msg) {
-          msg.hidden = false;
-          msg.textContent = "Set your age on sign-up to enter 21+ rooms.";
-        }
-        setStatus("Age required for 21+ rooms.");
-        return;
-      }
-      if (age < 21) {
-        if (msg) {
-          msg.hidden = false;
-          msg.textContent =
-            "You must be 21 or older. Your profile age is " + age + ".";
-        }
-        setStatus("Blocked: 21+ room · profile age " + age + ".");
-        return;
-      }
+  function openProfessionalPage(card) {
+    var handle = String(card.handle || "").replace(/^@/, "");
+    if (!handle) return;
+    try { location.hash = "tower-profile-" + handle; } catch (e) {}
+    if (window.CognationTowerOpenProfile) {
+      try { window.CognationTowerOpenProfile(handle); } catch (e2) {}
     }
-    if (msg) {
-      msg.hidden = false;
-      msg.textContent =
-        "Simulation world stub — imagine 3D figurines walking and talking. No WebXR engine here.";
+  }
+
+  function showRoom(on) {
+    var room = state.shell && state.shell.querySelector("[data-commune-room]");
+    var deck = state.deck;
+    var actions = state.shell && state.shell.querySelector(".commune-swipe-actions");
+    if (room) room.hidden = !on;
+    if (deck) deck.hidden = !!on;
+    if (actions) actions.hidden = !!on;
+  }
+
+  function roomLog(roomId) {
+    var doc = readJson(localStorage, ROOM_CHAT_KEY, {});
+    if (!doc[roomId]) {
+      doc[roomId] = [{
+        id: "host-" + roomId,
+        senderName: "Cognation",
+        body: "Cognation hosts this room. Keep it kind.",
+        at: new Date().toISOString(),
+      }];
+      writeJson(localStorage, ROOM_CHAT_KEY, doc);
     }
-    setStatus('Entered "' + (card.title || 'world') + '" simulation stub.');
+    return doc;
+  }
+  function paintRoom(room) {
+    var panel = state.shell.querySelector("[data-commune-room]");
+    if (!panel || !room) return;
+    var title = panel.querySelector("[data-commune-room-title]");
+    var topic = panel.querySelector("[data-commune-room-topic]");
+    var log = panel.querySelector("[data-commune-room-log]");
+    if (title) title.textContent = room.title || "Room";
+    if (topic) topic.textContent = room.body || room.topic || "";
+    if (log) {
+      log.innerHTML = "";
+      var doc = roomLog(room.id);
+      (doc[room.id] || []).forEach(function (msg) {
+        var p = document.createElement("p");
+        p.className = "commune-room-line";
+        p.textContent = (msg.senderName || "Cognation") + ": " + (msg.body || "");
+        log.appendChild(p);
+      });
+    }
+    showRoom(true);
+    state.roomId = room.id;
+  }
+  function openRoom(roomId, scroll) {
+    roomId = String(roomId || "");
+    var rooms = ensureSiteRooms();
+    var room = null;
+    rooms.forEach(function (item) { if (item.id === roomId) room = item; });
+    if (!room) return false;
+    if (!state.shell) return false;
+    paintRoom(room);
+    if (scroll && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
+    return true;
+  }
+  function closeRoom() {
+    state.roomId = "";
+    showRoom(false);
   }
 
   function paintDeck() {
     if (!state.deck) return;
+    closeRoom();
     state.deck.innerHTML = "";
     var card = currentCard();
     if (!card) {
-      var empty = document.createElement("div");
-      empty.className = "commune-swipe-empty";
-      empty.innerHTML =
-        "<p>Deck clear for this session.</p>" +
-        '<button type="button" class="btn btn-secondary" data-commune-reshuffle>Reshuffle remaining</button>';
-      state.deck.appendChild(empty);
-      var rs = empty.querySelector("[data-commune-reshuffle]");
-      if (rs) {
-        rs.addEventListener("click", function () {
-          rebuildDeck();
-          setStatus("Deck reshuffled.");
-        });
-      }
-      updateIndexUi();
-      syncLikeButtonGate();
+      refill();
+      card = currentCard();
+    }
+    if (!card) {
+      state.deck.innerHTML = '<p class="commune-swipe-empty">Nothing public to show yet.</p>';
+      syncActionLabels();
       return;
     }
-    var front = renderCard(card, true);
-    state.deck.appendChild(front);
-    bindCardActions(front, card);
-    var next = state.cards[state.index + 1];
-    if (next) state.deck.appendChild(renderCard(next, false));
-    updateIndexUi();
-    syncLikeButtonGate();
+    var el = renderCard(card);
+    state.deck.appendChild(el);
+    bindCard(el, card);
+    syncActionLabels();
   }
 
-  function messageStore() {
-    return window.CognationMessageStore || null;
+  function refill() {
+    var built = buildLanes();
+    state.cards = paceDeck(built.lanes, built.dating, 12);
+    state.index = 0;
   }
 
-  function ensureConversation(peerId, peerName) {
-    var store = messageStore();
-    if (!store) return null;
-    if (typeof store.ensureConversation === "function") {
-      return store.ensureConversation(peerId, peerName);
-    }
-    var st = store.getState && store.getState();
-    if (!st) return null;
-    var cid = "dm-" + peerId;
-    var found = null;
-    (st.conversations || []).forEach(function (c) {
-      if (c.id === cid || c.peerId === peerId) found = c;
-    });
-    if (!found) {
-      found = {
-        id: cid,
-        title: peerName || peerId,
-        peerId: peerId,
-        mutualMatch: false,
-        participants: [
-          { id: "you", name: "You" },
-          { id: peerId, name: peerName || peerId },
-        ],
-        messages: [],
-      };
-      st.conversations.push(found);
-      store.save(st);
-    }
-    return found;
-  }
-
-  function pushTowerMessage(opts) {
-    opts = opts || {};
-    var store = messageStore();
-    var conv = ensureConversation(opts.peerId, opts.peerName);
-    if (!store || !conv) return false;
-    var st = store.getState();
-    var target = null;
-    for (var i = 0; i < st.conversations.length; i++) {
-      if (st.conversations[i].id === conv.id) {
-        target = st.conversations[i];
-        break;
-      }
-    }
-    if (!target) return false;
-    if (opts.mutualMatch) target.mutualMatch = true;
-    var msg = {
-      id: "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      senderId: opts.senderId || "system",
-      senderName: opts.senderName || "COMMUNE",
-      body: opts.body || "",
-      createdAt: new Date().toISOString(),
-      reactions: {},
-      kind: opts.kind || "friend",
-      mutualMatch: !!opts.mutualMatch,
-    };
-    target.messages.push(msg);
-    if ("activeId" in st) st.activeId = target.id;
-    else st.activeId = target.id;
-    store.save(st);
-    document.dispatchEvent(
-      new CustomEvent("cognation:messages-updated", {
-        detail: { conversationId: target.id },
-      })
-    );
-    if (typeof store.refreshUi === "function") {
-      try {
-        store.refreshUi();
-      } catch (e) {}
-    }
-    return true;
-  }
-
-  function postRatingUpdate(card, score, avg) {
-    var name = card.name || card.title || "Member";
-    var pid = card.profileId || card.id;
-    pushTowerMessage({
-      peerId: pid,
-      peerName: name,
-      kind: "rating-update",
-      senderId: "system",
-      senderName: "COMMUNE Ratings",
-      body:
-        currentRaterId() +
-        " rated you " +
-        score +
-        "/10" +
-        (avg != null ? " · new average " + avg : "") +
-        ".",
-    });
-  }
-
-  function postMutualMatch(card) {
-    var name = card.name || card.title || "Match";
-    var pid = card.profileId || card.id;
-    pushTowerMessage({
-      peerId: pid,
-      peerName: name,
-      kind: "friend",
-      mutualMatch: true,
-      senderId: pid,
-      senderName: name,
-      body: "It's a match! You both swiped right. Say hi whenever you're ready.",
-    });
-    pushTowerMessage({
-      peerId: pid,
-      peerName: name,
-      kind: "friend",
-      mutualMatch: true,
-      senderId: "you",
-      senderName: "You",
-      body: "Matched with " + name + " from COMMUNE dating (demo).",
-    });
-  }
-
-  function dismissForever(card) {
+  function dismiss(card) {
     var ids = getDismissed();
     if (ids.indexOf(card.id) < 0) ids.push(card.id);
     setDismissed(ids);
   }
-  function likeCard(card) {
+  function like(card) {
     var ids = getLikes();
     if (ids.indexOf(card.id) < 0) ids.push(card.id);
     setLikes(ids);
   }
-  function shareCard(card) {
-    var ids = getShares();
-    if (ids.indexOf(card.id) < 0) ids.push(card.id);
-    setShares(ids);
+
+  function recordShare(card) {
+    var interests = terms(card.interests);
+    if (!interests.length) interests = terms((card.title || "") + " " + (card.body || ""));
+    if (!interests.length) return;
+    var shares = readJson(localStorage, SHARES_KEY, []);
+    if (!Array.isArray(shares)) shares = [];
+    shares.push({
+      id: "share-" + card.id + "-" + Date.now().toString(36),
+      adId: card.id,
+      title: card.title,
+      body: card.body,
+      videoUrl: card.videoUrl || "",
+      fromName: card.fromName || "",
+      handle: card.handle || "",
+      profileId: card.profileId || "",
+      interests: interests,
+      swiperId: currentProfileId(),
+      at: Date.now(),
+    });
+    writeJson(localStorage, SHARES_KEY, shares.slice(-200));
   }
 
-  function maybeInjectAdAfterSwipe() {
-    if (state.swipeCount > 0 && state.swipeCount % AD_EVERY === 0) {
-      var peek = state.cards[state.index];
-      if (peek && peek.type === TYPE.AD) return;
-      var ad = shuffle(DEMO_ADS)[0];
-      var adCard = {
-        id: ad.id + "-live-" + state.swipeCount,
-        type: TYPE.AD,
-        title: ad.title,
-        body: ad.body,
-        cta: ad.cta,
-        likeable: false,
-      };
-      if (getDismissed().indexOf(adCard.id) >= 0) return;
-      state.cards.splice(state.index, 0, adCard);
+  function sendPersonalFriendRequest(targetId) {
+    targetId = String(targetId || "");
+    var personal = viewerPersonal();
+    var cap = (window.CognationTowerFriends && window.CognationTowerFriends.cap) || FRIEND_CAP;
+    var count = personal && Array.isArray(personal.friendIds) ? personal.friendIds.length : 0;
+    if (count >= cap) return { ok: false, full: true, message: "This list is full." };
+    if (!targetId || !personal) return { ok: false, message: "Could not send that request." };
+    if (personal.friendIds && personal.friendIds.map(String).indexOf(targetId) >= 0) {
+      return { ok: true, already: true, message: "You're already friends." };
+    }
+    var doc = readJson(localStorage, REQUESTS_KEY, { outgoing: [], incoming: [] });
+    if (!Array.isArray(doc.outgoing)) doc.outgoing = [];
+    if (!Array.isArray(doc.incoming)) doc.incoming = [];
+    var fromId = String(personal.id || currentProfileId());
+    var dup = doc.outgoing.some(function (req) {
+      return req && String(req.fromId) === fromId && String(req.toId) === targetId;
+    });
+    if (!dup) {
+      doc.outgoing.push({ fromId: fromId, toId: targetId, at: Date.now() });
+      doc.incoming.push({ fromId: fromId, toId: targetId, at: Date.now() });
+      writeJson(localStorage, REQUESTS_KEY, doc);
+    }
+    var social = window.CognationSocialGraph;
+    if (social && typeof social.isReady === "function" && social.isReady() && typeof social.isRemoteProfileId === "function" && social.isRemoteProfileId(targetId) && typeof social.act === "function") {
+      try { social.act(targetId, "personal"); } catch (e) {}
+    }
+    return { ok: true, message: "Friend request sent." };
+  }
+
+  function datingRights() {
+    var doc = readJson(localStorage, DATING_RIGHT_KEY, {});
+    return doc && typeof doc === "object" ? doc : {};
+  }
+  function markDatingRight(fromId, toId) {
+    var doc = datingRights();
+    doc[String(fromId) + "|" + String(toId)] = Date.now();
+    writeJson(localStorage, DATING_RIGHT_KEY, doc);
+  }
+  function hasDatingRight(fromId, toId) {
+    return !!datingRights()[String(fromId) + "|" + String(toId)];
+  }
+  function deliverDatingCard(fromRec, toId) {
+    if (!fromRec || !toId || !datingOptIn(fromRec)) return;
+    var photo = profilePhoto(fromRec);
+    if (!photo) return;
+    var doc = readJson(localStorage, INBOUND_KEY, {});
+    if (!Array.isArray(doc[toId])) doc[toId] = [];
+    var exists = doc[toId].some(function (c) { return c && c.profileId === fromRec.id; });
+    if (!exists) {
+      doc[toId].push({
+        profileId: fromRec.id,
+        name: fromRec.displayName || "Member",
+        photo: photo,
+        minAge: datingMinAge(fromRec),
+      });
+      writeJson(localStorage, INBOUND_KEY, doc);
     }
   }
-
-  function animateOff(dir, done) {
-    var front =
-      state.deck &&
-      state.deck.querySelector(
-        ".commune-card.is-active, [data-commune-card].is-active"
-      );
-    if (!front) {
-      done();
-      return;
-    }
-    front.classList.add(dir === "left" ? "is-exit-left" : "is-exit-right");
-    window.setTimeout(done, 220);
+  function selfDatingRecord() {
+    var personal = viewerPersonal();
+    if (personal && datingOptIn(personal) && profilePhoto(personal)) return personal;
+    var id = currentProfileId();
+    var rec = profileById(id);
+    if (rec && datingOptIn(rec) && profilePhoto(rec)) return rec;
+    return null;
   }
 
-  function datingRated(activeEl) {
-    return !!(
-      activeEl && activeEl.getAttribute("data-rating-selected") === "true"
-    );
+  function finishSwipe() {
+    state.cards.splice(state.index, 1);
+    state.seen += 1;
+    if (state.cards.length < 4) {
+      var more = sampleDeck(8);
+      more.forEach(function (card) {
+        var dup = state.cards.some(function (c) { return c.id === card.id; });
+        if (!dup) state.cards.push(card);
+      });
+    }
+    state.busy = false;
+    paintDeck();
   }
 
   function swipe(direction) {
-    if (state.busy) return;
+    if (state.busy || state.roomId) return;
     var card = currentCard();
-    if (!card) {
-      setStatus("No more cards — reshuffle or follow pros for more services.");
-      return;
-    }
+    if (!card) return;
     var dir = direction === "left" ? "left" : "right";
-    var active =
-      state.deck &&
-      state.deck.querySelector(
-        ".commune-card.is-active, [data-commune-card].is-active"
-      );
-
+    var active = state.deck && state.deck.querySelector("[data-commune-card].is-active");
     if (dir === "right" && card.type === TYPE.DATING) {
-      if (!datingRated(active)) {
+      if (!(active && active.getAttribute("data-rating-selected") === "true")) {
         var st = active && active.querySelector("[data-dating-rate-status]");
         if (st) {
           st.hidden = false;
-          st.textContent = "Rate 1–10 before you can swipe right.";
-          st.classList.add("is-error");
+          st.textContent = "Rate the photo before you swipe right.";
         }
-        setStatus(
-          "Dating card: rate 1–10 before Like / swipe right. Dismiss (left) is still OK."
-        );
-        syncLikeButtonGate();
+        setStatus("Rate the photo before you share your card.");
+        syncActionLabels();
         return;
       }
-      var range = active.querySelector("input[data-dating-rate]");
-      var score = parseInt(range && range.value, 10) || 5;
-      var avg = saveRating(card.profileId || card.id, currentRaterId(), score);
-      postRatingUpdate(card, score, avg);
-      addDatingLike(card.profileId || card.id);
-      if (isMutual(card.profileId || card.id)) {
-        postMutualMatch(card);
-        setStatus(
-          "Mutual match with " +
-            (card.name || "member") +
-            "! Check Tower messages."
-        );
-      }
     }
-
+    if (dir === "right" && card.type === TYPE.KNOW) {
+      var sent = sendPersonalFriendRequest(card.profileId);
+      setStatus(sent.message || (sent.full ? "This list is full." : "Friend request sent."));
+      if (sent.full) return;
+    }
     state.busy = true;
-    animateOff(dir, function () {
+    if (active) active.classList.add(dir === "left" ? "is-exit-left" : "is-exit-right");
+    window.setTimeout(function () {
       if (dir === "left") {
-        dismissForever(card);
-        setStatus("Dismissed · hidden for this session.");
+        dismiss(card);
+        setStatus("Passed.");
       } else if (card.type === TYPE.DATING) {
-        likeCard(card);
-        if (!isMutual(card.profileId || card.id)) {
-          setStatus(
-            "Liked " + (card.name || "profile") + " · waiting on mutual (demo)."
-          );
+        like(card);
+        var me = currentProfileId();
+        markDatingRight(me, card.profileId);
+        var self = selfDatingRecord();
+        if (self) deliverDatingCard(self, card.profileId);
+        if (hasDatingRight(card.profileId, me)) {
+          var store = window.CognationMessageStore;
+          if (store && typeof store.openMatch === "function") {
+            store.openMatch(
+              { id: me, name: (self && self.displayName) || "You" },
+              { id: card.profileId, name: card.name || "Member" }
+            );
+          }
+          writeNotice(me, "match", "It's a match. A message is open in Tower.");
+          writeNotice(card.profileId, "match", "It's a match. A message is open in Tower.");
+          renderNotices();
+          setStatus("It's a match. A message is open in Tower.");
+        } else {
+          setStatus("Your card is on their Commune.");
         }
-      } else if (card.likeable) {
-        likeCard(card);
-        setStatus("Liked · saved to demo likes.");
+      } else if (card.type === TYPE.AD) {
+        recordShare(card);
+        setStatus("Shared with friends who share this interest.");
+      } else if (card.type === TYPE.KNOW) {
+        /* status already set */
+      } else if (card.type === TYPE.FRIEND || card.type === TYPE.EVENT || card.type === TYPE.FACT || card.type === TYPE.WELLNESS || card.type === TYPE.CHAT) {
+        like(card);
+        if (card.type !== TYPE.CHAT) recordShare(card);
+        setStatus("Kept.");
       } else {
-        shareCard(card);
-        setStatus("Shared into friends' COMMUNE algo (demo store).");
+        like(card);
+        setStatus("Kept.");
       }
-      state.swipeCount += 1;
-      state.cards.splice(state.index, 1);
-      maybeInjectAdAfterSwipe();
-      state.busy = false;
-      paintDeck();
-    });
+      finishSwipe();
+    }, 220);
   }
 
   function rebuildDeck() {
     syncDatingVisibility();
-    state.cards = buildDeckCards();
-    state.index = 0;
+    renderNotices();
+    refill();
+    state.seen = 0;
     paintDeck();
   }
 
   function onPointerDown(ev) {
-    var front =
-      state.deck &&
-      state.deck.querySelector(
-        ".commune-card.is-active, [data-commune-card].is-active"
-      );
+    var front = state.deck && state.deck.querySelector("[data-commune-card].is-active");
     if (!front) return;
-    if (
-      ev.target.closest &&
-      ev.target.closest("button, a, input, select, textarea, label, output")
-    ) {
-      return;
-    }
+    if (ev.target.closest && ev.target.closest("button, a, input, textarea, label, video, iframe")) return;
     var point = ev.touches ? ev.touches[0] : ev;
-    state.pointer = { x0: point.clientX, y0: point.clientY, dx: 0, el: front };
+    state.pointer = { x0: point.clientX, dx: 0, el: front };
     front.classList.add("is-dragging");
-    if (ev.pointerId != null && front.setPointerCapture) {
-      try {
-        front.setPointerCapture(ev.pointerId);
-      } catch (e) {}
-    }
   }
   function onPointerMove(ev) {
     if (!state.pointer) return;
     var point = ev.touches ? ev.touches[0] : ev;
     var dx = point.clientX - state.pointer.x0;
-    var dy = point.clientY - state.pointer.y0;
     state.pointer.dx = dx;
-    if (state.pointer.el) {
-      state.pointer.el.style.transform =
-        "translate(" + dx + "px," + dy * 0.15 + "px) rotate(" + dx / 28 + "deg)";
-    }
+    if (state.pointer.el) state.pointer.el.style.transform = "translate(" + dx + "px,0) rotate(" + dx / 28 + "deg)";
   }
   function onPointerUp() {
     if (!state.pointer) return;
-    var dx = state.pointer.dx;
+    var dx = state.pointer.dx || 0;
     var el = state.pointer.el;
     state.pointer = null;
     if (el) {
@@ -1134,19 +1188,14 @@
   }
 
   function wireDatingToggle(shell) {
-    var toggle = shell.querySelector(
-      "[data-commune-see-dating], [data-commune-dating-toggle]"
-    );
+    var toggle = shell.querySelector("[data-commune-see-dating], [data-commune-dating-toggle]");
     if (!toggle) return;
-    if (toggle.type === "checkbox") toggle.checked = getSeeDating();
     toggle.addEventListener("change", function () {
       var age = getMemberAge();
       if (age != null && age <= 18) {
         toggle.checked = false;
         setSeeDating(false);
-        setStatus(
-          "Dating content requires age over 18. Your age is " + age + "."
-        );
+        setStatus("Dating cards stay off under 19.");
         syncDatingVisibility();
         rebuildDeck();
         return;
@@ -1154,11 +1203,7 @@
       setSeeDating(!!toggle.checked);
       syncDatingVisibility();
       rebuildDeck();
-      setStatus(
-        toggle.checked
-          ? "Dating content enabled — speed-dating cards may appear in the mix."
-          : "Dating content hidden."
-      );
+      setStatus(toggle.checked ? "Dating cards can appear now and then." : "Dating cards hidden.");
     });
   }
 
@@ -1168,91 +1213,59 @@
       if (!btn || !shell.contains(btn)) return;
       swipe(btn.getAttribute("data-commune-swipe") === "left" ? "left" : "right");
     });
+    var back = shell.querySelector("[data-commune-room-back]");
+    if (back) back.addEventListener("click", closeRoom);
+    var form = shell.querySelector("[data-commune-room-compose]");
+    if (form) {
+      form.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        var input = shell.querySelector("[data-commune-room-input]");
+        var text = input ? String(input.value || "").trim() : "";
+        if (!text || !state.roomId) return;
+        var doc = roomLog(state.roomId);
+        doc[state.roomId].push({
+          id: "m" + Date.now().toString(36),
+          senderName: "You",
+          body: text.slice(0, 500),
+          at: new Date().toISOString(),
+        });
+        writeJson(localStorage, ROOM_CHAT_KEY, doc);
+        if (input) input.value = "";
+        var room = null;
+        ensureSiteRooms().forEach(function (item) { if (item.id === state.roomId) room = item; });
+        if (room) paintRoom(room);
+      });
+    }
     var deck = shell.querySelector("[data-commune-deck]");
     if (deck) {
       deck.addEventListener("pointerdown", onPointerDown);
       deck.addEventListener("pointermove", onPointerMove);
       deck.addEventListener("pointerup", onPointerUp);
       deck.addEventListener("pointercancel", onPointerUp);
-      deck.addEventListener("touchstart", onPointerDown, { passive: true });
-      deck.addEventListener("touchmove", onPointerMove, { passive: true });
-      deck.addEventListener("touchend", onPointerUp);
     }
     document.addEventListener("keydown", function (ev) {
       var panel = document.getElementById("panel-commune");
-      if (!panel || panel.hidden) return;
-      if (ev.key === "ArrowLeft") {
-        ev.preventDefault();
-        swipe("left");
-      } else if (ev.key === "ArrowRight") {
-        ev.preventDefault();
-        swipe("right");
-      }
+      if (!panel || panel.hidden || state.roomId) return;
+      if (ev.key === "ArrowLeft") { ev.preventDefault(); swipe("left"); }
+      else if (ev.key === "ArrowRight") { ev.preventDefault(); swipe("right"); }
     });
     wireDatingToggle(shell);
   }
 
-  function seedDemoFollows() {
-    if (
-      window.CognationAccounts &&
-      window.CognationAccounts.ensureDemoProfessionals
-    ) {
-      try {
-        window.CognationAccounts.ensureDemoProfessionals();
-      } catch (e) {}
-    }
-    var ids = getFollows();
-    ["prof-demo-mira-pro", "prof-demo-jordan-pro"].forEach(function (id) {
-      if (ids.indexOf(id) < 0) ids.push(id);
-    });
-    setFollows(ids);
-  }
-
   function init() {
+    ensureSiteRooms();
     var shell = document.querySelector("[data-commune-shell]");
     if (!shell) return;
-    if (
-      window.CognationAccounts &&
-      window.CognationAccounts.ensureDemoProfessionals
-    ) {
-      try {
-        window.CognationAccounts.ensureDemoProfessionals();
-      } catch (e) {}
-    }
     state.shell = shell;
-    shell.setAttribute("data-commune-source", "interest");
     state.deck = shell.querySelector("[data-commune-deck]");
     state.statusEl = shell.querySelector("[data-commune-swipe-status]");
     bindInteractions(shell);
     rebuildDeck();
-    document.addEventListener("cognation:commune-follows-changed", rebuildDeck);
     document.addEventListener("cognation:session-started", rebuildDeck);
     document.addEventListener("cognation:member-profile-updated", function () {
       syncDatingVisibility();
       rebuildDeck();
     });
-  }
-
-  function openRoom(roomId) {
-    roomId = String(roomId || "");
-    if (!state.cards || !state.cards.length) rebuildDeck();
-    var idx = -1;
-    for (var i = 0; i < state.cards.length; i++) {
-      if (state.cards[i] && state.cards[i].id === roomId) {
-        idx = i;
-        break;
-      }
-    }
-    if (idx < 0) return false;
-    state.index = idx;
-    paintDeck();
-    var card = state.cards[idx];
-    var front = state.deck && state.deck.querySelector("[data-commune-card]");
-    if (card && front && card.type === TYPE.CHAT) enterSim(card, front);
-    if (state.shell && state.shell.scrollIntoView) {
-      state.shell.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-    return true;
   }
 
   window.CognationCommuneSwipe = {
@@ -1268,15 +1281,18 @@
     getSeeDating: getSeeDating,
     setSeeDating: setSeeDating,
     datingAllowed: datingAllowed,
-    seedDemoFollows: seedDemoFollows,
+    seedDemoFollows: function () { return getFollows(); },
+    siteRoomCatalog: function () { return SITE_ROOMS.map(roomCard); },
+    visibleSiteRooms: ensureSiteRooms,
+    ratingSentence: ratingSentence,
+    paceDeck: paceDeck,
+    sampleDeck: sampleDeck,
+    sendPersonalFriendRequest: sendPersonalFriendRequest,
     FOLLOWS_KEY: FOLLOWS_KEY,
     SEE_DATING_KEY: SEE_DATING_KEY,
     MEMBER_PROFILE_KEY: MEMBER_PROFILE_KEY,
   };
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
 })();

@@ -1009,7 +1009,7 @@
               >
                 <header class="commune-swipe-header">
                   <h3 class="commune-swipe-title">COMMUNE</h3>
-                  <p class="commune-swipe-dek">Swipe the deck — discover services, rooms, and live moments.</p>
+                  <p class="commune-swipe-dek">A paced deck of everyday cards. One card is one thing.</p>
                   <div class="commune-dating-toggle-row">
                     <label class="commune-dating-toggle" for="commune-see-dating">
                       <input
@@ -1024,95 +1024,32 @@
                       <span class="commune-dating-toggle-text">See dating content</span>
                     </label>
                     <p class="form-hint commune-dating-toggle-hint" id="commune-dating-toggle-hint">
-                      Off by default. Dating cards show only when this is on and you’re 18+ (Engineer gates age).
+                      Off until you turn it on. Dating cards stay hidden, and they only appear for someone local.
                     </p>
                   </div>
+                  <div class="commune-private-notices" data-commune-notices hidden></div>
                 </header>
 
                 <p class="commune-swipe-hint" id="commune-swipe-hint">
-                  Swipe left to dismiss · swipe right to like · or use the buttons below
+                  Swipe left to pass · swipe right to keep · cards stay mixed so no one focus takes over
                 </p>
 
                 <div class="commune-swipe-stage">
-                  <div class="commune-swipe-deck" data-commune-deck aria-live="polite" aria-atomic="true">
-                    <article class="commune-card is-active" data-commune-card data-card-type="featured-service" aria-label="Featured service, card 1 of 6">
-                      <p class="commune-card-kicker">Featured service</p>
-                      <h4 class="commune-card-title">Wellness Concierge Match</h4>
-                      <p class="commune-card-body">Book a guided intro with a vetted local wellness partner — demo card only.</p>
-                      <span class="commune-card-badge">Featured</span>
-                    </article>
-
-                    <article class="commune-card" data-commune-card data-card-type="ad" aria-label="Ad, card 2 of 6" hidden>
-                      <p class="commune-card-kicker">Sponsored</p>
-                      <h4 class="commune-card-title">Pink Hour Café</h4>
-                      <p class="commune-card-body">Neighborhood hang · baby-pink latte art · demo ad placement.</p>
-                      <span class="commune-card-badge commune-card-badge--ad">Ad</span>
-                    </article>
-
-                    <article class="commune-card" data-commune-card data-card-type="live-video" aria-label="Live video, card 3 of 6" hidden>
-                      <p class="commune-card-kicker">Live now</p>
-                      <h4 class="commune-card-title">Community Circle</h4>
-                      <div class="commune-live-chrome" aria-hidden="true">
-                        <button type="button" class="commune-live-play" tabindex="-1" disabled>▶</button>
-                        <span class="commune-live-pulse"></span>
-                        <span class="commune-live-label">LIVE</span>
+                  <div class="commune-swipe-deck" data-commune-deck aria-live="polite" aria-atomic="true"></div>
+                  <section class="commune-room" data-commune-room hidden>
+                    <p class="commune-card-kicker">Chatroom · hosted by Cognation</p>
+                    <h4 class="commune-card-title" data-commune-room-title></h4>
+                    <p class="commune-card-body" data-commune-room-topic></p>
+                    <div class="commune-room-log" data-commune-room-log role="log" aria-live="polite"></div>
+                    <form class="commune-room-compose" data-commune-room-compose action="#" method="post">
+                      <label class="visually-hidden" for="commune-room-input">Message the room</label>
+                      <textarea id="commune-room-input" data-commune-room-input rows="2" maxlength="500" placeholder="Share something kind"></textarea>
+                      <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Send</button>
+                        <button type="button" class="btn btn-secondary" data-commune-room-back>Back to deck</button>
                       </div>
-                      <p class="commune-card-body">Stub play chrome — Engineer wires stream later.</p>
-                    </article>
-
-                    <article class="commune-card" data-commune-card data-card-type="speed-dating" data-dating-content aria-label="Speed dating, card 4 of 6" hidden data-dating-opt-in="true">
-                      <p class="commune-card-kicker">Speed dating</p>
-                      <h4 class="commune-card-title" data-dating-name>Jordan Lee</h4>
-                      <figure class="commune-dating-photo">
-                        <img
-                          data-dating-photo
-                          src="assets/logo.svg"
-                          alt="Profile photo of Jordan Lee"
-                          width="320"
-                          height="320"
-                        >
-                      </figure>
-                      <p class="commune-card-body">Dating opt-in · rate 1–10 below before you swipe right. Demo shell — Engineer wires averaging.</p>
-                      <div class="commune-dating-rate" data-dating-rate-wrap>
-                        <label class="commune-dating-rate-label" for="dating-rate-range">Your rating <span class="req" aria-hidden="true">*</span></label>
-                        <p class="form-hint" id="dating-rate-hint">Required before Like / swipe right</p>
-                        <div class="commune-dating-rate-row">
-                          <input
-                            type="range"
-                            id="dating-rate-range"
-                            name="dating-rate"
-                            min="1"
-                            max="10"
-                            step="1"
-                            value="5"
-                            data-dating-rate
-                            data-dating-rate-value
-                            aria-valuemin="1"
-                            aria-valuemax="10"
-                            aria-describedby="dating-rate-hint dating-rate-value-label"
-                          >
-                          <output class="commune-dating-rate-output" id="dating-rate-value-label" data-dating-rate-output for="dating-rate-range">5</output>
-                        </div>
-                        <p class="commune-dating-rate-status" data-dating-rate-status hidden role="status" aria-live="polite"></p>
-                      </div>
-                      <span class="commune-card-badge">Opt-in</span>
-                    </article>
-
-                    <article class="commune-card" data-commune-card data-card-type="chatroom" aria-label="Chatroom, card 5 of 6" hidden>
-                      <p class="commune-card-kicker">Chatroom</p>
-                      <h4 class="commune-card-title">Sim-world lounge</h4>
-                      <p class="commune-card-body">Drop into a shared ambient space with friends.</p>
-                      <button type="button" class="btn btn-primary commune-enter-sim" data-commune-enter-sim>
-                        Enter sim-world
-                      </button>
-                    </article>
-
-                    <article class="commune-card commune-card--fact" data-commune-card data-card-type="random-fact" data-fact-verified="true" aria-label="Random fact, card 6 of 6" hidden>
-                      <p class="commune-card-kicker">Random fact <span class="commune-fact-verified" aria-label="Verified">✓ Verified</span></p>
-                      <h4 class="commune-card-title">Did you know?</h4>
-                      <p class="commune-card-body">Octopuses have three hearts — two pump blood to the gills, one to the rest of the body. Source: aquarium / marine biology primers (Smithsonian Ocean).</p>
-                    </article>
-                  </div>
+                    </form>
+                  </section>
                 </div>
 
                 <div class="commune-swipe-actions" role="group" aria-label="Card actions">
@@ -1139,7 +1076,7 @@
                   <button type="button" class="commune-swipe-dot" role="tab" aria-selected="false" aria-label="Card 6" data-commune-dot="5"></button>
                 </div>
 
-                <p class="commune-swipe-index" data-commune-index aria-live="polite">Card 1 of 6</p>
+                <p class="commune-swipe-index" data-commune-index aria-live="polite"></p>
               </div>
             </div>
 

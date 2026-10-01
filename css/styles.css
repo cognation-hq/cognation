@@ -9278,6 +9278,13 @@ body { padding-top: 0 !important; }
 .tower-private-main-grid .tower-friends-browse {
   display: none !important;
 }
+/* The compact side calendar is gone. Do not keep an empty column beside the shared Calendar. */
+.tower-private-main-grid > .tower-side-friends:not(:has(.tower-personal-calendar)) {
+  display: none;
+}
+.tower-private-main-grid:not(:has(.tower-personal-calendar)) {
+  grid-template-columns: minmax(11rem, 15rem) minmax(12rem, 15rem) !important;
+}
 .tower-private-main-grid > .tower-feed {
   width: 100%;
   max-width: 15rem;

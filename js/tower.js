@@ -4795,7 +4795,7 @@
   }
 
   function renderPersonalMiniCalendar(root) {
-    var host = root.querySelector("[data-tower-cal-personal-mini], [data-tower-calendar-personal] .tower-cal");
+    var host = root.querySelector("[data-tower-cal-personal-mini]");
     if (!host) return;
     var p = TowerProfileStore.get() || {};
     var events = sharedCalendarEvents(p);
@@ -8928,7 +8928,7 @@
     });
     window.setTimeout(function () {
       var row = document.querySelector('[data-tower-private-side] [data-event-id="' + eventId + '"]');
-      var target = row || document.querySelector("[data-tower-private-side] [data-tower-calendar-personal]");
+      var target = row || document.querySelector("[data-tower-private-side] [data-tower-private-calendar]");
       if (target && target.scrollIntoView) target.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 50);
     return true;

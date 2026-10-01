@@ -90,7 +90,7 @@
     }
 
     var selector = name === "calendar"
-      ? "[data-tower-calendar-personal]"
+      ? "[data-tower-private-calendar]"
       : "[data-tower-friends-browse]";
     window.setTimeout(function () {
       var target = document.querySelector(selector);

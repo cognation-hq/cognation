@@ -4798,6 +4798,7 @@
       '<span class="tower-instax-viewfinder"></span>' +
       '<span class="tower-instax-lens"><span class="tower-instax-lens-glass"></span></span>' +
       '<span class="tower-instax-shutter"></span>' +
+      '<span class="tower-instax-rainbow"></span>' +
       "</span></div>"
     );
   }
@@ -4806,13 +4807,21 @@
     if (!photo) return;
     photo.textContent = "";
     if (url) {
-      photo.style.backgroundImage = 'url("' + String(url).replace(/"/g, "") + '")';
-      photo.style.backgroundSize = "cover";
-      photo.style.backgroundPosition = "center";
+      var safe = String(url).replace(/"/g, "");
+      photo.style.setProperty("background-image", 'url("' + safe + '")', "important");
+      photo.style.setProperty("background-size", "cover", "important");
+      photo.style.setProperty("background-position", "center", "important");
+      photo.style.setProperty("background-repeat", "no-repeat", "important");
+      var img = document.createElement("img");
+      img.alt = "";
+      img.setAttribute("data-tower-polaroid-img", "");
+      img.src = safe;
+      photo.appendChild(img);
     } else {
-      photo.style.backgroundImage = "";
-      photo.style.backgroundSize = "";
-      photo.style.backgroundPosition = "";
+      photo.style.removeProperty("background-image");
+      photo.style.removeProperty("background-size");
+      photo.style.removeProperty("background-position");
+      photo.style.removeProperty("background-repeat");
     }
   }
 

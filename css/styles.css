@@ -11693,3 +11693,35 @@ a.circle-fall-portrait {
   text-underline-offset: 0.14em;
 }
 
+/* Add event stays short, with black type on a white card. Edit Profile is untouched. */
+#panel-tower .tower-private-calendar .tower-cal-editor {
+  background: #fff !important;
+  color: #000 !important;
+  border: 1px solid #000 !important;
+}
+#panel-tower .tower-private-calendar .tower-cal-editor :is(h5, label, p, span, .form-hint) {
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+#panel-tower .tower-private-calendar .tower-cal-editor :is(input, textarea) {
+  background: #fff !important;
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  border: 1px solid #222 !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+  font-size: 0.82rem !important;
+}
+#panel-tower .tower-private-calendar .tower-cal-editor .btn {
+  background: #fff !important;
+  color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+  border: 1px solid #000 !important;
+  box-shadow: none !important;
+}
+

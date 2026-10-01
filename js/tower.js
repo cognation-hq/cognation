@@ -513,6 +513,8 @@
     if (!p) return;
     var doc = readScrapbookLayouts();
     var prev = readSavedScrapbook(p) || {};
+    var ownId = p._profileId || p.id || "";
+    var prevOwn = ownId && doc[ownId] ? doc[ownId] : {};
     var nextLayout = p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : prev.widgetLayout || null;
     var nextQuotes = Array.isArray(p.quoteStickers) && p.quoteStickers.length
       ? p.quoteStickers
@@ -528,15 +530,15 @@
        already stored for this profile instead of painting those fields blank. */
     var nextAvatar = p.avatarDataUrl && String(p.avatarDataUrl).indexOf("data:image/") === 0
       ? p.avatarDataUrl
-      : (prev.avatarDataUrl && String(prev.avatarDataUrl).indexOf("data:image/") === 0 && p._remote
-        ? prev.avatarDataUrl
+      : (prevOwn.avatarDataUrl && String(prevOwn.avatarDataUrl).indexOf("data:image/") === 0 && p._remote
+        ? prevOwn.avatarDataUrl
         : (p.avatarDataUrl || ""));
-    if (p._remote && (!nextAvatar || String(nextAvatar).indexOf("data:image/") !== 0) && prev.avatarDataUrl) {
-      nextAvatar = prev.avatarDataUrl;
+    if (p._remote && (!nextAvatar || String(nextAvatar).indexOf("data:image/") !== 0) && prevOwn.avatarDataUrl) {
+      nextAvatar = prevOwn.avatarDataUrl;
     }
     var nextMusic = p.musicUrl && String(p.musicUrl).trim()
       ? String(p.musicUrl).trim()
-      : (p._remote && prev.musicUrl ? String(prev.musicUrl).trim() : (p.musicUrl || ""));
+      : (p._remote && prevOwn.musicUrl ? String(prevOwn.musicUrl).trim() : (p.musicUrl || ""));
     var record = {
       widgetLayout: nextLayout,
       quoteStickers: nextQuotes,
@@ -544,10 +546,10 @@
       friendPinLayout: nextPins,
       avatarDataUrl: nextAvatar || "",
       musicUrl: nextMusic || "",
-      musicSkin: (p.musicSkin || (p._remote && prev.musicSkin) || ""),
-      musicTitle: (p.musicTitle || (p._remote && prev.musicTitle) || ""),
-      musicArtist: (p.musicArtist || (p._remote && prev.musicArtist) || ""),
-      musicEnabled: p.musicEnabled != null ? p.musicEnabled : (p._remote ? prev.musicEnabled : p.musicEnabled),
+      musicSkin: (p.musicSkin || (p._remote && prevOwn.musicSkin) || ""),
+      musicTitle: (p.musicTitle || (p._remote && prevOwn.musicTitle) || ""),
+      musicArtist: (p.musicArtist || (p._remote && prevOwn.musicArtist) || ""),
+      musicEnabled: p.musicEnabled != null ? p.musicEnabled : (p._remote ? prevOwn.musicEnabled : p.musicEnabled),
     };
     scrapbookLayoutKeys(p).forEach(function (key) {
       doc[key] = record;
@@ -632,7 +634,8 @@
   function restoreSavedTowerFields(p) {
     if (!p || p._directoryFriend) return p;
     var local = accountTowerBlob(p._profileId) || {};
-    var legacy = legacyTowerBlob();
+    /* The legacy blob is the personal page. Do not paint it onto the professional page. */
+    var legacy = p._profileKind === "professional" ? null : legacyTowerBlob();
     if (legacy) {
       if ((!local.avatarDataUrl || String(local.avatarDataUrl).indexOf("data:image/") !== 0) && legacy.avatarDataUrl) {
         local.avatarDataUrl = legacy.avatarDataUrl;
@@ -705,7 +708,9 @@
         if (!cur || typeof cur.x !== "number" || typeof cur.y !== "number") p.friendPinLayout[fid] = pos;
       });
     }
-    var savedLayout = readSavedScrapbook(p);
+    var savedDoc = readScrapbookLayouts();
+    var savedId = p._profileId || p.id || "";
+    var savedLayout = savedId && savedDoc[savedId] ? savedDoc[savedId] : null;
     if (savedLayout) {
       if (
         (!p.avatarDataUrl || String(p.avatarDataUrl).indexOf("data:image/") !== 0) &&

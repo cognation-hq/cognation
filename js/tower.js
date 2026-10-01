@@ -8603,14 +8603,136 @@
     return named;
   }
 
-  /* Five spots on a tilted ring. Front is lowest and largest. Back is highest and smallest. */
+  /* Five spots on a lightning ring tilted like water coming toward the viewer.
+     90° is stage center (near, lowest, largest). The back spots stay high and small. */
+  var CIRCLE_TILT = 80 * Math.PI / 180;
+  var CIRCLE_RING_R = 320;
+  var CIRCLE_PERSPECTIVE = 500;
+  var CIRCLE_SCALE = 0.6;
   var CIRCLE_SPOTS = [
-    { id: "left", x: -300, y: 6, s: 0.8 },
-    { id: "center", x: 0, y: 124, s: 1.4 },
-    { id: "right", x: 300, y: 6, s: 0.8 },
-    { id: "back-right", x: 156, y: -156, s: 0.44 },
-    { id: "back-left", x: -156, y: -156, s: 0.44 }
+    { id: "left", angle: 176 },
+    { id: "center", angle: 90 },
+    { id: "right", angle: 4 },
+    { id: "back-right", angle: -46 },
+    { id: "back-left", angle: -134 }
   ];
+
+  function circleProjectRadius(angleDeg, radius) {
+    var t = angleDeg * Math.PI / 180;
+    var x = Math.cos(t) * radius;
+    var y = Math.sin(t) * radius;
+    var depth = CIRCLE_PERSPECTIVE / (CIRCLE_PERSPECTIVE - y * Math.sin(CIRCLE_TILT));
+    return {
+      x: x * depth,
+      y: y * Math.cos(CIRCLE_TILT) * depth,
+      s: depth * CIRCLE_SCALE
+    };
+  }
+
+  function circleProject(angleDeg) {
+    return circleProjectRadius(angleDeg, CIRCLE_RING_R);
+  }
+
+  function circleBoltSegments(radius, wobble, seed, baseWidth) {
+    var steps = 144;
+    var chunk = 6;
+    var segs = [];
+    var start;
+    for (start = 0; start < steps; start += chunk) {
+      var cmds = [];
+      var depthSum = 0;
+      var count = 0;
+      var end = Math.min(steps, start + chunk);
+      var i;
+      for (i = start; i <= end; i++) {
+        var n = Math.sin(i * 0.73 + seed) * 0.58 + Math.sin(i * 1.91 + seed * 1.4) * 0.42;
+        if (i === 0 || i === steps) n = 0;
+        var p = circleProjectRadius((i / steps) * 360, radius + n * wobble);
+        cmds.push((i === start ? "M" : "L") + p.x.toFixed(1) + " " + p.y.toFixed(1));
+        depthSum += p.s / CIRCLE_SCALE;
+        count++;
+      }
+      segs.push({ d: cmds.join(" "), width: Math.max(0.7, baseWidth * (depthSum / count)) });
+    }
+    return segs;
+  }
+
+  function circleBranchPath(angleDeg, radius, length, seed) {
+    var cmds = [];
+    var steps = 6;
+    var i;
+    for (i = 0; i <= steps; i++) {
+      var along = (i / steps) * length;
+      var side = Math.sin(i * 2.1 + seed) * 16;
+      if (i === 0) side = 0;
+      var p = circleProjectRadius(angleDeg + side * 0.18, radius + along);
+      cmds.push((i ? "L" : "M") + p.x.toFixed(1) + " " + p.y.toFixed(1));
+    }
+    return cmds.join(" ");
+  }
+
+  function paintCircleLightning(ring) {
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "circle-lightning");
+    svg.setAttribute("data-circle-lightning", "");
+    svg.setAttribute("viewBox", "-520 -260 1040 520");
+    svg.setAttribute("aria-hidden", "true");
+    var defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    var filter = document.createElementNS("http://www.w3.org/2000/svg", "filter");
+    filter.setAttribute("id", "circle-bolt-glow");
+    filter.setAttribute("x", "-50%");
+    filter.setAttribute("y", "-50%");
+    filter.setAttribute("width", "200%");
+    filter.setAttribute("height", "200%");
+    var blur = document.createElementNS("http://www.w3.org/2000/svg", "feGaussianBlur");
+    blur.setAttribute("stdDeviation", "4.5");
+    blur.setAttribute("result", "blur");
+    var merge = document.createElementNS("http://www.w3.org/2000/svg", "feMerge");
+    var mergeBlur = document.createElementNS("http://www.w3.org/2000/svg", "feMergeNode");
+    mergeBlur.setAttribute("in", "blur");
+    var mergeSrc = document.createElementNS("http://www.w3.org/2000/svg", "feMergeNode");
+    mergeSrc.setAttribute("in", "SourceGraphic");
+    merge.appendChild(mergeBlur);
+    merge.appendChild(mergeSrc);
+    filter.appendChild(blur);
+    filter.appendChild(merge);
+    defs.appendChild(filter);
+    svg.appendChild(defs);
+    function bolt(d, color, width, opacity) {
+      var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", d);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", color);
+      path.setAttribute("stroke-width", width.toFixed(2));
+      path.setAttribute("stroke-linejoin", "round");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("opacity", String(opacity));
+      path.setAttribute("filter", "url(#circle-bolt-glow)");
+      svg.appendChild(path);
+    }
+    function bolts(radius, wobble, seed, baseWidth, color, opacity) {
+      circleBoltSegments(radius, wobble, seed, baseWidth).forEach(function (seg) {
+        bolt(seg.d, color, seg.width, opacity);
+      });
+    }
+    bolts(CIRCLE_RING_R + 16, 20, 0.4, 11, "#b44bff", 0.7);
+    bolts(CIRCLE_RING_R, 26, 1.7, 6.5, "#3ecbff", 0.95);
+    bolts(CIRCLE_RING_R - 6, 16, 2.8, 4, "#ff4ad8", 0.9);
+    bolts(CIRCLE_RING_R + 3, 10, 4.1, 1.7, "#f4fbff", 0.95);
+    var forks = [18, 48, 90, 128, 168, 206, 236, 278, 314, 344];
+    forks.forEach(function (angle, index) {
+      var outward = index % 2 === 0;
+      var t = angle * Math.PI / 180;
+      var depth = CIRCLE_PERSPECTIVE / (CIRCLE_PERSPECTIVE - Math.sin(t) * CIRCLE_RING_R * Math.sin(CIRCLE_TILT));
+      bolt(
+        circleBranchPath(angle, CIRCLE_RING_R - (outward ? 0 : 8), outward ? 42 + (index % 3) * 8 : -30, index + 1),
+        index % 3 === 0 ? "#ff4ad8" : index % 3 === 1 ? "#3ecbff" : "#c084fc",
+        1.6 * depth,
+        0.9
+      );
+    });
+    ring.appendChild(svg);
+  }
 
   var CIRCLE_REFRESH_MS = 15 * 60 * 1000;
   var CIRCLE_ROOMS = [
@@ -8833,11 +8955,15 @@
 
   function paintCircleRing(layer) {
     var topics = circleShownTopics.slice();
-    if (!topics.length) return;
     var ring = document.createElement("div");
     ring.className = "circle-ring";
     ring.setAttribute("data-circle-ring", "");
     ring.setAttribute("data-circle-topics", String(topics.length));
+    paintCircleLightning(ring);
+    if (!topics.length) {
+      layer.appendChild(ring);
+      return;
+    }
     var spin = document.createElement("div");
     spin.className = "circle-ring-spin";
     topics.forEach(function (topic) {
@@ -8879,11 +9005,14 @@
     var mix = wrapped - index;
     var from = CIRCLE_SPOTS[index];
     var to = CIRCLE_SPOTS[(index + 1) % count];
+    var toAngle = to.angle;
+    if (toAngle > from.angle) toAngle -= 360;
+    var p = circleProject(from.angle + (toAngle - from.angle) * mix);
     return {
       id: mix < 0.5 ? from.id : to.id,
-      x: from.x + (to.x - from.x) * mix,
-      y: from.y + (to.y - from.y) * mix,
-      s: from.s + (to.s - from.s) * mix
+      x: p.x,
+      y: p.y,
+      s: p.s
     };
   }
 

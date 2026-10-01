@@ -11637,9 +11637,19 @@ a.circle-fall-portrait {
 .circle-ring-spin {
   position: absolute;
   left: 50%;
-  top: 40%;
+  top: 48%;
   width: 0;
   height: 0;
+}
+.circle-lightning {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  width: 1040px;
+  height: 520px;
+  transform: translate(-50%, -50%);
+  overflow: visible;
+  pointer-events: none;
 }
 .circle-topic {
   position: absolute;

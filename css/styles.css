@@ -9398,6 +9398,67 @@ body { padding-top: 0 !important; }
 .tower-compose--compact .form-actions {
   margin-top: 0;
 }
+.tower-event-dropdown {
+  position: relative;
+  min-width: 7.5rem;
+}
+.tower-event-dropdown-summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.7rem;
+  padding: 0.22rem 0.55rem;
+  border: 1px solid #c45a5a;
+  border-radius: 6px;
+  background: #fff;
+  color: #1a1a1a;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.tower-event-dropdown-summary::-webkit-details-marker { display: none; }
+.tower-event-dropdown[open] .tower-event-fields {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  top: calc(100% + 0.25rem);
+  width: min(16rem, 70vw);
+  padding: 0.55rem;
+  background: #fff;
+  color: #1a1a1a;
+  border: 1px solid #c45a5a;
+  border-radius: 8px;
+  box-shadow: 0 8px 22px rgba(26, 26, 26, 0.16);
+}
+.tower-event-fields label {
+  display: block;
+  margin: 0.35rem 0 0.12rem;
+  font-size: 0.75rem;
+}
+.tower-event-fields input,
+.tower-event-fields textarea {
+  width: 100%;
+  box-sizing: border-box;
+  color: #1a1a1a;
+  background: #fff;
+}
+.tower-going-live-kicker,
+.tower-going-live-name,
+.tower-going-live-when,
+.tower-going-live-details {
+  margin: 0 0 0.25rem;
+}
+.tower-going-live-name { font-weight: 700; }
+.tower-sticker--going-live { width: min(16rem, 70vw); }
+.tower-going-live-edit label { display: block; font-size: 0.75rem; margin-top: 0.3rem; }
+.tower-going-live-edit input,
+.tower-going-live-edit textarea {
+  width: 100%;
+  box-sizing: border-box;
+  color: #1a1a1a;
+  background: #fff;
+}
+.tower-sticker--going-live { color: #f7f9ff; }
 .tower-compose--compact select,
 .tower-compose--compact input[type="file"] {
   padding: 0.22rem 0.4rem !important;
@@ -10753,6 +10814,7 @@ body {
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--friends,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--html,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--calendar,
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--going-live,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--music,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--video,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--social,

@@ -81,6 +81,7 @@
     friends: { x: 2, y: 52, z: 4, tilt: 0 },
     html: { x: 22, y: 3, z: 3, tilt: 0 },
     calendar: { x: 55, y: 28, z: 5, tilt: 0 },
+    "going-live": { x: 34, y: 58, z: 8, tilt: 0 },
     polaroid: { x: 40, y: 6, z: 6, tilt: 0 },
     instax: { x: 62, y: 4, z: 7, tilt: 0 },
   };
@@ -4370,6 +4371,102 @@
     });
   }
 
+  function normalizeGoingLive(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    var title = String(raw.title || "").trim().slice(0, 120);
+    var details = String(raw.details || raw.notes || "").trim().slice(0, 240);
+    var liveAt = String(raw.liveAt || "").trim().slice(0, 16);
+    if (!title || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(liveAt)) return null;
+    return { id: "going-live", title: title, details: details, liveAt: liveAt };
+  }
+
+  function sharedGoingLive(profile) {
+    var own = normalizeGoingLive(profile && profile.goingLive);
+    if (own) return own;
+    var recs = accountProfilesFor(profile);
+    var i;
+    for (i = 0; i < recs.length; i++) {
+      var found = normalizeGoingLive(recs[i] && recs[i].goingLive);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  /* One going-live notice on the personal page and the professional page, plus the shared calendar. */
+  function publishGoingLive(live) {
+    live = normalizeGoingLive(live);
+    if (!live) return null;
+    var p = TowerProfileStore.get();
+    var events = sharedCalendarEvents(p).filter(function (e) {
+      return e && e.id !== "going-live";
+    });
+    var parts = live.liveAt.split("T");
+    events.push({
+      id: "going-live",
+      title: live.title,
+      date: parts[0],
+      time: parts[1] || "",
+      notes: live.details || "",
+      status: "accepted",
+      source: "owner",
+    });
+    events = normalizeCalendarEventsList(events);
+    p.goingLive = live;
+    p.calendarEvents = events;
+    var accounts = window.CognationAccounts;
+    var recs = accountProfilesFor(p);
+    if (accounts && typeof accounts.saveProfileRecord === "function") {
+      recs.forEach(function (rec) {
+        if (!rec) return;
+        rec.goingLive = live;
+        rec.calendarEvents = events;
+        try { accounts.saveProfileRecord(rec); } catch (eLive) {}
+      });
+    }
+    TowerProfileStore.save(p);
+    return live;
+  }
+
+  function renderGoingLiveWidget(root) {
+    var sticker = root.querySelector('[data-tower-widget="going-live"]');
+    if (!sticker) return;
+    var body = sticker.querySelector("[data-tower-going-live-body]");
+    var p = TowerProfileStore.get();
+    var live = sharedGoingLive(p);
+    if (!live) {
+      sticker.hidden = true;
+      sticker.classList.add("is-widget-off");
+      if (body) body.innerHTML = "";
+      return;
+    }
+    sticker.hidden = false;
+    sticker.classList.remove("is-widget-off");
+    if (!body) return;
+    var owner = isTowerOwner(p);
+    var parts = live.liveAt.split("T");
+    var when = escapeHtml(parts[0] + (parts[1] ? " · " + formatEventTime(parts[1]) : ""));
+    if (owner && sticker.getAttribute("data-editing") === "true") {
+      body.innerHTML =
+        '<form class="tower-going-live-edit" data-tower-going-live-edit action="#" method="post">' +
+        '<label for="tower-going-live-title">Title</label>' +
+        '<input id="tower-going-live-title" type="text" maxlength="120" required value="' + escapeHtml(live.title) + '" data-going-live-title>' +
+        '<label for="tower-going-live-when">Goes live</label>' +
+        '<input id="tower-going-live-when" type="datetime-local" required value="' + escapeHtml(live.liveAt) + '" data-going-live-when>' +
+        '<label for="tower-going-live-details">Details</label>' +
+        '<textarea id="tower-going-live-details" maxlength="240" rows="2" data-going-live-details>' + escapeHtml(live.details || "") + "</textarea>" +
+        '<div class="form-actions">' +
+        '<button type="submit" class="btn btn-primary">Save</button>' +
+        '<button type="button" class="btn btn-secondary" data-going-live-cancel>Cancel</button>' +
+        "</div></form>";
+      return;
+    }
+    body.innerHTML =
+      '<p class="tower-going-live-name">' + escapeHtml(live.title) + "</p>" +
+      '<p class="tower-going-live-when">' + when + "</p>" +
+      (live.details ? '<p class="tower-going-live-details">' + escapeHtml(live.details) + "</p>" : "") +
+      (owner ? '<button type="button" class="btn btn-secondary" data-going-live-edit>Edit</button>' : "");
+  }
+
   function saveCalendarToProfile(mutator, opts) {
     var p = TowerProfileStore.get();
     p.calendarEvents = sharedCalendarEvents(p);
@@ -7445,6 +7542,83 @@
     try { syncAddProfileUi(root); } catch (eAdd) {}
     try { syncRotateToolbar(root); } catch (eRot) {}
     try { refreshTowerCalendars(root); } catch (eCal) {}
+    try { renderGoingLiveWidget(root); } catch (eLive) {}
+  }
+
+  function initGoingLive(root) {
+    if (!root || root.__cognationGoingLiveBound) return;
+    root.__cognationGoingLiveBound = true;
+    var postBtn = root.querySelector("[data-tower-event-post]");
+    if (postBtn) {
+      postBtn.addEventListener("click", function () {
+        var titleIn = root.querySelector("[data-tower-event-title]");
+        var liveIn = root.querySelector("[data-tower-event-live]");
+        var detailsIn = root.querySelector("[data-tower-event-details]");
+        var status = root.querySelector("[data-tower-event-status]");
+        function say(msg, isError) {
+          if (!status) return;
+          status.hidden = !msg;
+          status.textContent = msg || "";
+          status.classList.toggle("is-error", !!isError);
+        }
+        var live = normalizeGoingLive({
+          title: titleIn ? titleIn.value : "",
+          liveAt: liveIn ? liveIn.value : "",
+          details: detailsIn ? detailsIn.value : "",
+        });
+        if (!live) {
+          say("Add a title and the time you go live.", true);
+          return;
+        }
+        if (!publishGoingLive(live)) {
+          say("Could not post that event.", true);
+          return;
+        }
+        if (titleIn) titleIn.value = "";
+        if (liveIn) liveIn.value = "";
+        if (detailsIn) detailsIn.value = "";
+        var drop = root.querySelector("[data-tower-event-dropdown]");
+        if (drop) drop.open = false;
+        say("Posted on your personal and professional pages.", false);
+        renderGoingLiveWidget(root);
+        refreshTowerCalendars(root);
+      });
+    }
+    root.addEventListener("click", function (ev) {
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      if (t.closest("[data-going-live-edit]")) {
+        var sticker = root.querySelector('[data-tower-widget="going-live"]');
+        if (!sticker || !isTowerOwner(TowerProfileStore.get())) return;
+        sticker.setAttribute("data-editing", "true");
+        renderGoingLiveWidget(root);
+        return;
+      }
+      if (t.closest("[data-going-live-cancel]")) {
+        var stickerCancel = root.querySelector('[data-tower-widget="going-live"]');
+        if (stickerCancel) stickerCancel.removeAttribute("data-editing");
+        renderGoingLiveWidget(root);
+      }
+    });
+    root.addEventListener("submit", function (ev) {
+      var form = ev.target && ev.target.closest ? ev.target.closest("[data-tower-going-live-edit]") : null;
+      if (!form || !root.contains(form)) return;
+      ev.preventDefault();
+      var titleIn = form.querySelector("[data-going-live-title]");
+      var whenIn = form.querySelector("[data-going-live-when]");
+      var detailsIn = form.querySelector("[data-going-live-details]");
+      var live = normalizeGoingLive({
+        title: titleIn ? titleIn.value : "",
+        liveAt: whenIn ? whenIn.value : "",
+        details: detailsIn ? detailsIn.value : "",
+      });
+      if (!live) return;
+      publishGoingLive(live);
+      var sticker = root.querySelector('[data-tower-widget="going-live"]');
+      if (sticker) sticker.removeAttribute("data-editing");
+      renderGoingLiveWidget(root);
+      refreshTowerCalendars(root);
+    });
   }
 
   function initTower(root) {
@@ -7488,6 +7662,7 @@
     initFriendsBrowse(root);
     initProfessionalFollowers(root);
     initTowerCalendar(root);
+    initGoingLive(root);
 
     var profileForm = root.querySelector("[data-tower-profile-form]");
     var avatarFile = root.querySelector("[data-tower-avatar-file]");
@@ -7979,7 +8154,7 @@
         e.preventDefault();
         var attachments = [];
         var files = fileInput && fileInput.files ? Array.prototype.slice.call(fileInput.files) : [];
-        var kind = (kindSelect && kindSelect.value) || "document";
+        var kind = (kindSelect && kindSelect.value) || "photo";
         files.forEach(function (f) {
           attachments.push({
             kind: kind,

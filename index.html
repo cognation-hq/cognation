@@ -394,14 +394,19 @@
                       </div>
                       <div class="tower-upload-row">
                         <div class="form-group">
-                          <label for="tower-attach-kind">Type</label>
-                          <select id="tower-attach-kind" name="attachKind">
-                            <option value="photo">Picture</option>
-                            <option value="note">Notes</option>
-                            <option value="video">Video</option>
-                            <option value="art">Creative</option>
-                            <option value="document">Document</option>
-                          </select>
+                          <details class="tower-event-dropdown" data-tower-event-dropdown>
+                            <summary class="tower-event-dropdown-summary">Event</summary>
+                            <div class="tower-event-fields" data-tower-event-fields>
+                              <label for="tower-event-title">Title</label>
+                              <input id="tower-event-title" type="text" maxlength="120" required placeholder="Live session" data-tower-event-title>
+                              <label for="tower-event-live">Goes live</label>
+                              <input id="tower-event-live" type="datetime-local" required data-tower-event-live>
+                              <label for="tower-event-details">Details</label>
+                              <textarea id="tower-event-details" maxlength="240" rows="2" placeholder="What people should know" data-tower-event-details></textarea>
+                              <button type="button" class="btn btn-primary" data-tower-event-post>Post event</button>
+                              <p class="commune-status" data-tower-event-status hidden role="status" aria-live="polite"></p>
+                            </div>
+                          </details>
                         </div>
                         <div class="form-group">
                           <label for="tower-files">Files</label>
@@ -748,6 +753,13 @@
                       <input type="file" accept="image/*" data-tower-avatar-file class="tower-offscreen-file" tabindex="-1" aria-label="Upload profile photo">
                       <input type="file" accept="image/*" data-tower-instax-file class="tower-offscreen-file" tabindex="-1" aria-label="Upload a photo">
 
+                      <div class="tower-sticker tower-sticker--going-live" data-tower-widget="going-live" data-sticker-label="Going live" hidden>
+                        <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Going live sticker" tabindex="-1" hidden>⋮⋮</button>
+                        <div class="tower-going-live" data-tower-going-live>
+                          <h4 class="tower-going-live-kicker">Going live</h4>
+                          <div data-tower-going-live-body></div>
+                        </div>
+                      </div>
                       <div class="tower-sticker tower-sticker--calendar" data-tower-widget="calendar" data-sticker-label="Calendar" data-tower-calendar-personal>
                         <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Calendar sticker" tabindex="-1" hidden>⋮⋮</button>
                         <div class="tower-cal tower-cal--public" data-tower-cal-public data-tower-calendar-personal aria-label="Calendar">

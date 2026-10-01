@@ -2393,13 +2393,34 @@
     return "";
   }
 
+  function looksLikeYoutubeUrl(raw) {
+    var href = safeHttpUrl(raw);
+    if (!href) return false;
+    try {
+      var host = new URL(href).hostname.replace(/^www\./i, "").toLowerCase();
+      return (
+        host === "youtu.be" ||
+        host === "youtube.com" ||
+        host === "m.youtube.com" ||
+        host === "music.youtube.com" ||
+        host === "youtube-nocookie.com" ||
+        host.slice(-12) === ".youtube.com"
+      );
+    } catch (eYt) {
+      return false;
+    }
+  }
+
   function youtubeEmbedSrc(videoId, muted, autoplay) {
+    var origin = "";
+    try { origin = window.location.origin || ""; } catch (eOrigin) {}
     var q =
       "enablejsapi=1&playsinline=1&rel=0&modestbranding=1&autoplay=" +
       (autoplay ? "1" : "0") +
       "&mute=" +
       (muted ? "1" : "0");
-    return "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(videoId) + "?" + q;
+    if (origin) q += "&origin=" + encodeURIComponent(origin);
+    return "https://www.youtube.com/embed/" + encodeURIComponent(videoId) + "?" + q;
   }
 
   function postYoutubeCommand(iframe, func) {
@@ -2428,30 +2449,14 @@
     if (yt) yt.hidden = true;
   }
 
-  function ensureProYoutubeIframe(root, videoId) {
+  /* Professional page: the box stays empty. The pink player is the only embed. */
+  function showEmptyProYoutube(root) {
     var box = root.querySelector("[data-tower-pro-youtube]");
     var frame = root.querySelector("[data-tower-pro-youtube-frame]");
-    if (!box || !frame) return null;
+    if (frame) frame.innerHTML = "";
+    if (!box) return;
     box.hidden = false;
-    if (!videoId) {
-      frame.innerHTML = "";
-      box.classList.remove("has-video");
-      return null;
-    }
-    box.classList.add("has-video");
-    var src = youtubeEmbedSrc(videoId, false, false);
-    var iframe = frame.querySelector("iframe");
-    if (!iframe) {
-      iframe = document.createElement("iframe");
-      iframe.setAttribute("title", "YouTube video");
-      iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
-      iframe.setAttribute("allowfullscreen", "");
-      iframe.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
-      iframe.loading = "lazy";
-      frame.appendChild(iframe);
-    }
-    if (iframe.getAttribute("src") !== src) iframe.src = src;
-    return iframe;
+    box.classList.remove("has-video");
   }
 
   function ensureYoutubeIframe(root, videoId, muted, autoplay) {
@@ -2468,12 +2473,92 @@
       iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
       iframe.setAttribute("allowfullscreen", "");
       iframe.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
-      iframe.loading = "lazy";
+      iframe.loading = "eager";
       frame.appendChild(iframe);
     }
-    if (iframe.getAttribute("src") !== src) iframe.src = src;
+    var already = iframe.getAttribute("data-yt-id") === videoId && iframe.getAttribute("src");
+    if (!already && iframe.getAttribute("src") !== src) iframe.src = src;
     iframe.setAttribute("data-yt-id", videoId);
     return iframe;
+  }
+
+  function loadYoutubeApi(done) {
+    if (window.YT && window.YT.Player) {
+      done();
+      return;
+    }
+    var queue = window.__cognationYtQueue || (window.__cognationYtQueue = []);
+    queue.push(done);
+    if (window.__cognationYtApiLoading) return;
+    window.__cognationYtApiLoading = true;
+    var prev = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = function () {
+      if (typeof prev === "function") prev();
+      var pending = window.__cognationYtQueue || [];
+      window.__cognationYtQueue = [];
+      pending.forEach(function (fn) {
+        try { fn(); } catch (eApi) {}
+      });
+    };
+    var script = document.createElement("script");
+    script.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(script);
+  }
+
+  function attachYoutubePlayer(root, iframe, videoId) {
+    var wrap = root.querySelector("[data-tower-music]");
+    if (!wrap || !iframe) return;
+    wrap.__ytIframe = iframe;
+    if (wrap.__ytBoundId === videoId && wrap.__ytPlayer) return;
+    wrap.__ytId = videoId;
+    wrap.__ytBoundId = videoId;
+    loadYoutubeApi(function () {
+      if (!window.YT || !window.YT.Player) return;
+      if (wrap.__ytId !== videoId) return;
+      try {
+        wrap.__ytPlayer = new YT.Player(iframe, {
+          events: {
+            onReady: function (ev) {
+              wrap.__ytPlayer = ev.target;
+            },
+          },
+        });
+      } catch (ePlayer) {}
+    });
+  }
+
+  function bindIpodWheel(root) {
+    function currentPlayer() {
+      var wrap = root.querySelector("[data-tower-music]");
+      return wrap && wrap.__ytPlayer;
+    }
+    function seek(delta) {
+      var player = currentPlayer();
+      if (player && player.getCurrentTime && player.seekTo) {
+        var t = 0;
+        try { t = player.getCurrentTime() || 0; } catch (eTime) {}
+        try { player.seekTo(Math.max(0, t + delta), true); } catch (eSeek) {}
+        return;
+      }
+      var iframe = root.querySelector("[data-tower-youtube-frame] iframe");
+      if (!iframe) return;
+      var vid = iframe.getAttribute("data-yt-id") || "";
+      if (!vid) return;
+      var start = parseInt(iframe.getAttribute("data-yt-start") || "0", 10);
+      if (isNaN(start)) start = 0;
+      start = Math.max(0, start + delta);
+      iframe.setAttribute("data-yt-start", String(start));
+      iframe.src = youtubeEmbedSrc(vid, false, true) + "&start=" + start;
+    }
+    root.querySelectorAll(".tower-ipod-skip").forEach(function (btn) {
+      if (btn.__cognationIpodSkip) return;
+      btn.__cognationIpodSkip = true;
+      btn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        seek(btn.classList.contains("tower-ipod-skip--prev") ? -10 : 10);
+      });
+    });
   }
 
   /* Green MP3 and wood radio are not personal-profile looks. Pink is the classic note, silver is the CD. None hides the player. */
@@ -2541,18 +2626,32 @@
         syncMusicToggleUi(root, off);
         if (off) {
           if (media.audio) media.audio.pause();
-          if (media.youtubeIframe) {
-            postYoutubeCommand(media.youtubeIframe, "mute");
+          var wrapOff = root.querySelector("[data-tower-music]");
+          var playerOff = wrapOff && wrapOff.__ytPlayer;
+          if (playerOff && playerOff.pauseVideo) {
+            try { playerOff.pauseVideo(); } catch (ePause) {}
+          } else if (media.youtubeIframe) {
             postYoutubeCommand(media.youtubeIframe, "pauseVideo");
           }
         } else if (media.youtubeIframe) {
-          /* Explicit user gesture: allow autoplay unmute+play */
-          var vid = media.youtubeIframe.getAttribute("data-yt-id") || "";
-          if (vid) {
-            media.youtubeIframe.src = youtubeEmbedSrc(vid, false, true);
-          } else {
-            postYoutubeCommand(media.youtubeIframe, "unMute");
-            postYoutubeCommand(media.youtubeIframe, "playVideo");
+          /* Explicit user gesture: play the embed that is already in the pink screen. */
+          var wrapPlay = root.querySelector("[data-tower-music]");
+          var player = wrapPlay && wrapPlay.__ytPlayer;
+          if (player && player.playVideo) {
+            try {
+              player.unMute();
+              player.playVideo();
+            } catch (ePlay) {
+              player = null;
+            }
+          }
+          if (!player || !player.playVideo) {
+            var vid = media.youtubeIframe.getAttribute("data-yt-id") || "";
+            if (vid) media.youtubeIframe.src = youtubeEmbedSrc(vid, false, true);
+            else {
+              postYoutubeCommand(media.youtubeIframe, "unMute");
+              postYoutubeCommand(media.youtubeIframe, "playVideo");
+            }
           }
         } else if (media.audio) {
           media.audio.muted = false;
@@ -2689,18 +2788,11 @@
       clearYoutubeEmbed(root);
       clearTowerAudio(audio);
       if (looks) looks.hidden = true;
-      wrap.setAttribute("data-music-skin", "pro");
-      if (!ytId && !ownerPublic) {
-        if (proBox) proBox.hidden = true;
-        wrap.hidden = true;
-        wrap.removeAttribute("data-music-mode");
-        showMusicSticker(root, false);
-        return;
-      }
-      showMusicSticker(root, true);
       wrap.hidden = false;
-      wrap.setAttribute("data-music-mode", ytId ? "pro-youtube" : "pro-empty");
-      ensureProYoutubeIframe(root, ytId);
+      wrap.setAttribute("data-music-skin", "pro");
+      wrap.setAttribute("data-music-mode", "pro-empty");
+      showEmptyProYoutube(root);
+      showMusicSticker(root, true);
       return;
     }
     if (proBox) {
@@ -2742,31 +2834,31 @@
     wrap.hidden = false;
 
     if (ytId && skin === "classic") {
-      /* The pink click-wheel stays up. The video plays inside its black screen. */
+      /* Pink click-wheel. The saved video stays in the screen as a normal embed. */
       wrap.setAttribute("data-music-mode", "youtube");
       applyMusicSkin(root, "classic");
       clearTowerAudio(audio);
-      var iframe = ensureYoutubeIframe(root, ytId, true, false);
-      if (iframe) {
-        postYoutubeCommand(iframe, "mute");
-        postYoutubeCommand(iframe, "pauseVideo");
-      }
-      /* Start paused until the viewer presses the pink center — avoids login autoplay. */
-      if (!viewerWantsMusicOff()) {
-        try {
+      var iframe = ensureYoutubeIframe(root, ytId, false, false);
+      attachYoutubePlayer(root, iframe, ytId);
+      bindIpodWheel(root);
+      /* First visit starts paused so the center button plays. Later visits keep that choice. */
+      try {
+        if (sessionStorage.getItem(VIEWER_MUSIC_OFF_KEY) == null) {
           sessionStorage.setItem(VIEWER_MUSIC_OFF_KEY, "1");
-        } catch (eMute) {}
-      }
+        }
+      } catch (eMute) {}
       bindMusicToggles(root, { youtubeIframe: iframe });
-      syncMusicToggleUi(root, true);
+      syncMusicToggleUi(root, viewerWantsMusicOff());
       return;
     }
 
-    if (ytId) {
+    if (ytId || looksLikeYoutubeUrl(url)) {
+      /* A YouTube link never becomes a file download. Silver keeps the CD face. */
       wrap.setAttribute("data-music-mode", "audio");
       clearYoutubeEmbed(root);
       clearTowerAudio(audio);
       applyMusicSkin(root, skin);
+      bindIpodWheel(root);
       bindMusicToggles(root, {});
       syncMusicToggleUi(root, true);
       return;
@@ -3710,7 +3802,7 @@
       if (id === "music") {
         var personalMusic = !p || p._profileKind !== "professional";
         if (!personalMusic) {
-          on = isTowerOwner(p) || !!parseYoutubeVideoId(musicUrl);
+          on = true;
         } else {
           var skinChoice = visibleMusicSkin(p && p.musicSkin);
           if (skinChoice === "none" || (p && p.musicEnabled === false)) on = false;
@@ -4380,11 +4472,12 @@
 
   function normalizeGoingLive(raw) {
     if (!raw || typeof raw !== "object") return null;
-    var title = String(raw.title || "").trim().slice(0, 120);
-    var details = String(raw.details || raw.notes || "").trim().slice(0, 240);
-    var liveAt = String(raw.liveAt || "").trim().slice(0, 16);
-    if (!title || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(liveAt)) return null;
-    return { id: "going-live", title: title, details: details, liveAt: liveAt };
+    var when = String(raw.when || raw.liveAt || "").trim().slice(0, 16);
+    var where = String(raw.where || "").trim().slice(0, 120);
+    var what = String(raw.what || raw.title || "").trim().slice(0, 240);
+    if (!what) what = String(raw.details || raw.notes || "").trim().slice(0, 240);
+    if (!what || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(when)) return null;
+    return { id: "going-live", when: when, where: where, what: what };
   }
 
   function sharedGoingLive(profile) {
@@ -4407,13 +4500,13 @@
     var events = sharedCalendarEvents(p).filter(function (e) {
       return e && e.id !== "going-live";
     });
-    var parts = live.liveAt.split("T");
+    var parts = live.when.split("T");
     events.push({
       id: "going-live",
-      title: live.title,
+      title: live.what,
       date: parts[0],
       time: parts[1] || "",
-      notes: live.details || "",
+      notes: live.where || "",
       status: "accepted",
       source: "owner",
     });
@@ -4450,17 +4543,17 @@
     sticker.classList.remove("is-widget-off");
     if (!body) return;
     var owner = isTowerOwner(p);
-    var parts = live.liveAt.split("T");
-    var when = escapeHtml(parts[0] + (parts[1] ? " · " + formatEventTime(parts[1]) : ""));
+    var parts = live.when.split("T");
+    var whenText = parts[0] + (parts[1] ? " · " + formatEventTime(parts[1]) : "");
     if (owner && sticker.getAttribute("data-editing") === "true") {
       body.innerHTML =
         '<form class="tower-going-live-edit" data-tower-going-live-edit action="#" method="post">' +
-        '<label for="tower-going-live-title">Title</label>' +
-        '<input id="tower-going-live-title" type="text" maxlength="120" required value="' + escapeHtml(live.title) + '" data-going-live-title>' +
-        '<label for="tower-going-live-when">Goes live</label>' +
-        '<input id="tower-going-live-when" type="datetime-local" required value="' + escapeHtml(live.liveAt) + '" data-going-live-when>' +
-        '<label for="tower-going-live-details">Details</label>' +
-        '<textarea id="tower-going-live-details" maxlength="240" rows="2" data-going-live-details>' + escapeHtml(live.details || "") + "</textarea>" +
+        '<label for="tower-going-live-when">when:</label>' +
+        '<input id="tower-going-live-when" type="datetime-local" required value="' + escapeHtml(live.when) + '" data-going-live-when>' +
+        '<label for="tower-going-live-where">where:</label>' +
+        '<input id="tower-going-live-where" type="text" maxlength="120" value="' + escapeHtml(live.where || "") + '" data-going-live-where>' +
+        '<label for="tower-going-live-what">what:</label>' +
+        '<input id="tower-going-live-what" type="text" maxlength="240" required value="' + escapeHtml(live.what) + '" data-going-live-what>' +
         '<div class="form-actions">' +
         '<button type="submit" class="btn btn-primary">Save</button>' +
         '<button type="button" class="btn btn-secondary" data-going-live-cancel>Cancel</button>' +
@@ -4468,9 +4561,9 @@
       return;
     }
     body.innerHTML =
-      '<p class="tower-going-live-name">' + escapeHtml(live.title) + "</p>" +
-      '<p class="tower-going-live-when">' + when + "</p>" +
-      (live.details ? '<p class="tower-going-live-details">' + escapeHtml(live.details) + "</p>" : "") +
+      '<p class="tower-going-live-when"><span class="tower-going-live-kicker">when:</span> ' + escapeHtml(whenText) + "</p>" +
+      '<p class="tower-going-live-where"><span class="tower-going-live-kicker">where:</span> ' + escapeHtml(live.where || "") + "</p>" +
+      '<p class="tower-going-live-what"><span class="tower-going-live-kicker">what:</span> ' + escapeHtml(live.what) + "</p>" +
       (owner ? '<button type="button" class="btn btn-secondary" data-going-live-edit>Edit</button>' : "");
   }
 
@@ -6539,7 +6632,7 @@
       }
 
       /* Drag from anywhere on the sticker. Real controls keep their clicks. */
-      if (ev.target.closest("a, button, input, textarea, select, label, summary, [contenteditable='true'], [data-tower-rotate], [data-tower-avatar-resize], [data-tower-name-resize], [data-tower-emoji-resize]")) {
+      if (ev.target.closest("a, button, input, textarea, select, label, summary, iframe, [contenteditable='true'], [data-tower-rotate], [data-tower-avatar-resize], [data-tower-name-resize], [data-tower-emoji-resize]")) {
         return;
       }
       var sticker = ev.target.closest("[data-tower-widget]");
@@ -7558,9 +7651,9 @@
     var postBtn = root.querySelector("[data-tower-event-post]");
     if (postBtn) {
       postBtn.addEventListener("click", function () {
-        var titleIn = root.querySelector("[data-tower-event-title]");
-        var liveIn = root.querySelector("[data-tower-event-live]");
-        var detailsIn = root.querySelector("[data-tower-event-details]");
+        var whenIn = root.querySelector("[data-tower-event-when]");
+        var whereIn = root.querySelector("[data-tower-event-where]");
+        var whatIn = root.querySelector("[data-tower-event-what]");
         var status = root.querySelector("[data-tower-event-status]");
         function say(msg, isError) {
           if (!status) return;
@@ -7569,21 +7662,21 @@
           status.classList.toggle("is-error", !!isError);
         }
         var live = normalizeGoingLive({
-          title: titleIn ? titleIn.value : "",
-          liveAt: liveIn ? liveIn.value : "",
-          details: detailsIn ? detailsIn.value : "",
+          when: whenIn ? whenIn.value : "",
+          where: whereIn ? whereIn.value : "",
+          what: whatIn ? whatIn.value : "",
         });
         if (!live) {
-          say("Add a title and the time you go live.", true);
+          say("Add when and what.", true);
           return;
         }
         if (!publishGoingLive(live)) {
           say("Could not post that event.", true);
           return;
         }
-        if (titleIn) titleIn.value = "";
-        if (liveIn) liveIn.value = "";
-        if (detailsIn) detailsIn.value = "";
+        if (whenIn) whenIn.value = "";
+        if (whereIn) whereIn.value = "";
+        if (whatIn) whatIn.value = "";
         var drop = root.querySelector("[data-tower-event-dropdown]");
         if (drop) drop.open = false;
         say("Posted on your personal and professional pages.", false);
@@ -7611,13 +7704,13 @@
       var form = ev.target && ev.target.closest ? ev.target.closest("[data-tower-going-live-edit]") : null;
       if (!form || !root.contains(form)) return;
       ev.preventDefault();
-      var titleIn = form.querySelector("[data-going-live-title]");
       var whenIn = form.querySelector("[data-going-live-when]");
-      var detailsIn = form.querySelector("[data-going-live-details]");
+      var whereIn = form.querySelector("[data-going-live-where]");
+      var whatIn = form.querySelector("[data-going-live-what]");
       var live = normalizeGoingLive({
-        title: titleIn ? titleIn.value : "",
-        liveAt: whenIn ? whenIn.value : "",
-        details: detailsIn ? detailsIn.value : "",
+        when: whenIn ? whenIn.value : "",
+        where: whereIn ? whereIn.value : "",
+        what: whatIn ? whatIn.value : "",
       });
       if (!live) return;
       publishGoingLive(live);

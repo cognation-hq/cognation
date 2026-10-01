@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <!-- Start the uncached config request during HTML parse. The classic script
        below still runs before js/supabase-client.js so auth sees the values. -->
   <link rel="preload" href="/runtime-config" as="script">
@@ -397,12 +398,12 @@
                           <details class="tower-event-dropdown" data-tower-event-dropdown>
                             <summary class="tower-event-dropdown-summary">Event</summary>
                             <div class="tower-event-fields" data-tower-event-fields>
-                              <label for="tower-event-title">Title</label>
-                              <input id="tower-event-title" type="text" maxlength="120" required placeholder="Live session" data-tower-event-title>
-                              <label for="tower-event-live">Goes live</label>
-                              <input id="tower-event-live" type="datetime-local" required data-tower-event-live>
-                              <label for="tower-event-details">Details</label>
-                              <textarea id="tower-event-details" maxlength="240" rows="2" placeholder="What people should know" data-tower-event-details></textarea>
+                              <label for="tower-event-when">when:</label>
+                              <input id="tower-event-when" type="datetime-local" required data-tower-event-when>
+                              <label for="tower-event-where">where:</label>
+                              <input id="tower-event-where" type="text" maxlength="120" placeholder="Place" data-tower-event-where>
+                              <label for="tower-event-what">what:</label>
+                              <input id="tower-event-what" type="text" maxlength="240" required placeholder="What's happening" data-tower-event-what>
                               <button type="button" class="btn btn-primary" data-tower-event-post>Post event</button>
                               <p class="commune-status" data-tower-event-status hidden role="status" aria-live="polite"></p>
                             </div>

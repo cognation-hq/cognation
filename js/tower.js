@@ -4245,7 +4245,7 @@
       events.length +
       " event" +
       (events.length === 1 ? "" : "s") +
-      " (same data as Calendar)</p>";
+      "</p>";
     host.innerHTML = html;
   }
 

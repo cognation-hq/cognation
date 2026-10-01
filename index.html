@@ -404,7 +404,7 @@
                       </div>
                     </details>
 
-                    <details class="tower-private-theme tower-private-calendar tower-compact-block" data-tower-private-calendar data-tower-calendar>
+                    <details class="tower-private-theme tower-private-calendar tower-compact-block" data-tower-private-calendar data-tower-calendar open>
                       <summary class="tower-private-theme-summary">
                         Calendar
                         <span class="cgn-deferral" role="note">Demo / local only — not live backend</span>
@@ -420,31 +420,13 @@
                       </div>
                     </details>
 
-                    <div class="paper-rule-block" aria-hidden="true"></div>
-                    <div class="tower-private-main-grid tower-private-workspace" data-tower-workspace>
-
-                    <section class="tower-remote-social" data-remote-social hidden aria-label="Connections">
-                      <h4 class="tower-friends-browse-heading">Connections</h4>
-                      <div data-remote-friend-requests></div>
-                      <div data-remote-notifications></div>
-                    </section>
-                    <aside class="tower-side-friends" aria-label="Friends">
-                      <div class="tower-friends-browse" data-tower-friends-browse data-tower-friends aria-label="Friends" hidden>
-                        <h4 class="tower-friends-browse-heading">Friends</h4>
-                        <label class="visually-hidden" for="tower-friends-find">Search friends</label>
-                        <input id="tower-friends-find" class="tower-friends-find" type="search" data-tower-friends-find placeholder="Search friends" autocomplete="off">
-                        <ul class="tower-friends-browse-list" data-tower-friends-browse-list role="list"></ul>
-                      </div>
-                    </aside>
-                    <div class="tower-feed" data-tower-feed role="feed" aria-label="Tower posts"></div>
                     <aside
                       class="tower-private-messages"
                       data-tower-private-messages
                       data-tower-messages
-                      data-tower-messages-closed
                       aria-label="Messages"
                     >
-                      <details class="tower-messages-shell" data-tower-messages-shell>
+                      <details class="tower-messages-shell" data-tower-messages-shell open>
                         <summary class="tower-messages-heading">Messages</summary>
                         <div class="tower-messages" data-commune-messaging data-tower-messages>
                           <ul
@@ -485,6 +467,24 @@
                         </div>
                       </details>
                     </aside>
+
+                    <div class="paper-rule-block" aria-hidden="true"></div>
+                    <div class="tower-private-main-grid tower-private-workspace" data-tower-workspace>
+
+                    <section class="tower-remote-social" data-remote-social hidden aria-label="Connections">
+                      <h4 class="tower-friends-browse-heading">Connections</h4>
+                      <div data-remote-friend-requests></div>
+                      <div data-remote-notifications></div>
+                    </section>
+                    <aside class="tower-side-friends" aria-label="Friends">
+                      <div class="tower-friends-browse" data-tower-friends-browse data-tower-friends aria-label="Friends" hidden>
+                        <h4 class="tower-friends-browse-heading">Friends</h4>
+                        <label class="visually-hidden" for="tower-friends-find">Search friends</label>
+                        <input id="tower-friends-find" class="tower-friends-find" type="search" data-tower-friends-find placeholder="Search friends" autocomplete="off">
+                        <ul class="tower-friends-browse-list" data-tower-friends-browse-list role="list"></ul>
+                      </div>
+                    </aside>
+                    <div class="tower-feed" data-tower-feed role="feed" aria-label="Tower posts"></div>
 
                     </div>
 

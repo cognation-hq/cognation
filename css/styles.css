@@ -9283,13 +9283,19 @@ body { padding-top: 0 !important; }
   display: none;
 }
 .tower-private-main-grid:not(:has(.tower-personal-calendar)) {
-  grid-template-columns: minmax(11rem, 15rem) minmax(12rem, 15rem) !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+.tower-private-side .tower-private-calendar,
+.tower-private-side .tower-private-messages {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
 }
 .tower-private-main-grid > .tower-feed {
   width: 100%;
-  max-width: 15rem;
+  max-width: none;
   min-width: 0;
-  justify-self: center;
+  justify-self: stretch;
   align-self: start;
 }
 .tower-private-main-grid > .tower-private-messages {

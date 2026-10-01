@@ -284,6 +284,89 @@
     return { ok: true, message: msg, conversation: conv };
   };
 
+  function messageViewerIds() {
+    var ids = ["you"];
+    try {
+      var raw = localStorage.getItem("cognation.session.v2");
+      var session = raw ? JSON.parse(raw) : null;
+      if (session) {
+        if (session.activeProfileId) ids.push(String(session.activeProfileId));
+        if (session.username) ids.push(String(session.username));
+      }
+    } catch (e) {}
+    return ids;
+  }
+
+  MessageStore.viewerIds = messageViewerIds;
+
+  MessageStore.conversationTitle = function (conv) {
+    if (!conv) return "";
+    if (conv.participantIds && conv.participants) {
+      var mine = messageViewerIds();
+      var other = null;
+      conv.participants.forEach(function (person) {
+        if (!person || mine.indexOf(String(person.id)) >= 0) return;
+        other = person;
+      });
+      if (other && other.name) return other.name;
+    }
+    return conv.title || "Messages";
+  };
+
+  MessageStore.listConversations = function () {
+    var mine = messageViewerIds();
+    return this.getState().conversations.filter(function (conv) {
+      if (!conv || !conv.participantIds || !conv.participantIds.length) return true;
+      return conv.participantIds.some(function (id) {
+        return mine.indexOf(String(id)) >= 0;
+      });
+    });
+  };
+
+  MessageStore.openMatch = function (a, b) {
+    a = a || {};
+    b = b || {};
+    if (!a.id || !b.id) return null;
+    var ids = [String(a.id), String(b.id)].sort();
+    var cid = "match-" + ids[0] + "--" + ids[1];
+    var state = this.getState();
+    var found = null;
+    for (var i = 0; i < state.conversations.length; i++) {
+      if (state.conversations[i].id === cid) {
+        found = state.conversations[i];
+        break;
+      }
+    }
+    if (!found) {
+      found = {
+        id: cid,
+        title: b.name || "Match",
+        participantIds: ids,
+        participants: [
+          { id: String(a.id), name: a.name || "Member" },
+          { id: String(b.id), name: b.name || "Member" },
+        ],
+        mutualMatch: true,
+        messages: [
+          {
+            id: "match-" + Date.now().toString(36),
+            senderId: "cognation",
+            senderName: "Cognation",
+            body: "You both swiped right. Say hello when you're ready.",
+            createdAt: new Date().toISOString(),
+            kind: "friend",
+            mutualMatch: true,
+            reactions: {},
+          },
+        ],
+      };
+      state.conversations.unshift(found);
+      this.save(state);
+    }
+    this.refreshUi();
+    return found;
+  };
+
   MessageStore._uiRefresh = null;
   MessageStore.refreshUi = function () {
     document.dispatchEvent(new CustomEvent("cognation:messages-updated"));
@@ -396,7 +479,7 @@
         /* CGN-008: list by name; click opens thread */
         btn.innerHTML =
           '<span class="commune-conv-name">' +
-          escapeHtml(conv.title) +
+          escapeHtml(MessageStore.conversationTitle(conv)) +
           "</span>";
         btn.addEventListener("click", function () {
           selectConversation(conv.id);
@@ -553,7 +636,7 @@
         return;
       }
 
-      if (threadTitle) threadTitle.textContent = conv.title;
+      if (threadTitle) threadTitle.textContent = MessageStore.conversationTitle(conv);
       if (emptyEl) emptyEl.hidden = true;
       form.hidden = false;
 

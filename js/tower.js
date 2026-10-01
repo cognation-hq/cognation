@@ -8413,9 +8413,20 @@
   function placeCircleFallLayer(layer) {
     if (!layer) return;
     layer.style.top = "";
-    var main = document.getElementById("main");
-    if (main && main.parentNode && layer.previousElementSibling !== main) {
-      main.parentNode.insertBefore(layer, main.nextSibling);
+    var page = layer.closest ? layer.closest("[data-circle-page]") : null;
+    if (!page) {
+      page = document.createElement("section");
+      page.className = "circle-page";
+      page.setAttribute("data-circle-page", "");
+      var title = document.createElement("h3");
+      title.className = "circle-page-title";
+      title.textContent = "CIRCLE";
+      page.appendChild(title);
+      page.appendChild(layer);
+    }
+    var topbar = document.querySelector(".app-topbar");
+    if (topbar && topbar.parentNode && page.previousElementSibling !== topbar) {
+      topbar.parentNode.insertBefore(page, topbar.nextSibling);
     }
   }
 
@@ -8574,8 +8585,12 @@
       if (circleFallState.refreshTimer) clearInterval(circleFallState.refreshTimer);
     }
     circleFallState = null;
-    var layer = document.querySelector("[data-circle-fall]");
-    if (layer && layer.parentNode) layer.parentNode.removeChild(layer);
+    var page = document.querySelector("[data-circle-page]");
+    if (page && page.parentNode) page.parentNode.removeChild(page);
+    else {
+      var layer = document.querySelector("[data-circle-fall]");
+      if (layer && layer.parentNode) layer.parentNode.removeChild(layer);
+    }
     document.body.classList.remove("is-circle-open");
     var shortcut = document.querySelector('[data-tower-anchor="circle"]');
     if (shortcut) shortcut.setAttribute("aria-pressed", "false");

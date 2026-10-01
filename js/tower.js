@@ -524,18 +524,43 @@
     var nextPins = p.friendPinLayout && typeof p.friendPinLayout === "object" && Object.keys(p.friendPinLayout).length
       ? p.friendPinLayout
       : (prev.friendPinLayout && typeof prev.friendPinLayout === "object" ? prev.friendPinLayout : {});
+    /* A later remote profile has no photo and no YouTube link. Keep the copy
+       already stored for this profile instead of painting those fields blank. */
+    var nextAvatar = p.avatarDataUrl && String(p.avatarDataUrl).indexOf("data:image/") === 0
+      ? p.avatarDataUrl
+      : (prev.avatarDataUrl && String(prev.avatarDataUrl).indexOf("data:image/") === 0 && p._remote
+        ? prev.avatarDataUrl
+        : (p.avatarDataUrl || ""));
+    if (p._remote && (!nextAvatar || String(nextAvatar).indexOf("data:image/") !== 0) && prev.avatarDataUrl) {
+      nextAvatar = prev.avatarDataUrl;
+    }
+    var nextMusic = p.musicUrl && String(p.musicUrl).trim()
+      ? String(p.musicUrl).trim()
+      : (p._remote && prev.musicUrl ? String(prev.musicUrl).trim() : (p.musicUrl || ""));
     var record = {
       widgetLayout: nextLayout,
       quoteStickers: nextQuotes,
       emojiStickers: nextEmoji,
       friendPinLayout: nextPins,
+      avatarDataUrl: nextAvatar || "",
+      musicUrl: nextMusic || "",
+      musicSkin: (p.musicSkin || (p._remote && prev.musicSkin) || ""),
+      musicTitle: (p.musicTitle || (p._remote && prev.musicTitle) || ""),
+      musicArtist: (p.musicArtist || (p._remote && prev.musicArtist) || ""),
+      musicEnabled: p.musicEnabled != null ? p.musicEnabled : (p._remote ? prev.musicEnabled : p.musicEnabled),
     };
     scrapbookLayoutKeys(p).forEach(function (key) {
       doc[key] = record;
     });
     try {
       localStorage.setItem(SCRAPBOOK_LAYOUT_KEY, JSON.stringify(doc));
-    } catch (eWrite) {}
+    } catch (eWrite) {
+      record.avatarDataUrl = "";
+      scrapbookLayoutKeys(p).forEach(function (key) {
+        doc[key] = record;
+      });
+      try { localStorage.setItem(SCRAPBOOK_LAYOUT_KEY, JSON.stringify(doc)); } catch (eWritePins) {}
+    }
   }
 
   /* Remote profiles do not store widget x/y, and a refresh often still carries
@@ -679,6 +704,23 @@
         if (!pos || typeof pos.x !== "number" || typeof pos.y !== "number") return;
         if (!cur || typeof cur.x !== "number" || typeof cur.y !== "number") p.friendPinLayout[fid] = pos;
       });
+    }
+    var savedLayout = readSavedScrapbook(p);
+    if (savedLayout) {
+      if (
+        (!p.avatarDataUrl || String(p.avatarDataUrl).indexOf("data:image/") !== 0) &&
+        savedLayout.avatarDataUrl &&
+        String(savedLayout.avatarDataUrl).indexOf("data:image/") === 0
+      ) {
+        p.avatarDataUrl = savedLayout.avatarDataUrl;
+      }
+      if ((!p.musicUrl || !String(p.musicUrl).trim()) && savedLayout.musicUrl && String(savedLayout.musicUrl).trim()) {
+        p.musicUrl = String(savedLayout.musicUrl).trim();
+        if (!p.musicTitle && savedLayout.musicTitle) p.musicTitle = savedLayout.musicTitle;
+        if (!p.musicArtist && savedLayout.musicArtist) p.musicArtist = savedLayout.musicArtist;
+        if (!p.musicSkin && savedLayout.musicSkin) p.musicSkin = savedLayout.musicSkin;
+        if (p.musicEnabled == null && savedLayout.musicEnabled != null) p.musicEnabled = savedLayout.musicEnabled;
+      }
     }
     return p;
   }
@@ -958,6 +1000,28 @@
            unchanged profile and leave the old initials in place. */
         /* Quota failed. Fall through and try the legacy key. Do not report success
            and do not drop the photo or the page background to make the write fit. */
+        if (
+          result &&
+          result.error === "Profile not found." &&
+          typeof window.CognationAccounts.saveProfileRecord === "function"
+        ) {
+          var sessionForSave = getSessionObject();
+          var storedRec = {
+            id: id,
+            kind: data._profileKind === "professional" ? "professional" : "personal",
+            accountUsername: sessionForSave && sessionForSave.username
+              ? String(sessionForSave.username).toLowerCase()
+              : "",
+            phone: data._profilePhone || "",
+          };
+          Object.keys(towerBlob).forEach(function (k) {
+            storedRec[k] = towerBlob[k];
+          });
+          if (window.CognationAccounts.saveProfileRecord(storedRec)) {
+            document.dispatchEvent(new CustomEvent("cognation:tower-profile-updated", { detail: towerBlob }));
+            return true;
+          }
+        }
       }
       try {
         localStorage.setItem(TOWER_PROFILE_KEY, JSON.stringify(towerBlob));
@@ -2960,6 +3024,18 @@
 
     showMusicSticker(root, true);
     if (!url) {
+      var keptOnScreen = savedPinkVideoId();
+      if (keptOnScreen && skin === "classic") {
+        wrap.hidden = false;
+        wrap.setAttribute("data-music-mode", "youtube");
+        applyMusicSkin(root, "classic");
+        clearTowerAudio(audio);
+        var keptFrame = ensureYoutubeIframe(root, keptOnScreen, false, false);
+        bindIpodWheel(root);
+        bindMusicToggles(root, { youtubeIframe: keptFrame });
+        syncMusicToggleUi(root, viewerWantsMusicOff());
+        return;
+      }
       wrap.hidden = false;
       wrap.setAttribute("data-music-mode", "audio");
       clearYoutubeEmbed(root);
@@ -3302,13 +3378,27 @@
   /** Assign dock positions only for newly featured friends missing a saved layout. Never overwrite. */
   function ensureFriendPinPositions(p, selectedIds) {
     var pinLayout = getFriendPinLayout(p);
+    var saved = readSavedScrapbook(p);
+    var savedPins = saved && saved.friendPinLayout && typeof saved.friendPinLayout === "object"
+      ? saved.friendPinLayout
+      : {};
     var changed = false;
     selectedIds.forEach(function (id, index) {
       var pos = pinLayout[id];
-      if (!pos || typeof pos.x !== "number" || typeof pos.y !== "number") {
-        pinLayout[id] = defaultFriendPinPos(p, index);
+      if (pos && typeof pos.x === "number" && typeof pos.y === "number") return;
+      var kept = savedPins[id];
+      if (kept && typeof kept.x === "number" && typeof kept.y === "number") {
+        pinLayout[id] = {
+          x: kept.x,
+          y: kept.y,
+          z: typeof kept.z === "number" ? kept.z : 12,
+          tilt: typeof kept.tilt === "number" ? kept.tilt : 0,
+        };
         changed = true;
+        return;
       }
+      pinLayout[id] = defaultFriendPinPos(p, index);
+      changed = true;
     });
     p.friendPinLayout = pinLayout;
     return changed;

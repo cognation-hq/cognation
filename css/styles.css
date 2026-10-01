@@ -11706,6 +11706,30 @@ a.circle-fall-portrait {
   text-underline-offset: 0.14em;
 }
 
+/* Pull the My feed stack together. The controls stay; only the empty gaps shrink. */
+.tower-private-side .tower-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.tower-private-side .tower-main > .tower-header,
+.tower-private-side .tower-main > .tower-compose,
+.tower-private-side .tower-main > .tower-private-theme,
+.tower-private-side .tower-main > .tower-private-friends,
+.tower-private-side .tower-main > .tower-private-messages,
+.tower-private-side .tower-main > .paper-rule-block,
+.tower-private-side .tower-main > .tower-private-main-grid {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+.tower-private-side .tower-private-theme {
+  padding-top: 0.12rem !important;
+  padding-bottom: 0.15rem !important;
+}
+.tower-private-side .paper-rule-block {
+  margin: 0 !important;
+}
+
 /* Add event stays short, with black type on a white card. Edit Profile is untouched. */
 #panel-tower .tower-private-calendar .tower-cal-editor {
   background: #fff !important;

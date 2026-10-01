@@ -8412,12 +8412,11 @@
 
   function placeCircleFallLayer(layer) {
     if (!layer) return;
-    var bar = document.querySelector(".app-topbar");
-    var top = 0;
-    if (bar && bar.getBoundingClientRect) {
-      top = Math.max(0, Math.round(bar.getBoundingClientRect().bottom));
+    layer.style.top = "";
+    var main = document.getElementById("main");
+    if (main && main.parentNode && layer.previousElementSibling !== main) {
+      main.parentNode.insertBefore(layer, main.nextSibling);
     }
-    layer.style.top = top + "px";
   }
 
   function circleStageSize() {

@@ -81,7 +81,7 @@
     friends: { x: 2, y: 52, z: 4, tilt: 0 },
     html: { x: 22, y: 3, z: 3, tilt: 0 },
     calendar: { x: 55, y: 28, z: 5, tilt: 0 },
-    "going-live": { x: 34, y: 58, z: 8, tilt: 0 },
+    "going-live": { x: 60, y: 74, z: 18, tilt: 0 },
     polaroid: { x: 40, y: 6, z: 6, tilt: 0 },
     instax: { x: 62, y: 4, z: 7, tilt: 0 },
   };
@@ -136,6 +136,13 @@
       p.quoteStickers.forEach(function (q) {
         clearTilt(q, null);
       });
+    }
+    var live = p.widgetLayout && p.widgetLayout["going-live"];
+    if (live && live.x === 34 && live.y === 58) {
+      live.x = DEFAULT_WIDGET_LAYOUT["going-live"].x;
+      live.y = DEFAULT_WIDGET_LAYOUT["going-live"].y;
+      live.z = DEFAULT_WIDGET_LAYOUT["going-live"].z;
+      changed = true;
     }
     if (changed) {
       try { TowerProfileStore.save(p, { geometry: true }); } catch (eSettle) {}

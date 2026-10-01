@@ -9398,9 +9398,15 @@ body { padding-top: 0 !important; }
 .tower-compose--compact .form-actions {
   margin-top: 0;
 }
+.tower-compose,
+.tower-compose .tower-upload-row,
+.tower-compose .form-group,
+.tower-event-dropdown {
+  overflow: visible;
+}
 .tower-event-dropdown {
   position: relative;
-  min-width: 7.5rem;
+  min-width: 11rem;
 }
 .tower-event-dropdown-summary {
   list-style: none;
@@ -9408,7 +9414,7 @@ body { padding-top: 0 !important; }
   display: inline-flex;
   align-items: center;
   min-height: 1.7rem;
-  padding: 0.22rem 0.55rem;
+  padding: 0.22rem 0.7rem;
   border: 1px solid #c45a5a;
   border-radius: 6px;
   background: #fff;
@@ -9418,12 +9424,15 @@ body { padding-top: 0 !important; }
 }
 .tower-event-dropdown-summary::-webkit-details-marker { display: none; }
 .tower-event-dropdown[open] .tower-event-fields {
-  position: absolute;
+  position: relative;
   z-index: 30;
-  left: 0;
-  top: calc(100% + 0.25rem);
-  width: min(16rem, 70vw);
-  padding: 0.55rem;
+  left: auto;
+  width: 100%;
+  min-width: 14rem;
+  margin-top: 0.4rem;
+  padding: 0.75rem 0.9rem 0.8rem 1rem;
+  box-sizing: border-box;
+  overflow: visible;
   background: #fff;
   color: #1a1a1a;
   border: 1px solid #c45a5a;
@@ -9432,13 +9441,20 @@ body { padding-top: 0 !important; }
 }
 .tower-event-fields label {
   display: block;
-  margin: 0.35rem 0 0.12rem;
-  font-size: 0.75rem;
+  margin: 0.45rem 0 0.2rem;
+  padding: 0;
+  text-indent: 0;
+  overflow: visible;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: #1a1a1a;
 }
+.tower-event-fields label:first-child { margin-top: 0; }
 .tower-event-fields input,
 .tower-event-fields textarea {
   width: 100%;
   box-sizing: border-box;
+  padding: 0.35rem 0.55rem;
   color: #1a1a1a;
   background: #fff;
 }

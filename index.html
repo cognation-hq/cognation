@@ -329,6 +329,39 @@
                       <h3 class="tower-title">TOWER</h3>
                     </header>
 
+                    <form class="tower-compose tower-compose--compact" data-tower-compose action="#" method="post">
+                      <h4 class="tower-block-heading" data-tower-block-heading>On the block</h4>
+                      <div class="form-group">
+                        <label class="visually-hidden" for="tower-body">Update</label>
+                        <textarea id="tower-body" name="body" rows="2" maxlength="2000" placeholder="Share something…"></textarea>
+                      </div>
+                      <div class="tower-upload-row">
+                        <div class="form-group">
+                          <details class="tower-event-dropdown" data-tower-event-dropdown>
+                            <summary class="tower-event-dropdown-summary">Event</summary>
+                            <div class="tower-event-fields" data-tower-event-fields>
+                              <label for="tower-event-when">when:</label>
+                              <input id="tower-event-when" type="datetime-local" required data-tower-event-when>
+                              <label for="tower-event-where">where:</label>
+                              <input id="tower-event-where" type="text" maxlength="120" placeholder="Place" data-tower-event-where>
+                              <label for="tower-event-what">what:</label>
+                              <input id="tower-event-what" type="text" maxlength="240" required placeholder="What's happening" data-tower-event-what>
+                              <button type="button" class="btn btn-primary" data-tower-event-post>Post event</button>
+                              <p class="commune-status" data-tower-event-status hidden role="status" aria-live="polite"></p>
+                            </div>
+                          </details>
+                        </div>
+                        <div class="form-group">
+                          <label for="tower-files">Files</label>
+                          <input id="tower-files" name="files" type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif,.webp,.mp4,.mov">
+                        </div>
+                      </div>
+                      <p class="commune-status" data-tower-status hidden role="status" aria-live="polite"></p>
+                      <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Post</button>
+                      </div>
+                    </form>
+
                     <details class="tower-private-theme tower-private-friends tower-compact-block" data-tower-private-friends data-tower-top-friends>
                       <summary class="tower-private-theme-summary">Top friends</summary>
                       <div class="tower-private-theme-body">
@@ -386,39 +419,6 @@
                         </div>
                       </div>
                     </details>
-
-                    <form class="tower-compose tower-compose--compact" data-tower-compose action="#" method="post">
-                      <h4 class="tower-block-heading" data-tower-block-heading>On the block</h4>
-                      <div class="form-group">
-                        <label class="visually-hidden" for="tower-body">Update</label>
-                        <textarea id="tower-body" name="body" rows="2" maxlength="2000" placeholder="Share something…"></textarea>
-                      </div>
-                      <div class="tower-upload-row">
-                        <div class="form-group">
-                          <details class="tower-event-dropdown" data-tower-event-dropdown>
-                            <summary class="tower-event-dropdown-summary">Event</summary>
-                            <div class="tower-event-fields" data-tower-event-fields>
-                              <label for="tower-event-when">when:</label>
-                              <input id="tower-event-when" type="datetime-local" required data-tower-event-when>
-                              <label for="tower-event-where">where:</label>
-                              <input id="tower-event-where" type="text" maxlength="120" placeholder="Place" data-tower-event-where>
-                              <label for="tower-event-what">what:</label>
-                              <input id="tower-event-what" type="text" maxlength="240" required placeholder="What's happening" data-tower-event-what>
-                              <button type="button" class="btn btn-primary" data-tower-event-post>Post event</button>
-                              <p class="commune-status" data-tower-event-status hidden role="status" aria-live="polite"></p>
-                            </div>
-                          </details>
-                        </div>
-                        <div class="form-group">
-                          <label for="tower-files">Files</label>
-                          <input id="tower-files" name="files" type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif,.webp,.mp4,.mov">
-                        </div>
-                      </div>
-                      <p class="commune-status" data-tower-status hidden role="status" aria-live="polite"></p>
-                      <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">Post</button>
-                      </div>
-                    </form>
 
                     <div class="paper-rule-block" aria-hidden="true"></div>
                     <div class="tower-private-main-grid tower-private-workspace" data-tower-workspace>

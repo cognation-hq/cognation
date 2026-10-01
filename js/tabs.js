@@ -22,6 +22,9 @@
     if (!tabs.length || tabs.length !== panels.length) return;
 
     function activate(index, focusTab) {
+      if (window.CognationCircleFall && typeof window.CognationCircleFall.stop === "function") {
+        window.CognationCircleFall.stop();
+      }
       tabs.forEach(function (tab, i) {
         var selected = i === index;
         tab.setAttribute("aria-selected", selected ? "true" : "false");
@@ -72,6 +75,13 @@
   }
 
   function openTowerAnchor(name) {
+    if (name === "circle") {
+      if (window.CognationCircleFall && typeof window.CognationCircleFall.start === "function") {
+        window.CognationCircleFall.start();
+      }
+      return;
+    }
+
     var towerTab = document.getElementById("tab-tower");
     if (towerTab) towerTab.click();
 
@@ -103,6 +113,39 @@
     if (!hash) return;
     if (hash === "calendar" || hash === "circle") {
       openTowerAnchor(hash);
+      return;
+    }
+    if (hash.indexOf("commune-room-") === 0) {
+      var communeTab = document.getElementById("tab-commune");
+      if (communeTab) communeTab.click();
+      var roomId = hash.slice("commune-room-".length);
+      window.setTimeout(function () {
+        if (window.CognationCommuneSwipe && typeof window.CognationCommuneSwipe.openRoom === "function") {
+          window.CognationCommuneSwipe.openRoom(roomId);
+        }
+      }, 40);
+      return;
+    }
+    if (hash.indexOf("tower-post-") === 0) {
+      var towerForPost = document.getElementById("tab-tower");
+      if (towerForPost) towerForPost.click();
+      var postId = hash.slice("tower-post-".length);
+      window.setTimeout(function () {
+        if (typeof window.CognationTowerOpenPost === "function") {
+          window.CognationTowerOpenPost(postId);
+        }
+      }, 40);
+      return;
+    }
+    if (hash.indexOf("tower-event-") === 0) {
+      var towerForEvent = document.getElementById("tab-tower");
+      if (towerForEvent) towerForEvent.click();
+      var eventId = hash.slice("tower-event-".length);
+      window.setTimeout(function () {
+        if (typeof window.CognationTowerOpenEvent === "function") {
+          window.CognationTowerOpenEvent(eventId);
+        }
+      }, 40);
       return;
     }
     var tabIdMap = {

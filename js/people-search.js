@@ -49,13 +49,7 @@
       .replace(/^@/, "");
   }
 
-  function searchPeople(query) {
-    var q = normalize(query);
-    if (!q) return [];
-    var social = remoteSocial();
-    if (hasRemoteSession() && social && social.memberResults) {
-      return social.memberResults(q);
-    }
+  function friendMatches(q) {
     return PEOPLE.filter(function (p) {
       var full = (p.first + " " + p.last).toLowerCase();
       return (
@@ -65,78 +59,117 @@
         p.handle.toLowerCase().indexOf(q) !== -1 ||
         p.id.indexOf(q) !== -1
       );
-    }).slice(0, 8);
+    }).slice(0, 6).map(function (p) {
+      return {
+        id: p.id,
+        name: p.first + " " + p.last,
+        handle: p.handle,
+        kind: "friend"
+      };
+    });
+  }
+
+  function professionalProfiles() {
+    var accounts = window.CognationAccounts;
+    if (accounts && typeof accounts.ensureDemoProfessionals === "function") {
+      try { accounts.ensureDemoProfessionals(); } catch (e) {}
+    }
+    var out = [];
+    try {
+      var raw = localStorage.getItem("cognation.profiles.v1");
+      var doc = raw ? JSON.parse(raw) : null;
+      var profiles = doc && doc.profiles ? doc.profiles : {};
+      Object.keys(profiles).forEach(function (id) {
+        var rec = profiles[id];
+        if (!rec || rec.kind !== "professional" || !rec.handle) return;
+        out.push({
+          id: rec.id,
+          name: rec.displayName || rec.handle,
+          handle: String(rec.handle).replace(/^@/, ""),
+          kind: "professional"
+        });
+      });
+    } catch (e2) {}
+    return out;
+  }
+
+  function professionalMatches(q) {
+    return professionalProfiles().filter(function (p) {
+      var name = String(p.name || "").toLowerCase();
+      var handle = String(p.handle || "").toLowerCase();
+      return name.indexOf(q) !== -1 || handle.indexOf(q) !== -1 || String(p.id || "").toLowerCase().indexOf(q) !== -1;
+    }).slice(0, 6);
+  }
+
+  function searchPeople(query) {
+    var q = normalize(query);
+    if (!q) return [];
+    var social = remoteSocial();
+    if (hasRemoteSession() && social && social.memberResults) {
+      return social.memberResults(q).map(function (p) {
+        var professional = p.kind === "professional";
+        return {
+          id: p.id,
+          name: p.display_name || p.handle,
+          handle: p.handle,
+          kind: professional ? "professional" : "friend",
+          remote: true
+        };
+      });
+    }
+    return friendMatches(q).concat(professionalMatches(q));
+  }
+
+  function kindLabel(kind) {
+    return kind === "professional" ? "Professional" : "Friend";
+  }
+
+  function openResult(item) {
+    var handle = String((item && item.handle) || "").replace(/^@/, "");
+    if (!handle) return;
+    var tower = document.getElementById("tab-tower");
+    if (tower) tower.click();
+    if (window.CognationTowerOpenProfile) {
+      window.CognationTowerOpenProfile(handle);
+      return;
+    }
+    try { location.hash = "tower-profile-" + handle; } catch (e) {}
   }
 
   function renderResults(root, items) {
     var box = root.querySelector("[data-people-search-results]");
     if (!box) return;
-    var remote = hasRemoteSession();
-    var added = loadAdded();
     box.innerHTML = "";
     if (!items.length) {
       box.hidden = false;
-      box.innerHTML = '<p class="people-search-empty">No people found</p>';
+      box.innerHTML = '<p class="people-search-empty">No friends or professional profiles found</p>';
       return;
     }
     box.hidden = false;
     items.forEach(function (p) {
-      var row = document.createElement("div");
+      var row = document.createElement("button");
+      row.type = "button";
       row.className = "people-search-row";
       row.setAttribute("role", "option");
-      var name = remote ? p.display_name : p.first + " " + p.last;
-      var already = !remote && added.indexOf(p.id) >= 0;
+      row.setAttribute("data-result-kind", p.kind);
+      row.setAttribute("data-result-handle", p.handle);
       row.innerHTML =
-        '<div class="people-search-meta">' +
+        '<span class="people-search-meta">' +
         '<span class="people-search-name">' +
-        escapeHtml(name) +
+        escapeHtml(p.name) +
         "</span>" +
         '<span class="people-search-handle">@' +
         escapeHtml(p.handle) +
-        "</span></div>" +
-        '<button type="button" class="btn btn-secondary people-search-add" data-add-id="' +
-        escapeHtml(p.id) +
-        '"' +
-        (already ? " disabled" : "") +
-        ">" +
-        (remote ? "Open" : already ? "Added" : "Add") +
-        "</button>";
-      box.appendChild(row);
-    });
-    box.querySelectorAll("[data-add-id]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var id = btn.getAttribute("data-add-id");
-        if (hasRemoteSession()) {
-          var social = remoteSocial();
-          var profile = social && social.getProfile ? social.getProfile(id) : null;
-          if (profile && social.openProfile) {
-            social.openProfile(profile);
-            inputClear(root);
-          }
-          return;
-        }
-        var ids = loadAdded();
-        if (ids.indexOf(id) === -1) ids.push(id);
-        saveAdded(ids);
-        /* Also offer into Tower featured friends if profile store exists */
-        if (window.CognationTowerProfileStore) {
-          var prof = window.CognationTowerProfileStore.get();
-          prof.featuredFriendIds = prof.featuredFriendIds || [];
-          if (prof.featuredFriendIds.indexOf(id) === -1) {
-            var max = parseInt(prof.friendsDisplayCount || 3, 10);
-            if ([3, 6, 8].indexOf(max) === -1) max = 3;
-            if (prof.featuredFriendIds.length >= max) prof.featuredFriendIds.shift();
-            prof.featuredFriendIds.push(id);
-            window.CognationTowerProfileStore.save(prof);
-            document.dispatchEvent(new CustomEvent("cognation:tower-profile-updated", { detail: prof }));
-          }
-        }
-        btn.textContent = "Added";
-        btn.disabled = true;
-        document.dispatchEvent(
-          new CustomEvent("cognation:people-added", { detail: { id: id } })
-        );
+        "</span>" +
+        '<span class="people-search-kind">' +
+        kindLabel(p.kind) +
+        "</span></span>" +
+        '<span class="people-search-open">Open</span>';
+      row.addEventListener("click", function () {
+        openResult(p);
+        inputClear(root);
       });
+      box.appendChild(row);
     });
   }
 

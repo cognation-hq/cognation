@@ -275,7 +275,7 @@
           id="people-search-input"
           type="search"
           name="people"
-          placeholder="Search people…"
+          placeholder="Search friends and professional profiles"
           autocomplete="off"
           spellcheck="false"
           data-people-search-input
@@ -296,7 +296,7 @@
   </section>
 
   <main id="main">
-    <!-- Tab order (L→R): TOWER · NEWS · COMMUNE · CALENDAR · CIRCLE (V2 areas stay hidden) -->
+    <!-- Tab order (L→R): TOWER · NEWS · COMMUNE · CIRCLE (V2 areas stay hidden) -->
     <section class="section tabs-section" aria-label="COGNATION">
       <div class="container">
         <div class="tabs tabs--chrome" data-tabs>
@@ -305,7 +305,6 @@
               <button type="button" role="tab" id="tab-tower" aria-controls="panel-tower" aria-selected="true" tabindex="0">TOWER</button>
               <button type="button" role="tab" id="tab-news" aria-controls="panel-news" aria-selected="false" tabindex="-1">NEWS</button>
               <button type="button" role="tab" id="tab-commune" aria-controls="panel-commune" aria-selected="false" tabindex="-1">COMMUNE</button>
-              <button type="button" class="app-topbar-shortcut" data-tower-anchor="calendar">CALENDAR</button>
               <button type="button" class="app-topbar-shortcut" data-tower-anchor="circle">CIRCLE</button>
               <button type="button" role="tab" id="tab-pages" aria-controls="panel-pages" aria-selected="false" tabindex="-1" hidden>PAGES</button>
             </div>
@@ -341,8 +340,10 @@
                             <option value="8">Top 8</option>
                           </select>
                           <fieldset class="tower-friends-pick" data-tower-friends-pick>
-                            <legend class="visually-hidden">Pick friends to feature</legend>
-                            <p class="form-hint">Tap to feature (demo neighbors). Drag selected chips to set rank 1…n:</p>
+                            <legend class="visually-hidden">Search friends to feature</legend>
+                            <label class="tower-friends-search-label" for="tower-friends-search">Search friends</label>
+                            <input id="tower-friends-search" type="search" data-tower-friends-search placeholder="Type a name" autocomplete="off">
+                            <div class="tower-friends-search-results" data-tower-friends-search-results hidden></div>
                             <div class="tower-friends-chips" data-tower-friends-chips></div>
                             <div class="tower-friends-save-row" style="margin-top:0.5rem;display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;">
                               <button type="button" class="btn btn-primary tower-btn-compact" data-tower-save-friends>Save</button>
@@ -358,6 +359,10 @@
                       <div class="tower-private-theme-body">
                         <p class="form-hint">Show as pins on Public</p>
                         <div class="tower-badge-visibility" data-tower-badge-visibility></div>
+                        <label class="tower-badge-upload">
+                          Upload a badge image
+                          <input type="file" accept="image/*" data-tower-badge-file aria-label="Upload a badge image">
+                        </label>
                         <div class="tower-friends-save-row" style="margin-top:0.65rem;display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;">
                           <button type="button" class="btn btn-primary tower-btn-compact" data-tower-save-badges>Save</button>
                           <span class="form-hint" data-tower-badges-status role="status" aria-live="polite"></span>
@@ -412,15 +417,16 @@
                     <div class="paper-rule-block" aria-hidden="true"></div>
                     <div class="tower-private-main-grid tower-private-workspace" data-tower-workspace>
 
-                    <!-- Left rail: friends circles + personal calendar -->
-                    <aside class="tower-left-rail" data-tower-calendar aria-label="Friends and calendar">
-                      <section class="tower-remote-social" data-remote-social hidden aria-label="Connections">
-                        <h4 class="tower-friends-browse-heading">Connections</h4>
-                        <div data-remote-friend-requests></div>
-                        <div data-remote-notifications></div>
-                      </section>
+                    <section class="tower-remote-social" data-remote-social hidden aria-label="Connections">
+                      <h4 class="tower-friends-browse-heading">Connections</h4>
+                      <div data-remote-friend-requests></div>
+                      <div data-remote-notifications></div>
+                    </section>
+                    <aside class="tower-side-friends" aria-label="Friends and calendar">
                       <div class="tower-friends-browse" data-tower-friends-browse data-tower-friends aria-label="Friends">
                         <h4 class="tower-friends-browse-heading">Friends</h4>
+                        <label class="visually-hidden" for="tower-friends-find">Search friends</label>
+                        <input id="tower-friends-find" class="tower-friends-find" type="search" data-tower-friends-find placeholder="Search friends" autocomplete="off">
                         <ul class="tower-friends-browse-list" data-tower-friends-browse-list role="list"></ul>
                       </div>
                       <div class="tower-personal-calendar" data-tower-calendar-personal>
@@ -436,11 +442,7 @@
                         </div>
                       </div>
                     </aside>
-
-                    <!-- Center: wider feed -->
                     <div class="tower-feed" data-tower-feed role="feed" aria-label="Tower posts"></div>
-
-                    <!-- Right rail: messages closed by default -->
                     <aside
                       class="tower-private-messages"
                       data-tower-private-messages
@@ -506,6 +508,7 @@
                   <div class="tower-rotate-toolbar" data-tower-rotate-toolbar>
                     <button type="button" class="btn btn-secondary tower-rotate-btn" data-tower-rotate="5" title="Rotate selected widget 5° clockwise">Rotate</button>
                   </div>
+                  <div class="tower-emoji-bar" data-tower-emoji-bar role="group" aria-label="Emoji widgets"></div>
                 </div>
 
                   <div class="tower-bg-upload" data-tower-public-look>
@@ -524,15 +527,10 @@
                         <img class="tower-avatar-ornament" data-tower-ornament-img src="" alt="" aria-hidden="true" hidden>
                         <div class="tower-avatar-wrap" data-tower-avatar-frame="none">
                         <div class="tower-avatar-mat">
-                          <div class="tower-avatar" data-tower-avatar aria-hidden="true">?</div>
+                          <button type="button" class="tower-avatar" data-tower-avatar aria-label="Upload profile photo">?</button>
                         </div>
                         <img class="tower-avatar-frame-overlay" data-tower-frame-overlay src="" alt="" aria-hidden="true" hidden>
                         <button type="button" class="tower-avatar-resize" data-tower-avatar-resize aria-label="Drag to resize frame" title="Drag to resize frame"></button>
-                        <label class="tower-avatar-upload" title="Upload profile photo">
-                          <span class="tower-avatar-upload-hint" aria-hidden="true">📷</span>
-                          <span class="visually-hidden">Upload profile picture</span>
-                          <input type="file" accept="image/*" data-tower-avatar-file>
-                        </label>
                       </div>
                       <div class="tower-profile-actions">
                         <div class="tower-follow-row" data-tower-follow-row>
@@ -544,6 +542,12 @@
                             aria-pressed="false"
                             aria-label="Add this person as a friend"
                           >Add friend</button>
+                        </div>
+                        <div class="tower-followers" data-tower-followers hidden>
+                          <p class="tower-followers-note" data-tower-followers-note>No followers yet.</p>
+                          <label class="visually-hidden" for="tower-followers-find">Search followers</label>
+                          <input id="tower-followers-find" class="tower-followers-find" type="search" data-tower-followers-find placeholder="Search followers" autocomplete="off">
+                          <ul class="tower-followers-results" data-tower-followers-results role="list"></ul>
                         </div>
                         <button type="button" class="tower-go-live-btn" data-go-live aria-label="Go live">Go live</button>
                       </div>
@@ -656,6 +660,10 @@
                       </div><div class="tower-sticker tower-sticker--music" data-tower-widget="music" data-sticker-label="Music"><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Music sticker" tabindex="-1" hidden>⋮⋮</button><div class="tower-music" data-tower-music data-music-skin="classic" hidden>
                         <audio data-tower-audio preload="metadata" playsinline></audio>
 
+                        <div class="tower-pro-youtube" data-tower-pro-youtube hidden>
+                          <div class="tower-pro-youtube-screen" data-tower-pro-youtube-frame></div>
+                        </div>
+
                         <div class="tower-music-skin tower-music-skin--classic" data-music-face="classic">
                           <div class="tower-ipod" data-tower-ipod>
                             <div class="tower-ipod-screen">
@@ -726,17 +734,19 @@
 
                       <div class="tower-sticker tower-sticker--instax" data-tower-widget="instax" data-sticker-label="Camera">
                         <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Camera sticker" tabindex="-1" hidden>⋮⋮</button>
-                        <label class="tower-instax" title="Upload a photo">
+                        <div class="tower-instax" title="Upload a photo">
                           <span class="visually-hidden">Upload a photo</span>
                           <span class="tower-instax-body" aria-hidden="true">
                             <span class="tower-instax-flash"></span>
                             <span class="tower-instax-viewfinder"></span>
                             <span class="tower-instax-lens"><span class="tower-instax-lens-glass"></span></span>
                             <span class="tower-instax-shutter"></span>
+                            <span class="tower-instax-rainbow"></span>
                           </span>
-                          <input type="file" accept="image/*" data-tower-instax-file>
-                        </label>
+                        </div>
                       </div>
+                      <input type="file" accept="image/*" data-tower-avatar-file class="tower-offscreen-file" tabindex="-1" aria-label="Upload profile photo">
+                      <input type="file" accept="image/*" data-tower-instax-file class="tower-offscreen-file" tabindex="-1" aria-label="Upload a photo">
 
                       <div class="tower-sticker tower-sticker--calendar" data-tower-widget="calendar" data-sticker-label="Calendar" data-tower-calendar-personal>
                         <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Calendar sticker" tabindex="-1" hidden>⋮⋮</button>
@@ -1280,12 +1290,10 @@
 
   <footer class="site-footer">
     <div class="container footer-inner">
-      <p>&copy; <span id="year">2026</span> <span data-brand>COGNATION</span>. Starter site — rename via <code>js/brand.js</code>.</p>
       <nav class="footer-nav" aria-label="Footer">
         <a href="index.html">Home</a>
         <a href="about.html">About</a>
         <a href="contact.html">Contact</a>
-        <a href="https://x.ai/bot" rel="noopener noreferrer">Grok Bot</a>
       </nav>
     </div>
   </footer>

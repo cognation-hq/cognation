@@ -44,7 +44,7 @@
       subtitle: "Local Broadsheet · From Tower",
       dateline: "Local edition · Pin / neighborhood",
       volume: "Vol. I · No. 1",
-      dek: "Same broadsheet as International — Local plate generated from TOWER posts near the member’s pin / IP. Read-only.",
+      dek: "Most reacted posts from personal and professional Towers. Age-appropriate Tower content only.",
       topicsLeft: ["Neighborhood notes", "Block watch", "Market square", "School board"],
       topicsRight: [
         "TOWER — street level",
@@ -1007,18 +1007,12 @@
         .replace(/^-|-$/g, "") || "neighbor";
     }
 
-    function postsFromTower(scope) {
-      scope = scope || "local";
-      if (!window.CognationTowerStore || typeof window.CognationTowerStore.list !== "function") {
-        return FeedStore.listPosts(scope === "statewide" ? "statewide" : "local");
+    function postsFromTower() {
+      if (!window.CognationTowerStore || typeof window.CognationTowerStore.newsList !== "function") {
+        return [];
       }
-      var list = window.CognationTowerStore.list().slice();
-      if (scope === "statewide") {
-        list.sort(function (a, b) {
-          return (b.likes || 0) - (a.likes || 0);
-        });
-      }
-      return list.map(function (p, i) {
+      var list = window.CognationTowerStore.newsList();
+      return list.map(function (p) {
         var author = p.authorName || "Neighbor";
         var slug = towerProfileSlug(author);
         /* Prefer profile handle badge when this post is from the local profile */
@@ -1056,33 +1050,22 @@
           !!(p.shareBeyondFriends || p.audience === "friends_of_friends") ||
           /@friends?\s*of\s*friends\b/i.test(body) ||
           /@friendsoffriends\b/i.test(body);
-        var sourceLabel = "Local plate from Tower";
-        var sourceDetail = "Cognation Tower · @" + slug;
-        if (scope === "local" && isFof) {
-          sourceLabel = "Local feed · @friendsoffriends";
-          sourceDetail =
-            "On NEWS, @friendsoffriends delivers to friends’ friends’ Local feeds · @" + slug;
-          if (body.toLowerCase().indexOf("@friendsoffriends") === -1) {
-            body = "@friendsoffriends · @" + slug + " — " + body;
-          }
+        var towerLabel = p.towerKind === "professional" ? "Professional tower" : "Personal tower";
+        var reactions = Number(p.likes) || 0;
+        if (p.reactions && typeof p.reactions === "object") {
+          Object.keys(p.reactions).forEach(function (face) {
+            var users = p.reactions[face];
+            if (Array.isArray(users)) reactions += users.length;
+          });
         }
-        if (scope === "statewide") {
-          sourceLabel = "Statewide hit · News AI";
-          sourceDetail =
-            "Most-liked Tower topic (" +
-            (p.likes || 0) +
-            " ♥) · @" +
-            slug +
-            " · @statewide · @friendsoffriends";
-          body =
-            "@statewide · @friendsoffriends · @" +
-            slug +
-            " — " +
-            body +
-            " — FoF reach beyond immediate friends (e.g. 400+500≈900 Local feeds); selected by News.";
+        if (p.title && body.indexOf(p.title) !== 0) body = p.title + " — " + body;
+        var sourceLabel = towerLabel + " · " + reactions + " reactions";
+        var sourceDetail = "Most reacted on " + towerLabel.toLowerCase() + " · @" + slug;
+        if (isFof && body.toLowerCase().indexOf("@friendsoffriends") === -1) {
+          body = "@friendsoffriends · " + body;
         }
         return {
-          id: "from-tower-" + scope + "-" + p.id,
+          id: "from-tower-" + (p.towerKind || "personal") + "-" + p.id,
           authorName: author,
           body: body,
           createdAt: p.createdAt,
@@ -1102,7 +1085,7 @@
       if (!feedList) return;
       var posts =
         editionId === "local" || editionId === "statewide"
-          ? postsFromTower(editionId)
+          ? postsFromTower()
           : FeedStore.listPosts(editionId);
       feedList.innerHTML = "";
       wirePage = 0;

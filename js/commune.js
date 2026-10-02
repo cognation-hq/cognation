@@ -1016,7 +1016,11 @@
       var postId = post.id || ("news-" + String(post.createdAt || Date.now()) + "-" + Math.random().toString(36).slice(2, 7));
       article.setAttribute("data-news-post", "");
       article.setAttribute("data-post-id", postId);
+      if (post.rating) article.setAttribute("data-news-rating", String(post.rating));
       try {
+        if (window.CognationNewsComments && window.CognationNewsComments.mount) {
+          window.CognationNewsComments.mount(article, { id: postId, rating: post.rating || "" });
+        }
         if (window.CognationSeedOpsNewsLog && window.CognationSeedOpsNewsLog.onNewsPostRendered) {
           window.CognationSeedOpsNewsLog.onNewsPostRendered(post, editionId, {
             rankedIndex: opts.lead ? 0 : undefined,

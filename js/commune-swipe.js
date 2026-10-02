@@ -25,6 +25,7 @@
   var FRIEND_CAP = 6000;
 
   var TYPE = {
+    CLASSROOM: "classroom",
     AD: "ad",
     CHAT: "chatroom",
     FACT: "fact",
@@ -35,8 +36,10 @@
     DATING: "dating",
   };
 
-  var LANE_ORDER = [TYPE.AD, TYPE.CHAT, TYPE.FACT, TYPE.WELLNESS, TYPE.FRIEND, TYPE.EVENT, TYPE.KNOW];
+  /* Featured mix stays 1:1 across Classroom / ad / chat / dating / content (content = fact+wellness+friend+event+know). */
+  var LANE_ORDER = [TYPE.CLASSROOM, TYPE.AD, TYPE.CHAT, TYPE.FACT, TYPE.WELLNESS, TYPE.FRIEND, TYPE.EVENT, TYPE.KNOW];
   var REPEATABLE = {};
+  REPEATABLE[TYPE.CLASSROOM] = true;
   REPEATABLE[TYPE.CHAT] = true;
   REPEATABLE[TYPE.FACT] = true;
   REPEATABLE[TYPE.WELLNESS] = true;
@@ -59,6 +62,32 @@
     { id: "room-site-garage-sale", title: "Garage sale", topic: "garage sale", gate: "interest", interests: ["garage sale"] },
     { id: "room-site-reality", title: "Reality shows", topic: "reality shows", gate: "interest", interests: ["reality show", "reality shows", "reality tv"] },
     { id: "room-site-insurance", title: "Insurance", topic: "insurance", gate: "interest", interests: ["insurance"] },
+  ];
+
+  /* Honest-thin Classroom / webinar cards — life skills for ~18+ (insurance, voting, business). */
+  var CLASSROOM_BODY = "Cognation Classroom — life skills at a human pace.";
+  var CLASSROOM_SESSIONS = [
+    {
+      id: "class-insurance",
+      title: "Insurance basics",
+      topic: "insurance",
+      body: "What coverage is for, how premiums work, and questions worth asking before you buy.",
+      minAge: 18,
+    },
+    {
+      id: "class-voting",
+      title: "Voting & civic basics",
+      topic: "voting",
+      body: "How elections reach the ballot, registering where you live, and finding nonpartisan guides.",
+      minAge: 18,
+    },
+    {
+      id: "class-business",
+      title: "Starting a small business",
+      topic: "business",
+      body: "Sole prop vs LLC in plain language, basic bookkeeping, and when to ask a professional.",
+      minAge: 18,
+    },
   ];
 
   var FACTS = [
@@ -426,6 +455,33 @@
     };
   }
 
+  function classroomAllowed() {
+    var age = getMemberAge();
+    return age != null && age >= 18;
+  }
+
+  function classroomCard(session) {
+    return {
+      id: session.id,
+      type: TYPE.CLASSROOM,
+      title: session.title,
+      body: session.body || CLASSROOM_BODY,
+      topic: session.topic,
+      host: "Cognation",
+      classroom: true,
+      minAge: session.minAge || 18,
+    };
+  }
+
+  function classroomCatalog() {
+    return CLASSROOM_SESSIONS.map(classroomCard);
+  }
+
+  function visibleClassroomSessions() {
+    if (!classroomAllowed()) return [];
+    return classroomCatalog();
+  }
+
   function youtubeId(url) {
     var m = String(url || "").match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{6,})/);
     return m ? m[1] : "";
@@ -671,6 +727,7 @@
 
   function buildLanes() {
     var lanes = {};
+    lanes[TYPE.CLASSROOM] = visibleClassroomSessions();
     lanes[TYPE.AD] = placedAds();
     lanes[TYPE.CHAT] = ensureSiteRooms();
     lanes[TYPE.FACT] = FACTS.map(function (f) { return { id: f.id, type: TYPE.FACT, title: f.title, body: f.body }; });
@@ -700,10 +757,12 @@
     busy: false,
     pointer: null,
     roomId: "",
+    classroomId: "",
   };
 
   function typeLabel(t) {
     switch (t) {
+      case TYPE.CLASSROOM: return "Classroom";
       case TYPE.AD: return "Advertisement";
       case TYPE.CHAT: return "Chatroom";
       case TYPE.FACT: return "Fact";
@@ -848,6 +907,9 @@
     el.setAttribute("data-commune-card", "");
     el.setAttribute("data-card-type", card.type === TYPE.DATING ? "speed-dating" : card.type);
     el.setAttribute("data-card-id", card.id);
+    if (card.type === TYPE.CLASSROOM) {
+      el.setAttribute("data-classroom", "card");
+    }
     if (card.type === TYPE.DATING) {
       el.setAttribute("data-dating-content", "true");
       el.setAttribute("data-dating-opt-in", "true");
@@ -882,6 +944,10 @@
       if (card.type === TYPE.CHAT) {
         html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room</button>';
       }
+      if (card.type === TYPE.CLASSROOM) {
+        html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
+        html += '<p class="commune-card-meta">Life skills · ~18+</p>';
+      }
       if (card.type === TYPE.KNOW) html += '<span class="commune-card-badge commune-card-badge--ad">Ad</span>';
       if (card.type === TYPE.AD) html += '<span class="commune-card-badge commune-card-badge--ad">Ad</span>';
     }
@@ -911,6 +977,11 @@
     }
     var sim = el.querySelector("[data-commune-enter-sim]");
     if (sim) sim.addEventListener("click", function (ev) { ev.stopPropagation(); openRoom(card.id, true); });
+    var enterClass = el.querySelector("[data-commune-enter-classroom]");
+    if (enterClass) enterClass.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      openClassroom(card.id, true);
+    });
     var open = el.querySelector("[data-commune-open-profile]");
     if (open) open.addEventListener("click", function (ev) { ev.stopPropagation(); openProfessionalPage(card); });
     if (card.type === TYPE.AD && card.handle) {
@@ -930,13 +1001,35 @@
     }
   }
 
-  function showRoom(on) {
+  function showSubpanel(kind) {
+    /* kind: "" | "room" | "classroom" — hides deck when either panel is open */
     var room = state.shell && state.shell.querySelector("[data-commune-room]");
+    var classroom = state.shell && state.shell.querySelector("[data-classroom], #panel-classroom, [data-commune-classroom]");
     var deck = state.deck;
     var actions = state.shell && state.shell.querySelector(".commune-swipe-actions");
-    if (room) room.hidden = !on;
-    if (deck) deck.hidden = !!on;
-    if (actions) actions.hidden = !!on;
+    var on = !!kind;
+    if (room) room.hidden = kind !== "room";
+    if (classroom) classroom.hidden = kind !== "classroom";
+    if (deck) deck.hidden = on;
+    if (actions) actions.hidden = on;
+  }
+
+  function showRoom(on) {
+    if (on) {
+      state.classroomId = "";
+      showSubpanel("room");
+    } else if (!state.classroomId) {
+      showSubpanel("");
+    }
+  }
+
+  function showClassroom(on) {
+    if (on) {
+      state.roomId = "";
+      showSubpanel("classroom");
+    } else if (!state.roomId) {
+      showSubpanel("");
+    }
   }
 
   function roomLog(roomId) {
@@ -980,6 +1073,7 @@
     rooms.forEach(function (item) { if (item.id === roomId) room = item; });
     if (!room) return false;
     if (!state.shell) return false;
+    closeClassroom();
     paintRoom(room);
     if (scroll && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
     return true;
@@ -989,8 +1083,53 @@
     showRoom(false);
   }
 
+  function paintClassroom(session) {
+    var panel = state.shell && state.shell.querySelector("[data-classroom], #panel-classroom, [data-commune-classroom]");
+    if (!panel || !session) return;
+    var title = panel.querySelector("[data-classroom-title]");
+    var topic = panel.querySelector("[data-classroom-topic]");
+    var body = panel.querySelector("[data-classroom-body]");
+    var notes = panel.querySelector("[data-classroom-notes]");
+    if (title) title.textContent = session.title || "Classroom";
+    if (topic) topic.textContent = session.topic ? ("Topic · " + session.topic) : "Life skills · ~18+";
+    if (body) body.textContent = session.body || CLASSROOM_BODY;
+    if (notes) {
+      notes.textContent =
+        "Honest thin session: Cognation hosts short life-skills webinars here (insurance, voting, business). Full curriculum arrives later — this seat is real.";
+    }
+    showClassroom(true);
+    state.classroomId = session.id;
+  }
+
+  function openClassroom(sessionId, scroll) {
+    sessionId = String(sessionId || "");
+    if (!classroomAllowed()) return false;
+    var sessions = classroomCatalog();
+    var session = null;
+    sessions.forEach(function (item) { if (item.id === sessionId) session = item; });
+    if (!session && sessions.length) session = sessions[0];
+    if (!session) return false;
+    if (!state.shell) {
+      /* Allow pathway smoke before shell bind: surface still exists in DOM. */
+      var panel = document.querySelector("[data-classroom], #panel-classroom, [data-commune-classroom]");
+      if (!panel) return false;
+      state.shell = document.querySelector("[data-commune-shell]") || panel.closest("[data-commune-shell]") || null;
+      if (!state.shell) state.shell = panel.parentElement;
+    }
+    closeRoom();
+    paintClassroom(session);
+    if (scroll && state.shell && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
+    return true;
+  }
+
+  function closeClassroom() {
+    state.classroomId = "";
+    showClassroom(false);
+  }
+
   function paintDeck() {
     if (!state.deck) return;
+    closeClassroom();
     closeRoom();
     state.deck.innerHTML = "";
     var card = currentCard();
@@ -1147,7 +1286,7 @@
   }
 
   function swipe(direction) {
-    if (state.busy || state.roomId) return;
+    if (state.busy || state.roomId || state.classroomId) return;
     var card = currentCard();
     if (!card) return;
     var dir = direction === "left" ? "left" : "right";
@@ -1213,6 +1352,11 @@
       return;
     }
     if (card.type === TYPE.KNOW) return;
+    if (card.type === TYPE.CLASSROOM) {
+      like(card);
+      setStatus("Kept. Open the session anytime from a Classroom card.");
+      return;
+    }
     if (card.type === TYPE.FRIEND || card.type === TYPE.EVENT || card.type === TYPE.FACT || card.type === TYPE.WELLNESS || card.type === TYPE.CHAT) {
       like(card);
       if (card.type !== TYPE.CHAT) recordShare(card);
@@ -1287,6 +1431,8 @@
     });
     var back = shell.querySelector("[data-commune-room-back]");
     if (back) back.addEventListener("click", closeRoom);
+    var classBack = shell.querySelector("[data-classroom-back], [data-commune-classroom-back]");
+    if (classBack) classBack.addEventListener("click", closeClassroom);
     var form = shell.querySelector("[data-commune-room-compose]");
     if (form) {
       form.addEventListener("submit", function (ev) {
@@ -1317,7 +1463,7 @@
     }
     document.addEventListener("keydown", function (ev) {
       var panel = document.getElementById("panel-commune");
-      if (!panel || panel.hidden || state.roomId) return;
+      if (!panel || panel.hidden || state.roomId || state.classroomId) return;
       if (ev.key === "ArrowLeft") { ev.preventDefault(); swipe("left"); }
       else if (ev.key === "ArrowRight") { ev.preventDefault(); swipe("right"); }
     });
@@ -1343,6 +1489,11 @@
   window.CognationCommuneSwipe = {
     rebuild: rebuildDeck,
     openRoom: openRoom,
+    openClassroom: openClassroom,
+    closeClassroom: closeClassroom,
+    classroomCatalog: classroomCatalog,
+    visibleClassroomSessions: visibleClassroomSessions,
+    classroomAllowed: classroomAllowed,
     getFollows: getFollows,
     setFollows: setFollows,
     isFollowing: isFollowing,

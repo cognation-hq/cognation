@@ -109,4 +109,17 @@ gone(boot(storageB, owner).CognationTowerProfileStore.topFriendIds(), "accounts 
 var viewer = boot(storageA, { id: "prof-hank", handle: "seed-hank-0030", name: "Hank" }).CognationTowerProfileStore;
 assert.strictEqual(viewer.removeTopFriend(REMOVED), false, "viewer cannot remove");
 assert.deepStrictEqual(viewer.topFriendIds(), ORIGINAL, "viewer does not inherit the removal");
+var storageC = memoryStorage();
+seed(storageC);
+var winC = boot(storageC, owner);
+account(winC);
+winC.CognationAccounts.updateProfileTower = function () { return { ok: false, error: "storage" }; };
+assert.strictEqual(winC.CognationTowerProfileStore.removeTopFriend(REMOVED), true, "keyed remove");
+storageC.setItem("cognation.tower.profile.v1", JSON.stringify({
+  handle: "alexa", removedFriendPinIds: [], featuredFriendIds: [],
+}));
+gone(boot(storageC, owner).CognationTowerProfileStore.topFriendIds(), "reload after another profile clobbers the legacy key");
+var keyed = JSON.parse(storageC.getItem("cognation.tower.top-friends.v1"));
+assert.ok(keyed["prof-seed"].removedFriendPinIds.indexOf(REMOVED) >= 0, "keyed removal survived");
+
 console.log("top-friend-delete.test.js: ok");

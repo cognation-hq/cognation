@@ -1025,9 +1025,9 @@
       if (this._saving) return false;
       data = data || {};
       opts = opts || {};
-      /* Other people's Towers are read-only — never persist mutate UI into their blob. */
-      if (data._directoryFriend) return false;
-      if (data._remote && !isTowerOwner(data) && !opts.geometry) return false;
+      /* Only the owner may persist Tower edits (name, avatar, stickers, music,
+         polaroids, top friends, bio, geometry). Others' profiles stay read-only. */
+      if (!isTowerOwner(data)) return false;
       this._saving = true;
       try {
       writeScrapbookLayout(data);
@@ -1810,6 +1810,23 @@
     var p = TowerProfileStore.get();
     var owner = isTowerOwner(p);
     root.setAttribute("data-tower-is-owner", owner ? "true" : "false");
+    if (!owner) {
+      root.querySelectorAll("[contenteditable='true']").forEach(function (el) {
+        el.removeAttribute("contenteditable");
+      });
+    }
+    root.querySelectorAll(
+      "[data-tower-profile-form] input, [data-tower-profile-form] textarea, [data-tower-profile-form] select, [data-tower-profile-form] button," +
+      "[data-tower-save-friends], [data-tower-save-badges], [data-tower-save-frame]," +
+      "[data-tower-public-look-save], [data-tower-private-theme-save]," +
+      "[data-tower-collage-apply], [data-tower-collage-demo], [data-tower-add-widget]," +
+      "[data-tower-choose-avatar], [data-tower-clear-avatar]," +
+      "[data-tower-music-url-inline], [data-tower-music-look], [data-tower-music-skin]," +
+      "[data-tower-avatar-file], [data-tower-avatar-file-panel], [data-tower-instax-file]," +
+      "[data-tower-name-size], [data-tower-slogan], [data-tower-public-widget], [data-tower-badge-vis]"
+    ).forEach(function (el) {
+      el.disabled = !owner;
+    });
     var edit = root.querySelector("[data-tower-profile-edit]");
     if (edit) {
       edit.hidden = !owner;
@@ -1949,6 +1966,7 @@
     });
     if (saveBtn) {
       saveBtn.addEventListener("click", function () {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
         var p = TowerProfileStore.get();
         p.privateFeedTheme = readPrivateFeedThemeFromForm(root);
         if (!TowerProfileStore.save(p)) {
@@ -2530,6 +2548,7 @@
         applyDisplayNameSize(root, range.value);
       });
       range.addEventListener("change", function () {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
         var p = TowerProfileStore.get();
         p.displayNameSize = normalizeDisplayNameSize(range.value);
         TowerProfileStore.save(p);
@@ -3459,6 +3478,7 @@
   }
 
   function commitSocialDraft(root, id, value) {
+    if (!isTowerOwner(TowerProfileStore.get())) return;
     var p = TowerProfileStore.get();
     if (!p.socialLinks || typeof p.socialLinks !== "object") p.socialLinks = {};
     p.socialLinks[id] = storedSocialValue(id, value);
@@ -4253,6 +4273,7 @@
   }
 
   function setPublicWidgetVisible(root, id, on) {
+    if (!isTowerOwner(TowerProfileStore.get())) return;
     if (!id || id === "avatar" || id === "feed" || id === "messages") return;
     if (PUBLIC_WIDGET_IDS.indexOf(id) < 0) return;
     var p = TowerProfileStore.get();
@@ -4826,6 +4847,7 @@
   }
 
   function writeSharedCalendar(profile, events) {
+    if (!isTowerOwner(profile)) return;
     var accounts = window.CognationAccounts;
     var recs = accountProfilesFor(profile);
     if (profile) profile.calendarEvents = events;
@@ -4882,6 +4904,7 @@
     live = normalizeGoingLive(live);
     if (!live) return null;
     var p = TowerProfileStore.get();
+    if (!isTowerOwner(p)) return null;
     var events = sharedCalendarEvents(p).filter(function (e) {
       return e && e.id !== "going-live";
     });
@@ -4953,6 +4976,7 @@
   }
 
   function saveCalendarToProfile(mutator, opts) {
+    if (!isTowerOwner(TowerProfileStore.get())) return TowerProfileStore.get();
     var p = TowerProfileStore.get();
     p.calendarEvents = sharedCalendarEvents(p);
     seedCalendarEventsIfMissing(p);
@@ -6587,6 +6611,7 @@
   }
 
   function commitInlineName(root, el) {
+    if (!isTowerOwner(TowerProfileStore.get())) return;
     var p = TowerProfileStore.get();
     var next = String(el.textContent || "").replace(/\s+/g, " ").trim().slice(0, 80);
     if (!next) next = p.displayName || "You";
@@ -6598,6 +6623,7 @@
   }
 
   function commitInlineHandle(root, el) {
+    if (!isTowerOwner(TowerProfileStore.get())) return;
     var p = TowerProfileStore.get();
     var prev = normalizeHandle(p.handle || "");
     var next = normalizeHandle(el.textContent || "");
@@ -6630,6 +6656,7 @@
   }
 
   function commitInlineQuote(root, el) {
+    if (!isTowerOwner(TowerProfileStore.get())) return;
     var sticker = el.closest("[data-tower-quote-id]");
     if (!sticker) return;
     var id = sticker.getAttribute("data-tower-quote-id");
@@ -6654,6 +6681,7 @@
   }
 
   function commitInlineSlogan(root, el) {
+    if (!isTowerOwner(TowerProfileStore.get())) return;
     var p = TowerProfileStore.get();
     var text = String(el.textContent || "").trim().slice(0, 400);
     p.slogan = text;
@@ -6777,6 +6805,7 @@
     var confirm = dlg.querySelector("[data-tower-add-quote-confirm]");
     if (confirm) {
       confirm.addEventListener("click", function () {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
         var ta = dlg.querySelector("[data-tower-add-quote-text]");
         var text = ta ? ta.value : "";
         var choice = dlg.getAttribute("data-add-choice") || "quote";
@@ -6949,6 +6978,7 @@
 
     if (resetBtn) {
       resetBtn.addEventListener("click", function () {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
         var p = TowerProfileStore.get();
         p.widgetLayout = JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT));
         if (p.widgetLayout && p.widgetLayout.feed) delete p.widgetLayout.feed;
@@ -7502,6 +7532,10 @@
     btn.addEventListener("click", function (ev) {
       ev.preventDefault();
       ev.stopPropagation();
+      if (!isTowerOwner(TowerProfileStore.get())) {
+        setOpen(false);
+        return;
+      }
       setOpen(!isOpen());
     });
 
@@ -7579,6 +7613,7 @@
     if (saveBtn && !saveBtn.__cognationFrameSaveBound) {
       saveBtn.__cognationFrameSaveBound = true;
       saveBtn.addEventListener("click", function () {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
         var input = root.querySelector("[data-tower-avatar-frame-input]");
         var id = normalizeFrameId(input ? input.value : "none");
         var colorIn = root.querySelector("[data-tower-cowboy-color-input]");
@@ -7777,6 +7812,7 @@
     });
 
     function loadBackgroundImageFile(file) {
+      if (!isTowerOwner(TowerProfileStore.get())) return;
       if (!file) return;
       if (!/^image\//.test(file.type)) {
         setStatus("Choose an image file.", true);
@@ -7886,6 +7922,7 @@
 
     if (saveBtn) {
       saveBtn.addEventListener("click", function () {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
         var p = TowerProfileStore.get();
         var look = readPublicLookFromForm(root);
         if (root.querySelector("[data-tower-font]")) p.towerFont = look.towerFont;
@@ -7938,6 +7975,7 @@
     if (demoBtn && !demoBtn.__bound) {
       demoBtn.__bound = true;
       demoBtn.addEventListener("click", function () {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
         var layoutSel2 = root.querySelector("[data-tower-collage-layout]");
         var layoutId = layoutSel2 ? layoutSel2.value : "grid-3x3";
         if (layoutId === "none") layoutId = "grid-3x3";
@@ -7958,6 +7996,7 @@
     if (applyBtn && !applyBtn.__bound) {
       applyBtn.__bound = true;
       applyBtn.addEventListener("click", function () {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
         var p = TowerProfileStore.get();
         p.backgroundMode = "collage";
         p.backgroundCollage = readCollageFromForm(root);
@@ -8265,6 +8304,7 @@
     if (profileForm) {
       profileForm.addEventListener("submit", function (e) {
         e.preventDefault();
+        if (!isTowerOwner(TowerProfileStore.get())) return;
         var p = TowerProfileStore.get();
         var nameInput = root.querySelector("#tower-display-name");
         var htmlInput = root.querySelector("[data-tower-profile-html]");
@@ -8407,6 +8447,10 @@
     }
 
     function storeProfileImage(dataUrl, field, statusFn, okMsg, mutate) {
+      if (!isTowerOwner(TowerProfileStore.get())) {
+        (statusFn || setProfileStatus)("Only the profile owner can edit this profile.", true);
+        return;
+      }
       if (!dataUrl || dataUrl.indexOf("data:image/") !== 0) {
         (statusFn || setProfileStatus)("Could not read that image.", true);
         return;
@@ -8597,6 +8641,7 @@
     var skinInLive = root.querySelector("[data-tower-music-skin]");
     if (skinInLive) {
       skinInLive.addEventListener("change", function () {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
         var cur = TowerProfileStore.get();
         cur.musicSkin = visibleMusicSkin(skinInLive.value || "classic");
         TowerProfileStore.save(cur);
@@ -8613,6 +8658,7 @@
     var friendsCount = root.querySelector("[data-tower-friends-count]");
     if (friendsCount) {
       friendsCount.addEventListener("change", function () {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
         var cur = TowerProfileStore.get();
         var n = parseInt(friendsCount.value, 10);
         if ([3, 6, 8].indexOf(n) === -1) n = 3;
@@ -8627,6 +8673,7 @@
     if (saveFriendsBtn && !saveFriendsBtn.__cognationFriendsSaveBound) {
       saveFriendsBtn.__cognationFriendsSaveBound = true;
       saveFriendsBtn.addEventListener("click", function () {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
         var cur = TowerProfileStore.get();
         var countSel = root.querySelector("[data-tower-friends-count]");
         var n = parseInt(countSel && countSel.value ? countSel.value : cur.friendsDisplayCount || 3, 10);
@@ -8741,6 +8788,7 @@
     if (saveBadgesBtn && !saveBadgesBtn.__cognationBadgesSaveBound) {
       saveBadgesBtn.__cognationBadgesSaveBound = true;
       saveBadgesBtn.addEventListener("click", function () {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
         var cur = TowerProfileStore.get();
         if (!cur.badgeVisibility || typeof cur.badgeVisibility !== "object") {
           cur.badgeVisibility = {};

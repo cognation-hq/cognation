@@ -454,21 +454,55 @@
   function refreshFriends() {
     var me = identity();
     if (!me) return Promise.resolve([]);
+    var uid = encodeURIComponent(me.supabaseUserId);
     return client()
       .rest("friendships", {
         query:
-          "select=friend_user_id&user_id=eq." + encodeURIComponent(me.supabaseUserId),
+          "select=user_id,friend_user_id&or=(user_id.eq." +
+          uid +
+          ",friend_user_id.eq." +
+          uid +
+          ")",
       })
       .then(function (rows) {
-        return profilesForUsers(
-          (Array.isArray(rows) ? rows : []).map(function (row) {
-            return row.friend_user_id;
-          })
-        );
+        var meId = me.supabaseUserId;
+        var otherIds = [];
+        var seen = {};
+        (Array.isArray(rows) ? rows : []).forEach(function (row) {
+          if (!row) return;
+          var other =
+            row.user_id === meId ? row.friend_user_id : row.user_id;
+          other = String(other || "");
+          if (!other || other === meId || seen[other]) return;
+          seen[other] = true;
+          otherIds.push(other);
+        });
+        return profilesForUsers(otherIds);
       })
       .then(function (profiles) {
         renderFriends(profiles);
         emit("cognation:remote-friends-loaded", { profiles: profiles });
+        var ids = (Array.isArray(profiles) ? profiles : [])
+          .map(function (p) {
+            return String((p && (p.handle || p.id)) || "").replace(/^@/, "");
+          })
+          .filter(Boolean)
+          .slice(0, 250);
+        var store = window.CognationTowerProfileStore;
+        if (store && store.get && store.save) {
+          try {
+            var tower = store.get() || {};
+            tower.friendIds = ids.slice();
+            store.save(tower, { geometry: true });
+          } catch (eHydrate) {}
+        }
+        try {
+          document.dispatchEvent(
+            new CustomEvent("cognation:circle-friends-hydrated", {
+              detail: { ids: ids, profiles: profiles },
+            })
+          );
+        } catch (eEmit) {}
         return profiles;
       });
   }

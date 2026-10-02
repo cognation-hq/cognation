@@ -377,6 +377,14 @@
     }
     var prior = readJson(sessionStorage, BOOT_FLAG, null);
     if (prior && prior.ok && !opts.force) {
+      /* Re-apply age so Classroom gate sees member_age even on cache hit. */
+      if (prior.memberAge != null) {
+        applyViewerPrefs({ age: prior.memberAge }, { seedDefaults: false });
+        refillDeck();
+      } else if (isSeedOrOpsSession()) {
+        applyViewerPrefs({}, { seedDefaults: true });
+        refillDeck();
+      }
       return Promise.resolve({ ok: true, cached: true, prior: prior });
     }
     hydrating = true;
@@ -452,11 +460,18 @@
     }
     setTimeout(function () {
       run(false);
-    }, 700);
+    }, 200);
     document.addEventListener("cognation:session-started", function () {
       try {
         sessionStorage.removeItem(BOOT_FLAG);
       } catch (e) {}
+      /* Eager age so Classroom cards / Open session see 18+ before async getUser. */
+      if (isSeedOrOpsSession()) {
+        try {
+          applyViewerPrefs({}, { seedDefaults: true });
+          refillDeck();
+        } catch (eEager) {}
+      }
       run(true);
     });
     document.addEventListener("cognation:auth-changed", function () {

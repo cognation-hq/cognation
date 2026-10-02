@@ -1,65 +1,101 @@
 [
   {
-    "id": "intl-2026-09-15-nepal-toll",
+    "id": "intl-2026-10-02-spain-housing",
     "authorName": "Cognation Wire",
-    "body": "BREAKING | Nepal / South Asia\nNEPAL FLOOD DEATH TOLL NEARS 1,400 AS SEARCH FOR THOUSANDS CONTINUES\n\nNepal’s NDRRMA reported Tuesday that Aug. 26 flash floods claimed about 1,395–1,399 lives, with missing figures at roughly 5,130–5,170. Linked to an ice-rock avalanche / glacier collapse near the Nepal–Tibet border along the Bhotekoshi–Trishuli corridor; 13,700+ rescued. Only ~104 bodies identified so far. Dual-country dead-or-missing tallies above 7,000 remain provisional.\n\nSources: The Hindu (PTI) https://www.thehindu.com/news/international/nepal-flash-floods-death-toll-update/article71469850.ece ; Everest Times https://www.everest-times.com/2026/09/15/31759/",
-    "createdAt": "2026-09-15T21:00:00.000Z",
-    "seeded": true
+    "body": "BREAKING | Spain / Europe\nMADRID HOUSING DECREES FAIL; EARLY-ELECTION TALK RISES\n\nSpain’s Congress rejected two government housing decrees Friday (about 178–172 and 184–166). Measures covered eviction protections, short-term-lease limits, and automatic rental renewals after protests sparked by an elderly woman’s eviction. Early-election talk rose; Sánchez opened a weekend reflection with no snap vote locked.\n\nSources: Al Jazeera https://www.aljazeera.com/news/2026/10/2/spains-parliament-rejects-govt-housing-decrees-amid-mass-protests · France 24 (AFP) https://www.france24.com/en/live-news/20261002-spain-s-government-dealt-blow-as-lawmakers-reject-housing-bills · Euronews https://www.euronews.com/2026/10/02/spanish-congress-rejects-housing-laws-despite-sanchezs-warning-theyll-be-judged-sooner-tha",
+    "createdAt": "2026-10-02T20:00:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
   },
   {
-    "id": "intl-2026-09-15-nepal-recovery",
+    "id": "intl-2026-10-02-germany-merz",
     "authorName": "Cognation Wire",
-    "body": "EVERGREEN | Nepal / India / South Asia\nKATHMANDU SHIFTS TOWARD RECOVERY AS INDIA RUSHES POWER EXPORTS\n\nNepal moving from rescue to reconstruction. Preliminary RDNA rebuild bill ~723.3B NPR (~$4.8B); 12+ hydropower plants swept away. India approved up to 654 MW exports for 18 hours/day through Dec. 31. Kathmandu has sought UN Loss and Damage Fund support.\n\nSources: DW https://www.dw.com/en/nepal-thousands-still-missing-as-flood-recovery-begins/a-79259980 ; Reuters https://www.reuters.com/business/energy/india-approves-export-power-nepal-after-deadly-flood-2026-09-14/",
-    "createdAt": "2026-09-15T20:45:00.000Z",
-    "seeded": true
+    "body": "BREAKING | Germany / Europe\nREFORM ROW RAISES FEARS FOR MERZ COALITION\n\nGermany’s CDU is pressing SPD partners on pension and labor-market bills ahead of coalition talks next week. Reports say conservatives may withhold support for income-tax reform until those drafts move, feeding collapse speculation.\n\nSources: DW https://www.dw.com/en/germany-news-reform-row-raises-fears-for-merzs-coalition/live-79512757",
+    "createdAt": "2026-10-02T19:45:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
   },
   {
-    "id": "intl-2026-09-15-pakistan-alerts",
+    "id": "intl-2026-10-02-brazil-amazon",
     "authorName": "Cognation Wire",
-    "body": "BREAKING | Pakistan / South Asia\nPAKISTAN ISSUES FRESH FLOOD ALERTS AS MONSOON RAINS RETURN\n\nNDMA/PMD warn of rain through ~Sept. 17: urban flooding, flash floods, landslides risk in GB, KP, Punjab, Kashmir, NE Balochistan. PM Shehbaz directed full NDMA–provincial relief coordination.\n\nSources: WE News https://wenewsenglish.com/pakistan-braces-for-more-rain-as-authorities-warn-of-floods-and-landslides/",
-    "createdAt": "2026-09-15T20:30:00.000Z",
-    "seeded": true
+    "body": "BREAKING | Brazil / Americas\nLULA vs FLÁVIO BOLSONARO — AMAZON POLICY ON THE BALLOT\n\nBrazil votes Sunday in a presidential race where Amazon rules are a central stake. Axios: Lula vs Sen. Flávio Bolsonaro; deforestation fell sharply under Lula; outcome could reshape forest policy and U.S. ties.\n\nSources: Axios https://www.axios.com/2026/10/02/brazil-election-lula-flavio-bolsonaro-trump-amazon",
+    "createdAt": "2026-10-02T19:30:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
   },
   {
-    "id": "intl-2026-09-15-houthis-red-sea",
+    "id": "intl-2026-10-02-g7-energy",
     "authorName": "Cognation Wire",
-    "body": "BREAKING | Middle East / Red Sea\nHOUTHIS PRESS RED SEA COAST AS SAUDI ARABIA SOUNDS WIDE ALERTS\n\nHouthis struck Saudi targets and tightened hold on Yemen’s Red Sea coast near Bab el-Mandeb. Saudi alerts briefly covered Mecca/Jeddah; Brent above $108 amid Hormuz + Red Sea pressure.\n\nSource: Reuters https://www.reuters.com/world/middle-east/houthis-strike-saudi-targets-anew-talks-over-strait-hormuz-stall-2026-09-15/",
-    "createdAt": "2026-09-15T20:15:00.000Z",
-    "seeded": true
+    "body": "BREAKING | G7 / Energy\nG7 TO RELEASE UP TO 100M BARRELS OF DIESEL AND CRUDE\n\nG7 leaders agreed to release up to 100 million barrels of diesel and crude from reserves over about four months, coordinated via the IEA, to steady fuel markets.\n\nSources: NBC News https://www.nbcnews.com/business/energy/g-7-diesel-crude-release-trump-macron-rcna601132 · BBC https://www.bbc.com/news/articles/ck87zg8jnwngo",
+    "createdAt": "2026-10-02T19:15:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
   },
   {
-    "id": "intl-2026-09-15-yemen-displacement",
+    "id": "intl-2026-10-02-us-jobs",
     "authorName": "Cognation Wire",
-    "body": "BREAKING | Yemen / Horn of Africa\nU.N.: MORE THAN 100,000 DISPLACED AS YEMEN FIGHTING SURGES\n\nUNHCR: 100,000+ internally displaced; thousands fled by sea to Djibouti. Saudi–Egypt leaders called for free navigation through Hormuz and Bab el-Mandeb.\n\nSource: Reuters https://www.reuters.com/world/middle-east/yemen-conflict-displaces-over-100000-people-un-says-2026-09-15/",
-    "createdAt": "2026-09-15T20:00:00.000Z",
-    "seeded": true
+    "body": "BREAKING | United States / Economy (Nationwide)\nSEPTEMBER JOBS MISS — 29,000 ADDED; PRESSURE ON GOP\n\nU.S. employers added about 29,000 jobs in September, below estimates, with unemployment near 4.2%. Soft hiring adds midterm pressure on Trump and Republicans.\n\nSources: Washington Post https://www.washingtonpost.com/business/2026/10/02/us-economy-added-29000-jobs-september-missing-estimates/",
+    "createdAt": "2026-10-02T19:00:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
   },
   {
-    "id": "intl-2026-09-15-ukraine-donetsk",
+    "id": "intl-2026-10-02-eu-return-hubs",
     "authorName": "Cognation Wire",
-    "body": "BREAKING | Ukraine / Europe\nUKRAINE CLAIMS DONETSK PUSH AS ZELENSKYY CONDITIONS ENERGY TRUCE\n\nBrig. Gen. Biletskyi: Third Army Corps “Vivaldi” offensive in N. Donetsk (claims unverified by Reuters). Zelenskyy conditions energy-truce pause on lasting Russian halt to infrastructure strikes.\n\nSources: Reuters https://www.reuters.com/world/europe/ukraine-launches-offensive-push-north-donetsk-region-senior-commander-says-2026-09-15/ ; Al Jazeera https://www.aljazeera.com/news/2026/9/15/zelenskyy-says-ukraine-will-pause-attacks-if-russia-spares-infrastructure",
-    "createdAt": "2026-09-15T19:45:00.000Z",
-    "seeded": true
+    "body": "BREAKING | European Union / Migration\nEU APPROVES MIGRANT “RETURN HUBS”; FIVE STATES PLAN THIRD-COUNTRY DEPORTATIONS\n\nEU rules now allow return hubs in non-EU countries under human-rights safeguards. Greece, Germany, Austria, Denmark, and the Netherlands are pursuing a joint hub (Uganda/Rwanda often named); first facility eyed for 2027.\n\nSources: CBS News https://www.cbsnews.com/news/europe-eu-immigration-asylum-seeker-third-country-deportations/",
+    "createdAt": "2026-10-02T18:45:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
   },
   {
-    "id": "intl-2026-09-15-drc-protests",
+    "id": "intl-2026-10-02-pacific-whale",
     "authorName": "Cognation Wire",
-    "body": "BREAKING | DR Congo / Central Africa\nKINSHASA PROTESTS MET WITH TEAR GAS OVER THIRD-TERM FEARS\n\nPolice used tear gas as hundreds protested constitutional changes critics say could enable a third Tshisekedi term. ≥10 reported arrested. Ebola “world’s worst” claim — health desk to confirm separately.\n\nSource: Al Jazeera https://www.aljazeera.com/news/2026/9/15/police-crack-down-on-protests-against-constitutional-change-in-dr-congo",
-    "createdAt": "2026-09-15T19:30:00.000Z",
-    "seeded": true
+    "body": "EVERGREEN | South Pacific\nWHALE SINKS YACHT; FOUR SAILORS RESCUED AFTER ~18 HOURS\n\nYacht *Tai Tam* struck a sperm whale ~250 nm north of Norfolk Island; crew abandoned to a life raft and were rescued by containership MV Sofrana Surville. All four survived.\n\nSources: CBS News https://www.cbsnews.com/news/whale-sinks-yacht-south-pacific-sailors-rescued-new-zealand/",
+    "createdAt": "2026-10-02T18:30:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
   },
   {
-    "id": "intl-2026-09-15-dangote-ipo",
+    "id": "intl-2026-10-02-apple-disk-access",
     "authorName": "Cognation Wire",
-    "body": "EVERGREEN | Nigeria / Africa\nDANGOTE OPENS AFRICA’S LARGEST REFINERY TO ‘PEOPLE’S IPO’\n\nRetail IPO seeking ~$1.6B; valuation near $49B. Min. bundle ~5,250 naira (~$4) for 10 shares; Dangote retains ~87%. Plant ~650,000 bpd.\n\nSource: France 24 (AP) https://www.france24.com/en/africa/20260915-nigeria-s-dangote-refinery-launches-biggest-african-ipo-for-retail-investors",
-    "createdAt": "2026-09-15T19:15:00.000Z",
-    "seeded": true
+    "body": "EVERGREEN | Tech / STEM\nAPPLE TIGHTENS macOS FULL DISK ACCESS OVER AI-AGENT RISK\n\nApple will require more explicit user action before granting Full Disk Access, citing rising risk from autonomous AI agents that could reach files, mail, and messages.\n\nSources: TechCrunch https://techcrunch.com/2026/10/02/apple-says-its-tightening-macos-full-disk-access-controls-due-to-new-risks-from-ai-agents/",
+    "createdAt": "2026-10-02T18:15:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
   },
   {
-    "id": "intl-2026-09-15-editors-box-nepal",
-    "authorName": "COMMUNE Editors",
-    "body": "EDITOR’S BOX — What to watch next on Nepal floods\n\nWatch NDRRMA body-ID / DNA backlog, tunnel & hydropower worker searches, winter resettlement in Rasuwa–Nuwakot–Dhading. Track India’s power-export deliveries vs. Nepal load, Loss and Damage Fund replies ahead of PM Shah’s expected UNGA ~Sept. 24. Print lock: dead 1,395–1,399; missing ~5,130–5,170 until one official bulletin.",
-    "createdAt": "2026-09-15T19:00:00.000Z",
-    "seeded": true
+    "id": "intl-2026-10-02-arkia-dubai",
+    "authorName": "Cognation Wire",
+    "body": "BREAKING | Israel–UAE / Travel\nARKIA FLIES FIRST DUBAI REPATRIATION AFTER EL AL CANCELS\n\nAfter El Al rescue flights were canceled when landing permissions lapsed, Arkia operated the first approved repatriation flight from Dubai for Israelis stranded in the UAE.\n\nSources: Jerusalem Post https://www.jpost.com/israel-news/article-910399",
+    "createdAt": "2026-10-02T18:00:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
+  },
+  {
+    "id": "intl-2026-10-02-nvidia-shield",
+    "authorName": "Cognation Wire",
+    "body": "EVERGREEN | Tech / STEM (Nationwide wire)\n7-YEAR-OLD NVIDIA SHIELD TV JUMPS ~$100 ON AI SUPPLY PRESSURE\n\nArs Technica: older Nvidia Shield TV hardware is about $100 more expensive amid AI-related supply and pricing pressure.\n\nSources: Ars Technica https://arstechnica.com/gadgets/2026/10/the-7-year-old-nvidia-shield-tv-is-now-100-more-expensive-thanks-to-ai/",
+    "createdAt": "2026-10-02T17:45:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
+  },
+  {
+    "id": "intl-2026-10-02-editors-box-gpg",
+    "authorName": "NEWS Editors",
+    "body": "EDITOR’S BOX — Oct 2 International desk (G–PG)\n\nNepal Sep 15 pack retired. Adult/war draft withdrawn. Plate rated G–PG for under-13 standing (war/terror wires dropped). Watch: Spain election odds; Merz coalition; Brazil Amazon ballot; G7 fuel release; EU return hubs; Apple FDA controls. Print lock: curated from live wire ~3:30pm CT 2026-10-02. No RSS autopublish — raw /api/news has no age filters.",
+    "createdAt": "2026-10-02T17:15:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
   }
 ]

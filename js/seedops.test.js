@@ -691,3 +691,181 @@ hydrateWin.CognationCommuneSwipe = {
   });
 })();
 
+/* Tower seed hydrate-from-existing + read-only gates */
+var towerHydrateSrc = fs.readFileSync(path.join(root, "js/seedops-tower-hydrate.js"), "utf8");
+assert.ok(!(new RegExp("demo" + " unlock", "i").test(towerHydrateSrc)), "tower-hydrate must not contain banned public-demo phrase");
+assert.ok(html.indexOf("js/seedops-tower-hydrate.js") !== -1, "index.html must load tower-hydrate");
+assert.ok(
+  html.indexOf("js/seedops-dating-hydrate.js") < html.indexOf("js/seedops-tower-hydrate.js"),
+  "tower-hydrate must load after dating-hydrate"
+);
+assert.ok(towerHydrateSrc.indexOf("HARD_CAP = 250") !== -1, "tower-hydrate hard cap 250");
+assert.ok(towerHydrateSrc.indexOf("firstNameOnly") !== -1, "tower-hydrate first-name helper");
+assert.ok(towerHydrateSrc.indexOf("featuredFriendIds") !== -1, "tower-hydrate maps top friends");
+assert.ok(towerHydrateSrc.indexOf("fillEmptyShells") !== -1, "content gen only for empty shells");
+
+var towerJs = fs.readFileSync(path.join(root, "js/tower.js"), "utf8");
+assert.ok(towerJs.indexOf("profile._directoryFriend) return false") !== -1, "isTowerOwner rejects directory friends");
+assert.ok(towerJs.indexOf("syncViewerMutateUi") !== -1, "viewer mutate UI sync");
+assert.ok(towerJs.indexOf("Only the profile owner can add Polaroids") !== -1, "instax owner guard");
+assert.ok(towerJs.indexOf("viewingOther") !== -1, "no legacy polaroid paint onto others");
+var towerCss = fs.readFileSync(path.join(root, "css/styles.css"), "utf8");
+assert.ok(
+  towerCss.indexOf('[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-widget="instax"]') !== -1,
+  "CSS hides instax for non-owners"
+);
+
+(function () {
+  var thWin = {
+    CognationAccounts: {
+      _p: {},
+      saveProfileRecord: function (rec) {
+        if (!rec || !rec.id) return false;
+        this._p[rec.id] = rec;
+        return true;
+      },
+      getProfileById: function (id) { return this._p[id] || null; },
+    },
+    CognationAuth: {
+      getSession: function () {
+        return { username: "seed-0001", seedFleetId: "seed-0001", supabaseUserId: "uid-1", activeProfileId: "prof-seed-0001" };
+      },
+    },
+    CognationSeedOpsLog: { write: function () {} },
+    CognationTowerStore: {
+      _data: { version: 1, posts: [] },
+      load: function () { return this._data; },
+      setRemotePosts: function (posts) {
+        this._data = { version: 2, remote: true, posts: posts.slice() };
+        return this._data.posts;
+      },
+    },
+    CognationSeedOpsTowerPosts: {
+      postOne: function (fleetId) {
+        thWin.__generated = (thWin.__generated || 0) + 1;
+        return { ok: true, path: "test", post: { id: "gen-" + fleetId, seedFleetId: fleetId } };
+      },
+    },
+    CognationSupabase: {
+      configured: function () { return true; },
+      rest: function (table, opts) {
+        var q = (opts && opts.query) || "";
+        if (table === "profiles") {
+          return Promise.resolve([
+            {
+              id: "srv-t1",
+              user_id: "uid-1",
+              seed_fleet_id: "seed-0001",
+              handle: "seed-ada-0001",
+              display_name: "Ada Lovelace",
+              bio: "Quiet mornings.",
+              account_kind: "seed",
+              kind: "personal",
+            },
+            {
+              id: "srv-t2",
+              user_id: "uid-2",
+              seed_fleet_id: "seed-0002",
+              handle: "seed-aisha-0002",
+              display_name: "Aisha",
+              bio: "",
+              account_kind: "seed",
+              kind: "personal",
+            },
+          ]);
+        }
+        if (table === "friendships") {
+          return Promise.resolve([
+            { user_id: "uid-1", friend_user_id: "uid-2", created_at: "2026-10-01T00:00:00Z" },
+          ]);
+        }
+        if (table === "tower_posts") {
+          return Promise.resolve([
+            {
+              id: "tp-1",
+              author_profile_id: "srv-t1",
+              body: "Ada took a slow morning walk.",
+              visibility: "public",
+              attachments: [],
+              created_at: "2026-10-01T12:00:00Z",
+              author: {
+                id: "srv-t1",
+                user_id: "uid-1",
+                handle: "seed-ada-0001",
+                display_name: "Ada",
+                account_kind: "seed",
+                seed_fleet_id: "seed-0001",
+                kind: "personal",
+              },
+            },
+          ]);
+        }
+        return Promise.resolve([]);
+      },
+    },
+  };
+  var thCtx = vm.createContext({
+    window: thWin,
+    document: {
+      addEventListener: function () {},
+      dispatchEvent: function () {},
+      readyState: "complete",
+      querySelector: function () { return null; },
+    },
+    sessionStorage: {
+      _d: {},
+      getItem: function (k) { return this._d[k] || null; },
+      setItem: function (k, v) { this._d[k] = String(v); },
+      removeItem: function (k) { delete this._d[k]; },
+    },
+    localStorage: {
+      _d: {},
+      getItem: function (k) { return this._d[k] || null; },
+      setItem: function (k, v) { this._d[k] = String(v); },
+      removeItem: function (k) { delete this._d[k]; },
+    },
+    console: console,
+    setTimeout: function (fn) { return 0; },
+    clearTimeout: function () {},
+    CustomEvent: function (name, init) {
+      this.type = name;
+      this.detail = (init && init.detail) || {};
+    },
+    encodeURIComponent: encodeURIComponent,
+    Promise: Promise,
+    Math: Math,
+    Number: Number,
+    String: String,
+    Object: Object,
+    Array: Array,
+    Date: Date,
+    parseInt: parseInt,
+    JSON: JSON,
+  });
+  thWin.document = thCtx.document;
+  thWin.sessionStorage = thCtx.sessionStorage;
+  thWin.localStorage = thCtx.localStorage;
+  thCtx.window = thWin;
+  vm.runInContext(fs.readFileSync(path.join(root, "js/seedops-schema.js"), "utf8"), thCtx);
+  vm.runInContext(towerHydrateSrc, thCtx);
+  var thApi = thWin.CognationSeedOpsTowerHydrate;
+  assert.ok(thApi, "CognationSeedOpsTowerHydrate exports");
+  assert.strictEqual(thApi.HARD_CAP, 250);
+  assert.strictEqual(thApi.firstNameOnly("Ada Lovelace"), "Ada");
+  assert.strictEqual(thApi.firstNameOnly("Maya42"), "Maya");
+  thApi.hydrate({ force: true, fillEmpty: true }).then(function (out) {
+    assert.ok(out && out.ok, "tower hydrate ok " + JSON.stringify(out));
+    assert.ok(out.merged >= 2, "merged seed profiles");
+    var ada = thWin.CognationAccounts.getProfileById("prof-seed-0001");
+    assert.ok(ada, "ada materialized");
+    assert.strictEqual(ada.displayName, "Ada", "first-name only");
+    assert.ok(Array.isArray(ada.featuredFriendIds) && ada.featuredFriendIds.length >= 1, "top friends from friendship");
+    assert.ok(out.posts >= 1, "tower posts applied");
+    /* seed-0002 had no posts → content gen fills empty shell */
+    assert.ok(out.generated >= 1 || (thWin.__generated || 0) >= 1, "empty shell content gen");
+    console.log("seedops.test.js tower-hydrate: ok");
+  }).catch(function (err) {
+    console.error(err);
+    process.exitCode = 1;
+  });
+})();

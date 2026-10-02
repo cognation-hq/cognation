@@ -1,5 +1,5 @@
 /**
- * SeedOps unit checks (schema + friend gate + pathways + ops trigger + tower posts).
+ * SeedOps unit checks (schema + friend gate + pathways + ops trigger + tower posts + friction).
  * Run: node js/seedops.test.js
  */
 "use strict";
@@ -291,6 +291,136 @@ aliveWin.CognationAuth.getSession = function () {
   return { username: "seed-0001", activeProfileId: "prof-seed-0001" };
 };
 /* load commune-alive into the same storage-backed context as schema */
+
+/* --- Friction live hooks --- */
+(function () {
+  var listeners = [];
+  var frictionWin = {
+    CognationAccounts: win.CognationAccounts,
+    CognationSeedOps: win.CognationSeedOps,
+    CognationSeedOpsFriendGate: {
+      viewerRecord: function () {
+        return { accountKind: "real", isSeed: false, isOpsBot: false };
+      },
+    },
+    CognationAuth: {
+      getSession: function () {
+        return { username: "real-beta", supabaseUserId: "real-1" };
+      },
+    },
+  };
+  var frictionDoc = {
+    readyState: "complete",
+    visibilityState: "visible",
+    addEventListener: function (name, fn) {
+      listeners.push({ name: name, fn: fn });
+    },
+    dispatchEvent: function (ev) {
+      listeners.forEach(function (L) {
+        if (L.name === ev.type) L.fn(ev);
+      });
+      return true;
+    },
+    querySelector: function () { return null; },
+    querySelectorAll: function () { return []; },
+    createElement: function () {
+      return { setAttribute: function () {}, appendChild: function () {}, style: {}, addEventListener: function () {} };
+    },
+    body: { appendChild: function () {} },
+  };
+  var ctx = vm.createContext({
+    window: frictionWin,
+    document: frictionDoc,
+    sessionStorage: {
+      _d: {},
+      getItem: function (k) { return this._d[k] || null; },
+      setItem: function (k, v) { this._d[k] = String(v); },
+      removeItem: function (k) { delete this._d[k]; },
+    },
+    localStorage: {
+      _d: {},
+      getItem: function (k) { return this._d[k] || null; },
+      setItem: function (k, v) { this._d[k] = String(v); },
+      removeItem: function (k) { delete this._d[k]; },
+    },
+    console: console,
+    setTimeout: function () { return 0; },
+    clearTimeout: function () {},
+    CustomEvent: function (name, init) {
+      this.type = name;
+      this.detail = (init && init.detail) || {};
+    },
+    Date: Date,
+    Math: Math,
+    String: String,
+    Object: Object,
+    Array: Array,
+    JSON: JSON,
+  });
+  frictionWin.document = frictionDoc;
+  frictionWin.sessionStorage = ctx.sessionStorage;
+  ctx.window = frictionWin;
+  vm.runInContext(fs.readFileSync(path.join(root, "js/seedops-log.js"), "utf8"), ctx);
+  vm.runInContext(fs.readFileSync(path.join(root, "js/seedops-friction.js"), "utf8"), ctx);
+  var F = frictionWin.CognationFriction;
+  assert.ok(F, "CognationFriction exports");
+  assert.ok(F.PATHWAYS.indexOf("classroom") >= 0);
+  assert.strictEqual(F.pathwayFromCardType("speed-dating"), "dating");
+  assert.strictEqual(F.pathwayFromCardType("chatroom"), "chat");
+  assert.strictEqual(F.pathwayFromCardType("ad"), "ad");
+
+  frictionWin.CognationSeedOpsLog.clear();
+  F.begin("tower", "tower-compose");
+  F.retry("tower", "post_error");
+  F.complete("tower");
+  var rows = frictionWin.CognationSeedOpsLog.list("friction").map(function (e) { return e.payload; });
+  assert.ok(rows.length >= 3, "real user emits start/retry/complete");
+  assert.strictEqual(rows[0].pathway, "tower");
+  assert.strictEqual(rows[0].phase, "start");
+  assert.strictEqual(rows[0].userKind, "real");
+  assert.strictEqual(rows[0].surface, "tower-compose");
+  assert.ok(rows.some(function (r) { return r.phase === "retry" && r.reason === "post_error"; }));
+  assert.ok(rows.some(function (r) { return r.phase === "complete"; }));
+
+  frictionWin.CognationSeedOpsLog.clear();
+  F.begin("dating", "commune-swipe");
+  F.abandon("dating", "swipe_left");
+  var abandoned = frictionWin.CognationSeedOpsLog.list("friction").map(function (e) { return e.payload; });
+  assert.ok(abandoned.some(function (r) { return r.phase === "abandon" && r.reason === "swipe_left"; }));
+
+  /* seed/ops skipped */
+  frictionWin.CognationSeedOpsFriendGate.viewerRecord = function () {
+    return { accountKind: "seed", isSeed: true, seedFleetId: "seed-0001" };
+  };
+  frictionWin.CognationSeedOpsLog.clear();
+  assert.strictEqual(F.begin("commune", "commune-swipe"), null);
+  assert.strictEqual(frictionWin.CognationSeedOpsLog.list("friction").length, 0, "seed fleet skipped");
+
+  frictionWin.CognationSeedOpsFriendGate.viewerRecord = function () {
+    return { accountKind: "ops", isOpsBot: true };
+  };
+  assert.strictEqual(F.retry("news", "publish_error"), null);
+  assert.strictEqual(frictionWin.CognationSeedOpsLog.list("friction").length, 0, "ops skipped");
+
+  /* wireUi registers tab-change + friction + click + visibility listeners */
+  var names = listeners.map(function (L) { return L.name; });
+  assert.ok(names.indexOf("cognation:tab-change") >= 0, "tab-change listener");
+  assert.ok(names.indexOf("cognation:friction") >= 0, "friction event bridge");
+  assert.ok(names.indexOf("click") >= 0, "click live hooks");
+  assert.ok(names.indexOf("visibilitychange") >= 0, "visibility abandon");
+
+  /* static: pathway modules call CognationFriction */
+  function src(rel) {
+    return fs.readFileSync(path.join(root, rel), "utf8");
+  }
+  assert.ok(src("js/tabs.js").indexOf("cognation:tab-change") !== -1, "tabs dispatch tab-change");
+  assert.ok(src("js/tower.js").indexOf("CognationFriction") !== -1, "tower friction hooks");
+  assert.ok(src("js/commune.js").indexOf("CognationFriction") !== -1, "news friction hooks");
+  assert.ok(src("js/commune-swipe.js").indexOf("CognationFriction") !== -1, "commune-swipe friction hooks");
+  assert.ok(src("docs/seedops.md").indexOf("Live hooks (wired)") !== -1, "docs note live hooks");
+  console.log("seedops.test.js friction: ok");
+})();
+
 (function () {
   var context = vm.createContext({
     window: aliveWin,

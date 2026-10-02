@@ -33,6 +33,11 @@
       });
       if (focusTab) tabs[index].focus();
       /* WELL is not in the public tablist; provider-only entry may call CognationWellAuth directly later. */
+      try {
+        var tab = tabs[index];
+        var name = String((tab && tab.id) || "").replace(/^tab-/, "");
+        document.dispatchEvent(new CustomEvent("cognation:tab-change", { detail: { tab: name } }));
+      } catch (e) {}
     }
 
     tabs.forEach(function (tab, i) {
@@ -79,6 +84,9 @@
       if (window.CognationCircleFall && typeof window.CognationCircleFall.start === "function") {
         window.CognationCircleFall.start();
       }
+      try {
+        document.dispatchEvent(new CustomEvent("cognation:tab-change", { detail: { tab: "circle" } }));
+      } catch (e) {}
       return;
     }
 

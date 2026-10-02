@@ -8548,6 +8548,9 @@
           var social = remoteSocial();
           if (!social || !social.createTowerPost) {
             setStatus("Tower is still connecting. Please try again.", true);
+            try {
+              if (window.CognationFriction) window.CognationFriction.retry("tower", "tower_connecting");
+            } catch (frConn) {}
             return;
           }
           setStatus("Posting to Tower…", false);
@@ -8560,6 +8563,9 @@
               if (bodyInput) bodyInput.value = "";
               if (fileInput) fileInput.value = "";
               setStatus("Posted to Tower.", false);
+              try {
+                if (window.CognationFriction) window.CognationFriction.complete("tower");
+              } catch (frRemote) {}
               renderFeed(root);
             })
             .catch(function (error) {
@@ -8567,6 +8573,9 @@
                 (error && error.message) || "Could not post to Tower. Please try again.",
                 true
               );
+              try {
+                if (window.CognationFriction) window.CognationFriction.retry("tower", "post_error");
+              } catch (frCatch) {}
             });
           return;
         }
@@ -8577,11 +8586,17 @@
         });
         if (!result.ok) {
           setStatus(result.error || "Could not post.", true);
+          try {
+            if (window.CognationFriction) window.CognationFriction.retry("tower", "post_error");
+          } catch (frErr) {}
           return;
         }
         if (bodyInput) bodyInput.value = "";
         if (fileInput) fileInput.value = "";
         setStatus("Posted to Tower. Local COMMUNE will pick this up.", false);
+        try {
+          if (window.CognationFriction) window.CognationFriction.complete("tower");
+        } catch (frOk) {}
         renderFeed(root);
       });
     }
@@ -9457,8 +9472,19 @@
   window.CognationTowerOpenPost = openTowerPost;
 
   window.CognationCircleFall = {
-    start: startCircleFall,
-    stop: stopCircleFall,
+    start: function () {
+      startCircleFall();
+      try {
+        if (window.CognationFriction) window.CognationFriction.begin("circle", "circle-fall");
+      } catch (e) {}
+    },
+    stop: function () {
+      var was = !!circleFallState;
+      stopCircleFall();
+      try {
+        if (was && window.CognationFriction) window.CognationFriction.abandon("circle", "circle_stop");
+      } catch (e2) {}
+    },
     cap: CIRCLE_FALL_CAP,
     friendIds: circleFriendIds,
     refreshMs: CIRCLE_REFRESH_MS,

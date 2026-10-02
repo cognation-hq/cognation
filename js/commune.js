@@ -1226,6 +1226,9 @@
       applyEditionChrome();
       renderFeed();
       setStatus(feedStatus, "Switched to " + (EDITIONS[editionId].label) + " edition (demo).", false);
+      try {
+        if (window.CognationFriction) window.CognationFriction.begin("news", "edition:" + editionId);
+      } catch (e) {}
     }
 
     editionInputs.forEach(function (input) {
@@ -1242,6 +1245,9 @@
 
     if (refreshBtn) {
       refreshBtn.addEventListener("click", function () {
+        try {
+          if (window.CognationFriction) window.CognationFriction.begin("news", "news-refresh");
+        } catch (e) {}
         refreshHotTopics();
       });
     }
@@ -1267,6 +1273,9 @@
         var result = FeedStore.addPost(editionId, feedInput.value, authorForPosts());
         if (!result.ok) {
           setStatus(feedStatus, result.error || "Could not publish.", true);
+          try {
+            if (window.CognationFriction) window.CognationFriction.retry("news", "publish_error");
+          } catch (frNews) {}
           return;
         }
         feedInput.value = "";
@@ -1275,6 +1284,9 @@
           "Published to " + EDITIONS[editionId].label + " edition (saved locally).",
           false
         );
+        try {
+          if (window.CognationFriction) window.CognationFriction.complete("news");
+        } catch (frNewsOk) {}
         renderFeed();
         feedInput.focus();
       });

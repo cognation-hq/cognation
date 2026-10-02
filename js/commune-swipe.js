@@ -138,6 +138,28 @@
       document.dispatchEvent(new CustomEvent(name, { detail: detail || {} }));
     } catch (e) {}
   }
+  function friction(phase, pathway, reasonOrSurface) {
+    try {
+      var F = window.CognationFriction;
+      if (!F) return;
+      if (phase === "begin") F.begin(pathway, reasonOrSurface);
+      else if (phase === "retry") F.retry(pathway, reasonOrSurface);
+      else if (phase === "complete") F.complete(pathway);
+      else if (phase === "abandon") F.abandon(pathway, reasonOrSurface);
+    } catch (e) {}
+  }
+  function pathwayForCard(card) {
+    if (!card) return "commune";
+    if (window.CognationFriction && window.CognationFriction.pathwayFromCardType) {
+      return window.CognationFriction.pathwayFromCardType(card.type);
+    }
+    var t = String(card.type || "").toLowerCase();
+    if (t === "dating" || t === "speed-dating") return "dating";
+    if (t === "ad" || t === "advertisement") return "ad";
+    if (t === "chat" || t === "chatroom") return "chat";
+    if (t === "classroom") return "classroom";
+    return "commune";
+  }
   function clone(card) {
     var copy = {};
     if (!card) return copy;
@@ -1075,10 +1097,12 @@
     if (!state.shell) return false;
     closeClassroom();
     paintRoom(room);
+    friction("begin", "chat", "chatroom:" + roomId);
     if (scroll && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
     return true;
   }
   function closeRoom() {
+    if (state.roomId) friction("abandon", "chat", "room_back");
     state.roomId = "";
     showRoom(false);
   }
@@ -1118,11 +1142,13 @@
     }
     closeRoom();
     paintClassroom(session);
+    friction("begin", "classroom", "classroom:" + (session.id || sessionId));
     if (scroll && state.shell && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
     return true;
   }
 
   function closeClassroom() {
+    if (state.classroomId) friction("abandon", "classroom", "classroom_back");
     state.classroomId = "";
     showClassroom(false);
   }
@@ -1300,6 +1326,7 @@
         }
         setStatus("Rate the photo before you share your card.");
         syncActionLabels();
+        friction("retry", "dating", "rating_required");
         return;
       }
     }
@@ -1308,6 +1335,7 @@
       setStatus(sent.message || (sent.full ? "This list is full." : "Friend request sent."));
       if (sent.full) return;
     }
+    friction("begin", pathwayForCard(card), "commune-swipe");
     state.busy = true;
     if (active) active.classList.add(dir === "left" ? "is-exit-left" : "is-exit-right");
     window.setTimeout(function () {
@@ -1318,9 +1346,11 @@
 
   function settleSwipe(card, dir) {
     if (!card) return;
+    var pathway = pathwayForCard(card);
     if (dir === "left") {
       dismiss(card);
       setStatus("Passed.");
+      friction("abandon", pathway, "swipe_left");
       return;
     }
     if (card.type === TYPE.DATING) {
@@ -1344,27 +1374,35 @@
       } else {
         setStatus("Your card is on their Commune.");
       }
+      friction("complete", "dating");
       return;
     }
     if (card.type === TYPE.AD) {
       recordShare(card);
       setStatus("Shared with friends who share this interest.");
+      friction("complete", "ad");
       return;
     }
-    if (card.type === TYPE.KNOW) return;
+    if (card.type === TYPE.KNOW) {
+      friction("complete", "commune");
+      return;
+    }
     if (card.type === TYPE.CLASSROOM) {
       like(card);
       setStatus("Kept. Open the session anytime from a Classroom card.");
+      friction("complete", "classroom");
       return;
     }
     if (card.type === TYPE.FRIEND || card.type === TYPE.EVENT || card.type === TYPE.FACT || card.type === TYPE.WELLNESS || card.type === TYPE.CHAT) {
       like(card);
       if (card.type !== TYPE.CHAT) recordShare(card);
       setStatus("Kept.");
+      friction("complete", pathway);
       return;
     }
     like(card);
     setStatus("Kept.");
+    friction("complete", pathway);
   }
 
   function rebuildDeck() {
@@ -1452,6 +1490,7 @@
         var room = null;
         ensureSiteRooms().forEach(function (item) { if (item.id === state.roomId) room = item; });
         if (room) paintRoom(room);
+        friction("complete", "chat");
       });
     }
     var deck = shell.querySelector("[data-commune-deck]");

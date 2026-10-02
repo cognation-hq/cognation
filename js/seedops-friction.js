@@ -66,6 +66,11 @@
     return p;
   }
 
+  function skipFleet() {
+    var kind = userKind();
+    return kind === "seed" || kind === "ops";
+  }
+
   function clearStallTimer() {
     if (state.active && state.active.timer) {
       clearTimeout(state.active.timer);
@@ -104,7 +109,18 @@
 
   function begin(pathway, surface) {
     pathway = normalizePathway(pathway);
-    if (!pathway) return;
+    if (!pathway) return null;
+    if (skipFleet()) return null;
+    if (state.active && state.active.pathway && state.active.pathway !== pathway) {
+      /* Closing the prior pathway keeps stall/abandon accounting honest across surfaces. */
+      track(state.active.pathway, "abandon", {
+        surface: state.active.surface,
+        reason: "pathway_switch",
+        dwellMs: Date.now() - state.active.startedAt,
+      });
+      clearStallTimer();
+      state.active = null;
+    }
     clearStallTimer();
     var startedAt = Date.now();
     state.active = {
@@ -113,7 +129,7 @@
       startedAt: startedAt,
       timer: null,
     };
-    track(pathway, "start", { surface: surface });
+    var row = track(pathway, "start", { surface: surface });
     state.active.timer = setTimeout(function () {
       if (!state.active || state.active.pathway !== pathway) return;
       track(pathway, "stall", {
@@ -122,10 +138,12 @@
         reason: "idle_threshold",
       });
     }, STALL_MS);
+    return row;
   }
 
   function retry(pathway, reason) {
-    track(pathway, "retry", {
+    if (skipFleet()) return null;
+    return track(pathway, "retry", {
       surface: state.active && state.active.surface,
       reason: reason || "user_retry",
       dwellMs: state.active ? Date.now() - state.active.startedAt : undefined,
@@ -134,8 +152,9 @@
 
   function complete(pathway) {
     pathway = normalizePathway(pathway) || (state.active && state.active.pathway);
-    if (!pathway) return;
-    track(pathway, "complete", {
+    if (!pathway) return null;
+    if (skipFleet()) return null;
+    var row = track(pathway, "complete", {
       surface: state.active && state.active.surface,
       dwellMs: state.active ? Date.now() - state.active.startedAt : undefined,
     });
@@ -143,12 +162,14 @@
       clearStallTimer();
       state.active = null;
     }
+    return row;
   }
 
   function abandon(pathway, reason) {
     pathway = normalizePathway(pathway) || (state.active && state.active.pathway);
-    if (!pathway) return;
-    track(pathway, "abandon", {
+    if (!pathway) return null;
+    if (skipFleet()) return null;
+    var row = track(pathway, "abandon", {
       surface: state.active && state.active.surface,
       reason: reason || "navigate_away",
       dwellMs: state.active ? Date.now() - state.active.startedAt : undefined,
@@ -157,6 +178,7 @@
       clearStallTimer();
       state.active = null;
     }
+    return row;
   }
 
   function onTabChange(name) {
@@ -175,42 +197,71 @@
     if (next) begin(next, "tab:" + next);
   }
 
+  function pathwayFromCardType(type) {
+    var t = String(type || "").toLowerCase();
+    if (t === "speed-dating" || t === "dating") return "dating";
+    if (t === "advertisement" || t === "ad") return "ad";
+    if (t === "chatroom" || t === "chat") return "chat";
+    if (t === "classroom") return "classroom";
+    return "commune";
+  }
+
   function wireUi() {
     document.addEventListener("cognation:tab-change", function (ev) {
       var name = ev && ev.detail && (ev.detail.tab || ev.detail.name || ev.detail.id);
       onTabChange(name);
     });
-    /* Fallback: observe topbar tab clicks */
+    /* Pathway modules may emit: { pathway, phase, surface?, reason?, meta? } */
+    document.addEventListener("cognation:friction", function (ev) {
+      var d = (ev && ev.detail) || {};
+      var pathway = d.pathway;
+      var phase = String(d.phase || "").toLowerCase();
+      if (!pathway || !phase) return;
+      if (phase === "start" || phase === "begin") begin(pathway, d.surface);
+      else if (phase === "retry") retry(pathway, d.reason);
+      else if (phase === "complete") complete(pathway);
+      else if (phase === "abandon") abandon(pathway, d.reason);
+      else track(pathway, phase, d);
+    });
+    /* Fallback: main topbar tabs only (ignore tower side / commune dots). */
     document.addEventListener("click", function (ev) {
-      var tab = ev.target && ev.target.closest && ev.target.closest("[role='tab']");
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var shortcut = t.closest("[data-tower-anchor='circle']");
+      if (shortcut) {
+        onTabChange("circle");
+        return;
+      }
+      var tab = t.closest("[role='tab']");
       if (!tab || !tab.id) return;
-      var id = String(tab.id || "").replace(/^tab-/, "");
-      onTabChange(id);
-      var shortcut = ev.target.closest("[data-tower-anchor='circle']");
-      if (shortcut) onTabChange("circle");
+      if (!/^tab-(tower|news|commune)$/i.test(tab.id)) return;
+      onTabChange(String(tab.id).replace(/^tab-/, ""));
     });
     document.addEventListener("click", function (ev) {
       var t = ev.target;
       if (!t || !t.closest) return;
+      if (t.closest("[data-friction-retry]")) {
+        var retryEl = t.closest("[data-friction-retry]");
+        retry(retryEl.getAttribute("data-friction-retry") || (state.active && state.active.pathway), retryEl.getAttribute("data-friction-reason") || "user_retry");
+        return;
+      }
       if (t.closest("[data-tower-compose], [data-tower-post-submit], [data-tower-feed]")) {
-        if (state.active && state.active.pathway === "tower") {
-          /* activity pings reset stall */
-          begin("tower", "tower-compose");
-        } else {
-          begin("tower", "tower-compose");
-        }
+        begin("tower", "tower-compose");
       }
-      if (t.closest("[data-commune-swipe], .commune-swipe-btn, [data-card-type]")) {
-        begin("commune", "commune-swipe");
+      if (t.closest("[data-commune-feed-compose], [data-commune-refresh], [data-commune-edition]")) {
+        begin("news", "news-feed");
       }
-      if (t.closest("[data-card-type='chatroom']")) begin("chat", "chatroom-card");
-      if (t.closest("[data-card-type='dating'], [data-card-type='speed-dating'], [data-commune-see-dating]")) {
-        begin("dating", "dating");
+      if (t.closest("[data-commune-swipe], .commune-swipe-btn")) {
+        var card = t.closest("[data-commune-card]") || document.querySelector("[data-commune-card].is-active");
+        var ctype = card && card.getAttribute("data-card-type");
+        begin(pathwayFromCardType(ctype), "commune-swipe");
+      } else if (t.closest("[data-card-type]")) {
+        var typed = t.closest("[data-card-type]");
+        begin(pathwayFromCardType(typed.getAttribute("data-card-type")), "card:" + (typed.getAttribute("data-card-type") || "commune"));
       }
-      if (t.closest("[data-card-type='ad'], [data-card-type='advertisement']")) {
-        begin("ad", "ad-card");
-      }
-      if (t.closest("[data-classroom], [data-card-type='classroom']")) {
+      if (t.closest("[data-commune-enter-sim], [data-card-type='chatroom']")) begin("chat", "chatroom");
+      if (t.closest("[data-commune-see-dating], [data-commune-dating-toggle]")) begin("dating", "dating-toggle");
+      if (t.closest("[data-commune-enter-classroom], [data-classroom], [data-card-type='classroom']")) {
         begin("classroom", "classroom");
       }
     });
@@ -229,6 +280,8 @@
     retry: retry,
     complete: complete,
     abandon: abandon,
+    pathwayFromCardType: pathwayFromCardType,
+    onTabChange: onTabChange,
   };
 
   if (document.readyState === "loading") {

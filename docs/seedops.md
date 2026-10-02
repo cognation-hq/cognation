@@ -93,6 +93,22 @@ Channel `friction`. **Real beta users only** (seed/ops skipped). No bot ratings 
 
 Shared sink: `js/seedops-log.js` (`sessionStorage` ring `cognation.seedops.log.v1` + `console.debug`).
 
+### Live hooks (wired)
+
+Objective stall / retry / abandon / complete only — no bot ratings of humans.
+
+| Pathway | Start / stall | Retry | Complete | Abandon |
+|---------|---------------|-------|----------|---------|
+| tower | tab + compose click; 45s idle | post error / still connecting | successful Tower post | tab change / pathway switch / page hidden |
+| news | tab; edition change; refresh | publish error | local News publish | tab change / pathway switch / page hidden |
+| commune | tab; swipe begin | — | swipe-right keep (non-featured) | swipe-left pass; tab change |
+| circle | CIRCLE shortcut + `CognationCircleFall.start` | — | — | CircleFall stop / tab change |
+| chat | enter room / chatroom card | — | send room message | room back / swipe-left on chat card |
+| classroom | enter session / classroom card | — | swipe-right keep Classroom | classroom back / swipe-left |
+| dating | dating card / toggle | rating-required gate | swipe-right dating | swipe-left |
+| ad | ad card | — | swipe-right share | swipe-left |
+
+Also: `cognation:tab-change` from `js/tabs.js` (main tabs + Circle); optional `cognation:friction` / `[data-friction-retry]` bridges. Cap **250** and no public Demo unlock unchanged.
 
 ## 7. Ops trigger (internal)
 

@@ -78,7 +78,21 @@ db.exec(`
     visibility TEXT NOT NULL DEFAULT 'friends' CHECK (visibility IN ('friends', 'public')),
     created_at TEXT NOT NULL
   );
-`);
+`)
+
+/* SeedOps: account_kind on profiles (real | seed | ops). */
+try {
+  db.exec("ALTER TABLE profiles ADD COLUMN account_kind TEXT NOT NULL DEFAULT 'real'");
+} catch (e) {
+  /* column may already exist */
+}
+try {
+  db.exec("ALTER TABLE profiles ADD COLUMN seed_fleet_id TEXT");
+} catch (e2) {}
+try {
+  db.exec("ALTER TABLE users ADD COLUMN account_kind TEXT NOT NULL DEFAULT 'real'");
+} catch (e3) {}
+;
 
 function now() {
   return new Date().toISOString();
@@ -120,6 +134,8 @@ function publicProfile(row) {
     kind: row.kind,
     handle: row.handle,
     displayName: row.display_name,
+    accountKind: row.account_kind || "real",
+    seedFleetId: row.seed_fleet_id || "",
     bio: row.bio,
     followerCount: Number(row.follower_count || 0),
   };
@@ -308,10 +324,28 @@ function toggleFollow({ followerUserId, profileId }) {
   return { ok: true, following: true, followerCount: Number(getProfileById(profileId).follower_count) };
 }
 
+function accountKindForUser(userId) {
+  const row =
+    db.prepare("SELECT account_kind FROM profiles WHERE user_id = ? AND kind = 'personal' LIMIT 1").get(userId) ||
+    db.prepare("SELECT account_kind FROM users WHERE id = ?").get(userId);
+  const kind = row && row.account_kind ? String(row.account_kind) : "real";
+  return kind === "seed" || kind === "ops" ? kind : "real";
+}
+
+function isRealKind(kind) {
+  return String(kind || "real") === "real";
+}
+
 function sendFriendRequest({ senderUserId, recipientProfileId }) {
   const recipient = getProfileById(recipientProfileId);
   if (!recipient || recipient.kind !== "personal") return { ok: false, error: "personal_profile_not_found" };
   if (recipient.user_id === senderUserId) return { ok: false, error: "cannot_friend_self" };
+  /* SeedOps: real ↛ seed/ops */
+  const senderKind = accountKindForUser(senderUserId);
+  const recipientKind = recipient.account_kind || accountKindForUser(recipient.user_id) || "real";
+  if (isRealKind(senderKind) !== isRealKind(recipientKind)) {
+    return { ok: false, error: "real_seed_friend_blocked" };
+  }
   const existing = db
     .prepare(
       "SELECT * FROM friend_requests WHERE sender_user_id = ? AND recipient_user_id = ? AND status = 'pending'"

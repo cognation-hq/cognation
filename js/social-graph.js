@@ -42,7 +42,7 @@
     return api()
       .rest("profiles", {
         query:
-          "select=id,user_id,kind,handle,display_name&id=eq." + encoded(profileId),
+          "select=id,user_id,kind,handle,display_name,account_kind,seed_fleet_id&id=eq." + encoded(profileId),
       })
       .then(function (rows) {
         return Array.isArray(rows) && rows[0] ? rows[0] : null;
@@ -115,6 +115,15 @@
           });
       }
       if (state.mode === "friend" || state.mode === "requested") {
+        /* SeedOps: real ↛ seed/ops friend block (client gate; RPC also enforces). */
+        var gate = window.CognationSeedOpsFriendGate;
+        if (gate && typeof gate.canFriend === "function") {
+          var target = state.target || { id: profileId };
+          var decision = gate.canFriend(null, target);
+          if (!decision.ok) {
+            return Promise.reject(new Error(decision.message || "Friend request blocked."));
+          }
+        }
         return api()
           .rpc("send_friend_request", { recipient_profile_id: profileId })
           .then(function () {

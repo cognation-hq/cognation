@@ -3570,6 +3570,13 @@
     if (!id || id === "alexa-thomas") return { ok: false, error: "self" };
     var personal = viewerPersonalRecord();
     if (!personal || personal.kind === "professional") return { ok: false, error: "not-personal" };
+    /* SeedOps: real ↛ seed/ops */
+    if (window.CognationSeedOpsFriendGate && typeof window.CognationSeedOpsFriendGate.canFriend === "function") {
+      var gateDecision = window.CognationSeedOpsFriendGate.canFriend(personal, id);
+      if (!gateDecision.ok) {
+        return { ok: false, error: gateDecision.error || "real_seed_friend_blocked", message: gateDecision.message };
+      }
+    }
     if (!Array.isArray(personal.friendIds)) personal.friendIds = [];
     if (personal.friendIds.indexOf(id) >= 0) return { ok: true, already: true, count: personal.friendIds.length };
     if (personal.friendIds.length >= TOWER_FRIEND_CAP) return { ok: false, full: true, count: personal.friendIds.length };

@@ -684,6 +684,42 @@
     if (chosen != null) p.musicYoutubeWidth = chosen;
   }
 
+  /* Remote rows do not store a top-friend removal. The owner local copy
+     (legacy key and/or accounts profile) is what reload must paint. */
+  function explicitTopFriendSnapshot(blob, profileHandle) {
+    if (!blob || typeof blob !== "object") return null;
+    var blobHandle = normalizeHandle(blob.handle || "");
+    if (blobHandle && profileHandle && blobHandle !== profileHandle) return null;
+    var removed = Array.isArray(blob.removedFriendPinIds)
+      ? blob.removedFriendPinIds.map(function (id) { return String(id || ""); }).filter(Boolean)
+      : [];
+    var featured = Array.isArray(blob.featuredFriendIds)
+      ? blob.featuredFriendIds.map(function (id) { return String(id || ""); }).filter(Boolean)
+      : [];
+    if (!removed.length && !featured.length) return null;
+    return { removed: removed, featured: featured };
+  }
+
+  function applyOwnerTopFriends(p, legacy, account) {
+    if (!p || p._directoryFriend || p._profileKind === "professional") return;
+    if (p._remote && !isTowerOwner(p)) return;
+    var profileHandle = normalizeHandle(p.handle || "");
+    var fromLegacy = explicitTopFriendSnapshot(legacy, profileHandle);
+    var fromAccount = explicitTopFriendSnapshot(account, profileHandle);
+    var chosen = null;
+    if (fromLegacy && fromAccount) {
+      chosen = fromAccount.removed.length > fromLegacy.removed.length ? fromAccount : fromLegacy;
+    } else {
+      chosen = fromLegacy || fromAccount;
+    }
+    if (!chosen) return;
+    p.removedFriendPinIds = chosen.removed.slice();
+    p.featuredFriendIds = chosen.featured.slice();
+    var fdc = parseInt(p.friendsDisplayCount, 10);
+    if ([3, 6, 8].indexOf(fdc) === -1) fdc = 3;
+    p.featuredFriendIds = p.featuredFriendIds.slice(0, fdc);
+  }
+
   function restoreSavedTowerFields(p) {
     if (!p || p._directoryFriend) return p;
     var local = accountTowerBlob(p._profileId) || {};
@@ -717,6 +753,7 @@
     /* pointerup writes cognation.tower.profile.v1. Remote get() still has the
        default 320 until sync, so the owner local width wins on paint/reload. */
     applyOwnerMusicYoutubeWidth(p, legacy, local);
+    applyOwnerTopFriends(p, legacy, local);
     if (!local || !Object.keys(local).length) return p;
     if (
       (!p.avatarDataUrl || String(p.avatarDataUrl).indexOf("data:image/") !== 0) &&
@@ -1115,6 +1152,16 @@
       } finally {
         this._saving = false;
       }
+    },
+    /* Owner-only. Writes the local key reload reads, not the stale remote row. */
+    removeTopFriend: function (friendId) {
+      var p = this.get();
+      if (!p || p._directoryFriend || profileIsProfessional(p) || !isTowerOwner(p)) return false;
+      if (!removeTopFriendPin(p, friendId)) return false;
+      return !!this.save(p, { geometry: true });
+    },
+    topFriendIds: function () {
+      return resolveTopFriendIds(this.get());
     },
   };
 
@@ -3596,6 +3643,10 @@
     var stored = ((p && p.friendIds) || []).filter(function (id) {
       return known[id] && keep(id);
     });
+    /* A removal shrinks the saved set. Do not pull the next friend into that slot. */
+    if (ranked.length || ((p && p.removedFriendPinIds) || []).length) {
+      return ranked.slice(0, TOP_FRIEND_VISIBLE).filter(keep);
+    }
     var pool = ranked.length ? ranked : stored;
     if (!pool.length) {
       pool = [];
@@ -3604,6 +3655,28 @@
       });
     }
     return pool.slice(0, TOP_FRIEND_VISIBLE).filter(keep);
+  }
+
+  /** Drop one displayed friend and remember the set that should remain. */
+  function removeTopFriendPin(p, friendId) {
+    if (!p || profileIsProfessional(p)) return false;
+    friendId = String(friendId || "");
+    if (!friendId) return false;
+    var current = resolveTopFriendIds(p);
+    var base = current.slice();
+    (p.featuredFriendIds || []).forEach(function (id) {
+      id = String(id || "");
+      if (!id || id === friendId || id === "alexa-thomas" || base.indexOf(id) >= 0) return;
+      base.push(id);
+    });
+    p.featuredFriendIds = base.filter(function (id) { return id !== friendId; });
+    if (!Array.isArray(p.removedFriendPinIds)) p.removedFriendPinIds = [];
+    if (p.removedFriendPinIds.indexOf(friendId) < 0) p.removedFriendPinIds.push(friendId);
+    if (p.friendPinLayout && p.friendPinLayout[friendId]) delete p.friendPinLayout[friendId];
+    var fdc = parseInt(p.friendsDisplayCount, 10);
+    if ([3, 6, 8].indexOf(fdc) === -1) fdc = 3;
+    if (p.featuredFriendIds.length > fdc) p.featuredFriendIds = p.featuredFriendIds.slice(0, fdc);
+    return true;
   }
 
   function renderFriendPins(root, p) {
@@ -3910,11 +3983,8 @@
       remove.textContent = " ×";
       btn.appendChild(remove);
       btn.addEventListener("click", function () {
-        if (!isTowerOwner(TowerProfileStore.get())) return;
-        var cur = TowerProfileStore.get();
-        cur.featuredFriendIds = (cur.featuredFriendIds || []).filter(function (fid) { return fid !== f.id; });
-        TowerProfileStore.save(cur);
-        renderFriendsPicker(root, cur);
+        if (!TowerProfileStore.removeTopFriend(f.id)) return;
+        renderFriendsPicker(root, TowerProfileStore.get());
       });
       chips.appendChild(btn);
     });
@@ -3971,6 +4041,7 @@
         hit.textContent = friend.name;
         hit.addEventListener("click", function () {
           var profile = TowerProfileStore.get();
+          if (!isTowerOwner(profile)) return;
           var lim = parseInt(
             (root.querySelector("[data-tower-friends-count]") || {}).value || profile.friendsDisplayCount || 3,
             10
@@ -3990,8 +4061,12 @@
             }
             ids.push(friend.id);
             profile = TowerProfileStore.get();
+            if (!isTowerOwner(profile)) return;
             profile.featuredFriendIds = ids;
-            TowerProfileStore.save(profile);
+            profile.removedFriendPinIds = (profile.removedFriendPinIds || []).filter(function (id) {
+              return id !== friend.id;
+            });
+            TowerProfileStore.save(profile, { geometry: true });
           }
           input.value = "";
           box.hidden = true;
@@ -6907,6 +6982,10 @@
       }
       if (entry.type === "friend") {
         var fp = TowerProfileStore.get();
+        if (!isTowerOwner(fp)) return;
+        fp.removedFriendPinIds = (fp.removedFriendPinIds || []).filter(function (id) {
+          return id !== entry.id;
+        });
         var ids = (fp.featuredFriendIds || []).slice();
         if (ids.indexOf(entry.id) < 0) {
           var max = fp.friendsDisplayCount || 3;
@@ -6925,7 +7004,7 @@
           fp.friendPinLayout[entry.id] = entry.layout;
         }
         ensureFriendPinPositions(fp, fp.featuredFriendIds);
-        TowerProfileStore.save(fp);
+        TowerProfileStore.save(fp, { geometry: true });
         renderFriendsPicker(root, fp);
         renderFriendPins(root, fp);
         syncOwnerStickerHandles(root);
@@ -6950,13 +7029,15 @@
     if (resetBtn) {
       resetBtn.addEventListener("click", function () {
         var p = TowerProfileStore.get();
+        if (!isTowerOwner(p)) return;
         p.widgetLayout = JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT));
         if (p.widgetLayout && p.widgetLayout.feed) delete p.widgetLayout.feed;
         if (p.widgetLayout && p.widgetLayout.messages) delete p.widgetLayout.messages;
         p.publicWidgets = JSON.parse(JSON.stringify(DEFAULT_PUBLIC_WIDGETS));
         p.polaroidRemoved = false;
         p.removedFriendPinIds = [];
-        TowerProfileStore.save(p);
+        p.featuredFriendIds = [];
+        TowerProfileStore.save(p, { geometry: true });
         applyWidgetLayout(root, p);
         applyPublicWidgets(root, p);
         syncPublicWidgetsForm(root, p);
@@ -7318,12 +7399,8 @@
               ? JSON.parse(JSON.stringify(fp.friendPinLayout[friendId]))
               : null;
           pushWidgetUndo({ type: "friend", id: friendId, layout: savedFriendLayout });
-          if (!Array.isArray(fp.removedFriendPinIds)) fp.removedFriendPinIds = [];
-          if (fp.removedFriendPinIds.indexOf(friendId) < 0) fp.removedFriendPinIds.push(friendId);
-          if (fp.friendPinLayout && fp.friendPinLayout[friendId]) {
-            delete fp.friendPinLayout[friendId];
-          }
-          TowerProfileStore.save(fp);
+          if (!TowerProfileStore.removeTopFriend(friendId)) return;
+          fp = TowerProfileStore.get();
           renderFriendsPicker(root, fp);
           renderFriendPins(root, fp);
           setProfileStatusSafe("Friend pin removed — Undo to restore.", false);

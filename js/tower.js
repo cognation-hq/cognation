@@ -2723,6 +2723,7 @@
     var yt = root.querySelector("[data-tower-youtube]");
     if (frame) frame.innerHTML = "";
     if (yt) yt.hidden = true;
+    ensureYoutubeResizeHandle(root);
   }
 
   /* Professional page: empty box plus a link field. No pink player and no MP3 face. */
@@ -2950,6 +2951,29 @@
   }
 
 
+
+  function ensureYoutubeResizeHandle(root) {
+    var yt = root.querySelector("[data-tower-youtube]");
+    if (!yt) return null;
+    var frame = root.querySelector("[data-tower-youtube-frame]");
+    var handle = root.querySelector("[data-tower-youtube-resize]");
+    if (handle && frame && frame.contains(handle)) {
+      yt.appendChild(handle);
+    }
+    if (!handle) {
+      handle = document.createElement("button");
+      handle.type = "button";
+      handle.className = "tower-youtube-resize";
+      handle.setAttribute("data-tower-youtube-resize", "");
+      handle.setAttribute("aria-label", "Drag to resize YouTube width");
+      handle.title = "Drag to resize YouTube width";
+      yt.appendChild(handle);
+    } else if (handle.parentNode !== yt) {
+      yt.appendChild(handle);
+    }
+    return handle;
+  }
+
   function applyYoutubeWidth(root, widthPx) {
     var w = Math.max(180, Math.min(720, parseInt(widthPx, 10) || 320));
     var wrap = root.querySelector("[data-tower-music]");
@@ -3056,6 +3080,8 @@
     if (!wrap || !audio) return;
 
     applyYoutubeWidth(root, p && p.musicYoutubeWidth);
+    ensureYoutubeResizeHandle(root);
+    initYoutubeResize(root);
     var url = (p.musicUrl || "").trim();
     var skin = visibleMusicSkin(p.musicSkin || "classic");
     var personal = !p || p._profileKind !== "professional";

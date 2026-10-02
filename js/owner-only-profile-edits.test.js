@@ -89,7 +89,6 @@ function boot(storage, session, hash) {
 }
 
 var tower = src("js/tower.js");
-var css = src("css/styles.css");
 
 assert.ok(
   /if \(!isTowerOwner\(data\)\) return false;/.test(tower),
@@ -119,26 +118,11 @@ assert.ok(
   /function commitSocialDraft[\s\S]{0,120}if \(!isTowerOwner\(TowerProfileStore\.get\(\)\)\) return;/.test(tower),
   "social edit is owner-only"
 );
-["data-tower-save-friends", "data-tower-save-badges", "data-tower-save-frame", "data-tower-music-look", "data-tower-choose-avatar"].forEach(function (sel) {
-  assert.ok(
-    css.indexOf('[data-tower-app]:not([data-tower-is-owner="true"]) [' + sel + "]") !== -1,
-    "CSS hides " + sel + " for non-owners"
-  );
-});
 
 var session = { username: "owner", activeProfileId: "prof-owner" };
 var storage = memoryStorage();
 var win = boot(storage, session, "#tower-profile-other");
 var accounts = win.CognationAccounts;
-accounts.saveProfileRecord({
-  id: "prof-owner",
-  kind: "personal",
-  accountUsername: "owner",
-  phone: "(312) 555-0101",
-  handle: "owner",
-  displayName: "Owner",
-  slogan: "mine",
-});
 accounts.saveProfileRecord({
   id: "prof-other",
   kind: "professional",

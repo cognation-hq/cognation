@@ -148,3 +148,19 @@ Shared website fleet upsert + Admin API password binding: see [`docs/seedops-pro
 Module: `js/seedops-commune-alive.js` → `window.CognationSeedOpsCommuneAlive`
 
 Seed/ops sessions bootstrap a local member age/city/interests so site chatrooms are enterable, and materialize a dating-ready Wave sample into `CognationAccounts` (SVG avatars, shared Demo City, dating opt-in). Does **not** expose a public Demo gate. Tower/News liveliness still comes from shared `tower_posts` (prefer public visibility or seed↔seed friendships).
+
+## 10. Dating server→client hydrate
+
+Module: `js/seedops-dating-hydrate.js` → `window.CognationSeedOpsDatingHydrate`
+
+Closes the localStorage-only gap after Commune-alive (#31):
+
+- Loads viewer `seeDating` + member age/city/state/country/interests from auth `user_metadata` (seed/ops get Demo City defaults when metadata is empty so Alexa walk needs no console paste).
+- Fetches seed `profiles` rows with nonempty `bio` (SeedOps enriched ~79) and merges into `CognationAccounts` with dating opt-in + SVG avatar (shared Demo City; cap **250**).
+- Persists viewer pref changes back to `user_metadata` via `CognationSupabase.updateUser` (no new dating schema / DB rows).
+- Dating card copy uses the profile `bio` when present (`commune-swipe.js`).
+
+```js
+CognationSeedOpsDatingHydrate.hydrate({ force: true })
+CognationSeedOpsDatingHydrate.persistPrefs()
+```

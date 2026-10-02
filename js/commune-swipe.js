@@ -312,6 +312,7 @@
   }
   function setSeeDating(on) {
     try { localStorage.setItem(SEE_DATING_KEY, on ? "1" : "0"); } catch (e) {}
+    emit("cognation:see-dating-changed", { seeDating: !!on });
   }
   function datingAllowed() {
     var age = getMemberAge();
@@ -562,7 +563,7 @@
       name: rec.displayName || rec.handle || "Member",
       title: rec.displayName || rec.handle || "Member",
       photo: extra.photo || profilePhoto(rec),
-      body: "Open to meeting someone local.",
+      body: String((rec && rec.bio) || extra.body || "Open to meeting someone local.").slice(0, 280),
       handle: rec.handle || "",
       dating: true,
       minAge: datingMinAge(rec),

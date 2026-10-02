@@ -531,6 +531,37 @@
       state.byEdition[editionId].posts.unshift(post);
       if (!this.save(state)) return { ok: false, error: "Could not save post." };
       return { ok: true, post: post };
+    },
+    /**
+     * Autopull curated in-repo seed pack for International / Nationwide.
+     * Does NOT call /api/news/* (raw Google News RSS — no age filters).
+     * Returns { ok, editionId, count } or { ok:false, error }.
+     */
+    isCuratedAutopullEdition: function (editionId) {
+      return editionId === "international" || editionId === "nationwide";
+    },
+    pullCuratedSeedPack: function (editionId) {
+      if (!this.isCuratedAutopullEdition(editionId)) {
+        return { ok: false, error: "edition has no curated autopull pack" };
+      }
+      var meta = EDITIONS[editionId];
+      if (!meta || !Array.isArray(meta.seedPosts) || !meta.seedPosts.length) {
+        return { ok: false, error: "curated seed pack missing" };
+      }
+      var state = this.getState();
+      var posts = JSON.parse(JSON.stringify(meta.seedPosts)).map(function (p) {
+        var c = {};
+        Object.keys(p).forEach(function (k) {
+          c[k] = p[k];
+        });
+        c.seeded = true;
+        c.sourceDetail =
+          (p.sourceDetail || p.source || "Cognation curated") + " · curated pack";
+        return c;
+      });
+      state.byEdition[editionId] = { posts: posts };
+      if (!this.save(state)) return { ok: false, error: "Could not save curated pack." };
+      return { ok: true, editionId: editionId, count: posts.length };
     }
   };
 
@@ -1260,8 +1291,28 @@
     function setEdition(id) {
       editionId = EditionStore.setId(id);
       applyEditionChrome();
+      var pulled = null;
+      if (FeedStore.isCuratedAutopullEdition(editionId)) {
+        pulled = FeedStore.pullCuratedSeedPack(editionId);
+      }
       renderFeed();
-      setStatus(feedStatus, "Switched to " + (EDITIONS[editionId].label) + " edition (demo).", false);
+      if (pulled && pulled.ok) {
+        setStatus(
+          feedStatus,
+          "Switched to " +
+            EDITIONS[editionId].label +
+            " — curated seed pack loaded (" +
+            pulled.count +
+            " items). No raw RSS.",
+          false
+        );
+      } else {
+        setStatus(
+          feedStatus,
+          "Switched to " + EDITIONS[editionId].label + " edition.",
+          false
+        );
+      }
       try {
         if (window.CognationFriction) window.CognationFriction.begin("news", "edition:" + editionId);
       } catch (e) {}
@@ -1372,6 +1423,19 @@
     applyEditionChrome();
     showSection("feed");
     renderProfile();
+    if (FeedStore.isCuratedAutopullEdition(editionId)) {
+      var bootPull = FeedStore.pullCuratedSeedPack(editionId);
+      if (bootPull && bootPull.ok) {
+        setStatus(
+          feedStatus,
+          EDITIONS[editionId].label +
+            " curated seed pack ready (" +
+            bootPull.count +
+            " items).",
+          false
+        );
+      }
+    }
     renderFeed();
   }
 

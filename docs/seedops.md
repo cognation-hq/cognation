@@ -111,7 +111,23 @@ CognationSeedOpsTrigger.triggerAll("seed-0001")
 - Act-as refuses real-user targets; pathway context only (does not bypass friend/policy / `auth.uid()`).
 - Log channel: `ops-trigger`.
 
-See [`docs/seedops-provision.md`](seedops-provision.md) for Wave 1 smoke steps and what #4 Tower posts still owns.
+See [`docs/seedops-provision.md`](seedops-provision.md) for Wave 1 smoke steps and Tower seed content (#4).
+
+## 8. Shared Tower seed content
+
+Module: `js/seedops-tower-posts.js` → `window.CognationSeedOpsTowerPosts`
+
+```js
+CognationSeedOpsTowerPosts.postWave({ offset: 0, limit: 100 })
+CognationSeedOpsTowerPosts.postOne("seed-0001")
+// armed ops session:
+CognationSeedOpsTrigger.postWave({ offset: 0, limit: 100 })
+```
+
+- Deterministic wellness-tone bodies (first-name-safe, G/PG; no Instagram framing).
+- Caps: Wave 1 = **100**; Demo max = **250** (hard stop unless Alexa `unlockFleet`).
+- Local/demo `CognationTowerStore` (or SeedOps overlay); live client write when signed in as that seed.
+- News path logging via `CognationSeedOpsNewsLog` + channel `tower-posts`.
 
 ## Ops notes
 
@@ -125,4 +141,4 @@ Shared website fleet upsert + Admin API password binding: see [`docs/seedops-pro
 - Wave 1 default: `provision_seed_wave(0, 100)` then `node scripts/seedops-bind-auth.mjs`
 - Free-trial Demo max: **250** seeds (+3 ops); grow past 100 only after Wave 1 green; past 250 needs Alexa unlock
 - Friend gate unchanged: seed↔seed OK after binding; real↛seed blocked
-- After bind: `CognationSeedOpsTrigger.triggerPathway(...)` / `#seedops-ops` for Wave 1 pathway smoke (#3); Tower bulk posts remain #4
+- After bind: `CognationSeedOpsTrigger.triggerPathway(...)` / `#seedops-ops` for pathway smoke (#3); `CognationSeedOpsTowerPosts.postWave({offset:0,limit:100})` for shared Tower content (#4)

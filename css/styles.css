@@ -11989,3 +11989,38 @@ a.circle-fall-portrait {
   cursor: pointer;
 }
 
+
+/* —— SeedOps demo / seed badge —— */
+.seedops-demo-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+  color: #4a1d12;
+  background: #ffd7a8;
+  border: 1px solid #c47a3a;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.seedops-demo-badge[data-account-kind="ops"] {
+  color: #1e293b;
+  background: #e2e8f0;
+  border-color: #64748b;
+}
+
+.tower-profile-name-wrap .seedops-demo-badge,
+.commune-feed-author .seedops-demo-badge,
+.people-search-results .seedops-demo-badge {
+  margin-top: 0.15rem;
+}
+
+[data-seedops-badge-host="seed"] .tower-profile-name::after,
+[data-seedops-badge-host="ops"] .tower-profile-name::after {
+  /* badge is a real node; no pseudo needed */
+  content: none;
+}

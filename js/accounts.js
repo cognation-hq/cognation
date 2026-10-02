@@ -604,6 +604,13 @@
     LEGACY_PROFILE_KEY: LEGACY_PROFILE_KEY,
     MAX_PROFILES_PER_PHONE: MAX_PROFILES_PER_PHONE,
     DEMO_ALEXA: DEMO_ALEXA,
+    /* SeedOps bridge — prefer CognationSeedOps.materializeSample */
+    materializeSeedSample: function (count) {
+      if (window.CognationSeedOps && window.CognationSeedOps.materializeSample) {
+        return window.CognationSeedOps.materializeSample(count);
+      }
+      return { ok: false, error: "seedops-unavailable" };
+    },
     normalizePhone: normalizePhone,
     phoneKey: phoneKey,
     normalizeHandle: normalizeHandle,

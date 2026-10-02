@@ -949,6 +949,21 @@
       var postId = post.id || ("news-" + String(post.createdAt || Date.now()) + "-" + Math.random().toString(36).slice(2, 7));
       article.setAttribute("data-news-post", "");
       article.setAttribute("data-post-id", postId);
+      try {
+        if (window.CognationSeedOpsNewsLog && window.CognationSeedOpsNewsLog.onNewsPostRendered) {
+          window.CognationSeedOpsNewsLog.onNewsPostRendered(post, editionId, {
+            rankedIndex: opts.lead ? 0 : undefined,
+          });
+        }
+        if (
+          window.CognationSeedOpsBadge &&
+          post &&
+          (post.isSeed || post.accountKind === "seed" || post.accountKind === "ops")
+        ) {
+          var authorEl = article.querySelector(".commune-feed-author");
+          if (authorEl) window.CognationSeedOpsBadge.ensureBadge(authorEl, post);
+        }
+      } catch (eSeedRender) {}
       feedList.appendChild(article);
     }
 
@@ -1064,6 +1079,19 @@
         if (isFof && body.toLowerCase().indexOf("@friendsoffriends") === -1) {
           body = "@friendsoffriends · " + body;
         }
+        var seedMeta = {};
+        try {
+          if (window.CognationSeedOps && window.CognationSeedOps.classify) {
+            seedMeta = window.CognationSeedOps.classify({
+              displayName: author,
+              handle: slug,
+              accountKind: p.accountKind,
+              isSeed: p.isSeed,
+              seedFleetId: p.seedFleetId,
+              id: p.authorProfileId || p.profileId,
+            });
+          }
+        } catch (eSeed) {}
         return {
           id: "from-tower-" + (p.towerKind || "personal") + "-" + p.id,
           authorName: author,
@@ -1077,6 +1105,13 @@
           likes: p.likes || 0,
           seeded: true,
           fromTower: true,
+          towerPostId: p.id,
+          accountKind: seedMeta.accountKind || p.accountKind || "",
+          isSeed: !!(seedMeta.isSeed || p.isSeed),
+          seedFleetId: p.seedFleetId || "",
+          minAge: p.minAge || 0,
+          audience: p.audience || "",
+          reactions: p.reactions || {},
         };
       });
     }
@@ -1087,6 +1122,11 @@
         editionId === "local" || editionId === "statewide"
           ? postsFromTower()
           : FeedStore.listPosts(editionId);
+      try {
+        if (window.CognationSeedOpsNewsLog && window.CognationSeedOpsNewsLog.onTowerPostsForNews) {
+          window.CognationSeedOpsNewsLog.onTowerPostsForNews(posts, editionId);
+        }
+      } catch (eNewsLog) {}
       feedList.innerHTML = "";
       wirePage = 0;
       wireLoading = false;

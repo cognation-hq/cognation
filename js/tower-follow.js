@@ -175,6 +175,16 @@
     var friends = alreadyFriend(viewed);
     btn.setAttribute("aria-pressed", friends ? "true" : "false");
     btn.classList.remove("is-following");
+    var gateLocal = window.CognationSeedOpsFriendGate;
+    if (!friends && gateLocal && typeof gateLocal.canFriend === "function") {
+      var blocked = gateLocal.canFriend(null, viewed || { id: id });
+      if (!blocked.ok) {
+        btn.disabled = true;
+        btn.textContent = "Unavailable";
+        btn.setAttribute("aria-label", blocked.message || "Cannot friend seed or ops accounts");
+        return;
+      }
+    }
     btn.textContent = friends ? "Friends" : "Add friend";
     btn.setAttribute("aria-label", friends ? "You are friends" : "Add this person as a friend");
     if (!id && !viewed) return;

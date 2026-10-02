@@ -5559,7 +5559,18 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 [data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-friends-search],
 [data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-friends-chips],
 [data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-friends-count],
-[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-social] {
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-social],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-save-friends],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-save-badges],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-save-frame],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-add-widget],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-music-look],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-choose-avatar],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-clear-avatar],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-name-size],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-public-look-save],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-collage-apply],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-collage-demo] {
   display: none !important;
 }
 

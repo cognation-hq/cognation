@@ -111,6 +111,22 @@
     };
     try {
       switch (pathway + ":" + step) {
+        case "tower:compose_or_load_post": {
+          var towerPosts = window.CognationSeedOpsTowerPosts;
+          if (towerPosts && typeof towerPosts.postOne === "function") {
+            var posted = towerPosts.postOne(ctx, { localOnly: true });
+            detail.posted = !!(posted && posted.ok);
+            detail.towerPostId = posted && posted.post && posted.post.id;
+            detail.path = posted && posted.path;
+            if (posted && posted.ok === false) {
+              detail.status = posted.error === "past_demo_cap" ? "capped" : "error";
+              detail.error = posted.error;
+            }
+          } else {
+            detail.status = "deferred_surface_missing";
+          }
+          break;
+        }
         case "tower:verify_demo_badge":
           if (window.CognationSeedOpsBadge) window.CognationSeedOpsBadge.syncTowerBadges();
           break;

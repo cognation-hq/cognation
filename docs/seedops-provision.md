@@ -185,10 +185,43 @@ location.hash = "seedops-ops"
 
 Caps unchanged: Wave 1 = **100**; free-trial Demo max = **250** (+3 ops). Soft budget 1000 with 750 real headroom — no auto-grow.
 
-### Still for #4 / later — gaps
+## #4 Shared Tower seed content
 
-- Shared **Tower seed content** generation / bulk posts (#4 owns)
+After Wave 1 bind (+ optional #3 pathway smoke), SeedOps can generate deterministic wellness-tone Tower posts so the fleet scrapbook feels alive and the News path (post → curator → age floor → newspaper) can be exercised.
+
+| Piece | Behavior |
+|-------|----------|
+| `js/seedops-tower-posts.js` → `window.CognationSeedOpsTowerPosts` | Deterministic first-name-safe G/PG posts; Wave window default `(0,100)`; hard stop at Demo cap **250** unless `unlockFleet` |
+| Write path | Prefer `CognationSupabaseSocial.createTowerPost` when signed in as that seed (client path via #2/#3). Else `CognationTowerStore` local/demo, or SeedOps overlay `cognation.seedops.tower.posts.v1` when Tower is remote for another session |
+| News hooks | Each seeded post emits `tower-posts` log + `CognationSeedOpsNewsLog` rank/age_floor/render stages |
+| Ops trigger | `triggerPathway("tower", id)` optionally seeds one post; `CognationSeedOpsTrigger.postWave` / `postOne` passthrough when armed |
+
+### How SeedOps runs Wave 1 Tower seed (after bind)
+
+1. Hooks #1 / #2 applied; optionally signed in as ops or a seed.
+2. Console:
+
+```js
+// Wave 1 shared Tower content (local/demo store + News log)
+CognationSeedOpsTowerPosts.postWave({ offset: 0, limit: 100 })
+
+// One seed
+CognationSeedOpsTowerPosts.postOne("seed-0001")
+
+// Via armed ops trigger (same caps / act-as rules)
+CognationSeedOpsTrigger.isArmed() // true when ops/seedops session
+CognationSeedOpsTrigger.postWave({ offset: 0, limit: 100 })
+CognationSeedOpsTrigger.triggerPathway("tower", "seed-0001") // pathway smoke + one seed post
+```
+
+3. Inspect `CognationSeedOpsLog.list("tower-posts")` and `CognationSeedOpsLog.list("news")`.
+
+**Live Supabase multi-seed write:** sign in as each seed (or the target seed) and call `postOne` without `localOnly` so the client path posts as `auth.uid()`. Bulk service-role apply is **out of scope** for #4 (never put service role / `SEEDOPS_AUTH_PASSWORD` in frontend).
+
+### Still later — gaps after #4
+
 - Live Supabase apply / running bind against production (Alexa SQL; box cannot)
+- Bulk service-role Tower insert for all 100 without per-seed sign-in
 - Scheduled or CI-wrapped Wave 1 green → optional grow-to-250 gate
 - Rotating / per-seed passwords (today: one shared `SEEDOPS_AUTH_PASSWORD`)
 - Optional RLS helpers that trust `app_metadata.seedops` for service paths

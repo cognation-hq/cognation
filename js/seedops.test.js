@@ -1,5 +1,5 @@
 /**
- * SeedOps unit checks (schema + friend gate + pathways + ops trigger).
+ * SeedOps unit checks (schema + friend gate + pathways + ops trigger + tower posts).
  * Run: node js/seedops.test.js
  */
 "use strict";
@@ -102,6 +102,50 @@ var run = win.CognationSeedOpsPathways.run("circle", "seed-0001");
 assert.strictEqual(run.pathway, "circle");
 assert.ok(run.steps.length > 0);
 
+/* --- #4 Tower seed posts --- */
+win.CognationTowerStore = {
+  _data: { version: 1, posts: [] },
+  load: function () { return this._data; },
+  save: function (data) { this._data = data; return true; },
+  list: function () { return (this._data.posts || []).slice(); },
+  add: function () { return { ok: false, error: "unused" }; },
+};
+load("js/seedops-tower-posts.js", win);
+var towerPosts = win.CognationSeedOpsTowerPosts;
+assert.strictEqual(towerPosts.WAVE1_MAX, 100);
+assert.strictEqual(towerPosts.DEMO_CAP, 250);
+var body = towerPosts.composeBody(win.CognationSeedOps.buildSeedRecord(0));
+assert.ok(body.indexOf("Ada") !== -1, "body should use first name");
+assert.ok(!/\d/.test(body.replace(/seedops/gi, "")), "visible body should stay first-name-safe");
+assert.ok(!/instagram|reel|story highlight|follower count/i.test(body), "no Instagram copycat framing");
+
+var one = towerPosts.postOne("seed-0001");
+assert.ok(one.ok, "postOne seed-0001 should succeed");
+assert.strictEqual(one.post.seedFleetId, "seed-0001");
+assert.strictEqual(one.post.authorName, "Ada");
+assert.ok(one.post.isSeed && one.post.seeded);
+assert.ok(win.CognationSeedOpsLog.list("tower-posts").length >= 1);
+assert.ok(win.CognationSeedOpsLog.list("news").length >= 1, "News path should log seeded post");
+
+var wave = towerPosts.postWave({ offset: 0, limit: 100 });
+assert.ok(wave.ok);
+assert.strictEqual(wave.posted, 100);
+assert.strictEqual(wave.limit, 100);
+
+var clamped = towerPosts.clampWave({ offset: 200, limit: 100 });
+assert.ok(clamped.ok);
+assert.strictEqual(clamped.limit, 50, "wave must hard-stop at demo cap 250");
+var past = towerPosts.postOne("seed-0251");
+assert.ok(!past.ok);
+assert.strictEqual(past.error, "past_demo_cap");
+var refusedWave = towerPosts.clampWave({ offset: 250, limit: 10 });
+assert.ok(!refusedWave.ok);
+
+var towerSrc = fs.readFileSync(path.join(root, "js/seedops-tower-posts.js"), "utf8");
+assert.ok(!(new RegExp("demo" + " unlock", "i").test(towerSrc)), "tower posts must not contain banned public-demo phrase");
+assert.ok(towerSrc.indexOf("SEEDOPS_AUTH_PASSWORD") === -1, "no ops password in frontend");
+assert.ok(towerSrc.indexOf("SERVICE_ROLE") === -1 && towerSrc.indexOf("service_role") === -1, "no service role in frontend");
+
 /* --- #3 ops trigger --- */
 win.CognationAuth = {
   getSession: function () {
@@ -178,5 +222,30 @@ var src = fs.readFileSync(path.join(root, "js/seedops-ops-trigger.js"), "utf8");
 assert.ok(!(new RegExp("demo" + " unlock", "i").test(src)), "ops trigger must not contain banned public-demo phrase");
 var html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 assert.ok(html.indexOf("js/seedops-ops-trigger.js") !== -1, "index.html must load ops trigger");
+assert.ok(html.indexOf("js/seedops-tower-posts.js") !== -1, "index.html must load tower posts");
+assert.ok(
+  html.indexOf("js/seedops-tower-posts.js") < html.indexOf("js/seedops-ops-trigger.js"),
+  "tower posts must load before ops trigger"
+);
+
+/* Re-arm ops and confirm tower pathway seeds a post */
+win.CognationAuth.getSession = function () {
+  return { username: "ops-curator", activeProfileId: "prof-ops-curator" };
+};
+win.CognationAccounts.getProfileById = function (id) {
+  if (id === "prof-ops-curator") return win.CognationSeedOps.listOpsBots()[0];
+  return null;
+};
+win.CognationSupabase = null;
+assert.ok(trigger.isArmed());
+var towerKick = trigger.triggerPathway("tower", "seed-0003");
+assert.ok(towerKick.ok);
+assert.ok(towerKick.towerSeed && towerKick.towerSeed.ok, "tower pathway should seed a post");
+assert.strictEqual(towerKick.towerSeed.post.seedFleetId, "seed-0003");
+var viaTrigger = trigger.postOne("seed-0004");
+assert.ok(viaTrigger.ok);
+var viaWave = trigger.postWave({ offset: 0, limit: 2 });
+assert.ok(viaWave.ok);
+assert.strictEqual(viaWave.posted, 2);
 
 console.log("seedops.test.js: ok");

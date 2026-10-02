@@ -232,12 +232,29 @@
       at: new Date().toISOString(),
     });
     var summary = api.run(pathway, gate.record || gate.target);
+    var towerSeed = null;
+    if (String(pathway || "").toLowerCase() === "tower") {
+      var postsApi = window.CognationSeedOpsTowerPosts;
+      if (postsApi && typeof postsApi.postOne === "function") {
+        /* Optional shared Tower content for this seed so News-path logging can fire. */
+        towerSeed = postsApi.postOne(gate.record || gate.target, { localOnly: true });
+        emitLog({
+          action: "tower_seed_post",
+          ok: !!(towerSeed && towerSeed.ok),
+          target: gate.target,
+          towerPostId: towerSeed && towerSeed.post && towerSeed.post.id,
+          path: towerSeed && towerSeed.path,
+          error: towerSeed && towerSeed.error,
+        });
+      }
+    }
     return {
       ok: !!(summary && summary.ok !== false),
       pathway: pathway,
       target: gate.target,
       operator: gate.operator.seedFleetId,
       summary: summary,
+      towerSeed: towerSeed,
       note: "Act-as is pathway context only; does not bypass friend/policy or auth.uid().",
     };
   }
@@ -385,6 +402,38 @@
     boot();
   }
 
+  function postWave(opts) {
+    var op = resolveOperator();
+    if (!op) {
+      emitLog({ action: "post_wave", ok: false, error: "not_armed" });
+      return { ok: false, error: "not_armed", reason: "Operator session is not ops/seedops." };
+    }
+    var api = window.CognationSeedOpsTowerPosts;
+    if (!api || typeof api.postWave !== "function") {
+      return { ok: false, error: "tower_posts_unavailable" };
+    }
+    return api.postWave(opts || {});
+  }
+
+  function postOne(seedFleetId, opts) {
+    var gate = canActAs(seedFleetId);
+    if (!gate.ok) {
+      emitLog({
+        action: "post_one",
+        ok: false,
+        error: gate.error,
+        reason: gate.reason,
+        target: seedFleetId || "",
+      });
+      return { ok: false, error: gate.error, reason: gate.reason };
+    }
+    var api = window.CognationSeedOpsTowerPosts;
+    if (!api || typeof api.postOne !== "function") {
+      return { ok: false, error: "tower_posts_unavailable", target: gate.target };
+    }
+    return api.postOne(gate.record || gate.target, opts || {});
+  }
+
   window.CognationSeedOpsTrigger = {
     HASH: HASH,
     QUERY: QUERY,
@@ -396,6 +445,8 @@
     canActAs: canActAs,
     triggerPathway: triggerPathway,
     triggerAll: triggerAll,
+    postWave: postWave,
+    postOne: postOne,
     syncPanel: syncPanel,
     gateOpen: gateOpen,
   };

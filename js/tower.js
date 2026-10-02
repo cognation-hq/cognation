@@ -376,8 +376,31 @@
   }
 
   function personalProfileHandle(friendId) {
+    friendId = String(friendId || "");
+    var social = remoteSocial();
+    if (social) {
+      if (typeof social.getProfileForHandle === "function") {
+        var byHandle = social.getProfileForHandle(friendId.replace(/^@/, ""));
+        if (byHandle && byHandle.handle) return String(byHandle.handle).replace(/^@/, "");
+      }
+      if (typeof social.getProfileForUser === "function") {
+        var byUser = social.getProfileForUser(friendId, "personal");
+        if (byUser && byUser.handle) return String(byUser.handle).replace(/^@/, "");
+      }
+      if (typeof social.getProfile === "function") {
+        var byId = social.getProfile(friendId);
+        if (byId && byId.handle) return String(byId.handle).replace(/^@/, "");
+      }
+    }
     var person = directoryFriendById(friendId);
     if (person && person.handle) return String(person.handle).replace(/^@/, "");
+    /* Prefer already-handle-shaped ids (hydrated roster) over UUID slug mangling. */
+    if (friendId && friendId.indexOf("-") >= 0 && /^[0-9a-f]{8}-/i.test(friendId)) {
+      return friendHandleFromId(friendId);
+    }
+    if (friendId && !/^[0-9a-f]{8}-/i.test(friendId)) {
+      return String(friendId).replace(/^@/, "");
+    }
     return friendHandleFromId(friendId);
   }
 
@@ -707,6 +730,20 @@
         if (!pos || typeof pos.x !== "number" || typeof pos.y !== "number") return;
         if (!cur || typeof cur.x !== "number" || typeof cur.y !== "number") p.friendPinLayout[fid] = pos;
       });
+    }
+    if (
+      (!Array.isArray(p.friendIds) || !p.friendIds.length) &&
+      Array.isArray(local.friendIds) &&
+      local.friendIds.length
+    ) {
+      p.friendIds = local.friendIds.map(function (id) { return String(id || ""); }).filter(Boolean).slice(0, 250);
+    } else if (
+      (!Array.isArray(p.friendIds) || !p.friendIds.length) &&
+      legacy &&
+      Array.isArray(legacy.friendIds) &&
+      legacy.friendIds.length
+    ) {
+      p.friendIds = legacy.friendIds.map(function (id) { return String(id || ""); }).filter(Boolean).slice(0, 250);
     }
     var savedDoc = readScrapbookLayouts();
     var savedId = p._profileId || p.id || "";
@@ -8616,6 +8653,7 @@
   var circleFallState = null;
 
   function circleFriendRecord(id) {
+    id = String(id || "");
     var friend = null;
     for (var i = 0; i < DEMO_FRIENDS.length; i++) {
       if (DEMO_FRIENDS[i].id === id) {
@@ -8624,6 +8662,24 @@
       }
     }
     if (friend) return friend;
+    var social = remoteSocial();
+    if (social) {
+      var remote = null;
+      if (typeof social.getProfileForHandle === "function") {
+        remote = social.getProfileForHandle(id.replace(/^@/, ""));
+      }
+      if (!remote && typeof social.getProfile === "function") remote = social.getProfile(id);
+      if (!remote && typeof social.getProfileForUser === "function") {
+        remote = social.getProfileForUser(id, "personal");
+      }
+      if (remote) {
+        return {
+          id: id,
+          name: remote.display_name || remote.displayName || ("@" + (remote.handle || id)),
+          handle: remote.handle || id,
+        };
+      }
+    }
     return { id: id, name: friendSideLabel(id) };
   }
 
@@ -9385,7 +9441,13 @@
       paintFriendPicture(el, friend, friendIndex || i);
       el.addEventListener("click", function (ev) {
         ev.preventDefault();
-        try { location.hash = "tower-profile-" + handle; } catch (e) {}
+        var h = el.getAttribute("data-friend-handle") || handle;
+        if (window.CognationTowerOpenProfile) {
+          try { window.CognationTowerOpenProfile(h); } catch (eOpen) {}
+        } else {
+          try { location.hash = "tower-profile-" + h; } catch (e) {}
+        }
+        try { stopCircleFall(); } catch (eStop) {}
       });
       layer.appendChild(el);
       var spread = Math.min(w * 0.58, 680);
@@ -9470,6 +9532,18 @@
 
   window.CognationTowerOpenEvent = openTowerEvent;
   window.CognationTowerOpenPost = openTowerPost;
+
+  if (window && typeof document !== "undefined" && !window.__cognationCircleFriendsHydrate) {
+    window.__cognationCircleFriendsHydrate = true;
+    function restartCircleIfOpen() {
+      try {
+        if (!document.body || !document.body.classList.contains("is-circle-open")) return;
+        startCircleFall();
+      } catch (eRestart) {}
+    }
+    document.addEventListener("cognation:remote-friends-loaded", restartCircleIfOpen);
+    document.addEventListener("cognation:circle-friends-hydrated", restartCircleIfOpen);
+  }
 
   window.CognationCircleFall = {
     start: function () {

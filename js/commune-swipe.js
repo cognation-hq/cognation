@@ -1093,8 +1093,14 @@
     var rooms = ensureSiteRooms();
     var room = null;
     rooms.forEach(function (item) { if (item.id === roomId) room = item; });
-    if (!room) return false;
-    if (!state.shell) return false;
+    if (!room) {
+      setStatus("That room is not available right now.");
+      return false;
+    }
+    if (!state.shell) {
+      setStatus("Commune is still loading. Try Open again in a moment.");
+      return false;
+    }
     closeClassroom();
     paintRoom(room);
     friction("begin", "chat", "chatroom:" + roomId);
@@ -1125,9 +1131,34 @@
     state.classroomId = session.id;
   }
 
+  function syncAgeFromAuthMetadata() {
+    try {
+      var sb = window.CognationSupabase;
+      if (!sb || typeof sb.getSession !== "function") return false;
+      var sess = sb.getSession();
+      var meta =
+        (sess && sess.user && (sess.user.user_metadata || sess.user.userMetadata)) ||
+        (sess && (sess.user_metadata || sess.userMetadata)) ||
+        null;
+      if (!meta) return false;
+      var age = parseInt(meta.member_age != null ? meta.member_age : meta.memberAge, 10);
+      if (isNaN(age) || age <= 0) return false;
+      setMemberProfile({ age: age });
+      return true;
+    } catch (eSync) {
+      return false;
+    }
+  }
+
   function openClassroom(sessionId, scroll) {
     sessionId = String(sessionId || "");
-    if (!classroomAllowed()) return false;
+    if (!classroomAllowed()) {
+      syncAgeFromAuthMetadata();
+    }
+    if (!classroomAllowed()) {
+      setStatus("Classroom is for members 18+. Update your age in your profile to join.");
+      return false;
+    }
     var sessions = classroomCatalog();
     var session = null;
     sessions.forEach(function (item) { if (item.id === sessionId) session = item; });

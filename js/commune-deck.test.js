@@ -450,5 +450,37 @@ testAdsAndNoInventedCafe();
 testPassStaysHiddenForViewer();
 testLegacySessionPassBelongsToViewer();
 testRightSwipeStillKeeps();
+
+function testClassroomAgeGateToast() {
+  var api = loadSwipe(memoryStorage(), memoryStorage());
+  api.setMemberProfile({ age: 16, interests: ["insurance"] });
+  assert.strictEqual(api.classroomAllowed(), false);
+  assert.strictEqual(api.openClassroom("class-insurance", false), false);
+
+  api.setMemberProfile({ age: null, interests: ["insurance"] });
+  assert.strictEqual(api.classroomAllowed(), false);
+  assert.strictEqual(api.openClassroom("class-insurance", false), false);
+
+  api.setMemberProfile({ age: 28, interests: ["insurance"] });
+  assert.strictEqual(api.classroomAllowed(), true);
+
+  var src = fs.readFileSync(path.join(root, "js/commune-swipe.js"), "utf8");
+  assert.ok(
+    src.indexOf("Classroom is for members 18+") !== -1,
+    "openClassroom must toast age-gate copy"
+  );
+  assert.ok(src.indexOf("syncAgeFromAuthMetadata") !== -1, "must try auth member_age sync");
+
+  var social = fs.readFileSync(path.join(root, "js/supabase-social.js"), "utf8");
+  assert.ok(social.indexOf("friend_user_id.eq.") !== -1, "refreshFriends both directions");
+  assert.ok(social.indexOf("cognation:circle-friends-hydrated") !== -1, "circle hydrate emit");
+  assert.ok(social.indexOf("slice(0, 250)") !== -1, "friend hydrate capped at 250");
+
+  var tower = fs.readFileSync(path.join(root, "js/tower.js"), "utf8");
+  assert.ok(tower.indexOf("CognationTowerOpenProfile") !== -1, "circle click opens profile");
+  assert.ok(tower.indexOf("cognation:circle-friends-hydrated") !== -1, "circle restarts on hydrate");
+}
+
 testClassroomSurface();
+testClassroomAgeGateToast();
 console.log("commune-deck.test.js ok");

@@ -98,6 +98,10 @@ Shared sink: `js/seedops-log.js` (`sessionStorage` ring `cognation.seedops.log.v
 - Public Pages still must not expose a “Demo unlock” control (`scripts/check-no-public-demo-surface.js`).
 - Seed badges label **accounts**, not the local preview auth chrome.
 
-## Wave provision (Supabase)
+## Wave provision + auth binding (Supabase)
 
-Shared website fleet upsert: see [`docs/seedops-provision.md`](seedops-provision.md) and `provision_seed_wave(offset, limit)`.
+Shared website fleet upsert + Admin API password binding: see [`docs/seedops-provision.md`](seedops-provision.md).
+
+- Wave 1 default: `provision_seed_wave(0, 100)` then `node scripts/seedops-bind-auth.mjs`
+- Free-trial Demo max: **250** seeds (+3 ops); grow past 100 only after Wave 1 green; past 250 needs Alexa unlock
+- Friend gate unchanged: seed↔seed OK after binding; real↛seed blocked

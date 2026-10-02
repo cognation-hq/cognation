@@ -1,10 +1,22 @@
-# SeedOps — wave provision (shared website fleet)
+# SeedOps — wave provision + auth binding (shared website fleet)
 
-Idempotent Supabase provision for the **shared** seed fleet (`seed-0001`…`seed-1000`) and three ops bots. This is **not** the localStorage `materializeSample` helper in `js/seedops-schema.js`.
+Idempotent Supabase provision for the **shared** seed fleet and three ops bots. This is **not** the localStorage `materializeSample` helper in `js/seedops-schema.js`.
 
 Schema fit: `supabase/migrations/20261002_seedops_account_kind.sql` + `js/seedops-schema.js` (`FIRST_NAMES`, `buildSeedRecord`, `OPS_BOTS`).
 
+## Free-trial Demo caps (LOCKED)
+
+| Cap | Value | Rule |
+|-----|-------|------|
+| Wave 1 | **100** seeds | Default: `provision_seed_wave(0, 100)` |
+| Free-trial Demo max | **250** seeds (+ **3** ops) | Grow past Wave 1 **only after Wave 1 is green** |
+| Beyond 250 | Alexa unlock | Scripts refuse without `--unlock-fleet` / `SEEDOPS_UNLOCK_FLEET=1` |
+
+Schema still knows fleet ids `seed-0001`…`seed-1000` for id math; **do not auto-grow** provision or auth-bind past the caps above. No public Demo unlock UI.
+
 ## What lands
+
+### #1 Wave provision
 
 Migration: `supabase/migrations/20261002_seedops_provision_wave.sql`
 
@@ -17,56 +29,48 @@ Migration: `supabase/migrations/20261002_seedops_provision_wave.sql`
 Each seed row:
 
 - `account_kind = 'seed'`
-- `seed_fleet_id = seed-0001` … `seed-1000` (1-based, zero-padded)
+- `seed_fleet_id = seed-0001` … (1-based, zero-padded)
 - `display_name` = plain first name only (same cycle as `FIRST_NAMES` / `buildSeedRecord`)
 - `handle` = `seed-<slug>-<nnnn>` (machine id)
 
 Ops bots: `ops-curator` / `ops-mod` / `ops-wire` with display names Curator / Moderator / Wire.
 
-**No public Demo unlock UI** is added. Pages stay free of public demo unlock controls.
+### #2 Auth binding
+
+| Piece | Behavior |
+|-------|----------|
+| `scripts/seedops-bind-auth.mjs` | Service-role **Admin API** upsert: confirm email + set shared ops password on deterministic stub UUIDs |
+| `20261002_seedops_auth_binding.sql` | `seedops_demo_cap()`=250, `seedops_wave1_limit()`=100, `seedops_auth_binding_status(offset, limit)` |
+| App metadata | `seedops: true`, `account_kind`, `seed_fleet_id` on bound users |
+
+Deterministic UUID (same as #1 stubs): `md5('cognation.seedops.v1:' || seed_fleet_id)::uuid`.
+
+Internal emails: `seed-NNNN@seed.cognation.internal`, `ops-*@ops.cognation.internal`.
+
+**Friend graph:** `send_friend_request` uses `auth.uid()`. After binding, SeedOps can sign in as seed/ops (ops-only password) so **seed↔seed** (and ops↔seed) friending works. **real↛seed** stays blocked (`real_seed_friend_blocked` in `20261002_seedops_account_kind.sql` + `js/seedops-friend-gate.js`).
+
+**No public Demo unlock UI** is added. Pages stay free of public demo unlock controls. Never put the service role key or `SEEDOPS_AUTH_PASSWORD` in frontend JS or Pages.
 
 ## Prerequisites
 
 1. Apply `20260924_cognation_social.sql` (profiles + auth signup trigger).
-2. Apply `20261002_seedops_account_kind.sql` (`account_kind`, `seed_fleet_id`).
-3. Apply `20261002_seedops_provision_wave.sql` (this wave RPC).
+2. Apply `20261002_seedops_account_kind.sql` (`account_kind`, `seed_fleet_id`, friend gate).
+3. Apply `20261002_seedops_provision_wave.sql` (wave RPC + stubs).
+4. Apply `20261002_seedops_auth_binding.sql` (cap helpers + status RPC).
+5. Enable Email provider in Supabase Auth (password sign-in).
 
-Run in Supabase **SQL Editor** as a privileged role (same as prior Cognation migrations), or via CLI against the project.
+Run SQL in Supabase **SQL Editor** as a privileged role, or via CLI against the project.
 
-## How to run a wave
+## How to run Wave 1 (default)
 
-### SQL Editor (service role / postgres)
+### 1) Provision profiles + stub auth.users
 
 ```sql
--- Wave 1: seed-0001 … seed-0100 (+ ops bots)
+-- Wave 1: seed-0001 … seed-0100 (+ ops bots). Default free-trial start.
 select public.provision_seed_wave(0, 100);
-
--- Wave 2: seed-0101 … seed-0200
-select public.provision_seed_wave(100, 100);
-
--- Continue until 1000, e.g. last wave:
-select public.provision_seed_wave(900, 100);
 ```
 
-Args match `CognationSeedOps.listSeedAccounts({ offset, limit })`: **0-based offset**, `limit` capped at fleet size 1000. Re-running the same wave is safe (upsert by `seed_fleet_id`).
-
-Return JSON shape:
-
-```json
-{
-  "ok": true,
-  "fleetSize": 1000,
-  "offset": 0,
-  "limit": 100,
-  "seedUpserted": 100,
-  "opsBots": 3,
-  "fromFleetId": "seed-0001",
-  "toFleetId": "seed-0100",
-  "seedFleetIds": ["seed-0001", "…"]
-}
-```
-
-### RPC (service role key only)
+RPC (service role key only):
 
 ```bash
 curl -s "$SUPABASE_URL/rest/v1/rpc/provision_seed_wave" \
@@ -76,29 +80,87 @@ curl -s "$SUPABASE_URL/rest/v1/rpc/provision_seed_wave" \
   -d '{"p_offset":0,"p_limit":100}'
 ```
 
-Never put the service role key in frontend JS or Pages.
+### 2) Bind usable Auth passwords (Admin API)
 
-### Ops bots only
+```bash
+export SUPABASE_URL="https://YOUR_PROJECT.supabase.co"
+export SUPABASE_SERVICE_ROLE_KEY="…"   # never commit
+export SEEDOPS_AUTH_PASSWORD="…"      # ≥12 chars; ops-only shared password; never commit
 
-```sql
-select * from public.provision_ops_bots();
+# Dry-run plan (Wave 1 defaults)
+node scripts/seedops-bind-auth.mjs --dry-run
+
+# Bind Wave 1 + 3 ops
+node scripts/seedops-bind-auth.mjs
+# equivalent: --offset 0 --limit 100
 ```
 
-## Auth.users stubs (gap → PR #2)
+Script caps:
 
-`profiles.user_id` is `NOT NULL` and references `auth.users(id)`. This migration therefore creates **minimal stub** `auth.users` (+ `auth.identities` email rows) with:
+- Default end ≤ **100** (Wave 1).
+- Past 100 up to **250**: requires `--allow-grow` or `SEEDOPS_ALLOW_GROW=1` (only after Wave 1 green).
+- Past **250**: requires `--unlock-fleet` or `SEEDOPS_UNLOCK_FLEET=1` (Alexa).
 
-- Deterministic UUID: `md5('cognation.seedops.v1:' || seed_fleet_id)::uuid`
-- Internal emails: `seed-NNNN@seed.cognation.internal`, `ops-*@ops.cognation.internal`
-- Unusable bcrypt password (`seedops-disabled-…`) — **not** for human login
+Ops only:
 
-Signup trigger `create_profile_for_new_user` may create the personal profile on first auth insert; the wave then stamps `account_kind` / `seed_fleet_id` / handle / display_name.
+```bash
+node scripts/seedops-bind-auth.mjs --ops-only
+```
 
-### Still needed in PR #2 (auth binding)
+### 3) Status check (optional)
 
-- Usable seed/ops sign-in (Admin API or controlled passwords), if SeedOps must act as those accounts in the browser
-- Align identities / email confirmation / banned flags with GoTrue version quirks
-- Optional: map stub users to a dedicated Auth app metadata flag and RLS helpers
-- Optional: scripted roll of all 10 waves with logging / dry-run
+```sql
+select public.seedops_auth_binding_status(0, 100);
+```
 
-Until PR #2, treat stubs as **DB presence for social graph / News / friend-gate testing**, not as public login accounts.
+```bash
+curl -s "$SUPABASE_URL/rest/v1/rpc/seedops_auth_binding_status" \
+  -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"p_offset":0,"p_limit":100}'
+```
+
+Password usability is **not** visible in SQL status; confirm by signing in as a seed email with `SEEDOPS_AUTH_PASSWORD`, then calling `send_friend_request` seed→seed.
+
+## Growing toward Demo max 250 (after Wave 1 green)
+
+```sql
+-- Example: next 150 seeds → seed-0101 … seed-0250 (explicit; not automatic)
+select public.provision_seed_wave(100, 150);
+```
+
+```bash
+node scripts/seedops-bind-auth.mjs --offset 100 --limit 150 --allow-grow
+```
+
+Do **not** script a loop that auto-fills to 1000. Stop at 250 unless Alexa unlocks.
+
+## Auth.users stubs (#1) vs binding (#2)
+
+`profiles.user_id` is `NOT NULL` and references `auth.users(id)`. Wave provision creates **minimal stub** `auth.users` (+ `auth.identities` email rows) with unusable bcrypt (`seedops-disabled-…`).
+
+`seedops-bind-auth.mjs` then:
+
+1. Looks up each deterministic UUID via Auth Admin API.
+2. **Updates** password + `email_confirm` + seedops `app_metadata` / `user_metadata` (or **creates** the user if the stub is missing and `--no-create` was not set).
+3. Best-effort stamps `profiles.account_kind` / `seed_fleet_id` / handle / display_name via service-role REST.
+
+Signup trigger `create_profile_for_new_user` may create the personal profile on first auth insert; wave provision / bind script then stamps SeedOps fields.
+
+## Still needed in #3 (ops trigger) — gaps
+
+- Ops-bot **automation triggers** (curator / mod / wire acting on queue, News, Circle jobs) — not in this PR
+- Scheduled or CI-wrapped Wave 1 green → optional grow-to-250 gate
+- Rotating / per-seed passwords (today: one shared `SEEDOPS_AUTH_PASSWORD`)
+- Optional RLS helpers that trust `app_metadata.seedops` for service paths
+- Browser SeedOps operator chrome to sign in as a fleet id (internal only; still no public Demo unlock)
+
+## Friend policy reminder
+
+| Pair | Result |
+|------|--------|
+| real ↔ real | OK |
+| seed ↔ seed | OK (after auth binding) |
+| ops ↔ seed/ops | OK |
+| real ↔ seed/ops | **Blocked** (`real_seed_friend_blocked`) |

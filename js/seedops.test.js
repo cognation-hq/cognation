@@ -539,6 +539,13 @@ console.log("seedops.test.js: classroom pathway ok");
 var hydrateSrc = fs.readFileSync(path.join(root, "js/seedops-dating-hydrate.js"), "utf8");
 assert.ok(!(new RegExp("demo" + " unlock", "i").test(hydrateSrc)), "dating-hydrate must not contain banned public-demo phrase");
 assert.ok(html.indexOf("js/seedops-dating-hydrate.js") !== -1, "index.html must load dating-hydrate");
+var swipeSrcForDating = fs.readFileSync(path.join(root, "js/commune-swipe.js"), "utf8");
+assert.ok(swipeSrcForDating.indexOf("ensureDatingBiosThenRebuild") !== -1, "toggle into Dating rehydrates bios");
+assert.ok(swipeSrcForDating.indexOf("Loading dating cards") !== -1, "toggle shows loading status while hydrating");
+assert.ok(swipeSrcForDating.indexOf('String(rec.bio || "").trim()') !== -1, "datingCardFrom trims bios");
+var aliveSrc = fs.readFileSync(path.join(root, "js/seedops-commune-alive.js"), "utf8");
+assert.ok(aliveSrc.indexOf("datingBiosReady") !== -1, "commune-alive validates dating bios on cache hit");
+
 assert.ok(
   html.indexOf("js/seedops-commune-alive.js") < html.indexOf("js/seedops-dating-hydrate.js"),
   "dating-hydrate must load after commune-alive"
@@ -679,7 +686,39 @@ hydrateWin.CognationCommuneSwipe = {
   assert.ok(rec && rec.datingContent, "dating opt-in after merge");
   assert.strictEqual(rec.bio, "Weekend farmer-market regular. Dogs welcome.");
   assert.ok(rec.avatarDataUrl && rec.avatarDataUrl.indexOf("data:image/svg") === 0, "svg avatar");
-  api.hydrate({ force: true }).then(function (out) {
+  assert.ok(typeof api.datingBiosReady === "function", "datingBiosReady export");
+  assert.ok(typeof api.ensureDatingContent === "function", "ensureDatingContent export");
+  assert.ok(api.datingBiosReady(1), "bios ready after merge");
+  assert.ok(hydrateSrc.indexOf("blank Card 1") !== -1 || hydrateSrc.indexOf("datingBiosReady") !== -1, "blank-card guard present");
+  assert.ok(hydrateSrc.indexOf("seeDating before setMemberProfile") !== -1, "seeDating applied before member rebuild");
+
+  /* Stale cache with wiped profiles must re-merge (blank dating Card 1 path). */
+  hydrateWin.CognationAccounts._p = {};
+  context.sessionStorage.setItem(
+    "cognation.seedops.datingHydrate.v1",
+    JSON.stringify({
+      ok: true,
+      memberAge: 29,
+      seeDating: true,
+      merged: 79,
+      dating: 79,
+      seedish: true,
+      at: "stale",
+    })
+  );
+  assert.ok(!api.datingBiosReady(1), "bios not ready after wipe");
+
+  api.hydrate({ force: false }).then(function (staleOut) {
+    assert.ok(staleOut && staleOut.ok, "stale cache rehydrate ok " + JSON.stringify(staleOut));
+    assert.ok(!staleOut.cached, "stale cache must not short-circuit");
+    var revived = hydrateWin.CognationAccounts.getProfileById("prof-seed-0002");
+    assert.ok(revived && revived.datingContent, "dating opt-in revived");
+    assert.ok(String(revived.bio || "").trim().length > 0, "dating Card 1 bio revived");
+    return api.ensureDatingContent({ minCount: 1 });
+  }).then(function (ensured) {
+    assert.ok(ensured && (ensured.ok || ensured.ready), "ensureDatingContent ok");
+    return api.hydrate({ force: true });
+  }).then(function (out) {
     assert.ok(out && out.ok, "hydrate ok " + JSON.stringify(out));
     assert.strictEqual(hydrateSee, true, "seeDating hydrated");
     assert.strictEqual(hydrateMember.age, 29, "age from metadata");

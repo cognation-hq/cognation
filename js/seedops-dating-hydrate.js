@@ -27,6 +27,7 @@
   var persistTimer = null;
   var lastPersistJson = "";
   var hydrating = false;
+  var ensureInFlight = null;
 
   function emitLog(payload) {
     if (window.CognationSeedOpsLog && typeof window.CognationSeedOpsLog.write === "function") {
@@ -204,11 +205,8 @@
     ) {
       next.interests = INTEREST_DEFAULT.slice();
     }
-    if (swipe && typeof swipe.setMemberProfile === "function") {
-      swipe.setMemberProfile(next);
-    } else {
-      writeJson(localStorage, "cognation.member.profile.v1", next);
-    }
+    /* seeDating before setMemberProfile — member-profile-updated rebuilds the deck,
+       and dating cards must be eligible on that first rebuild (blank Card 1 race). */
     var see = prefs.seeDating;
     if (see == null && opts.seedDefaults) see = true; /* Alexa walk: no console paste */
     if (see != null && swipe && typeof swipe.setSeeDating === "function") {
@@ -217,6 +215,11 @@
       try {
         localStorage.setItem("cognation.commune.seeDating.v1", see ? "1" : "0");
       } catch (e) {}
+    }
+    if (swipe && typeof swipe.setMemberProfile === "function") {
+      swipe.setMemberProfile(next);
+    } else {
+      writeJson(localStorage, "cognation.member.profile.v1", next);
     }
     return next;
   }
@@ -227,9 +230,12 @@
     rec.locality = rec.locality || rec.city || DEMO_CITY;
     rec.state = rec.state || DEMO_STATE;
     rec.country = rec.country || DEMO_COUNTRY;
-    if (bio) rec.bio = String(bio).slice(0, 280);
-    if (!rec.bio) {
+    var trimmed = bio != null ? String(bio).trim().slice(0, 280) : "";
+    if (trimmed) rec.bio = trimmed;
+    else if (!String(rec.bio || "").trim()) {
       rec.bio = "Seed demo profile in " + DEMO_CITY + " — open to meeting someone local.";
+    } else {
+      rec.bio = String(rec.bio).trim().slice(0, 280);
     }
     var fleet = String(rec.seedFleetId || "");
     if (viewerFleet && fleet && fleet === viewerFleet) {
@@ -247,6 +253,78 @@
       rec.avatarDataUrl = svgAvatar(rec.displayName || "S", index);
     }
     return rec;
+  }
+
+
+  /** True when local profiles already carry dating opt-in + nonempty bios (cap-aware). */
+  function datingBiosReady(minCount) {
+    minCount = Math.max(1, Number(minCount) || 1);
+    var ready = 0;
+    function consider(rec) {
+      if (!rec) return;
+      var opted =
+        rec.datingContent === true ||
+        rec.datingEnabled === true ||
+        rec.showDatingContent === true;
+      if (!opted) return;
+      if (!String(rec.bio || "").trim()) return;
+      ready += 1;
+    }
+    var doc = readJson(localStorage, "cognation.profiles.v1", null);
+    var profiles = doc && doc.profiles ? doc.profiles : {};
+    Object.keys(profiles).forEach(function (id) {
+      consider(profiles[id]);
+    });
+    if (ready >= minCount) return true;
+    var accounts = window.CognationAccounts;
+    if (accounts && typeof accounts.getProfileById === "function") {
+      var n;
+      for (n = 1; n <= 48 && ready < minCount; n++) {
+        var pad = String(n);
+        while (pad.length < 4) pad = "0" + pad;
+        consider(accounts.getProfileById("prof-seed-" + pad));
+      }
+    }
+    return ready >= minCount;
+  }
+
+  /**
+   * Ensure dating-flagged bios exist locally. Re-runs server merge when the session
+   * cache said ok but profiles were wiped / never enriched (blank dating Card 1).
+   */
+  function ensureDatingContent(opts) {
+    opts = opts || {};
+    if (datingBiosReady(opts.minCount)) {
+      return Promise.resolve({ ok: true, ready: true, skipped: true });
+    }
+    if (ensureInFlight) return ensureInFlight;
+    var alive = window.CognationSeedOpsCommuneAlive;
+    if (alive && typeof alive.materializeDatingSample === "function") {
+      try {
+        alive.materializeDatingSample(opts.count || 48);
+      } catch (eMat) {}
+    }
+    ensureInFlight = hydrate({ force: true, forceBios: true })
+      .then(function (out) {
+        if (!datingBiosReady(opts.minCount) && alive && typeof alive.bootstrap === "function") {
+          try {
+            alive.bootstrap({ force: true });
+          } catch (eBoot) {}
+        }
+        refillDeck();
+        return out;
+      })
+      .then(
+        function (out) {
+          ensureInFlight = null;
+          return out;
+        },
+        function (err) {
+          ensureInFlight = null;
+          throw err;
+        }
+      );
+    return ensureInFlight;
   }
 
   function mergeServerBios(rows) {
@@ -377,15 +455,27 @@
     }
     var prior = readJson(sessionStorage, BOOT_FLAG, null);
     if (prior && prior.ok && !opts.force) {
-      /* Re-apply age so Classroom gate sees member_age even on cache hit. */
-      if (prior.memberAge != null) {
-        applyViewerPrefs({ age: prior.memberAge }, { seedDefaults: false });
-        refillDeck();
-      } else if (isSeedOrOpsSession()) {
-        applyViewerPrefs({}, { seedDefaults: true });
-        refillDeck();
+      var biosOk = datingBiosReady(1);
+      /* Cache is only valid when dating bios still live in CognationAccounts.
+         Otherwise Card 1 / first dating card paints blank after See dating toggle. */
+      if (!biosOk && (isSeedOrOpsSession() || opts.forceBios || prior.seedish)) {
+        try {
+          sessionStorage.removeItem(BOOT_FLAG);
+        } catch (eStale) {}
+        prior = null;
+      } else {
+        /* Re-apply age + seeDating so Classroom/dating gates match last hydrate. */
+        var cachedPrefs = { age: prior.memberAge };
+        if (prior.seeDating != null) cachedPrefs.seeDating = !!prior.seeDating;
+        if (prior.memberAge != null || prior.seeDating != null) {
+          applyViewerPrefs(cachedPrefs, { seedDefaults: false });
+          refillDeck();
+        } else if (isSeedOrOpsSession()) {
+          applyViewerPrefs({}, { seedDefaults: true });
+          refillDeck();
+        }
+        return Promise.resolve({ ok: true, cached: true, prior: prior, biosReady: biosOk });
       }
-      return Promise.resolve({ ok: true, cached: true, prior: prior });
     }
     hydrating = true;
     var seedish = isSeedOrOpsSession();
@@ -483,8 +573,14 @@
     document.addEventListener("cognation:member-profile-updated", function () {
       schedulePersist();
     });
-    document.addEventListener("cognation:see-dating-changed", function () {
+    document.addEventListener("cognation:see-dating-changed", function (ev) {
       schedulePersist();
+      var on = !!(ev && ev.detail && ev.detail.seeDating);
+      if (!on) return;
+      /* Toggle into Dating: refresh bios if cache left profiles empty (blank Card 1). */
+      ensureDatingContent({ minCount: 1 }).then(function () {
+        refillDeck();
+      });
     });
   }
 
@@ -505,5 +601,7 @@
     prefsFromMetadata: prefsFromMetadata,
     applyViewerPrefs: applyViewerPrefs,
     isSeedOrOpsSession: isSeedOrOpsSession,
+    datingBiosReady: datingBiosReady,
+    ensureDatingContent: ensureDatingContent,
   };
 })();

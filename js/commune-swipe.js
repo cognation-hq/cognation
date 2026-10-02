@@ -362,8 +362,11 @@
     try { return localStorage.getItem(SEE_DATING_KEY) === "1"; } catch (e) { return false; }
   }
   function setSeeDating(on) {
-    try { localStorage.setItem(SEE_DATING_KEY, on ? "1" : "0"); } catch (e) {}
-    emit("cognation:see-dating-changed", { seeDating: !!on });
+    var next = !!on;
+    var prev = getSeeDating();
+    try { localStorage.setItem(SEE_DATING_KEY, next ? "1" : "0"); } catch (e) {}
+    if (prev === next) return;
+    emit("cognation:see-dating-changed", { seeDating: next });
   }
   function datingAllowed() {
     var age = getMemberAge();
@@ -641,7 +644,11 @@
       name: rec.displayName || rec.handle || "Member",
       title: rec.displayName || rec.handle || "Member",
       photo: extra.photo || profilePhoto(rec),
-      body: String((rec && rec.bio) || extra.body || "Open to meeting someone local.").slice(0, 280),
+      body: String(
+        (rec && String(rec.bio || "").trim()) ||
+          (extra.body && String(extra.body).trim()) ||
+          "Open to meeting someone local."
+      ).slice(0, 280),
       handle: rec.handle || "",
       dating: true,
       minAge: datingMinAge(rec),
@@ -1472,6 +1479,29 @@
     swipe(dx < 0 ? "left" : "right");
   }
 
+  function ensureDatingBiosThenRebuild() {
+    var hydrate = window.CognationSeedOpsDatingHydrate;
+    var alive = window.CognationSeedOpsCommuneAlive;
+    var done = function () {
+      syncDatingVisibility();
+      rebuildDeck();
+    };
+    if (hydrate && typeof hydrate.ensureDatingContent === "function") {
+      hydrate.ensureDatingContent({ minCount: 1 }).then(done).catch(done);
+      return;
+    }
+    if (alive && typeof alive.materializeDatingSample === "function") {
+      try {
+        alive.materializeDatingSample(48);
+      } catch (eMat) {}
+    }
+    if (hydrate && typeof hydrate.hydrate === "function") {
+      hydrate.hydrate({ force: true, forceBios: true }).then(done).catch(done);
+      return;
+    }
+    done();
+  }
+
   function wireDatingToggle(shell) {
     var toggle = shell.querySelector("[data-commune-see-dating], [data-commune-dating-toggle]");
     if (!toggle) return;
@@ -1485,10 +1515,18 @@
         rebuildDeck();
         return;
       }
-      setSeeDating(!!toggle.checked);
+      var on = !!toggle.checked;
+      setSeeDating(on);
       syncDatingVisibility();
+      if (on) {
+        /* Hydrate bios before paint so dating Card 1 is not blank after toggle. */
+        setStatus("Loading dating cards…");
+        ensureDatingBiosThenRebuild();
+        setStatus("Dating cards can appear now and then.");
+        return;
+      }
       rebuildDeck();
-      setStatus(toggle.checked ? "Dating cards can appear now and then." : "Dating cards hidden.");
+      setStatus("Dating cards hidden.");
     });
   }
 

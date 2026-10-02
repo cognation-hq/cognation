@@ -185,3 +185,16 @@ CognationSeedOpsDatingHydrate.persistPrefs()
 
 Commune featured mix stays **1:1** across Classroom / ad / chat room / dating / content. Classroom cards (`data-card-type="classroom"`) open the honest-thin `#panel-classroom` session view (insurance, voting, small business — ~18+). Pathway `CognationSeedOpsPathways.run("classroom")` locates the surface, enters a session, and completes without `deferred_surface_missing`. Cap **250** and no public Demo unlock unchanged.
 
+## Tower seed hydrate (from existing)
+
+Module: `js/seedops-tower-hydrate.js` → `window.CognationSeedOpsTowerHydrate`
+
+Hydrates seed Tower profiles from existing `profiles` / `friendships` / `tower_posts` rows:
+
+1. First-name-only `displayName` (cap **250**, no fleet invent past Demo max)
+2. Friendships → `friendIds` / `featuredFriendIds` (top friends)
+3. Existing `tower_posts` → Tower activity
+4. SeedOps content gen (`CognationSeedOpsTowerPosts.postOne`) **only** when a shell is still empty after hydrate
+
+Other people's Towers stay fully read-only (no Edit profile, name/social edit, top-friend delete, or Polaroid add).
+

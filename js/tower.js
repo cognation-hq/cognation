@@ -657,8 +657,10 @@
   function restoreSavedTowerFields(p) {
     if (!p || p._directoryFriend) return p;
     var local = accountTowerBlob(p._profileId) || {};
+    /* Never paint the viewer's legacy personal page onto someone else's Tower. */
+    var viewingOther = !!(p._remote && !isTowerOwner(p));
     /* The legacy blob is the personal page. Do not paint it onto the professional page. */
-    var legacy = p._profileKind === "professional" ? null : legacyTowerBlob();
+    var legacy = (viewingOther || p._profileKind === "professional") ? null : legacyTowerBlob();
     if (legacy) {
       if ((!local.avatarDataUrl || String(local.avatarDataUrl).indexOf("data:image/") !== 0) && legacy.avatarDataUrl) {
         local.avatarDataUrl = legacy.avatarDataUrl;
@@ -705,6 +707,7 @@
       p.backgroundImageDataUrl = local.backgroundImageDataUrl;
     }
     if (
+      !viewingOther &&
       (!p.polaroidDataUrl || String(p.polaroidDataUrl).indexOf("data:image/") !== 0) &&
       local.polaroidDataUrl &&
       String(local.polaroidDataUrl).indexOf("data:image/") === 0
@@ -712,6 +715,7 @@
       p.polaroidDataUrl = local.polaroidDataUrl;
     }
     if (
+      !viewingOther &&
       (!Array.isArray(p.polaroidPrints) || !p.polaroidPrints.length) &&
       Array.isArray(local.polaroidPrints) &&
       local.polaroidPrints.length
@@ -986,10 +990,13 @@
       /* Listeners of tower-profile-updated call get(), which can call save().
          A re-entrant save is what turned one profile read into a stack overflow. */
       if (this._saving) return false;
-      this._saving = true;
-      try {
       data = data || {};
       opts = opts || {};
+      /* Other people's Towers are read-only — never persist mutate UI into their blob. */
+      if (data._directoryFriend) return false;
+      if (data._remote && !isTowerOwner(data) && !opts.geometry) return false;
+      this._saving = true;
+      try {
       writeScrapbookLayout(data);
       var id = data._profileId || resolveActiveProfileId();
       /* A drop only changes x/y. Never PATCH the profile: that reload paints
@@ -1626,11 +1633,13 @@
   function isTowerOwner(profile) {
     var remoteSession = getSessionObject();
     profile = profile || TowerProfileStore.get();
+    if (!profile) return false;
+    /* Directory / other-person shells are never editable by the viewer. */
+    if (profile._directoryFriend) return false;
     if (
       remoteSession &&
       remoteSession.source === "supabase" &&
       remoteSession.activeProfileId &&
-      profile &&
       profile._profileId === remoteSession.activeProfileId
     ) {
       return true;
@@ -1762,10 +1771,45 @@
     });
   }
 
+  /** Hide mutate chrome when the viewer is not the profile owner. */
+  function syncViewerMutateUi(root) {
+    if (!root) return;
+    var p = TowerProfileStore.get();
+    var owner = isTowerOwner(p);
+    root.setAttribute("data-tower-is-owner", owner ? "true" : "false");
+    var edit = root.querySelector("[data-tower-profile-edit]");
+    if (edit) {
+      edit.hidden = !owner;
+      if (!owner) {
+        edit.classList.remove("is-open");
+        var panel = edit.querySelector("[data-tower-profile-edit-panel]");
+        var btn = edit.querySelector("[data-tower-edit-profile]");
+        if (panel) panel.hidden = true;
+        if (btn) btn.setAttribute("aria-expanded", "false");
+      }
+    }
+    var onPublic = root.getAttribute("data-tower-side") === "public";
+    root.querySelectorAll("[data-tower-profile-name], [data-tower-handle-badge]").forEach(function (el) {
+      el.classList.toggle("is-owner-editable", !!(owner && onPublic));
+      if (!owner && el.getAttribute("contenteditable") === "true") {
+        el.removeAttribute("contenteditable");
+      }
+    });
+    root.querySelectorAll("[data-tower-social]").forEach(function (input) {
+      input.readOnly = !owner;
+      input.disabled = !owner;
+    });
+    root.querySelectorAll("[data-tower-friends-search], [data-tower-friends-count]").forEach(function (el) {
+      el.disabled = !owner;
+      if ("readOnly" in el) el.readOnly = !owner;
+    });
+  }
+
   function applyTowerSide(root, side, opts) {
     opts = opts || {};
     var owner = isTowerOwner(TowerProfileStore.get());
     root.setAttribute("data-tower-is-owner", owner ? "true" : "false");
+    try { syncViewerMutateUi(root); } catch (eMut) {}
     if (!owner) side = "public";
     side = side === "public" ? "public" : "private";
     root.setAttribute("data-tower-side", side);
@@ -3801,6 +3845,7 @@
       remove.textContent = " ×";
       btn.appendChild(remove);
       btn.addEventListener("click", function () {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
         var cur = TowerProfileStore.get();
         cur.featuredFriendIds = (cur.featuredFriendIds || []).filter(function (fid) { return fid !== f.id; });
         TowerProfileStore.save(cur);
@@ -5877,14 +5922,37 @@
     }
   }
 
-  /* One upright Polaroid on every personal profile. Professional pages stay without it. */
+  /* One upright Polaroid on every personal profile. Professional pages stay without it.
+     Camera / add-Polaroid is owner-only — viewers never see or use the Instax sticker. */
   function ensurePersonalPolaroid(root, p) {
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (!stage) return;
     var nodes = Array.prototype.slice.call(stage.querySelectorAll('[data-tower-widget="polaroid"]'));
     var personal = !p || p._profileKind !== "professional";
+    var owner = isTowerOwner(p);
     var cam = stage.querySelector('[data-tower-widget="instax"]');
     var prints = polaroidPrintList(p);
+    function hideCam() {
+      if (!cam) return;
+      cam.hidden = true;
+      cam.classList.add("is-widget-off");
+    }
+    function showCam() {
+      if (!owner) {
+        hideCam();
+        return;
+      }
+      if (!cam) {
+        cam = document.createElement("div");
+        cam.className = "tower-sticker tower-sticker--instax";
+        cam.setAttribute("data-tower-widget", "instax");
+        cam.setAttribute("data-sticker-label", "Camera");
+        cam.innerHTML = instaxMarkup();
+        stage.appendChild(cam);
+      }
+      cam.hidden = false;
+      cam.classList.remove("is-widget-off");
+    }
     if (!personal || (p && p.polaroidRemoved)) {
       nodes.forEach(function (el) {
         el.hidden = true;
@@ -5894,10 +5962,9 @@
         el.hidden = true;
         el.classList.add("is-widget-off");
       });
-      if (cam) {
-        cam.hidden = !personal || !!(p && p.polaroidRemoved);
-        cam.classList.toggle("is-widget-off", cam.hidden);
-      }
+      /* Owner may still see the camera after removing prints so they can re-add. */
+      if (owner && personal && p && p.polaroidRemoved) showCam();
+      else hideCam();
       return;
     }
     if (!prints.length) {
@@ -5909,16 +5976,7 @@
         el.hidden = true;
         el.classList.add("is-widget-off");
       });
-      if (!cam) {
-        cam = document.createElement("div");
-        cam.className = "tower-sticker tower-sticker--instax";
-        cam.setAttribute("data-tower-widget", "instax");
-        cam.setAttribute("data-sticker-label", "Camera");
-        cam.innerHTML = instaxMarkup();
-        stage.appendChild(cam);
-      }
-      cam.hidden = false;
-      cam.classList.remove("is-widget-off");
+      showCam();
       return;
     }
     while (nodes.length > 1) {
@@ -5936,17 +5994,7 @@
     }
     el.hidden = false;
     el.classList.remove("is-widget-off");
-    if (!cam) {
-      cam = document.createElement("div");
-      cam.className = "tower-sticker tower-sticker--instax";
-      cam.setAttribute("data-tower-widget", "instax");
-      cam.setAttribute("data-sticker-label", "Camera");
-      cam.innerHTML = instaxMarkup();
-      stage.appendChild(cam);
-    }
-    cam.hidden = false;
-    cam.classList.remove("is-widget-off");
-    var prints = polaroidPrintList(p);
+    showCam();
     var needed = Math.max(0, prints.length - 1);
     var extras = Array.prototype.slice.call(stage.querySelectorAll("[data-tower-polaroid-extra]"));
     while (extras.length > needed) {
@@ -7931,6 +7979,8 @@
     try { syncRotateToolbar(root); } catch (eRot) {}
     try { refreshTowerCalendars(root); } catch (eCal) {}
     try { renderGoingLiveWidget(root); } catch (eLive) {}
+    try { syncViewerMutateUi(root); } catch (eMut2) {}
+    try { ensurePersonalPolaroid(root, p); } catch (ePol) {}
   }
 
   function initGoingLive(root) {
@@ -8284,6 +8334,10 @@
     }
 
     function applyInstaxFile(file, statusFn) {
+      if (!isTowerOwner(TowerProfileStore.get())) {
+        (statusFn || setProfileStatus)("Only the profile owner can add Polaroids.", true);
+        return;
+      }
       readImageFile(file, statusFn, function (dataUrl) {
         var before = TowerProfileStore.get() || {};
         var keptBg = typeof before.backgroundImageDataUrl === "string" ? before.backgroundImageDataUrl : "";
@@ -8360,6 +8414,7 @@
     if (clearAvatarBtn && !clearAvatarBtn.__cognationClearAvatarBound) {
       clearAvatarBtn.__cognationClearAvatarBound = true;
       clearAvatarBtn.addEventListener("click", function () {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
         var p = TowerProfileStore.get();
         p.avatarDataUrl = "";
         TowerProfileStore.save(p);

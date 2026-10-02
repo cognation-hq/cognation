@@ -5534,7 +5534,11 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 [data-tower-app]:not([data-tower-is-owner="true"]) .tower-friends-display,
 [data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-widget="friends"],
 [data-tower-app]:not([data-tower-is-owner="true"]) .tower-avatar-upload,
-[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-public-url-chip] {
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-public-url-chip],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-friends-search],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-friends-chips],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-friends-count],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-social] {
   display: none !important;
 }
 
@@ -11567,6 +11571,11 @@ body.cognation-demo-on {
 }
 [data-tower-app]:not([data-tower-is-owner="true"]) .tower-instax {
   cursor: default;
+}
+/* Viewers never see the Polaroid camera / add control on someone else's Tower. */
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-widget="instax"],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-instax-file] {
+  display: none !important;
 }
 .tower-sticker--polaroid [data-tower-polaroid-photo] {
   position: relative;

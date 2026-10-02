@@ -2953,7 +2953,10 @@
   function applyYoutubeWidth(root, widthPx) {
     var w = Math.max(180, Math.min(720, parseInt(widthPx, 10) || 320));
     var wrap = root.querySelector("[data-tower-music]");
-    if (wrap) wrap.style.setProperty("--tower-youtube-width", w + "px");
+    if (wrap) {
+      wrap.style.setProperty("--tower-youtube-width", w + "px");
+      wrap.setAttribute("data-yt-width", String(w));
+    }
     return w;
   }
 
@@ -2963,14 +2966,14 @@
     if (!handle || !wrap || handle.__cognationYtResizeBound) return;
     handle.__cognationYtResizeBound = true;
     handle.addEventListener("pointerdown", function (ev) {
+      if (!isTowerOwner(TowerProfileStore.get())) return;
       ev.preventDefault();
       ev.stopPropagation();
       var startX = ev.clientX;
       var startW = wrap.getBoundingClientRect().width;
       function onMove(e) {
         var dx = e.clientX - startX;
-        var next = applyYoutubeWidth(root, startW + dx);
-        wrap.setAttribute("data-yt-width", String(next));
+        applyYoutubeWidth(root, startW + dx);
       }
       function onUp() {
         document.removeEventListener("pointermove", onMove);
@@ -3052,6 +3055,7 @@
     var audio = root.querySelector("[data-tower-audio]");
     if (!wrap || !audio) return;
 
+    applyYoutubeWidth(root, p && p.musicYoutubeWidth);
     var url = (p.musicUrl || "").trim();
     var skin = visibleMusicSkin(p.musicSkin || "classic");
     var personal = !p || p._profileKind !== "professional";
@@ -7033,7 +7037,7 @@
       }
 
       /* Drag from anywhere on the sticker. Real controls keep their clicks. */
-      if (ev.target.closest("a, button, input, textarea, select, label, summary, iframe, [contenteditable='true'], [data-tower-rotate], [data-tower-avatar-resize], [data-tower-name-resize], [data-tower-emoji-resize], [data-tower-polaroid-resize]")) {
+      if (ev.target.closest("a, button, input, textarea, select, label, summary, iframe, [contenteditable='true'], [data-tower-rotate], [data-tower-avatar-resize], [data-tower-name-resize], [data-tower-emoji-resize], [data-tower-polaroid-resize], [data-tower-youtube-resize]")) {
         return;
       }
       var sticker = ev.target.closest("[data-tower-widget]");
@@ -8165,6 +8169,7 @@
     initScrapbookStickers(root);
     initEmojiWidgets(root);
     initPolaroidResize(root);
+    initYoutubeResize(root);
     initInlineProfileEdits(root);
     initCollageControls(root);
     initPublicLookControls(root);

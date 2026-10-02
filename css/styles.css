@@ -5652,10 +5652,14 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   display: none !important;
 }
 
-/* YouTube public embed — drag to resize */
+/* YouTube public embed — drag to resize (owner + public) */
 .tower-music[data-music-mode="youtube"] {
   width: var(--tower-youtube-width, 20rem);
   max-width: min(96vw, 42rem);
+}
+.tower-music[data-music-mode="youtube"] .tower-ipod {
+  width: 100%;
+  max-width: 100%;
 }
 .tower-music-youtube-frame {
   position: relative;
@@ -5675,14 +5679,15 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   background: rgba(74, 44, 58, 0.55);
   cursor: nwse-resize;
   touch-action: none;
+  display: none;
 }
 .tower-youtube-resize:hover,
 .tower-youtube-resize:focus-visible {
   background: var(--color-accent);
   outline: none;
 }
-.tower-app[data-tower-side="private"] .tower-youtube-resize {
-  /* resize is for public scrapbook face; still allow owner preview */
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-youtube-resize {
+  display: block;
 }
 
 /* Frame option tiles: never inherit display fonts (avoids weird center glyphs) */

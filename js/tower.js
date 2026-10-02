@@ -573,6 +573,13 @@
       musicTitle: (p.musicTitle || (p._remote && prevOwn.musicTitle) || ""),
       musicArtist: (p.musicArtist || (p._remote && prevOwn.musicArtist) || ""),
       musicEnabled: p.musicEnabled != null ? p.musicEnabled : (p._remote ? prevOwn.musicEnabled : p.musicEnabled),
+      musicYoutubeWidth: (function () {
+        var n = parseInt(p.musicYoutubeWidth, 10);
+        if (isNaN(n)) n = parseInt(prevOwn.musicYoutubeWidth, 10);
+        if (isNaN(n)) n = parseInt(prev.musicYoutubeWidth, 10);
+        if (isNaN(n)) return null;
+        return Math.max(180, Math.min(720, n));
+      })(),
     };
     scrapbookLayoutKeys(p).forEach(function (key) {
       doc[key] = record;
@@ -608,6 +615,10 @@
         };
       });
       p.widgetLayout = base;
+    }
+    if (saved.musicYoutubeWidth != null && !isNaN(parseInt(saved.musicYoutubeWidth, 10))) {
+      /* Same as emoji/polaroid scale: last local size wins over a stale remote row. */
+      p.musicYoutubeWidth = Math.max(180, Math.min(720, parseInt(saved.musicYoutubeWidth, 10)));
     }
     if (Array.isArray(saved.quoteStickers) && saved.quoteStickers.length && (!Array.isArray(p.quoteStickers) || !p.quoteStickers.length)) {
       p.quoteStickers = saved.quoteStickers;
@@ -654,6 +665,25 @@
     }
   }
 
+
+  function applyOwnerMusicYoutubeWidth(p, legacy, account) {
+    if (!p || p._directoryFriend || p._profileKind === "professional") return;
+    if (p._remote && !isTowerOwner(p)) return;
+    var chosen = null;
+    function take(blob) {
+      if (chosen != null || !blob || blob.musicYoutubeWidth == null) return;
+      var blobHandle = normalizeHandle(blob.handle || "");
+      var profileHandle = normalizeHandle(p.handle || "");
+      if (blobHandle && profileHandle && blobHandle !== profileHandle) return;
+      var n = parseInt(blob.musicYoutubeWidth, 10);
+      if (isNaN(n)) return;
+      chosen = Math.max(180, Math.min(720, n));
+    }
+    take(legacy);
+    take(account);
+    if (chosen != null) p.musicYoutubeWidth = chosen;
+  }
+
   function restoreSavedTowerFields(p) {
     if (!p || p._directoryFriend) return p;
     var local = accountTowerBlob(p._profileId) || {};
@@ -684,6 +714,9 @@
         local.friendPinLayout = legacy.friendPinLayout;
       }
     }
+    /* pointerup writes cognation.tower.profile.v1. Remote get() still has the
+       default 320 until sync, so the owner local width wins on paint/reload. */
+    applyOwnerMusicYoutubeWidth(p, legacy, local);
     if (!local || !Object.keys(local).length) return p;
     if (
       (!p.avatarDataUrl || String(p.avatarDataUrl).indexOf("data:image/") !== 0) &&
@@ -3005,7 +3038,9 @@
         document.removeEventListener("pointercancel", onUp);
         var p = TowerProfileStore.get();
         p.musicYoutubeWidth = parseInt(wrap.getAttribute("data-yt-width") || "320", 10);
-        TowerProfileStore.save(p);
+        /* Geometry, like polaroid/emoji scale: write the local key reload reads.
+           Do not PATCH identity or the remote row snaps width back to 320. */
+        TowerProfileStore.save(p, { geometry: true });
       }
       document.addEventListener("pointermove", onMove);
       document.addEventListener("pointerup", onUp);

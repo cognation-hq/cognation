@@ -97,3 +97,7 @@ Shared sink: `js/seedops-log.js` (`sessionStorage` ring `cognation.seedops.log.v
 
 - Public Pages still must not expose a “Demo unlock” control (`scripts/check-no-public-demo-surface.js`).
 - Seed badges label **accounts**, not the local preview auth chrome.
+
+## Wave provision (Supabase)
+
+Shared website fleet upsert: see [`docs/seedops-provision.md`](seedops-provision.md) and `provision_seed_wave(offset, limit)`.

@@ -249,3 +249,104 @@ assert.ok(viaWave.ok);
 assert.strictEqual(viaWave.posted, 2);
 
 console.log("seedops.test.js: ok");
+
+/* Commune-alive bootstrap: dating + chat rooms for seed sessions */
+var aliveSrc = fs.readFileSync(path.join(root, "js/seedops-commune-alive.js"), "utf8");
+assert.ok(!(new RegExp("demo" + " unlock", "i").test(aliveSrc)), "commune-alive must not contain banned public-demo phrase");
+assert.ok(html.indexOf("js/seedops-commune-alive.js") !== -1, "index.html must load commune-alive");
+assert.ok(
+  html.indexOf("js/commune-swipe.js") < html.indexOf("js/seedops-commune-alive.js"),
+  "commune-alive must load after commune-swipe"
+);
+
+var aliveWin = { CognationAccounts: null, CognationAuth: {}, CognationSeedOpsLog: { write: function () {} } };
+load("js/seedops-schema.js", aliveWin);
+aliveWin.CognationAccounts = {
+  _p: {},
+  saveProfileRecord: function (rec) {
+    if (!rec || !rec.id) return false;
+    this._p[rec.id] = rec;
+    return true;
+  },
+  getProfileById: function (id) { return this._p[id] || null; },
+};
+var memberStore = { age: null, city: "", interests: "" };
+aliveWin.CognationCommuneSwipe = {
+  getMemberProfile: function () { return memberStore; },
+  setMemberProfile: function (p) { memberStore = p || {}; return memberStore; },
+  setSeeDating: function () {},
+  sampleDeck: function () {
+    return [
+      { type: "fact", id: "f1" },
+      { type: "wellness", id: "w1" },
+      { type: "chatroom", id: "room-site-21", title: "21+" },
+      { type: "dating", id: "date-x" },
+    ];
+  },
+  rebuild: function () {},
+  visibleSiteRooms: function () { return [{ id: "room-site-21", title: "21+" }]; },
+  openRoom: function () { return true; },
+};
+aliveWin.CognationAuth.getSession = function () {
+  return { username: "seed-0001", activeProfileId: "prof-seed-0001" };
+};
+/* load commune-alive into the same storage-backed context as schema */
+(function () {
+  var context = vm.createContext({
+    window: aliveWin,
+    document: {
+      addEventListener: function () {},
+      dispatchEvent: function () {},
+      readyState: "complete",
+      querySelector: function () { return null; },
+    },
+    sessionStorage: {
+      _d: {},
+      getItem: function (k) { return this._d[k] || null; },
+      setItem: function (k, v) { this._d[k] = String(v); },
+      removeItem: function (k) { delete this._d[k]; },
+    },
+    localStorage: {
+      _d: {},
+      getItem: function (k) { return this._d[k] || null; },
+      setItem: function (k, v) { this._d[k] = String(v); },
+      removeItem: function (k) { delete this._d[k]; },
+    },
+    console: console,
+    setTimeout: function (fn) { /* run sync for tests */ if (typeof fn === "function") fn(); return 0; },
+    CustomEvent: function (name, init) {
+      this.type = name;
+      this.detail = (init && init.detail) || {};
+    },
+    encodeURIComponent: encodeURIComponent,
+    Math: Math,
+    Number: Number,
+    String: String,
+    Object: Object,
+    Array: Array,
+    Date: Date,
+    parseInt: parseInt,
+  });
+  aliveWin.document = context.document;
+  aliveWin.sessionStorage = context.sessionStorage;
+  aliveWin.localStorage = context.localStorage;
+  context.window = aliveWin;
+  vm.runInContext(aliveSrc, context);
+})();
+var alive = aliveWin.CognationSeedOpsCommuneAlive;
+assert.ok(alive, "CognationSeedOpsCommuneAlive exports");
+assert.strictEqual(alive.DEMO_AGE, 28);
+assert.strictEqual(alive.DEMO_CITY, "Demo City");
+assert.ok(alive.isSeedOrOpsSession());
+var boot = alive.bootstrap({ force: true, count: 12 });
+assert.ok(boot.ok, "bootstrap ok: " + JSON.stringify(boot));
+assert.strictEqual(boot.memberAge, 28);
+assert.strictEqual(boot.memberCity, "Demo City");
+assert.ok(boot.materialized >= 12, "materialized dating sample");
+assert.ok(boot.datingProfiles >= 12, "dating profiles flagged");
+var sample = aliveWin.CognationAccounts.getProfileById("prof-seed-0002");
+assert.ok(sample && sample.datingContent, "seed dating opt-in");
+assert.ok(sample.avatarDataUrl && sample.avatarDataUrl.indexOf("data:image/svg") === 0, "svg avatar");
+assert.strictEqual(sample.city, "Demo City");
+
+console.log("seedops.test.js: commune-alive ok");

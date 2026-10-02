@@ -142,3 +142,9 @@ Shared website fleet upsert + Admin API password binding: see [`docs/seedops-pro
 - Free-trial Demo max: **250** seeds (+3 ops); grow past 100 only after Wave 1 green; past 250 needs Alexa unlock
 - Friend gate unchanged: seed↔seed OK after binding; real↛seed blocked
 - After bind: `CognationSeedOpsTrigger.triggerPathway(...)` / `#seedops-ops` for pathway smoke (#3); `CognationSeedOpsTowerPosts.postWave({offset:0,limit:100})` for shared Tower content (#4)
+
+## 9. Commune-alive (dating / chat rooms)
+
+Module: `js/seedops-commune-alive.js` → `window.CognationSeedOpsCommuneAlive`
+
+Seed/ops sessions bootstrap a local member age/city/interests so site chatrooms are enterable, and materialize a dating-ready Wave sample into `CognationAccounts` (SVG avatars, shared Demo City, dating opt-in). Does **not** expose a public Demo gate. Tower/News liveliness still comes from shared `tower_posts` (prefer public visibility or seed↔seed friendships).

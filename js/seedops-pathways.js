@@ -172,6 +172,15 @@
         case "dating:ensure_dating_opt_in": {
           var toggle = document.querySelector("[data-commune-see-dating], [data-see-dating-content]");
           detail.present = !!toggle;
+          var alive = window.CognationSeedOpsCommuneAlive;
+          if (alive && typeof alive.bootstrap === "function") {
+            var boot = alive.bootstrap({ force: true });
+            detail.bootstrapOk = !!(boot && boot.ok);
+            detail.datingProfiles = boot && boot.datingProfiles;
+            if (window.CognationCommuneSwipe && window.CognationCommuneSwipe.setSeeDating) {
+              window.CognationCommuneSwipe.setSeeDating(true);
+            }
+          }
           break;
         }
         case "ads:locate_ad_lane": {
@@ -179,9 +188,32 @@
           detail.present = !!ad;
           break;
         }
+        case "commune:open_commune_deck": {
+          var aliveC = window.CognationSeedOpsCommuneAlive;
+          if (aliveC && typeof aliveC.bootstrap === "function") {
+            var bootC = aliveC.bootstrap({ force: true });
+            detail.bootstrapOk = !!(bootC && bootC.ok);
+            detail.deckCards = bootC && bootC.deckCards;
+            detail.chatroomCards = bootC && bootC.chatroomCards;
+          }
+          detail.present = !!document.querySelector("[data-commune-deck], #panel-commune");
+          break;
+        }
         case "chat:open_commune_chatroom_card": {
+          var aliveR = window.CognationSeedOpsCommuneAlive;
+          if (aliveR && typeof aliveR.bootstrap === "function") {
+            aliveR.bootstrap({ force: true });
+          }
           var chat = document.querySelector("[data-card-type='chatroom']");
           detail.present = !!chat;
+          if (!detail.present && window.CognationCommuneSwipe && window.CognationCommuneSwipe.visibleSiteRooms) {
+            var rooms = window.CognationCommuneSwipe.visibleSiteRooms() || [];
+            detail.present = rooms.length > 0;
+            detail.roomCount = rooms.length;
+            if (rooms[0] && window.CognationCommuneSwipe.openRoom) {
+              detail.entered = !!window.CognationCommuneSwipe.openRoom(rooms[0].id, false);
+            }
+          }
           break;
         }
         case "circle:open_circle_fall": {

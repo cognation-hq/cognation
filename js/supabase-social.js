@@ -101,7 +101,7 @@
     return client()
       .rest("profiles", {
         query:
-          "select=id,user_id,kind,handle,display_name,bio&order=created_at.asc&limit=250",
+          "select=id,user_id,kind,handle,display_name,bio&order=created_at.desc&limit=400",
       })
       .then(cacheProfiles);
   }
@@ -185,13 +185,18 @@
   }
 
   function mapPost(row) {
-    var author = profileForId(row.author_profile_id);
+    var embedded = row && (row.author || row.profiles);
+    if (embedded) cacheProfile(embedded);
+    var author = profileForId(row.author_profile_id) || embedded || null;
+    var display =
+      (author && (author.display_name || author.displayName)) || "Cognation member";
+    var handle = author ? normalizeHandle(author.handle) : "";
     return {
       id: row.id,
       _remote: true,
       authorProfileId: row.author_profile_id,
-      authorName: author ? author.display_name : "Cognation member",
-      handle: author ? author.handle : "",
+      authorName: display,
+      handle: handle,
       body: row.body || "",
       createdAt: row.created_at,
       attachments: Array.isArray(row.attachments) ? row.attachments : [],
@@ -217,7 +222,7 @@
     return client()
       .rest("tower_posts", {
         query:
-          "select=id,author_profile_id,body,visibility,attachments,created_at&order=created_at.desc&limit=100",
+          "select=id,author_profile_id,body,visibility,attachments,created_at,author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,bio)&order=created_at.desc&limit=100",
       })
       .then(function (rows) {
         var posts = (Array.isArray(rows) ? rows : []).map(mapPost);

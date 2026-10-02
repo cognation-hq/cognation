@@ -684,40 +684,26 @@
     if (chosen != null) p.musicYoutubeWidth = chosen;
   }
 
-  /* Remote rows do not store a top-friend removal. The owner local copy
-     (legacy key and/or accounts profile) is what reload must paint. */
-  function explicitTopFriendSnapshot(blob, profileHandle) {
-    if (!blob || typeof blob !== "object") return null;
-    var blobHandle = normalizeHandle(blob.handle || "");
-    if (blobHandle && profileHandle && blobHandle !== profileHandle) return null;
-    var removed = Array.isArray(blob.removedFriendPinIds)
-      ? blob.removedFriendPinIds.map(function (id) { return String(id || ""); }).filter(Boolean)
-      : [];
-    var featured = Array.isArray(blob.featuredFriendIds)
-      ? blob.featuredFriendIds.map(function (id) { return String(id || ""); }).filter(Boolean)
-      : [];
-    if (!removed.length && !featured.length) return null;
-    return { removed: removed, featured: featured };
-  }
-
+  /* Remote rows omit a top-friend removal. Owner local copy wins on reload. */
   function applyOwnerTopFriends(p, legacy, account) {
     if (!p || p._directoryFriend || p._profileKind === "professional") return;
     if (p._remote && !isTowerOwner(p)) return;
     var profileHandle = normalizeHandle(p.handle || "");
-    var fromLegacy = explicitTopFriendSnapshot(legacy, profileHandle);
-    var fromAccount = explicitTopFriendSnapshot(account, profileHandle);
     var chosen = null;
-    if (fromLegacy && fromAccount) {
-      chosen = fromAccount.removed.length > fromLegacy.removed.length ? fromAccount : fromLegacy;
-    } else {
-      chosen = fromLegacy || fromAccount;
-    }
+    [legacy, account].forEach(function (blob) {
+      if (!blob || typeof blob !== "object") return;
+      var blobHandle = normalizeHandle(blob.handle || "");
+      if (blobHandle && profileHandle && blobHandle !== profileHandle) return;
+      var removed = Array.isArray(blob.removedFriendPinIds) ? blob.removedFriendPinIds.map(String).filter(Boolean) : [];
+      var featured = Array.isArray(blob.featuredFriendIds) ? blob.featuredFriendIds.map(String).filter(Boolean) : [];
+      if (!removed.length && !featured.length) return;
+      if (!chosen || removed.length > chosen.removed.length) chosen = { removed: removed, featured: featured };
+    });
     if (!chosen) return;
     p.removedFriendPinIds = chosen.removed.slice();
-    p.featuredFriendIds = chosen.featured.slice();
     var fdc = parseInt(p.friendsDisplayCount, 10);
     if ([3, 6, 8].indexOf(fdc) === -1) fdc = 3;
-    p.featuredFriendIds = p.featuredFriendIds.slice(0, fdc);
+    p.featuredFriendIds = chosen.featured.slice(0, fdc);
   }
 
   function restoreSavedTowerFields(p) {
@@ -1153,7 +1139,6 @@
         this._saving = false;
       }
     },
-    /* Owner-only. Writes the local key reload reads, not the stale remote row. */
     removeTopFriend: function (friendId) {
       var p = this.get();
       if (!p || p._directoryFriend || profileIsProfessional(p) || !isTowerOwner(p)) return false;
@@ -3643,7 +3628,6 @@
     var stored = ((p && p.friendIds) || []).filter(function (id) {
       return known[id] && keep(id);
     });
-    /* A removal shrinks the saved set. Do not pull the next friend into that slot. */
     if (ranked.length || ((p && p.removedFriendPinIds) || []).length) {
       return ranked.slice(0, TOP_FRIEND_VISIBLE).filter(keep);
     }
@@ -3657,25 +3641,14 @@
     return pool.slice(0, TOP_FRIEND_VISIBLE).filter(keep);
   }
 
-  /** Drop one displayed friend and remember the set that should remain. */
   function removeTopFriendPin(p, friendId) {
     if (!p || profileIsProfessional(p)) return false;
     friendId = String(friendId || "");
     if (!friendId) return false;
-    var current = resolveTopFriendIds(p);
-    var base = current.slice();
-    (p.featuredFriendIds || []).forEach(function (id) {
-      id = String(id || "");
-      if (!id || id === friendId || id === "alexa-thomas" || base.indexOf(id) >= 0) return;
-      base.push(id);
-    });
-    p.featuredFriendIds = base.filter(function (id) { return id !== friendId; });
+    p.featuredFriendIds = resolveTopFriendIds(p).filter(function (id) { return id !== friendId; });
     if (!Array.isArray(p.removedFriendPinIds)) p.removedFriendPinIds = [];
     if (p.removedFriendPinIds.indexOf(friendId) < 0) p.removedFriendPinIds.push(friendId);
     if (p.friendPinLayout && p.friendPinLayout[friendId]) delete p.friendPinLayout[friendId];
-    var fdc = parseInt(p.friendsDisplayCount, 10);
-    if ([3, 6, 8].indexOf(fdc) === -1) fdc = 3;
-    if (p.featuredFriendIds.length > fdc) p.featuredFriendIds = p.featuredFriendIds.slice(0, fdc);
     return true;
   }
 

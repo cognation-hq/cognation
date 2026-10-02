@@ -510,10 +510,7 @@
             parseInt(legacyNow.musicYoutubeWidth, 10) !== parseInt(personal.musicYoutubeWidth, 10)) ||
           (Array.isArray(legacyNow.removedFriendPinIds) &&
             legacyNow.removedFriendPinIds.length &&
-            JSON.stringify(legacyNow.removedFriendPinIds) !== JSON.stringify(personal.removedFriendPinIds || [])) ||
-          (Array.isArray(legacyNow.featuredFriendIds) &&
-            legacyNow.featuredFriendIds.length &&
-            JSON.stringify(legacyNow.featuredFriendIds) !== JSON.stringify(personal.featuredFriendIds || []))
+            JSON.stringify(legacyNow.removedFriendPinIds) !== JSON.stringify(personal.removedFriendPinIds || []))
         ));
         if (!legacyRicher) {
           localStorage.setItem(LEGACY_PROFILE_KEY, JSON.stringify(stripMeta(personal)));

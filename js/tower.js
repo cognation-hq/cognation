@@ -2507,7 +2507,7 @@
 
   function applyAvatarFrameScale(root, scale) {
     scale = normalizeAvatarFrameScale(scale);
-    var wrap = root.querySelector("[data-tower-avatar-frame]");
+    var wrap = root.querySelector('[data-tower-widget="avatar"] [data-tower-avatar-frame]');
     if (wrap) {
       wrap.style.setProperty("--tower-avatar-frame-scale", String(scale));
       wrap.setAttribute("data-avatar-frame-scale", String(scale));
@@ -2517,7 +2517,7 @@
 
   function initAvatarFrameResize(root) {
     var handle = root.querySelector("[data-tower-avatar-resize]");
-    var wrap = root.querySelector("[data-tower-avatar-frame]");
+    var wrap = root.querySelector('[data-tower-widget="avatar"] [data-tower-avatar-frame]');
     if (!handle || !wrap || handle.__cognationAvatarResizeBound) return;
     handle.__cognationAvatarResizeBound = true;
     handle.addEventListener("pointerdown", function (ev) {
@@ -3949,7 +3949,7 @@
 
   function applyCowboyHatColor(root, colorId) {
     colorId = normalizeCowboyHatColor(colorId);
-    var wrap = root.querySelector("[data-tower-avatar-frame]");
+    var wrap = root.querySelector('[data-tower-widget="avatar"] [data-tower-avatar-frame]');
     var hidden = root.querySelector("[data-tower-cowboy-color-input]");
     var fields = root.querySelector("[data-tower-cowboy-color-fields]");
     if (wrap) wrap.setAttribute("data-cowboy-hat-color", colorId);
@@ -5863,17 +5863,49 @@
     stage.__cognationStickersReparented = true;
   }
 
+  function normalizePolaroidScale(v) {
+    return normalizeAvatarFrameScale(v);
+  }
+
+  function polaroidPrintEntry(item) {
+    if (typeof item === "string" && item.indexOf("data:image/") === 0) {
+      return { url: item, scale: 1 };
+    }
+    if (item && typeof item === "object" && typeof item.url === "string" && item.url.indexOf("data:image/") === 0) {
+      return { url: item.url, scale: normalizePolaroidScale(item.scale) };
+    }
+    return null;
+  }
+
+  function polaroidHasUrl(list, url) {
+    for (var i = 0; i < (list || []).length; i++) {
+      var e = polaroidPrintEntry(list[i]);
+      if (e && e.url === url) return true;
+    }
+    return false;
+  }
+
   function polaroidPrintList(p) {
     var list = [];
     if (p && Array.isArray(p.polaroidPrints)) {
-      p.polaroidPrints.forEach(function (url) {
-        if (typeof url === "string" && url.indexOf("data:image/") === 0) list.push(url);
+      p.polaroidPrints.forEach(function (item) {
+        var e = polaroidPrintEntry(item);
+        if (e) list.push(e);
       });
     }
     if (!list.length && p && typeof p.polaroidDataUrl === "string" && p.polaroidDataUrl.indexOf("data:image/") === 0) {
-      list.push(p.polaroidDataUrl);
+      list.push({ url: p.polaroidDataUrl, scale: 1 });
     }
     return list;
+  }
+
+  function applyPolaroidPrintScale(sticker, scale) {
+    scale = normalizePolaroidScale(scale);
+    if (sticker) {
+      sticker.style.setProperty("--tower-polaroid-scale", String(scale));
+      sticker.setAttribute("data-polaroid-scale", String(scale));
+    }
+    return scale;
   }
 
   function polaroidMarkup() {
@@ -5881,6 +5913,7 @@
       '<button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Polaroid sticker" tabindex="-1" hidden>⋮⋮</button>' +
       '<div class="tower-avatar-wrap" data-tower-avatar-frame="polaroid" data-tower-polaroid>' +
       '<div class="tower-avatar" data-tower-polaroid-photo aria-hidden="true"></div>' +
+      '<button type="button" class="tower-polaroid-resize" data-tower-polaroid-resize aria-label="Drag to resize Polaroid" title="Drag to resize Polaroid"></button>' +
       "</div>"
     );
   }
@@ -5994,6 +6027,7 @@
     }
     el.hidden = false;
     el.classList.remove("is-widget-off");
+    applyPolaroidPrintScale(el, prints[0] && prints[0].scale);
     showCam();
     var needed = Math.max(0, prints.length - 1);
     var extras = Array.prototype.slice.call(stage.querySelectorAll("[data-tower-polaroid-extra]"));
@@ -6015,7 +6049,8 @@
       }
       printEl.hidden = false;
       printEl.classList.remove("is-widget-off");
-      paintPolaroidPhoto(printEl.querySelector("[data-tower-polaroid-photo]"), prints[i + 1]);
+      paintPolaroidPhoto(printEl.querySelector("[data-tower-polaroid-photo]"), prints[i + 1].url);
+      applyPolaroidPrintScale(printEl, prints[i + 1].scale);
     }
   }
 
@@ -6197,6 +6232,48 @@
           if (item.id !== wid) return item;
           return { id: item.id, glyph: item.glyph, size: size };
         });
+        TowerProfileStore.save(cur, { geometry: true });
+      }
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+      document.addEventListener("pointercancel", onUp);
+    });
+  }
+
+  function initPolaroidResize(root) {
+    if (!root || root.__cognationPolaroidResizeBound) return;
+    root.__cognationPolaroidResizeBound = true;
+    var stage = root.querySelector("[data-tower-scrapbook]");
+    if (!stage) return;
+    stage.addEventListener("pointerdown", function (ev) {
+      var handle = ev.target.closest("[data-tower-polaroid-resize]");
+      if (!handle || !stage.contains(handle)) return;
+      if (!isTowerOwner(TowerProfileStore.get())) return;
+      var sticker = handle.closest(".tower-sticker--polaroid");
+      if (!sticker) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      var startX = ev.clientX;
+      var startY = ev.clientY;
+      var startScale = normalizePolaroidScale(sticker.getAttribute("data-polaroid-scale") || 1);
+      function onMove(e) {
+        var delta = ((e.clientX - startX) + (e.clientY - startY)) / 180;
+        applyPolaroidPrintScale(sticker, startScale + delta);
+      }
+      function onUp() {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        document.removeEventListener("pointercancel", onUp);
+        var next = normalizePolaroidScale(sticker.getAttribute("data-polaroid-scale") || startScale);
+        var wid = sticker.getAttribute("data-tower-widget");
+        var extra = sticker.getAttribute("data-tower-polaroid-extra");
+        var idx = wid === "polaroid" ? 0 : (parseInt(extra, 10) + 1);
+        var cur = TowerProfileStore.get();
+        var prints = polaroidPrintList(cur);
+        if (!prints[idx]) return;
+        prints[idx] = { url: prints[idx].url, scale: next };
+        cur.polaroidPrints = prints;
+        if (idx === 0) cur.polaroidDataUrl = prints[0].url;
         TowerProfileStore.save(cur, { geometry: true });
       }
       document.addEventListener("pointermove", onMove);
@@ -6956,7 +7033,7 @@
       }
 
       /* Drag from anywhere on the sticker. Real controls keep their clicks. */
-      if (ev.target.closest("a, button, input, textarea, select, label, summary, iframe, [contenteditable='true'], [data-tower-rotate], [data-tower-avatar-resize], [data-tower-name-resize], [data-tower-emoji-resize]")) {
+      if (ev.target.closest("a, button, input, textarea, select, label, summary, iframe, [contenteditable='true'], [data-tower-rotate], [data-tower-avatar-resize], [data-tower-name-resize], [data-tower-emoji-resize], [data-tower-polaroid-resize]")) {
         return;
       }
       var sticker = ev.target.closest("[data-tower-widget]");
@@ -7904,7 +7981,7 @@
     var polaroidPrints = polaroidPrintList(p);
     var primaryPhoto = root.querySelector('[data-tower-widget="polaroid"] [data-tower-polaroid-photo]');
     if (primaryPhoto && document.activeElement !== primaryPhoto) {
-      paintPolaroidPhoto(primaryPhoto, polaroidPrints[0] || "");
+      paintPolaroidPhoto(primaryPhoto, (polaroidPrints[0] && polaroidPrints[0].url) || "");
     }
     var bgHint = root.querySelector("[data-tower-bg-image-status]");
     if (bgHint && !(p.backgroundImageDataUrl && document.activeElement && document.activeElement.matches && document.activeElement.matches("[data-tower-bg-image]"))) {
@@ -8087,6 +8164,7 @@
     initOrnamentPicker(root);
     initScrapbookStickers(root);
     initEmojiWidgets(root);
+    initPolaroidResize(root);
     initInlineProfileEdits(root);
     initCollageControls(root);
     initPublicLookControls(root);
@@ -8351,11 +8429,13 @@
           if (keptCollage && typeof keptCollage === "object") p.backgroundCollage = keptCollage;
           if (!Array.isArray(p.polaroidPrints)) p.polaroidPrints = [];
           var prior = p.polaroidDataUrl;
-          if (prior && prior.indexOf("data:image/") === 0 && prior !== dataUrl && p.polaroidPrints.indexOf(prior) === -1) {
-            p.polaroidPrints.push(prior);
+          var normalized = polaroidPrintList(p);
+          if (prior && prior.indexOf("data:image/") === 0 && prior !== dataUrl && !polaroidHasUrl(normalized, prior)) {
+            normalized.push({ url: prior, scale: 1 });
           }
-          if (p.polaroidPrints.indexOf(dataUrl) === -1) p.polaroidPrints.push(dataUrl);
-          if (p.polaroidPrints.length > 6) p.polaroidPrints = p.polaroidPrints.slice(-6);
+          if (!polaroidHasUrl(normalized, dataUrl)) normalized.push({ url: dataUrl, scale: 1 });
+          if (normalized.length > 6) normalized = normalized.slice(-6);
+          p.polaroidPrints = normalized;
           p.polaroidRemoved = false;
         });
       });

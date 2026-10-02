@@ -62,3 +62,76 @@ assert.strictEqual(api.isThreadVisible("PG-13", 13), true);
 assert.strictEqual(api.isThreadVisible("", 12), false);
 
 console.log("news-story-comments.test.js: ok");
+
+function sharedRest(db) {
+  function profile(id) { return db.profiles[id] || { display_name: "Member", account_kind: "real" }; }
+  return function (table, opts) {
+    opts = opts || {};
+    var method = opts.method || "GET";
+    if (table === "news_story_comments" && method === "POST") {
+      var row = {
+        id: "c" + (db.comments.length + 1),
+        story_id: opts.body.story_id,
+        body: opts.body.body,
+        created_at: "2026-10-02T17:00:0" + db.comments.length + ".000Z",
+        author_profile_id: opts.body.author_profile_id,
+        author: profile(opts.body.author_profile_id),
+        reactions: [],
+      };
+      db.comments.push(row);
+      return Promise.resolve([row]);
+    }
+    if (table === "news_story_comments") {
+      var story = decodeURIComponent((opts.query.match(/story_id=eq\.([^&]+)/) || [])[1] || "");
+      var rows = db.comments.filter(function (c) { return c.story_id === story; }).slice().reverse();
+      rows.forEach(function (c) {
+        c.reactions = db.reactions.filter(function (r) { return r.comment_id === c.id; });
+        c.author = profile(c.author_profile_id);
+      });
+      return Promise.resolve(rows.slice(0, 20));
+    }
+    if (table === "news_story_comment_reactions" && method === "POST") {
+      db.reactions.push(opts.body);
+      return Promise.resolve([opts.body]);
+    }
+    return Promise.resolve([]);
+  };
+}
+function boot(ls, auth, rest) {
+  var w = {};
+  vm.runInNewContext(src("js/news-comments.js"), {
+    window: w, localStorage: ls, Date: Date, Math: Math, Promise: Promise, encodeURIComponent: encodeURIComponent,
+  });
+  w.CognationSupabase = { configured: function () { return true; }, rest: rest };
+  w.CognationAuth = { getSession: function () { return auth; } };
+  return w.CognationNewsComments;
+}
+var db = { comments: [], reactions: [], profiles: {
+  "p-ada": { display_name: "Ada", account_kind: "seed" },
+  "p-hank": { display_name: "Hank", account_kind: "real" },
+}};
+var rest = sharedRest(db);
+var ada = boot(mem(), { activeProfileId: "p-ada", profileDisplayName: "Ada", accountKind: "seed" }, rest);
+var hank = boot(mem(), { activeProfileId: "p-hank", profileDisplayName: "Hank", accountKind: "real" }, rest);
+var guest = boot(mem(), null, rest);
+assert.strictEqual(guest.publishComment({ storyId: "s9", body: "nope" }).then ? "promise" : "sync", "promise");
+guest.publishComment({ storyId: "s9", body: "nope" }).then(function (deniedGuest) {
+  assert.strictEqual(deniedGuest.ok, false);
+  assert.strictEqual(deniedGuest.error, "signed_in_required");
+  assert.strictEqual(db.comments.length, 0, "guest did not write a you comment");
+  return ada.publishComment({ storyId: "s9", body: "from ada", parentId: "nope" });
+}).then(function (nested) {
+  assert.strictEqual(nested.error, "one_level_only");
+  return ada.publishComment({ storyId: "s9", body: "from ada" });
+}).then(function (posted) {
+  assert.strictEqual(posted.ok, true);
+  return hank.pullStory("s9");
+}).then(function (seen) {
+  assert.strictEqual(seen.length, 1);
+  assert.strictEqual(seen[0].authorName, "Ada");
+  assert.strictEqual(seen[0].accountKind, "seed");
+  assert.ok(hank.authorBadge("seed").indexOf("seedops-demo-badge") !== -1);
+  assert.ok(hank.authorBadge("real") === "");
+  assert.ok(!("parentId" in seen[0]));
+  console.log("news-story-comments.test.js: shared ok");
+}).catch(function (err) { console.error(err); process.exit(1); });

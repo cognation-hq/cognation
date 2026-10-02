@@ -220,6 +220,14 @@
     return request("/auth/v1/user", { method: "GET" });
   }
 
+  /* Merge fields into auth.users.raw_user_meta_data (GoTrue PUT /user). */
+  function updateUser(data) {
+    return request("/auth/v1/user", {
+      method: "PUT",
+      body: JSON.stringify({ data: data || {} }),
+    });
+  }
+
   function rest(table, options) {
     options = options || {};
     var suffix = options.query ? "?" + options.query : "";
@@ -247,6 +255,7 @@
     signIn: signIn,
     signOut: signOut,
     getUser: getUser,
+    updateUser: updateUser,
     rest: rest,
     rpc: rpc,
   };

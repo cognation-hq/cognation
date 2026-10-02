@@ -350,3 +350,160 @@ assert.ok(sample.avatarDataUrl && sample.avatarDataUrl.indexOf("data:image/svg")
 assert.strictEqual(sample.city, "Demo City");
 
 console.log("seedops.test.js: commune-alive ok");
+
+/* Dating server→client hydrate */
+var hydrateSrc = fs.readFileSync(path.join(root, "js/seedops-dating-hydrate.js"), "utf8");
+assert.ok(!(new RegExp("demo" + " unlock", "i").test(hydrateSrc)), "dating-hydrate must not contain banned public-demo phrase");
+assert.ok(html.indexOf("js/seedops-dating-hydrate.js") !== -1, "index.html must load dating-hydrate");
+assert.ok(
+  html.indexOf("js/seedops-commune-alive.js") < html.indexOf("js/seedops-dating-hydrate.js"),
+  "dating-hydrate must load after commune-alive"
+);
+assert.ok(fs.readFileSync(path.join(root, "js/supabase-client.js"), "utf8").indexOf("updateUser") !== -1, "supabase-client exports updateUser");
+
+var hydrateWin = {
+  CognationAccounts: {
+    _p: {},
+    saveProfileRecord: function (rec) {
+      if (!rec || !rec.id) return false;
+      this._p[rec.id] = rec;
+      return true;
+    },
+    getProfileById: function (id) { return this._p[id] || null; },
+  },
+  CognationAuth: {
+    getSession: function () {
+      return { username: "seed-0001", seedFleetId: "seed-0001", activeProfileId: "prof-seed-0001" };
+    },
+  },
+  CognationSeedOpsLog: { write: function () {} },
+  CognationSupabase: {
+    configured: function () { return true; },
+    getSession: function () { return { access_token: "test" }; },
+    getUser: function () {
+      return Promise.resolve({
+        user_metadata: {
+          see_dating: true,
+          member_age: 29,
+          member_city: "Demo City",
+          member_state: "Demo",
+          member_country: "United States",
+          member_interests: ["tech", "jobs"],
+        },
+      });
+    },
+    updateUser: function (data) {
+      hydrateWin.__lastUpdateUser = data;
+      return Promise.resolve({ user_metadata: data });
+    },
+    rest: function () {
+      return Promise.resolve([
+        {
+          id: "srv-2",
+          seed_fleet_id: "seed-0002",
+          display_name: "Aisha",
+          bio: "Weekend farmer-market regular. Dogs welcome.",
+          account_kind: "seed",
+        },
+        {
+          id: "srv-3",
+          seed_fleet_id: "seed-0003",
+          display_name: "Alex",
+          bio: "Board games, soft playlists, early nights.",
+          account_kind: "seed",
+        },
+      ]);
+    },
+  },
+};
+var hydrateMember = { age: null, city: "" };
+var hydrateSee = false;
+hydrateWin.CognationCommuneSwipe = {
+  getMemberProfile: function () { return hydrateMember; },
+  setMemberProfile: function (p) { hydrateMember = p || {}; return hydrateMember; },
+  getSeeDating: function () { return hydrateSee; },
+  setSeeDating: function (on) { hydrateSee = !!on; },
+  getMemberAge: function () { return parseInt(hydrateMember.age, 10) || null; },
+  rebuild: function () { hydrateWin.__rebuilt = true; },
+};
+(function () {
+  var context = vm.createContext({
+    window: hydrateWin,
+    document: {
+      addEventListener: function () {},
+      dispatchEvent: function () {},
+      readyState: "complete",
+      querySelector: function () { return null; },
+    },
+    sessionStorage: {
+      _d: {},
+      getItem: function (k) { return this._d[k] || null; },
+      setItem: function (k, v) { this._d[k] = String(v); },
+      removeItem: function (k) { delete this._d[k]; },
+    },
+    localStorage: {
+      _d: {},
+      getItem: function (k) { return this._d[k] || null; },
+      setItem: function (k, v) { this._d[k] = String(v); },
+      removeItem: function (k) { delete this._d[k]; },
+    },
+    console: console,
+    setTimeout: function (fn) { if (typeof fn === "function") fn(); return 0; },
+    clearTimeout: function () {},
+    CustomEvent: function (name, init) {
+      this.type = name;
+      this.detail = (init && init.detail) || {};
+    },
+    encodeURIComponent: encodeURIComponent,
+    Promise: Promise,
+    Math: Math,
+    Number: Number,
+    String: String,
+    Object: Object,
+    Array: Array,
+    Date: Date,
+    parseInt: parseInt,
+    JSON: JSON,
+  });
+  hydrateWin.document = context.document;
+  hydrateWin.sessionStorage = context.sessionStorage;
+  hydrateWin.localStorage = context.localStorage;
+  context.window = hydrateWin;
+  vm.runInContext(fs.readFileSync(path.join(root, "js/seedops-schema.js"), "utf8"), context);
+  vm.runInContext(hydrateSrc, context);
+  var api = hydrateWin.CognationSeedOpsDatingHydrate;
+  assert.ok(api, "CognationSeedOpsDatingHydrate exports");
+  assert.strictEqual(api.HARD_CAP, 250);
+  assert.ok(api.isSeedOrOpsSession(), "seed session detected");
+  var fromMeta = api.prefsFromMetadata({
+    see_dating: true,
+    member_age: 29,
+    member_city: "Demo City",
+  });
+  assert.strictEqual(fromMeta.seeDating, true);
+  assert.strictEqual(fromMeta.age, 29);
+  var merged = api.mergeServerBios([
+    {
+      id: "srv-2",
+      seed_fleet_id: "seed-0002",
+      display_name: "Aisha",
+      bio: "Weekend farmer-market regular. Dogs welcome.",
+    },
+  ]);
+  assert.ok(merged.ok && merged.merged === 1, "merge bios");
+  var rec = hydrateWin.CognationAccounts.getProfileById("prof-seed-0002");
+  assert.ok(rec && rec.datingContent, "dating opt-in after merge");
+  assert.strictEqual(rec.bio, "Weekend farmer-market regular. Dogs welcome.");
+  assert.ok(rec.avatarDataUrl && rec.avatarDataUrl.indexOf("data:image/svg") === 0, "svg avatar");
+  api.hydrate({ force: true }).then(function (out) {
+    assert.ok(out && out.ok, "hydrate ok " + JSON.stringify(out));
+    assert.strictEqual(hydrateSee, true, "seeDating hydrated");
+    assert.strictEqual(hydrateMember.age, 29, "age from metadata");
+    assert.ok(hydrateWin.__lastUpdateUser && hydrateWin.__lastUpdateUser.see_dating === true, "persisted prefs");
+    console.log("seedops.test.js dating-hydrate: ok");
+  }).catch(function (err) {
+    console.error(err);
+    process.exitCode = 1;
+  });
+})();
+

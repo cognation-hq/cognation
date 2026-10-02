@@ -59,4 +59,27 @@ assert.ok(
 assert.ok(tower.indexOf("ONE_YOUTUBE_PLAYER_ONLY") !== -1, "video sticker policy untouched");
 assert.ok(html.indexOf("data-tower-instax") !== -1 || true, "instax not required in this slice");
 
+
+/* Handle survives clearYoutubeEmbed: outside cleared frame + ensure on paint */
+assert.ok(
+  tower.indexOf("function ensureYoutubeResizeHandle") !== -1,
+  "ensureYoutubeResizeHandle present"
+);
+assert.ok(
+  /function clearYoutubeEmbed[\s\S]*?ensureYoutubeResizeHandle\(root\)/.test(tower),
+  "clearYoutubeEmbed re-ensures resize handle after frame clear"
+);
+assert.ok(
+  /function initTowerMusic[\s\S]*?ensureYoutubeResizeHandle\(root\);\s*initYoutubeResize\(root\);/.test(tower),
+  "music paint ensureHandle + initYoutubeResize so owner drag/persist bind"
+);
+assert.ok(
+  /data-tower-youtube-frame[^>]*>\s*<\/div>\s*<button[^>]*data-tower-youtube-resize/.test(html),
+  "DOM resize handle is outside [data-tower-youtube-frame] (not wiped by innerHTML clear)"
+);
+assert.ok(
+  !/<div[^>]*data-tower-youtube-frame[^>]*>\s*<button[^>]*data-tower-youtube-resize/.test(html),
+  "DOM resize handle is not nested inside youtube frame"
+);
+
 console.log("youtube-width-resize.test.js: ok");

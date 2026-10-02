@@ -5661,6 +5661,9 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   width: 100%;
   max-width: 100%;
 }
+.tower-music-youtube {
+  position: relative;
+}
 .tower-music-youtube-frame {
   position: relative;
 }

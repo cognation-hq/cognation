@@ -998,7 +998,7 @@
             <div role="tabpanel" id="panel-commune" aria-labelledby="tab-commune" hidden>
               <!-- CGN-007 visual shell: Engineer owns real swipe/like/follow graph behavior.
                    Hooks: data-commune-shell, data-commune-deck, data-commune-card,
-                   data-card-type, data-commune-swipe=left|right, data-commune-enter-sim -->
+                   data-card-type, data-classroom, data-commune-swipe=left|right, data-commune-enter-sim, data-commune-enter-classroom -->
               <div
                 class="commune-swipe-shell"
                 data-commune-shell
@@ -1048,6 +1048,23 @@
                         <button type="button" class="btn btn-secondary" data-commune-room-back>Back to deck</button>
                       </div>
                     </form>
+                  </section>
+                  <section
+                    class="commune-classroom"
+                    id="panel-classroom"
+                    data-classroom
+                    data-commune-classroom
+                    hidden
+                    aria-label="Classroom session"
+                  >
+                    <p class="commune-card-kicker">Classroom · hosted by Cognation</p>
+                    <h4 class="commune-card-title" data-classroom-title></h4>
+                    <p class="commune-card-meta" data-classroom-topic></p>
+                    <p class="commune-card-body" data-classroom-body></p>
+                    <p class="commune-classroom-notes" data-classroom-notes role="status"></p>
+                    <div class="form-actions">
+                      <button type="button" class="btn btn-secondary" data-classroom-back data-commune-classroom-back>Back to deck</button>
+                    </div>
                   </section>
                 </div>
 

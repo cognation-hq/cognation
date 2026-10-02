@@ -33,7 +33,7 @@ CognationSeedOpsPathways.run("tower" | "commune" | "news" | "circle" | "chat" | 
 CognationSeedOpsPathways.runAll()
 ```
 
-Emits `cognation:seedops-pathway-start|step|complete`. Classroom is stubbed when no surface exists yet.
+Emits `cognation:seedops-pathway-start|step|complete`. Classroom is a first-class Commune surface (`#panel-classroom` / `[data-classroom]` / featured Classroom cards); `run("classroom")` is `ok` when that surface is present.
 
 ## 4. real ↛ seed friend-block
 
@@ -164,3 +164,8 @@ Closes the localStorage-only gap after Commune-alive (#31):
 CognationSeedOpsDatingHydrate.hydrate({ force: true })
 CognationSeedOpsDatingHydrate.persistPrefs()
 ```
+
+## 11. Classroom (life skills)
+
+Commune featured mix stays **1:1** across Classroom / ad / chat room / dating / content. Classroom cards (`data-card-type="classroom"`) open the honest-thin `#panel-classroom` session view (insurance, voting, small business — ~18+). Pathway `CognationSeedOpsPathways.run("classroom")` locates the surface, enters a session, and completes without `deferred_surface_missing`. Cap **250** and no public Demo unlock unchanged.
+

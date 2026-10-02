@@ -351,6 +351,60 @@ assert.strictEqual(sample.city, "Demo City");
 
 console.log("seedops.test.js: commune-alive ok");
 
+/* Classroom pathway — first-class surface (not deferred) */
+assert.ok(html.indexOf('id="panel-classroom"') !== -1, "index.html must include #panel-classroom");
+assert.ok(html.indexOf("data-classroom") !== -1, "index.html must include data-classroom");
+assert.ok(html.indexOf("data-commune-enter-classroom") !== -1 || html.indexOf("data-classroom-back") !== -1, "classroom panel chrome present");
+var classPanel = {
+  hidden: false,
+  querySelector: function () { return { textContent: "" }; },
+  closest: function () { return null; },
+  parentElement: null,
+};
+win.document = {
+  querySelector: function (sel) {
+    var s = String(sel || "");
+    if (
+      s.indexOf("panel-classroom") !== -1 ||
+      s.indexOf("data-classroom") !== -1 ||
+      s.indexOf("data-card-type='classroom'") !== -1 ||
+      s.indexOf('data-card-type="classroom"') !== -1 ||
+      s.indexOf("data-commune-classroom") !== -1
+    ) {
+      return classPanel;
+    }
+    return null;
+  },
+  dispatchEvent: function () {},
+  addEventListener: function () {},
+};
+win.CognationCommuneSwipe = {
+  _age: 28,
+  _open: "",
+  getMemberAge: function () { return this._age; },
+  getMemberProfile: function () { return { age: this._age }; },
+  setMemberProfile: function (p) {
+    if (p && p.age != null) this._age = parseInt(p.age, 10) || 28;
+  },
+  classroomCatalog: function () {
+    return [
+      { id: "class-insurance", type: "classroom", title: "Insurance basics", minAge: 18, host: "Cognation" },
+      { id: "class-voting", type: "classroom", title: "Voting", minAge: 18, host: "Cognation" },
+      { id: "class-business", type: "classroom", title: "Business", minAge: 18, host: "Cognation" },
+    ];
+  },
+  openClassroom: function (id) { this._open = id; return true; },
+  closeClassroom: function () { this._open = ""; },
+};
+var classRun = win.CognationSeedOpsPathways.run("classroom", "seed-0001");
+assert.ok(classRun.ok, "classroom pathway summary ok");
+assert.strictEqual(classRun.pathway, "classroom");
+classRun.steps.forEach(function (step) {
+  assert.strictEqual(step.status, "ok", "classroom step " + step.step + " status");
+  assert.notStrictEqual(step.status, "deferred_surface_missing");
+});
+console.log("seedops.test.js: classroom pathway ok");
+
 /* Dating server→client hydrate */
 var hydrateSrc = fs.readFileSync(path.join(root, "js/seedops-dating-hydrate.js"), "utf8");
 assert.ok(!(new RegExp("demo" + " unlock", "i").test(hydrateSrc)), "dating-hydrate must not contain banned public-demo phrase");

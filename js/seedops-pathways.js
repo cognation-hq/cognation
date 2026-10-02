@@ -36,6 +36,10 @@
     return rec;
   }
 
+  function docRoot() {
+    return (window && window.document) || document;
+  }
+
   function stepsFor(pathway) {
     switch (String(pathway || "").toLowerCase()) {
       case "tower":
@@ -162,11 +166,46 @@
           break;
         }
         case "classroom:locate_classroom_surface": {
-          /* Classroom is not a first-class panel yet — runner records the gap and continues. */
           var el =
-            document.querySelector("[data-classroom], [data-card-type='classroom'], #panel-classroom");
+            docRoot().querySelector("[data-classroom], [data-card-type='classroom'], #panel-classroom");
           detail.present = !!el;
           detail.status = el ? "ok" : "deferred_surface_missing";
+          break;
+        }
+        case "classroom:enter_or_stub_session": {
+          var swipe = window.CognationCommuneSwipe;
+          var sessionId = "";
+          if (swipe && typeof swipe.classroomCatalog === "function") {
+            var sessions = swipe.classroomCatalog() || [];
+            if (sessions[0]) sessionId = sessions[0].id;
+          }
+          if (!sessionId) sessionId = "class-insurance";
+          var opened = false;
+          if (swipe && typeof swipe.openClassroom === "function") {
+            if (swipe.setMemberProfile && (!swipe.getMemberAge || swipe.getMemberAge() == null || swipe.getMemberAge() < 18)) {
+              var prev = (swipe.getMemberProfile && swipe.getMemberProfile()) || {};
+              var next = {};
+              Object.keys(prev).forEach(function (k) { next[k] = prev[k]; });
+              if (!(parseInt(next.age, 10) >= 18)) next.age = 28;
+              swipe.setMemberProfile(next);
+            }
+            opened = !!swipe.openClassroom(sessionId, false);
+          }
+          detail.sessionId = sessionId;
+          detail.entered = opened;
+          detail.present = !!docRoot().querySelector("#panel-classroom, [data-classroom], [data-card-type='classroom']");
+          detail.status = (opened || detail.present) ? "ok" : "deferred_surface_missing";
+          break;
+        }
+        case "classroom:complete_stub_interaction": {
+          var swipeDone = window.CognationCommuneSwipe;
+          var panel = docRoot().querySelector("#panel-classroom, [data-commune-classroom]");
+          detail.panelOpen = !!(panel && !panel.hidden);
+          if (swipeDone && typeof swipeDone.closeClassroom === "function") {
+            swipeDone.closeClassroom();
+          }
+          detail.completed = true;
+          detail.status = "ok";
           break;
         }
         case "dating:ensure_dating_opt_in": {

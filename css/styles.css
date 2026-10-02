@@ -8691,6 +8691,10 @@ body { padding-top: 0 !important; }
 .commune-card[data-card-type="chatroom"] {
   border-color: var(--color-navy);
 }
+.commune-card[data-card-type="classroom"] {
+  border-color: #2a6f7c;
+  background: linear-gradient(165deg, #f3fbfd, #e8f6f8 60%, #fff);
+}
 .commune-card[data-card-type="random-fact"] {
   background: linear-gradient(165deg, #fff, var(--color-surface));
 }
@@ -11940,6 +11944,32 @@ a.circle-fall-portrait {
   width: 100%;
   box-sizing: border-box;
 }
+
+.commune-classroom {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  width: 100%;
+  min-height: 18rem;
+  padding: 1.1rem 1.15rem 1.25rem;
+  border-radius: 1.1rem;
+  border: 1px solid #2a6f7c;
+  background: linear-gradient(165deg, #f7fcfd, #fff);
+  box-shadow: 0 10px 28px rgba(42, 111, 124, 0.12);
+}
+.commune-classroom[hidden] {
+  display: none !important;
+}
+.commune-classroom-notes {
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.75rem;
+  background: rgba(42, 111, 124, 0.08);
+  color: var(--color-muted, #4a5560);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
 .commune-ad-video,
 .commune-ad-video iframe {
   display: block;

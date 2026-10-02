@@ -94,6 +94,7 @@ function testRatingSentences() {
 function testPace() {
   var api = loadSwipe(memoryStorage(), memoryStorage());
   var lanes = {
+    classroom: [{ id: "cl1", title: "Insurance basics" }],
     ad: [{ id: "a1", title: "A placed ad" }],
     chatroom: [{ id: "c1", title: "Room" }],
     fact: [{ id: "f1", title: "Fact" }],
@@ -110,6 +111,7 @@ function testPace() {
   assert.ok(typesOf(deck).indexOf("dating") > 4);
 
   var sparse = api.paceDeck({
+    classroom: [],
     ad: [],
     chatroom: [{ id: "c1" }],
     fact: [{ id: "f1" }],
@@ -219,6 +221,7 @@ function testSiteRooms() {
   assert.deepStrictEqual(titles(api.visibleSiteRooms()), ["21+"]);
 
   var lanes = {
+    classroom: api.visibleClassroomSessions(),
     ad: [],
     chatroom: api.visibleSiteRooms(),
     fact: [{ id: "f1", title: "Fact" }],
@@ -400,6 +403,45 @@ function testRightSwipeStillKeeps() {
   assert.strictEqual(deckHas(bea.sampleDeck(18), "know-sam"), true);
 }
 
+
+function testClassroomSurface() {
+  var api = loadSwipe(memoryStorage(), memoryStorage());
+  var catalog = api.classroomCatalog();
+  assert.strictEqual(catalog.length, 3);
+  assert.strictEqual(
+    catalog.map(function (c) { return String(c.id); }).join(","),
+    "class-insurance,class-voting,class-business"
+  );
+  catalog.forEach(function (card) {
+    assert.strictEqual(card.type, "classroom");
+    assert.strictEqual(card.host, "Cognation");
+    assert.ok(card.minAge >= 18);
+  });
+
+  api.setMemberProfile({ age: 16, interests: ["insurance"] });
+  assert.strictEqual(api.classroomAllowed(), false);
+  assert.strictEqual(api.visibleClassroomSessions().length, 0);
+
+  api.setMemberProfile({ age: 18, interests: ["insurance"] });
+  assert.strictEqual(api.classroomAllowed(), true);
+  assert.strictEqual(api.visibleClassroomSessions().length, 3);
+
+  var deck = api.sampleDeck(24);
+  assert.ok(deck.some(function (c) { return c.type === "classroom"; }), "adult deck should include Classroom");
+  assertPaced(deck);
+
+  /* Featured mix 1:1 — classroom should appear without stacking runs of itself */
+  var classIdx = [];
+  deck.forEach(function (c, i) { if (c.type === "classroom") classIdx.push(i); });
+  for (var i = 1; i < classIdx.length; i++) {
+    assert.ok(classIdx[i] - classIdx[i - 1] >= 2, "classroom cards must not run back-to-back");
+  }
+
+  var html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  assert.ok(html.indexOf('id="panel-classroom"') !== -1, "index must include #panel-classroom");
+  assert.ok(html.indexOf("data-classroom") !== -1, "index must include data-classroom");
+}
+
 testRatingSentences();
 testPace();
 testFullFriendList();
@@ -408,4 +450,5 @@ testAdsAndNoInventedCafe();
 testPassStaysHiddenForViewer();
 testLegacySessionPassBelongsToViewer();
 testRightSwipeStillKeeps();
+testClassroomSurface();
 console.log("commune-deck.test.js ok");

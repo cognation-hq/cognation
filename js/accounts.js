@@ -504,7 +504,10 @@
           (legacyNow.friendPinLayout &&
             typeof legacyNow.friendPinLayout === "object" &&
             Object.keys(legacyNow.friendPinLayout).length &&
-            (!personal.friendPinLayout || !Object.keys(personal.friendPinLayout).length))
+            (!personal.friendPinLayout || !Object.keys(personal.friendPinLayout).length)) ||
+          (legacyNow.musicYoutubeWidth != null &&
+            !isNaN(parseInt(legacyNow.musicYoutubeWidth, 10)) &&
+            parseInt(legacyNow.musicYoutubeWidth, 10) !== parseInt(personal.musicYoutubeWidth, 10))
         ));
         if (!legacyRicher) {
           localStorage.setItem(LEGACY_PROFILE_KEY, JSON.stringify(stripMeta(personal)));

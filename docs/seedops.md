@@ -93,6 +93,26 @@ Channel `friction`. **Real beta users only** (seed/ops skipped). No bot ratings 
 
 Shared sink: `js/seedops-log.js` (`sessionStorage` ring `cognation.seedops.log.v1` + `console.debug`).
 
+
+## 7. Ops trigger (internal)
+
+Module: `js/seedops-ops-trigger.js` → `window.CognationSeedOpsTrigger`
+
+Controlled pathway kick for curator / mod / wire / SeedOps after auth bind. **No public Demo unlock.**
+
+```js
+CognationSeedOpsTrigger.isArmed()
+CognationSeedOpsTrigger.triggerPathway("tower" | "commune" | …, "seed-0001")
+CognationSeedOpsTrigger.triggerAll("seed-0001")
+// optional chrome (armed only): location.hash = "seedops-ops"
+```
+
+- Arms only for ops or seed sessions with seedops metadata / known ops fleet ids.
+- Act-as refuses real-user targets; pathway context only (does not bypass friend/policy / `auth.uid()`).
+- Log channel: `ops-trigger`.
+
+See [`docs/seedops-provision.md`](seedops-provision.md) for Wave 1 smoke steps and what #4 Tower posts still owns.
+
 ## Ops notes
 
 - Public Pages still must not expose a “Demo unlock” control (`scripts/check-no-public-demo-surface.js`).
@@ -105,3 +125,4 @@ Shared website fleet upsert + Admin API password binding: see [`docs/seedops-pro
 - Wave 1 default: `provision_seed_wave(0, 100)` then `node scripts/seedops-bind-auth.mjs`
 - Free-trial Demo max: **250** seeds (+3 ops); grow past 100 only after Wave 1 green; past 250 needs Alexa unlock
 - Friend gate unchanged: seed↔seed OK after binding; real↛seed blocked
+- After bind: `CognationSeedOpsTrigger.triggerPathway(...)` / `#seedops-ops` for Wave 1 pathway smoke (#3); Tower bulk posts remain #4

@@ -148,13 +148,50 @@ Do **not** script a loop that auto-fills to 1000. Stop at 250 unless Alexa unloc
 
 Signup trigger `create_profile_for_new_user` may create the personal profile on first auth insert; wave provision / bind script then stamps SeedOps fields.
 
-## Still needed in #3 (ops trigger) — gaps
+## #3 Ops trigger (internal pathway kick)
 
-- Ops-bot **automation triggers** (curator / mod / wire acting on queue, News, Circle jobs) — not in this PR
+After Wave 1 profiles + auth bind, SeedOps / ops bots need a **controlled internal trigger** to smoke fleet pathways without any public Demo unlock UI.
+
+| Piece | Behavior |
+|-------|----------|
+| `js/seedops-ops-trigger.js` → `window.CognationSeedOpsTrigger` | Arms only for `account_kind` **ops** or **seed** with seedops metadata / known ops fleet ids (`ops-curator`, `ops-mod`, `ops-wire`). Never for real users. |
+| Pathway kick | `triggerPathway(name, seedFleetId?)` / `triggerAll(seedFleetId?)` → existing `CognationSeedOpsPathways` |
+| Events | Channel `ops-trigger` via `CognationSeedOpsLog` + `cognation:seedops-ops-trigger` |
+| Thin chrome | Hash `#seedops-ops` (or `?seedops-ops=1`) opens a small operator panel **only when armed**. Unreachable to real users. No Demo unlock copy/controls. |
+| Act-as policy | Target must be a seed/ops `seed_fleet_id`. **Real-user targets are refused.** Act-as sets pathway **context only** — it does **not** impersonate `auth.uid()`, spoof friend requests, or bypass `CognationSeedOpsFriendGate` / SQL `real_seed_friend_blocked`. |
+
+### How SeedOps runs Wave 1 pathway smoke (after auth bind)
+
+1. Apply migrations + `provision_seed_wave(0, 100)` + `node scripts/seedops-bind-auth.mjs` (hooks #1 / #2).
+2. Sign in as an ops bot or seed (e.g. `ops-curator@ops.cognation.internal` / `seed-0001@seed.cognation.internal` with `SEEDOPS_AUTH_PASSWORD`).
+3. Console / RPC:
+
+```js
+// Must be armed (ops or seedops seed session)
+CognationSeedOpsTrigger.isArmed() // true
+
+// Kick one pathway for Wave 1 seed context
+CognationSeedOpsTrigger.triggerPathway("tower", "seed-0001")
+CognationSeedOpsTrigger.triggerPathway("circle", "seed-0001")
+
+// Or all pathways
+CognationSeedOpsTrigger.triggerAll("seed-0001")
+
+// Optional operator panel (armed sessions only)
+location.hash = "seedops-ops"
+```
+
+4. Inspect `CognationSeedOpsLog.list("ops-trigger")` and pathway events (`cognation:seedops-pathway-*`).
+
+Caps unchanged: Wave 1 = **100**; free-trial Demo max = **250** (+3 ops). Soft budget 1000 with 750 real headroom — no auto-grow.
+
+### Still for #4 / later — gaps
+
+- Shared **Tower seed content** generation / bulk posts (#4 owns)
+- Live Supabase apply / running bind against production (Alexa SQL; box cannot)
 - Scheduled or CI-wrapped Wave 1 green → optional grow-to-250 gate
 - Rotating / per-seed passwords (today: one shared `SEEDOPS_AUTH_PASSWORD`)
 - Optional RLS helpers that trust `app_metadata.seedops` for service paths
-- Browser SeedOps operator chrome to sign in as a fleet id (internal only; still no public Demo unlock)
 
 ## Friend policy reminder
 

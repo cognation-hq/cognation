@@ -229,7 +229,21 @@
     }
     var prior = readJson(sessionStorage, BOOT_FLAG, null);
     if (prior && prior.ok && !opts.force) {
-      return { ok: true, cached: true, prior: prior };
+      /* If dating-flagged profiles vanished (new tab storage wipe / tower-only hydrate),
+         rematerialize so See dating toggle is not a blank deck. */
+      var datingHydrate = window.CognationSeedOpsDatingHydrate;
+      var biosReady =
+        datingHydrate && typeof datingHydrate.datingBiosReady === "function"
+          ? datingHydrate.datingBiosReady(1)
+          : false;
+      if (!biosReady) {
+        try {
+          sessionStorage.removeItem(BOOT_FLAG);
+        } catch (eStaleAlive) {}
+        prior = null;
+      } else {
+        return { ok: true, cached: true, prior: prior };
+      }
     }
     var member = ensureMemberProfile();
     var mat = materializeDatingSample(opts.count || MATERIALIZE_COUNT);

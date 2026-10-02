@@ -175,9 +175,12 @@ Closes the localStorage-only gap after Commune-alive (#31):
 - Fetches seed `profiles` rows with nonempty `bio` (SeedOps enriched ~79) and merges into `CognationAccounts` with dating opt-in + SVG avatar (shared Demo City; cap **250**).
 - Persists viewer pref changes back to `user_metadata` via `CognationSupabase.updateUser` (no new dating schema / DB rows).
 - Dating card copy uses the profile `bio` when present (`commune-swipe.js`).
+- **Blank dating Card 1 guard:** session cache is ignored when dating-flagged bios are missing; `See dating` toggle calls `ensureDatingContent` before rebuild; `seeDating` is applied before `setMemberProfile` so the first rebuild can include dating cards.
 
 ```js
 CognationSeedOpsDatingHydrate.hydrate({ force: true })
+CognationSeedOpsDatingHydrate.ensureDatingContent()
+CognationSeedOpsDatingHydrate.datingBiosReady(1)
 CognationSeedOpsDatingHydrate.persistPrefs()
 ```
 

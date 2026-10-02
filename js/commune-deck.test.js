@@ -442,7 +442,20 @@ function testClassroomSurface() {
   assert.ok(html.indexOf("data-classroom") !== -1, "index must include data-classroom");
 }
 
+
+function testDatingBlankCard1Guards() {
+  var swipeSrc = fs.readFileSync(path.join(root, "js/commune-swipe.js"), "utf8");
+  assert.ok(swipeSrc.indexOf("ensureDatingBiosThenRebuild") !== -1, "dating toggle rehydrates before rebuild");
+  assert.ok(swipeSrc.indexOf("prev === next") !== -1, "setSeeDating skips no-op emit");
+  assert.ok(swipeSrc.indexOf('String(rec.bio || "").trim()') !== -1, "dating body trims whitespace bios");
+  var hydrateSrc = fs.readFileSync(path.join(root, "js/seedops-dating-hydrate.js"), "utf8");
+  assert.ok(hydrateSrc.indexOf("datingBiosReady") !== -1, "hydrate exposes datingBiosReady");
+  assert.ok(hydrateSrc.indexOf("ensureDatingContent") !== -1, "hydrate exposes ensureDatingContent");
+  assert.ok(hydrateSrc.indexOf("seeDating before setMemberProfile") !== -1, "prefs apply order avoids blank Card 1 race");
+}
+
 testRatingSentences();
+testDatingBlankCard1Guards();
 testPace();
 testFullFriendList();
 testSiteRooms();

@@ -684,10 +684,40 @@
     if (chosen != null) p.musicYoutubeWidth = chosen;
   }
 
-  /* Remote rows omit a top-friend removal. Owner local copy wins on reload. */
+  var TOP_FRIEND_LOCAL_KEY = "cognation.tower.top-friends.v1";
+
+  function readTopFriendLocalDoc() {
+    try {
+      var raw = localStorage.getItem(TOP_FRIEND_LOCAL_KEY);
+      var parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (eTop) {
+      return {};
+    }
+  }
+
+  function writeTopFriendLocal(profileId, removed, featured) {
+    if (!profileId) return;
+    var doc = readTopFriendLocalDoc();
+    doc[String(profileId)] = {
+      removedFriendPinIds: (removed || []).map(function (id) { return String(id || ""); }).filter(Boolean),
+      featuredFriendIds: (featured || []).map(function (id) { return String(id || ""); }).filter(Boolean),
+    };
+    try { localStorage.setItem(TOP_FRIEND_LOCAL_KEY, JSON.stringify(doc)); } catch (eTopWrite) {}
+  }
+
+  /* Remote rows omit a top-friend removal. The signed-in profile's own note wins on reload. */
   function applyOwnerTopFriends(p, legacy, account) {
     if (!p || p._directoryFriend || p._profileKind === "professional") return;
     if (p._remote && !isTowerOwner(p)) return;
+    var keyed = readTopFriendLocalDoc()[String(p._profileId || "")];
+    if (keyed && typeof keyed === "object") {
+      p.removedFriendPinIds = (keyed.removedFriendPinIds || []).map(function (id) { return String(id || ""); }).filter(Boolean);
+      var keyedCount = parseInt(p.friendsDisplayCount, 10);
+      if ([3, 6, 8].indexOf(keyedCount) === -1) keyedCount = 3;
+      p.featuredFriendIds = (keyed.featuredFriendIds || []).map(function (id) { return String(id || ""); }).filter(Boolean).slice(0, keyedCount);
+      return;
+    }
     var profileHandle = normalizeHandle(p.handle || "");
     var chosen = null;
     [legacy, account].forEach(function (blob) {
@@ -1143,6 +1173,7 @@
       var p = this.get();
       if (!p || p._directoryFriend || profileIsProfessional(p) || !isTowerOwner(p)) return false;
       if (!removeTopFriendPin(p, friendId)) return false;
+      writeTopFriendLocal(p._profileId, p.removedFriendPinIds, p.featuredFriendIds);
       return !!this.save(p, { geometry: true });
     },
     topFriendIds: function () {
@@ -4059,6 +4090,7 @@
             profile.removedFriendPinIds = (profile.removedFriendPinIds || []).filter(function (id) {
               return id !== friend.id;
             });
+            writeTopFriendLocal(profile._profileId, profile.removedFriendPinIds, profile.featuredFriendIds);
             TowerProfileStore.save(profile, { geometry: true });
           }
           input.value = "";
@@ -7001,6 +7033,7 @@
           if (ids.length < max) ids.push(entry.id);
         }
         fp.featuredFriendIds = ids.slice(0, fp.friendsDisplayCount || 8);
+        writeTopFriendLocal(fp._profileId, fp.removedFriendPinIds, fp.featuredFriendIds);
         if (entry.layout) {
           if (!fp.friendPinLayout || typeof fp.friendPinLayout !== "object") fp.friendPinLayout = {};
           fp.friendPinLayout[entry.id] = entry.layout;
@@ -7040,6 +7073,7 @@
         p.polaroidRemoved = false;
         p.removedFriendPinIds = [];
         p.featuredFriendIds = [];
+        writeTopFriendLocal(p._profileId, p.removedFriendPinIds, p.featuredFriendIds);
         TowerProfileStore.save(p, { geometry: true });
         applyWidgetLayout(root, p);
         applyPublicWidgets(root, p);

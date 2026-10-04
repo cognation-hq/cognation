@@ -404,28 +404,42 @@
     return friendHandleFromId(friendId);
   }
 
+  function towerProfileSlug() {
+    var hash = String(location.hash || "").replace(/^#/, "");
+    if (hash.indexOf("tower-profile-") !== 0) return "";
+    var slug = hash.slice("tower-profile-".length);
+    try { slug = decodeURIComponent(slug); } catch (eSlug) {}
+    return String(slug || "").trim().replace(/^@/, "");
+  }
+
   function resolveActiveProfileId() {
-    var social = remoteSocial();
-    if (social && social.getViewedProfileId) {
-      var remoteId = social.getViewedProfileId();
-      if (remoteId) return remoteId;
-    }
     if (window.CognationAccounts && typeof window.CognationAccounts.ensureSeeded === "function") {
       try { window.CognationAccounts.ensureSeeded(); } catch (e) {}
     }
     if (window.CognationAccounts && typeof window.CognationAccounts.ensureDemoProfessionals === "function") {
       try { window.CognationAccounts.ensureDemoProfessionals(); } catch (ePro) {}
     }
-    var hash = (location.hash || "").replace(/^#/, "");
-    if (hash.indexOf("tower-profile-") === 0) {
-      var slug = hash.slice("tower-profile-".length);
-      try { slug = decodeURIComponent(slug); } catch (eSlug) {}
+    /* A #tower-profile-{handle} names that page. If it is not loaded, do not
+       substitute the signed-in profile (often the professional page). */
+    var slug = towerProfileSlug();
+    if (slug) {
       if (window.CognationAccounts && window.CognationAccounts.getProfileByHandle) {
         var byHash = window.CognationAccounts.getProfileByHandle(slug);
-        if (byHash) return byHash.id;
+        if (byHash && byHash.id) return byHash.id;
       }
-      var friend = directoryFriendBySlug(slug);
-      if (friend) return "directory-" + friend.id;
+      var namedFriend = directoryFriendBySlug(slug);
+      if (namedFriend) return "directory-" + namedFriend.id;
+      var socialNamed = remoteSocial();
+      if (socialNamed && typeof socialNamed.getProfileForHandle === "function") {
+        var remoteNamed = socialNamed.getProfileForHandle(slug);
+        if (remoteNamed && remoteNamed.id) return remoteNamed.id;
+      }
+      return "viewed:" + slug;
+    }
+    var social = remoteSocial();
+    if (social && social.getViewedProfileId) {
+      var remoteId = social.getViewedProfileId();
+      if (remoteId) return remoteId;
     }
     var session = getSessionObject();
     if (session && session.activeProfileId) return session.activeProfileId;
@@ -1933,6 +1947,17 @@
       el.disabled = !owner;
       if ("readOnly" in el) el.readOnly = !owner;
     });
+    /* Go live / Offline belong to this account only. Hide them on every other profile. */
+    root.querySelectorAll("[data-go-live]").forEach(function (el) {
+      el.hidden = !owner;
+      if (!owner) el.setAttribute("hidden", "");
+      else el.removeAttribute("hidden");
+    });
+    if (!owner) {
+      root.querySelectorAll("[data-live-stage]").forEach(function (el) {
+        el.hidden = true;
+      });
+    }
   }
 
   function applyTowerSide(root, side, opts) {
@@ -3676,6 +3701,78 @@
     return !!(p && (p._profileKind === "professional" || p.kind === "professional"));
   }
 
+  function recordIsSeed(rec) {
+    if (!rec) return false;
+    if (window.CognationSeedOps && typeof window.CognationSeedOps.classify === "function") {
+      return !!window.CognationSeedOps.classify(rec).isSeed;
+    }
+    if (rec.isSeed || rec.accountKind === "seed" || rec._accountKind === "seed") return true;
+    var id = String(rec.id || rec._profileId || "");
+    if (/^prof-seed-\d/.test(id)) return true;
+    return /^seed-\d/.test(String(rec.seedFleetId || ""));
+  }
+
+  function recordIsOps(rec) {
+    if (!rec) return false;
+    if (window.CognationSeedOps && typeof window.CognationSeedOps.classify === "function") {
+      return !!window.CognationSeedOps.classify(rec).isOpsBot;
+    }
+    if (rec.isOpsBot || rec.accountKind === "ops") return true;
+    return /^ops-|^prof-ops-/.test(String(rec.handle || rec.id || ""));
+  }
+
+  function lookupFriendRecord(id) {
+    id = String(id || "");
+    if (!id) return null;
+    var accounts = window.CognationAccounts;
+    if (accounts && typeof accounts.getProfileById === "function") {
+      var byId = accounts.getProfileById(id);
+      if (byId) return byId;
+    }
+    if (accounts && typeof accounts.getProfileByHandle === "function") {
+      var byHandle = accounts.getProfileByHandle(id);
+      if (byHandle) return byHandle;
+    }
+    var i;
+    for (i = 0; i < DEMO_FRIENDS.length; i++) {
+      if (DEMO_FRIENDS[i] && DEMO_FRIENDS[i].id === id) {
+        return { id: id, handle: id, displayName: DEMO_FRIENDS[i].name, accountKind: "real" };
+      }
+    }
+    if (recordIsSeed({ id: id, handle: id })) {
+      return { id: id, handle: id, displayName: id, accountKind: "seed", isSeed: true };
+    }
+    return null;
+  }
+
+  function topFriendCanOpen(friendId) {
+    var rec = lookupFriendRecord(friendId);
+    if (!rec) return false;
+    var handle = String(rec.handle || "").replace(/^@/, "");
+    if (!handle) return false;
+    var session = getSessionObject();
+    var active = session && session.activeProfileId && window.CognationAccounts && window.CognationAccounts.getProfileById
+      ? window.CognationAccounts.getProfileById(session.activeProfileId)
+      : null;
+    var activeHandle = active ? String(active.handle || "").replace(/^@/, "").toLowerCase() : "";
+    var opensSignedInPro = !!(active && active.kind === "professional" && activeHandle && handle.toLowerCase() === activeHandle);
+    if (opensSignedInPro) {
+      var fid = String(friendId || "");
+      var isThatProfile = fid === String(active.id) || fid.toLowerCase() === activeHandle;
+      if (!isThatProfile) return false;
+    }
+    if (window.CognationAccounts && window.CognationAccounts.getProfileByHandle && window.CognationAccounts.getProfileByHandle(handle)) {
+      return true;
+    }
+    if (directoryFriendBySlug(handle)) return true;
+    var social = remoteSocial();
+    if (social && typeof social.getProfileForHandle === "function") {
+      var remote = social.getProfileForHandle(handle);
+      if (remote && remote.id && !(opensSignedInPro && remote.id === active.id)) return true;
+    }
+    return false;
+  }
+
   function resolveTopFriendIds(p) {
     if (profileIsProfessional(p)) return [];
     var removed = {};
@@ -3686,27 +3783,32 @@
       id = String(id || "");
       return !!id && id !== "alexa-thomas" && !removed[id];
     }
-    var known = {};
-    DEMO_FRIENDS.forEach(function (friend) {
-      if (friend && friend.id) known[friend.id] = true;
-    });
-    var ranked = ((p && p.featuredFriendIds) || []).filter(function (id) {
-      return known[id] && keep(id);
-    });
-    var stored = ((p && p.friendIds) || []).filter(function (id) {
-      return known[id] && keep(id);
-    });
+    var seedPage = recordIsSeed(p);
+    if (!seedPage && p && window.CognationAccounts && window.CognationAccounts.getProfileById) {
+      seedPage = recordIsSeed(window.CognationAccounts.getProfileById(p._profileId || p.id));
+    }
+    function allow(id) {
+      if (!keep(id)) return false;
+      var rec = lookupFriendRecord(id);
+      var seed = recordIsSeed(rec) || (!rec && recordIsSeed({ id: id, handle: id }));
+      var ops = recordIsOps(rec) || (!rec && recordIsOps({ id: id, handle: id }));
+      if (seedPage) return seed && !ops;
+      if (seed || ops) return false;
+      return !!rec;
+    }
+    var ranked = ((p && p.featuredFriendIds) || []).filter(allow);
+    var stored = ((p && p.friendIds) || []).filter(allow);
     if (ranked.length || ((p && p.removedFriendPinIds) || []).length) {
-      return ranked.slice(0, TOP_FRIEND_VISIBLE).filter(keep);
+      return ranked.slice(0, TOP_FRIEND_VISIBLE);
     }
     var pool = ranked.length ? ranked : stored;
-    if (!pool.length) {
-      pool = [];
+    /* Someone else's page keeps their list. Do not fill it with the demo roster. */
+    if (!pool.length && isTowerOwner(p) && !seedPage) {
       DEMO_FRIENDS.forEach(function (friend) {
-        if (friend && keep(friend.id)) pool.push(friend.id);
+        if (friend && allow(friend.id)) pool.push(friend.id);
       });
     }
-    return pool.slice(0, TOP_FRIEND_VISIBLE).filter(keep);
+    return pool.slice(0, TOP_FRIEND_VISIBLE);
   }
 
   function removeTopFriendPin(p, friendId) {
@@ -3747,8 +3849,9 @@
     });
 
     selected.forEach(function (id) {
-      var friend = DEMO_FRIENDS.filter(function (x) { return x.id === id; })[0];
-      if (!friend) return;
+      var rec = lookupFriendRecord(id);
+      if (!rec) return;
+      var friend = { id: id, name: rec.displayName || rec.name || id };
       var pos = pinLayout[id];
       if (!pos) return;
       var pin = stage.querySelector('[data-tower-friend-pin="' + id + '"]');
@@ -3756,12 +3859,14 @@
       DEMO_FRIENDS.forEach(function (entry, entryIndex) {
         if (entry.id === id) friendIndex = entryIndex;
       });
-      var profileHash = "tower-profile-" + personalProfileHandle(id);
+      var handle = String(rec.handle || "").replace(/^@/, "");
+      var canOpen = topFriendCanOpen(id);
+      var profileHash = canOpen && handle ? ("tower-profile-" + handle) : "";
       if (!pin) {
         pin = document.createElement("a");
         pin.className = "tower-friend-pin";
         pin.setAttribute("data-tower-friend-pin", id);
-        pin.href = "#" + profileHash;
+        pin.href = profileHash ? ("#" + profileHash) : (location.hash || "#");
         pin.setAttribute("aria-label", friend.name + " tower profile");
         var av = document.createElement("span");
         av.className = "tower-friend-pin-avatar";
@@ -3772,14 +3877,20 @@
         pin.appendChild(av);
         pin.appendChild(nm);
         pin.addEventListener("click", function (ev) {
-          if (pin.__cognationDidDrag) {
+          if (pin.__cognationDidDrag || pin.getAttribute("data-tower-friend-stay") === "true") {
             ev.preventDefault();
             pin.__cognationDidDrag = false;
           }
         });
         stage.appendChild(pin);
       }
-      pin.href = "#" + profileHash;
+      if (profileHash) {
+        pin.href = "#" + profileHash;
+        pin.removeAttribute("data-tower-friend-stay");
+      } else {
+        pin.href = location.hash && String(location.hash).indexOf("#tower-profile-") === 0 ? location.hash : "#";
+        pin.setAttribute("data-tower-friend-stay", "true");
+      }
       pin.setAttribute("aria-label", friend.name + " tower profile");
       var avEl = pin.querySelector(".tower-friend-pin-avatar");
       var nmEl = pin.querySelector(".tower-friend-pin-name");

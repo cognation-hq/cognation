@@ -127,9 +127,15 @@
   }
 
   function viewedProfileId() {
-    var hash = String(location.hash || "").replace(/^#tower-profile-/, "");
-    var byHash = hash ? profileForHandle(decodeURIComponent(hash)) : null;
-    return byHash ? byHash.id : currentProfileId();
+    var raw = String(location.hash || "");
+    if (raw.indexOf("#tower-profile-") === 0) {
+      var slug = raw.slice("#tower-profile-".length);
+      try { slug = decodeURIComponent(slug); } catch (eHash) {}
+      var byHash = slug ? profileForHandle(slug) : null;
+      /* Missing handle must not fall through to the signed-in profile. */
+      return byHash && byHash.id ? byHash.id : "";
+    }
+    return currentProfileId();
   }
 
   function toTowerProfile(profile) {

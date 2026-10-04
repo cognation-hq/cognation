@@ -431,6 +431,8 @@
       if (!btn) return;
       ev.preventDefault();
       ev.stopPropagation();
+      var app = btn.closest && btn.closest("[data-tower-app]");
+      if (btn.hidden || (app && app.getAttribute("data-tower-is-owner") !== "true")) return;
       var live = getLive();
       if (live && live.active) goOffline();
       else openLive();

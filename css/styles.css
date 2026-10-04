@@ -7271,9 +7271,9 @@ body.login-gate-open {
   border: 1px solid rgba(74, 44, 58, 0.18);
   background: rgba(255, 245, 249, 0.95);
   border-radius: 999px;
-  width: 2rem;
-  height: 2rem;
-  font-size: 1rem;
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
   line-height: 1;
   cursor: pointer;
   display: inline-grid;
@@ -9814,6 +9814,9 @@ body { padding-top: 0 !important; }
 
 /* Go Live on profile pic */
 .tower-avatar-wrap { position: relative; }
+[data-tower-app][data-tower-is-owner="false"] [data-go-live] {
+  display: none !important;
+}
 .tower-go-live-btn[data-go-live] {
   position: absolute;
   left: 50%;
@@ -9950,7 +9953,7 @@ body { padding-top: 0 !important; }
 .news-comment-author { font-weight: 600; margin-right: 0.35rem; }
 .news-comment-body { display: inline; margin: 0; }
 .news-comment-reacts { display: inline-flex; flex-wrap: wrap; gap: 0.15rem; margin-left: 0.25rem; vertical-align: middle; }
-.news-comment-react-chip { appearance: none; border: 1px solid rgba(74, 44, 58, 0.16); background: #fff8fb; border-radius: 999px; height: 1.15rem; min-width: 1.15rem; padding: 0 0.28rem; font-size: 0.7rem; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; gap: 0.12rem; }
+.news-comment-react-chip { appearance: none; border: 1px solid rgba(74, 44, 58, 0.16); background: #fff8fb; border-radius: 999px; height: 22px; min-width: 22px; padding: 0 0.28rem; font-size: 14px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; gap: 0.12rem; }
 .news-comment-react-chip.is-mine { border-color: rgba(183, 246, 255, 0.85); background: rgba(139, 237, 255, 0.22); }
 .news-comment-react-count { font-size: 0.62rem; font-weight: 600; color: #9a6b7d; }
 .news-comment-composer { display: flex; gap: 0.35rem; margin-top: 0.4rem; align-items: center; }

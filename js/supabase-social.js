@@ -184,6 +184,17 @@
     emit("cognation:remote-profile-loaded", { profileId: profile.id });
   }
 
+  function reactionsMap(rows) {
+    var reactions = {};
+    (Array.isArray(rows) ? rows : []).forEach(function (row) {
+      if (!row || !row.face || row.profile_id == null || row.profile_id === "") return;
+      var face = String(row.face);
+      if (!reactions[face]) reactions[face] = [];
+      reactions[face].push(String(row.profile_id));
+    });
+    return reactions;
+  }
+
   function mapPost(row) {
     var embedded = row && (row.author || row.profiles);
     if (embedded) cacheProfile(embedded);
@@ -191,6 +202,8 @@
     var display =
       (author && (author.display_name || author.displayName)) || "Cognation member";
     var handle = author ? normalizeHandle(author.handle) : "";
+    var reactions = reactionsMap(row && row.reactions);
+    var hearts = reactions["❤️"] ? reactions["❤️"].length : 0;
     return {
       id: row.id,
       _remote: true,
@@ -200,8 +213,8 @@
       body: row.body || "",
       createdAt: row.created_at,
       attachments: Array.isArray(row.attachments) ? row.attachments : [],
-      likes: 0,
-      reactions: {},
+      likes: hearts,
+      reactions: reactions,
       visibility: row.visibility || "friends",
     };
   }
@@ -222,7 +235,7 @@
     return client()
       .rest("tower_posts", {
         query:
-          "select=id,author_profile_id,body,visibility,attachments,created_at,author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,bio)&order=created_at.desc&limit=100",
+          "select=id,author_profile_id,body,visibility,attachments,created_at,author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,bio),reactions:tower_post_reactions(face,profile_id)&order=created_at.desc&limit=100",
       })
       .then(function (rows) {
         var posts = (Array.isArray(rows) ? rows : []).map(mapPost);
@@ -263,6 +276,60 @@
       .then(function () {
         return refreshFeed();
       });
+  }
+
+  function feedPost(postId) {
+    var i;
+    for (i = 0; i < state.feed.length; i++) {
+      if (state.feed[i] && state.feed[i].id === postId) return state.feed[i];
+    }
+    return null;
+  }
+
+  function applyReaction(post, face, profileId, adding) {
+    if (!post.reactions || typeof post.reactions !== "object") post.reactions = {};
+    var list = Array.isArray(post.reactions[face]) ? post.reactions[face].slice() : [];
+    var ix = list.indexOf(profileId);
+    if (adding) {
+      if (ix < 0) list.push(profileId);
+    } else if (ix >= 0) {
+      list.splice(ix, 1);
+    }
+    if (list.length) post.reactions[face] = list;
+    else delete post.reactions[face];
+    if (face === "❤️") post.likes = list.length;
+  }
+
+  function togglePostReaction(postId, face) {
+    face = String(face || "");
+    var me = identity();
+    var profileId = me && me.activeProfileId ? String(me.activeProfileId) : "";
+    if (!me || !profileId || !face) {
+      return Promise.resolve({ ok: false, error: "Sign in before reacting." });
+    }
+    var post = feedPost(postId);
+    if (!post) return Promise.resolve({ ok: false, error: "Post not found." });
+    var list = post.reactions && Array.isArray(post.reactions[face]) ? post.reactions[face] : [];
+    var mine = list.indexOf(profileId) >= 0;
+    var req = mine
+      ? client().rest("tower_post_reactions", {
+          method: "DELETE",
+          query:
+            "post_id=eq." + encodeURIComponent(postId) +
+            "&profile_id=eq." + encodeURIComponent(profileId) +
+            "&face=eq." + encodeURIComponent(face),
+        })
+      : client().rest("tower_post_reactions", {
+          method: "POST",
+          body: { post_id: postId, profile_id: profileId, face: face },
+        });
+    return req.then(function () {
+      applyReaction(post, face, profileId, !mine);
+      replaceTowerFeed(state.feed);
+      return { ok: true, post: post };
+    }, function () {
+      return { ok: false, error: "Could not save reaction." };
+    });
   }
 
   function updateCurrentProfile(data) {
@@ -599,6 +666,7 @@
     refreshFriends: refreshFriends,
     refreshNotifications: refreshNotifications,
     createTowerPost: createTowerPost,
+    togglePostReaction: togglePostReaction,
     updateCurrentProfile: updateCurrentProfile,
     createProfessionalProfile: createProfessionalProfile,
     acceptFriendRequest: acceptFriendRequest,

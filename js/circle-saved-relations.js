@@ -8,13 +8,16 @@
 
   function normalizeKind(profile) {
     if (!profile || typeof profile !== "object") return "";
-    var raw = profile.account_kind != null ? profile.account_kind : profile.accountKind;
-    var k = String(raw == null ? "" : raw).toLowerCase();
+    if (!Object.prototype.hasOwnProperty.call(profile, "account_kind") && !Object.prototype.hasOwnProperty.call(profile, "accountKind")) {
+      return "";
+    }
+    var raw = Object.prototype.hasOwnProperty.call(profile, "account_kind") ? profile.account_kind : profile.accountKind;
+    var k = String(raw == null ? "" : raw).trim().toLowerCase();
     if (k === "seed" || k === "demo") return "seed";
     if (k === "ops" || k === "opsbot" || k === "ops_bot") return "ops";
     if (k === "real") return "real";
-    /* Column default is real when the field is present but empty. */
-    return "real";
+    /* Missing, empty, or unknown is not a real person. */
+    return "";
   }
 
   function profilesForUser(userId, profiles) {
@@ -29,15 +32,18 @@
   function kindForUser(userId, profiles) {
     var rows = profilesForUser(userId, profiles);
     if (!rows.length) return "";
+    var fleet = "";
+    var sawReal = false;
     var i;
     for (i = 0; i < rows.length; i++) {
       var kind = normalizeKind(rows[i]);
-      if (kind === "seed" || kind === "ops") return kind;
+      if (!kind) return "";
+      if (kind === "seed" || kind === "ops") fleet = fleet || kind;
+      if (kind === "real") sawReal = true;
     }
-    for (i = 0; i < rows.length; i++) {
-      if (rows[i].kind === "personal") return normalizeKind(rows[i]);
-    }
-    return normalizeKind(rows[0]);
+    if (fleet) return fleet;
+    if (sawReal) return "real";
+    return "";
   }
 
   function pairAllowed(kindA, kindB) {
@@ -110,6 +116,7 @@
 
   /**
    * Rows the signed-in person is actually in.
+   * Both sides need a real, seed, or ops label. A missing label drops the line.
    * A real account is never paired with a seed or ops account.
    */
   function visibleRelations(input) {

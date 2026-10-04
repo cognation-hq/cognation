@@ -1413,6 +1413,13 @@
     toggleReaction: function (postId, face) {
       face = String(face || "");
       if (!face) return { ok: false, error: "Missing reaction." };
+      if (usingRemoteSocial()) {
+        var social = remoteSocial();
+        if (!social || typeof social.togglePostReaction !== "function") {
+          return { ok: false, error: "Could not save reaction." };
+        }
+        return social.togglePostReaction(postId, face);
+      }
       var data = this.load();
       if (!data) {
         data = { version: 1, posts: JSON.parse(JSON.stringify(SEED)) };
@@ -1511,6 +1518,9 @@
       var sess = localStorage.getItem("cognation.session.v2");
       if (sess) {
         var parsed = JSON.parse(sess);
+        if (usingRemoteSocial() && parsed && parsed.activeProfileId) {
+          return String(parsed.activeProfileId);
+        }
         if (parsed && parsed.username) return String(parsed.username).toLowerCase();
       }
     } catch (e) {}
@@ -1542,8 +1552,15 @@
         ev.preventDefault();
         ev.stopPropagation();
         var result = TowerStore.toggleReaction(post.id, face);
-        if (!result.ok) return;
-        renderFeed(root);
+        var paint = function (out) {
+          if (!out || !out.ok) return;
+          renderFeed(root);
+        };
+        if (result && typeof result.then === "function") {
+          result.then(paint);
+          return;
+        }
+        paint(result);
       });
       controls.appendChild(b);
     });

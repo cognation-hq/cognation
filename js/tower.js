@@ -9769,6 +9769,16 @@
     var shortcut = document.querySelector('[data-tower-anchor="circle"]');
     if (shortcut) shortcut.setAttribute("aria-pressed", "true");
 
+    /* Saved friendships and follows only. Do not start portraits, lightning,
+       or the 15-minute ring. That look stays with the designer. */
+    layer.setAttribute("data-circle-count", "0");
+    layer.removeAttribute("data-circle-refresh-ms");
+    var circlePage = document.querySelector("[data-circle-page]") || layer;
+    if (window.CognationCircleRelations && typeof window.CognationCircleRelations.mount === "function") {
+      window.CognationCircleRelations.mount(circlePage);
+    }
+    return;
+
     var w = window.innerWidth || 800;
     var bodies = [];
     ids.forEach(function (id, i) {
@@ -9913,10 +9923,11 @@
     friendIds: circleFriendIds,
     refreshMs: CIRCLE_REFRESH_MS,
     refresh: function () {
-      if (applyCircleTopics(true)) repaintCircleRing();
-      return circleShownTopics.map(function (topic) {
-        return { kind: topic.kind, target: topic.target, text: topic.text, action: topic.action, href: topic.href };
-      });
+      var page = document.querySelector("[data-circle-page]");
+      if (page && window.CognationCircleRelations && typeof window.CognationCircleRelations.mount === "function") {
+        window.CognationCircleRelations.mount(page);
+      }
+      return [];
     }
   };
 

@@ -11947,6 +11947,30 @@ a.circle-fall-portrait {
   line-height: 0.86 !important;
   text-shadow: 0 0 28px rgba(172, 242, 255, 0.33) !important;
 }
+
+/* Saved friendships and follows. Words only. No new frame art. */
+.circle-fall:has([data-circle-relations]) {
+  height: auto;
+  min-height: 70vh;
+  overflow: visible;
+}
+.circle-relations {
+  position: relative;
+  z-index: 3;
+  width: min(40rem, calc(100% - 2rem));
+  margin: 1.5rem auto 2rem;
+  padding: 0;
+  list-style: none;
+  pointer-events: auto;
+}
+.circle-relations li {
+  margin: 0.85rem 0;
+  text-align: center;
+  color: #f7fbff;
+  font-size: 1rem;
+  line-height: 1.45;
+  text-shadow: 0 2px 12px rgba(6, 10, 30, 0.7);
+}
 #panel-commune .commune-swipe-header .commune-swipe-title {
   display: block;
   width: 100%;

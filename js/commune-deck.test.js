@@ -63,21 +63,38 @@ function typesOf(deck) {
   return deck.map(function (card) { return card.type; });
 }
 
+function featuredFamily(type) {
+  var content = { fact: 1, wellness: 1, friend: 1, event: 1, know: 1, content: 1 };
+  if (content[type]) return "content";
+  return String(type || "");
+}
+
 function assertPaced(deck) {
   var i;
   for (i = 1; i < deck.length; i++) {
-    assert.notStrictEqual(deck[i].type, deck[i - 1].type, "same type ran in a row at " + i);
+    assert.notStrictEqual(
+      featuredFamily(deck[i].type),
+      featuredFamily(deck[i - 1].type),
+      "same featured family ran in a row at " + i + " (" + deck[i - 1].type + " → " + deck[i].type + ")"
+    );
   }
-  var datingAt = [];
-  deck.forEach(function (card, idx) {
-    if (card.type === "dating") datingAt.push(idx);
+}
+
+function assertFeaturedOneToOne(deck, expectDating) {
+  var counts = { classroom: 0, ad: 0, chatroom: 0, dating: 0, content: 0 };
+  deck.forEach(function (card) {
+    var fam = featuredFamily(card.type);
+    if (Object.prototype.hasOwnProperty.call(counts, fam)) counts[fam] += 1;
   });
-  datingAt.forEach(function (idx) {
-    assert.ok(idx >= 5, "dating led or landed in the first five cards");
-  });
-  for (i = 1; i < datingAt.length; i++) {
-    assert.ok(datingAt[i] - datingAt[i - 1] >= 6, "fewer than five other cards between dating cards");
-  }
+  var families = ["classroom", "ad", "chatroom", "content"];
+  if (expectDating) families.push("dating");
+  var present = families.filter(function (f) { return counts[f] > 0; });
+  assert.ok(present.length >= 2, "need at least two featured families in deck");
+  var vals = present.map(function (f) { return counts[f]; });
+  var min = Math.min.apply(null, vals);
+  var max = Math.max.apply(null, vals);
+  assert.ok(max - min <= 1, "featured families should stay within 1 of each other (1:1): " + JSON.stringify(counts));
+  if (!expectDating) assert.strictEqual(counts.dating, 0, "dating must stay out when off");
 }
 
 function testRatingSentences() {
@@ -102,13 +119,18 @@ function testPace() {
     friend: [{ id: "fr1", title: "Kept" }],
     event: [{ id: "e1", title: "Class" }],
     know: [{ id: "k1", title: "Someone" }],
+    content: [{ id: "live1", type: "content", title: "Garage sale live" }],
   };
-  var dating = [{ id: "d1" }, { id: "d2" }, { id: "d3" }];
-  var deck = api.paceDeck(lanes, dating, 28);
+  var dating = [{ id: "d1" }, { id: "d2" }, { id: "d3" }, { id: "d4" }, { id: "d5" }, { id: "d6" }];
+  var deck = api.paceDeck(lanes, dating, 25);
   assert.ok(deck.length >= 20);
-  assert.notStrictEqual(deck[0].type, "dating");
   assertPaced(deck);
-  assert.ok(typesOf(deck).indexOf("dating") > 4);
+  assertFeaturedOneToOne(deck, true);
+  assert.ok(typesOf(deck).indexOf("dating") !== -1, "dating is in the 1:1 featured mix");
+  assert.ok(typesOf(deck).indexOf("classroom") !== -1);
+  assert.ok(typesOf(deck).indexOf("ad") !== -1);
+  assert.ok(typesOf(deck).indexOf("chatroom") !== -1);
+  assert.ok(deck.some(function (c) { return featuredFamily(c.type) === "content"; }));
 
   var sparse = api.paceDeck({
     classroom: [],
@@ -119,14 +141,17 @@ function testPace() {
     friend: [],
     event: [],
     know: [],
+    content: [],
   }, [], 12);
   assert.ok(sparse.length >= 12);
   assertPaced(sparse);
+  assertFeaturedOneToOne(sparse, false);
   var skipped = sparse.filter(function (card) {
     return card.type === "know" || card.type === "ad" || card.type === "dating";
   });
   assert.strictEqual(skipped.length, 0);
 }
+
 
 function testFullFriendList() {
   var local = memoryStorage();
@@ -430,7 +455,8 @@ function testClassroomSurface() {
   assert.ok(deck.some(function (c) { return c.type === "classroom"; }), "adult deck should include Classroom");
   assertPaced(deck);
 
-  /* Featured mix 1:1 — classroom should appear without stacking runs of itself */
+  /* Featured mix 1:1 — classroom is its own featured family; never back-to-back with itself */
+  assertPaced(deck);
   var classIdx = [];
   deck.forEach(function (c, i) { if (c.type === "classroom") classIdx.push(i); });
   for (var i = 1; i < classIdx.length; i++) {

@@ -13,13 +13,15 @@ function src(rel) { return fs.readFileSync(path.join(root, rel), "utf8"); }
 var helperSrc = src("js/age-floor-keywords.js");
 
 var floor = require(path.join(root, "js/age-floor-keywords.js"));
-assert.strictEqual(String(floor.ADULT_KEYWORD_RE), "/(^|\\W)(13|16|17|18|21)\\+(?!\\w)|\\bPG-?13\\b|\\b(nsfw|explicit)\\b/i");
+assert.strictEqual(String(floor.ADULT_KEYWORD_RE), "/(^|\\W)(13|16|17|18|21)\\s?\\+(?!\\w)|\\bPG-?13\\b|\\b(nsfw|explicit)\\b/i");
 
 ["21+", "21+ only", "this is 21+.", "NSFW pic", "explicit",
- "18+ only", "13+", "17+", "16+.", "PG-13", "rated pg13", "(21+)", "Members 18+, please"].forEach(function (t) {
+ "18+ only", "13+", "17+", "16+.", "PG-13", "pg13", "rated pg13", "(21+)", "Members 18+, please",
+ "21 +", "21＋", "Ages 21 ＋ only", "１８＋", "13 +", "16 +", "17 +", "18 +"].forEach(function (t) {
   assert.strictEqual(floor.isAdultKeyword(t), true, "matches: " + JSON.stringify(t));
 });
-["121+", "a21+b", "21 plus", "explicitly fine?", "113+", "2018+", "PG", "G-rated", "", null, "Great news for students."].forEach(function (t) {
+["121+", "a21+b", "21 plus", "explicitly fine?", "113+", "2018+", "PG", "G-rated", "", null, "Great news for students.",
+ "21  +", "113 +", "2018 +", "21 +b"].forEach(function (t) {
   assert.strictEqual(floor.isAdultKeyword(t), false, "does not match: " + JSON.stringify(t));
 });
 /* No g flag: repeated calls stay stable. */

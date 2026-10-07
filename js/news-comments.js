@@ -22,16 +22,10 @@
     try { localStorage.setItem(KEY, JSON.stringify(d)); return true; } catch (e) { return false; }
   }
   function age() {
-    try {
-      if (window.CognationCommuneSwipe && window.CognationCommuneSwipe.getMemberAge) {
-        var n = window.CognationCommuneSwipe.getMemberAge();
-        if (n != null && !isNaN(n)) return n;
-      }
-      var p = JSON.parse(localStorage.getItem("cognation.member.profile.v1") || "null");
-      if (p && p.age != null) return parseInt(p.age, 10) || 0;
-    } catch (e) {}
-    /* Unknown age is treated as under-13, so the G/PG floor applies. */
-    return 0;
+    /* Shared rule (js/age-floor-keywords.js): unknown age is treated as under-13.
+       Fail closed if the helper is missing. */
+    var floor = window.CognationAgeFloor;
+    return floor && typeof floor.viewerAge === "function" ? floor.viewerAge() : 0;
   }
   function who() {
     var name = "you", kind = "real";
@@ -123,8 +117,9 @@
     }, function () { return { ok: false, error: "shared" }; });
   }
   function isGpg(rating) {
-    var r = String(rating || "").toUpperCase().replace(/[–—]/g, "-").replace(/\s+/g, "");
-    return r === "G" || r === "PG" || r === "G-PG" || r === "GPG";
+    /* Shared G/PG check (js/age-floor-keywords.js); fail closed if missing. */
+    var floor = window.CognationAgeFloor;
+    return !!(floor && typeof floor.ratingIsGPG === "function" && floor.ratingIsGPG(rating));
   }
   function isFlaggedForAge(body) {
     var floor = window.CognationAgeFloor;

@@ -9,6 +9,8 @@ var path = require("path");
 var vm = require("vm");
 var root = path.join(__dirname, "..");
 function src(rel) { return fs.readFileSync(path.join(root, rel), "utf8"); }
+/* index.html loads the shared age-floor helper before news-comments.js. */
+function ncSrc() { return src("js/age-floor-keywords.js") + "\n" + src("js/news-comments.js"); }
 function mem() {
   var d = {};
   return {
@@ -19,7 +21,7 @@ function mem() {
 }
 function load(ls) {
   var w = {};
-  vm.runInNewContext(src("js/news-comments.js"), { window: w, localStorage: ls, Date: Date, Math: Math });
+  vm.runInNewContext(ncSrc(), { window: w, localStorage: ls, Date: Date, Math: Math });
   return w.CognationNewsComments;
 }
 
@@ -99,7 +101,7 @@ function sharedRest(db) {
 }
 function boot(ls, auth, rest) {
   var w = {};
-  vm.runInNewContext(src("js/news-comments.js"), {
+  vm.runInNewContext(ncSrc(), {
     window: w, localStorage: ls, Date: Date, Math: Math, Promise: Promise, encodeURIComponent: encodeURIComponent,
   });
   w.CognationSupabase = { configured: function () { return true; }, rest: rest };

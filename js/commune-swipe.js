@@ -591,10 +591,68 @@
           title: title,
           body: [when, where].filter(Boolean).join(" · "),
           interests: terms(ev.interests || title + " " + where),
+          city: rec.city || rec.locality || "",
+          state: rec.state || "",
+          country: rec.country || "",
         });
       });
     });
     return out;
+  }
+
+  /* Cognation-curated free community listings (platform data — not seed-fabricated).
+   * Used on dating-match Tower lines until partnership events exist.
+   * Prefer viewer-local rows; nationwide rows are Cognation-hosted free events. */
+  var COGNATION_FREE_LOCAL_EVENTS = [
+    {
+      id: "cgn-free-community-board",
+      title: "Cognation community board walk",
+      body: "Free · weekend mornings",
+      nationwide: true,
+    },
+    {
+      id: "cgn-free-skill-share",
+      title: "Cognation free skill-share hour",
+      body: "Free · weekday evenings",
+      nationwide: true,
+    },
+  ];
+
+  function formatMatchEventLine(ev) {
+    if (!ev) return "";
+    var title = String(ev.title || "").trim();
+    if (!title) return "";
+    var detail = String(ev.body || "").trim();
+    var line = detail ? title + " · " + detail : title;
+    return "Local event: " + line;
+  }
+
+  /** One live local / Cognation free event line for dating-match Tower messages.
+   * Never invents seed copy: skips cal-demo calendar seeds; only public/pro or curated platform rows. */
+  function pickLocalEventLine() {
+    var all = publicEvents();
+    var localOnes = [];
+    var others = [];
+    all.forEach(function (ev) {
+      if (!ev || !ev.title) return;
+      var rec = profileById(ev.profileId);
+      if (rec && isLocal(rec)) localOnes.push(ev);
+      else others.push(ev);
+    });
+    var pick = localOnes[0] || others[0] || null;
+    if (!pick) {
+      var viewer = getMemberProfile();
+      var personal = viewerPersonal();
+      var vCity = norm(viewer.city || viewer.locality || (personal && (personal.city || personal.locality)));
+      var curated = COGNATION_FREE_LOCAL_EVENTS.filter(function (ev) {
+        if (!ev || !ev.title) return false;
+        if (ev.nationwide) return true;
+        if (!vCity) return false;
+        return norm(ev.city || ev.locality) === vCity;
+      });
+      pick = curated[0] || null;
+    }
+    return formatMatchEventLine(pick);
   }
 
   function isLocal(rec) {
@@ -1419,9 +1477,12 @@
       if (hasDatingRight(card.profileId, me)) {
         var store = window.CognationMessageStore;
         if (store && typeof store.openMatch === "function") {
+          var eventLine = "";
+          try { eventLine = pickLocalEventLine() || ""; } catch (eEv) { eventLine = ""; }
           store.openMatch(
             { id: me, name: (self && self.displayName) || "You" },
-            { id: card.profileId, name: card.name || "Member" }
+            { id: card.profileId, name: card.name || "Member" },
+            { eventLine: eventLine }
           );
         }
         writeNotice(me, "match", "It's a match. A message is open in Tower.");
@@ -1636,6 +1697,9 @@
     settleSwipe: settleSwipe,
     omitPassed: omitPassed,
     sendPersonalFriendRequest: sendPersonalFriendRequest,
+    publicEvents: publicEvents,
+    pickLocalEventLine: pickLocalEventLine,
+    formatMatchEventLine: formatMatchEventLine,
     FOLLOWS_KEY: FOLLOWS_KEY,
     SEE_DATING_KEY: SEE_DATING_KEY,
     MEMBER_PROFILE_KEY: MEMBER_PROFILE_KEY,

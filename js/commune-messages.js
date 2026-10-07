@@ -323,9 +323,10 @@
     });
   };
 
-  MessageStore.openMatch = function (a, b) {
+  MessageStore.openMatch = function (a, b, opts) {
     a = a || {};
     b = b || {};
+    opts = opts || {};
     if (!a.id || !b.id) return null;
     var ids = [String(a.id), String(b.id)].sort();
     var cid = "match-" + ids[0] + "--" + ids[1];
@@ -338,6 +339,20 @@
       }
     }
     if (!found) {
+      /* Optional event line from dating-match path only — never invent seed copy here. */
+      var eventLine = String(opts.eventLine || "").trim();
+      if (eventLine && /cal-demo/i.test(eventLine)) eventLine = "";
+      var matchMsg = {
+        id: "match-" + Date.now().toString(36),
+        senderId: "cognation",
+        senderName: "Cognation",
+        body: "You both swiped right. Say hello when you're ready.",
+        createdAt: new Date().toISOString(),
+        kind: "friend",
+        mutualMatch: true,
+        reactions: {},
+      };
+      if (eventLine) matchMsg.eventLine = eventLine;
       found = {
         id: cid,
         title: b.name || "Match",
@@ -347,18 +362,7 @@
           { id: String(b.id), name: b.name || "Member" },
         ],
         mutualMatch: true,
-        messages: [
-          {
-            id: "match-" + Date.now().toString(36),
-            senderId: "cognation",
-            senderName: "Cognation",
-            body: "You both swiped right. Say hello when you're ready.",
-            createdAt: new Date().toISOString(),
-            kind: "friend",
-            mutualMatch: true,
-            reactions: {},
-          },
-        ],
+        messages: [matchMsg],
       };
       state.conversations.unshift(found);
       this.save(state);
@@ -668,6 +672,13 @@
             : isMatch
               ? '<p class="tower-msg-label">Mutual match</p>'
               : "";
+        var eventLineHtml = "";
+        if (isMatch && msg.eventLine) {
+          eventLineHtml =
+            '<p class="tower-msg-event-line" data-match-event-line>' +
+            escapeHtml(String(msg.eventLine)) +
+            "</p>";
+        }
         article.innerHTML =
           label +
           '<header class="commune-msg-meta">' +
@@ -686,7 +697,8 @@
           "</header>" +
           '<p class="commune-msg-body tower-msg-body">' +
           escapeHtml(msg.body) +
-          "</p>";
+          "</p>" +
+          eventLineHtml;
         article.appendChild(buildReactionBar(msg, !isMine));
         messagesEl.appendChild(article);
       });

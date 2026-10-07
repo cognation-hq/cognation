@@ -33,7 +33,10 @@
     var name = "you", kind = "real";
     try {
       var s = JSON.parse(localStorage.getItem("cognation.session.demo.v1") || "null");
-      if (s && s.username) name = String(s.username);
+      if (s && String(s.profileDisplayName || "").trim()) name = String(s.profileDisplayName).trim();
+      else if (s && s.username) name = String(s.username);
+      /* Signed-in sessions carry the auth email as username; never show it as a name. */
+      if (name.indexOf("@") !== -1) name = "Member";
       if (s && (s.accountKind === "seed" || s.accountKind === "ops" || s.isSeed))
         kind = s.accountKind === "ops" ? "ops" : "seed";
     } catch (e) {}

@@ -97,7 +97,8 @@ security definer set search_path = public
 as $$
 declare
   supplied_handle text := lower(coalesce(new.raw_user_meta_data ->> 'handle', ''));
-  supplied_name text := coalesce(new.raw_user_meta_data ->> 'display_name', split_part(new.email, '@', 1));
+  -- Never derive a name from the email (see 20261007_profiles_hide_email.sql).
+  supplied_name text := coalesce(nullif(btrim(new.raw_user_meta_data ->> 'display_name'), ''), 'Member');
 begin
   supplied_handle := regexp_replace(supplied_handle, '[^a-z0-9_-]', '', 'g');
   if char_length(supplied_handle) < 3 then

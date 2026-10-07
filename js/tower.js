@@ -4219,9 +4219,14 @@
     try {
       var session = getSessionObject();
       if (session && (session.username === id || session.activeProfileId === id)) {
-        return String(session.displayName || session.username || "You");
+        /* Signed-in sessions carry the auth email as username; never show it as a name. */
+        var sessionName = String(session.username || "");
+        if (sessionName.indexOf("@") !== -1) sessionName = "Member";
+        return String(session.displayName || sessionName || "You");
       }
     } catch (eName) {}
+    /* Follower ids can be a signed-in session username (the auth email). */
+    if (id.indexOf("@") !== -1) return "Member";
     return id;
   }
 

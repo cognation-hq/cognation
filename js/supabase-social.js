@@ -97,6 +97,8 @@
     );
   }
 
+  var PROFILE_RETURN_COLUMNS = "id,user_id,kind,handle,display_name,bio";
+
   function selectProfiles() {
     return client()
       .rest("profiles", {
@@ -357,7 +359,9 @@
     return client()
       .rest("profiles", {
         method: "PATCH",
-        query: "id=eq." + encodeURIComponent(me.activeProfileId),
+        /* Explicit columns: profiles.email is not readable by browser roles, so
+           return=representation must not fall back to select=*. */
+        query: "id=eq." + encodeURIComponent(me.activeProfileId) + "&select=" + PROFILE_RETURN_COLUMNS,
         body: changes,
       })
       .then(function (rows) {
@@ -376,6 +380,7 @@
     return client()
       .rest("profiles", {
         method: "POST",
+        query: "select=" + PROFILE_RETURN_COLUMNS,
         body: {
           user_id: me.supabaseUserId,
           kind: "professional",

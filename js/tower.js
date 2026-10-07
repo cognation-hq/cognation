@@ -1182,24 +1182,22 @@
         var social = remoteSocial();
         var activeSession = getSessionObject();
         var remoteRow = social && social.getProfile ? social.getProfile(id) : null;
-        var identityChanged = !remoteRow ||
-          String(data.displayName || "").trim() !== String(remoteRow.display_name || "").trim() ||
-          String(data.handle || "").trim() !== String(remoteRow.handle || "").trim() ||
-          String(data.slogan || "").trim() !== String(remoteRow.bio || "").trim();
-        /* A drop only changes x/y. Skip the profile PATCH so the page does not
-           reload the remote profile and snap the sticker back to its spawn point. */
+        /* Write to the server only from the server's own row: wait until the active
+           profile's row is cached, never from a local blob (another account's record
+           or the legacy cognation.tower.profile.v1 key), and send only real changes. */
         if (
-          identityChanged &&
-          social &&
+          remoteRow &&
+          data._remote &&
           social.updateCurrentProfile &&
           activeSession &&
-          id === activeSession.activeProfileId
+          id === activeSession.activeProfileId &&
+          String(remoteRow.user_id || "") === String(activeSession.supabaseUserId || "")
         ) {
-          social.updateCurrentProfile({
-            displayName: data.displayName,
-            handle: data.handle,
-            bio: data.slogan,
-          }).catch(function () {});
+          var changes = {};
+          if (String(data.displayName || "").trim() !== String(remoteRow.display_name || "").trim()) changes.displayName = data.displayName;
+          if (String(data.handle || "").trim() !== String(remoteRow.handle || "").trim()) changes.handle = data.handle;
+          if (String(data.slogan || "").trim() !== String(remoteRow.bio || "").trim()) changes.bio = data.slogan;
+          if (Object.keys(changes).length) social.updateCurrentProfile(changes).catch(function () {});
         }
       }
       var towerBlob = {};

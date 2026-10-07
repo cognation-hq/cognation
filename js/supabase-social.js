@@ -345,6 +345,9 @@
     if (!me || !me.activeProfileId) {
       return Promise.reject(new Error("Sign in before editing your profile."));
     }
+    /* No PATCH until this user's server row is cached; then only changed fields. */
+    var row = profileForId(me.activeProfileId);
+    if (!row || row.user_id !== String(me.supabaseUserId)) return Promise.resolve(null);
     var changes = {};
     if (data && Object.prototype.hasOwnProperty.call(data, "displayName")) {
       changes.display_name = String(data.displayName || "").trim().slice(0, 80) || "Member";
@@ -355,7 +358,10 @@
     if (data && Object.prototype.hasOwnProperty.call(data, "bio")) {
       changes.bio = String(data.bio || "").trim().slice(0, 280);
     }
-    if (!Object.keys(changes).length) return Promise.resolve(profileForId(me.activeProfileId));
+    Object.keys(changes).forEach(function (key) {
+      if (changes[key] === row[key]) delete changes[key];
+    });
+    if (!Object.keys(changes).length) return Promise.resolve(row);
     return client()
       .rest("profiles", {
         method: "PATCH",

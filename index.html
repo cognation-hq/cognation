@@ -324,15 +324,18 @@
               <header class="tower-header">
                 <h3 class="tower-title">TOWER</h3>
               </header>
-              <div class="tower-app" data-tower-app data-tower-side="private" data-tower-is-owner="true">
-                <div class="tower-side-toggle" data-tower-side-toggle role="tablist" aria-label="Tower side">
-                  <button type="button" class="tower-side-btn" role="tab" data-tower-side-btn="private" aria-selected="true" id="tower-side-private">Connections</button>
-                  <button type="button" class="tower-side-btn" role="tab" data-tower-side-btn="public" aria-selected="false" id="tower-side-public">Public profile</button>
+              <div class="tower-app" data-tower-app data-tower-side="public" data-tower-is-owner="true">
+                <div class="tower-side-toggle" data-tower-side-toggle role="tablist" aria-label="Tower side" hidden>
+                  <button type="button" class="tower-side-btn" role="tab" data-tower-side-btn="private" aria-selected="false" id="tower-side-private">Connections</button>
+                  <button type="button" class="tower-side-btn" role="tab" data-tower-side-btn="public" aria-selected="true" id="tower-side-public">Public profile</button>
                 </div>
 
                 <!-- PRIVATE: profiles + connections (Feed compose lives under SIGNAL) -->
                 <div class="tower-private-side" data-tower-private-side>
                   <div class="tower-main">
+                    <p class="tower-side-jump-row">
+                      <button type="button" class="tower-side-jump" data-tower-side-jump="public">Public profile →</button>
+                    </p>
                     <details class="tower-private-theme tower-private-friends tower-compact-block tower-densify-section" data-tower-private-friends data-tower-top-friends open>
                       <summary class="tower-private-theme-summary">Top friends</summary>
                       <div class="tower-private-theme-body">
@@ -461,6 +464,9 @@
 
                 <!-- PUBLIC: scrapbook face visitors see -->
                 <div class="tower-public-side" data-tower-public-side hidden>
+                  <p class="tower-side-jump-row tower-side-jump-row--public">
+                    <button type="button" class="tower-side-jump" data-tower-side-jump="private">← Connections</button>
+                  </p>
                   <div class="tower-profile-kind-toggle" data-tower-profile-kind-toggle role="tablist" aria-label="Public profile page" hidden>
                     <button type="button" class="tower-kind-btn" role="tab" data-tower-profile-kind="personal" aria-selected="true" id="tower-kind-personal">Personal page</button>
                     <button type="button" class="tower-kind-btn" role="tab" data-tower-profile-kind="professional" aria-selected="false" id="tower-kind-professional">Professional page</button>
@@ -507,8 +513,9 @@
                         </div>
                         <div class="tower-followers" data-tower-followers hidden>
                           <p class="tower-followers-note" data-tower-followers-note>No followers yet.</p>
-                          <label class="visually-hidden" for="tower-followers-find">Search followers</label>
-                          <input id="tower-followers-find" class="tower-followers-find" type="search" data-tower-followers-find placeholder="Search followers" autocomplete="off">
+                          <p class="tower-followers-mutual" data-tower-followers-mutual hidden></p>
+                          <label class="visually-hidden" for="tower-followers-find" hidden>Search followers</label>
+                          <input id="tower-followers-find" class="tower-followers-find" type="search" data-tower-followers-find placeholder="Search followers" autocomplete="off" hidden>
                           <ul class="tower-followers-results" data-tower-followers-results role="list"></ul>
                         </div>
                         <button type="button" class="tower-go-live-btn" data-go-live aria-label="Go live">Go live</button>
@@ -574,6 +581,8 @@
                           <input id="tower-social-tiktok" name="socialTiktok" type="url" maxlength="500" placeholder="https://tiktok.com/@…" data-tower-social="tiktok" inputmode="url">
                           <label for="tower-social-linkedin">LinkedIn</label>
                           <input id="tower-social-linkedin" name="socialLinkedin" type="url" maxlength="500" placeholder="https://linkedin.com/in/…" data-tower-social="linkedin" inputmode="url">
+                          <label for="tower-social-linktree">Linktree</label>
+                          <input id="tower-social-linktree" name="socialLinktree" type="url" maxlength="500" placeholder="https://linktr.ee/…" data-tower-social="linktree" inputmode="url">
                           <label for="tower-social-venmo">Venmo</label>
                           <input id="tower-social-venmo" name="socialVenmo" type="text" maxlength="500" placeholder="@handle or https://venmo.com/…" data-tower-social="venmo" autocomplete="off">
                           <div class="form-actions tower-social-actions">

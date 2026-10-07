@@ -55,6 +55,29 @@
     }
   }
 
+  /* Cap 250: Follow edge = viewer's current Tower face (no picker). */
+  function viewerFace(btn) {
+    var root = btn && btn.closest && btn.closest("[data-tower-app]");
+    if (root) {
+      var viewKind = root.getAttribute("data-view-kind");
+      if (viewKind === "professional" || viewKind === "personal") return viewKind;
+      var kindBtn = root.querySelector('[data-tower-profile-kind="professional"][aria-selected="true"]');
+      if (kindBtn) return "professional";
+      var perBtn = root.querySelector('[data-tower-profile-kind="personal"][aria-selected="true"]');
+      if (perBtn) return "personal";
+    }
+    try {
+      var raw = localStorage.getItem("cognation.session.v2");
+      var session = raw ? JSON.parse(raw) : null;
+      if (session && session.profileKind === "professional") return "professional";
+    } catch (eFace) {}
+    return "personal";
+  }
+
+  function viewedIsProfessional(btn) {
+    return isProfessionalContext(btn);
+  }
+
   function alreadyFollowing(profile) {
     if (!profile) return false;
     var viewer = String(viewerFollowerId() || "");
@@ -164,12 +187,29 @@
     }
     btn.disabled = false;
     var viewed = activeProfile();
+    var face = viewerFace(btn);
+    btn.setAttribute("data-viewer-face", face);
     if (pro) {
+      /* personal→pro and pro→pro Follow OK; edge tagged with current Tower face. */
       var following = alreadyFollowing(viewed);
       btn.setAttribute("aria-pressed", following ? "true" : "false");
       btn.classList.toggle("is-following", following);
       btn.textContent = following ? "Following" : "Follow";
-      btn.setAttribute("aria-label", following ? "You follow this professional page" : "Follow this professional page");
+      btn.setAttribute(
+        "aria-label",
+        following
+          ? "Unfollow this professional page as your " + face + " face"
+          : "Follow this professional page as your " + face + " face"
+      );
+      return;
+    }
+    /* Friends are personal↔personal only. Professional cannot Friend personal. */
+    if (face === "professional") {
+      btn.disabled = true;
+      btn.classList.remove("is-following");
+      btn.setAttribute("aria-pressed", "false");
+      btn.textContent = "Unavailable";
+      btn.setAttribute("aria-label", "Professional pages cannot friend personal profiles");
       return;
     }
     var friends = alreadyFriend(viewed);
@@ -213,9 +253,16 @@
           return;
         }
       } else {
+      var remoteKind = isProfessionalContext(btn) ? "professional" : "personal";
+      var remoteFace = viewerFace(btn);
+      if (remoteKind === "personal" && remoteFace === "professional") {
+        btn.setAttribute("aria-label", "Professional pages cannot friend personal profiles");
+        syncButton(btn);
+        return;
+      }
       btn.disabled = true;
       graph
-        .act(id, isProfessionalContext(btn) ? "professional" : "personal")
+        .act(id, remoteKind, { viewerFace: remoteFace })
         .then(function () {
           syncButton(btn);
           document.dispatchEvent(new CustomEvent("cognation:social-relationship-changed"));
@@ -232,16 +279,25 @@
     }
     var viewed = activeProfile();
     var pro = isProfessionalContext(btn);
+    var face = viewerFace(btn);
     if (pro) {
       if (window.CognationTowerFollowers && typeof window.CognationTowerFollowers.add === "function") {
         var followerId = viewerFollowerId();
-        if (followerId) window.CognationTowerFollowers.add(String(followerId));
+        if (followerId) window.CognationTowerFollowers.add(String(followerId), face);
       }
       if (api && id) api.toggleFollow(id);
       syncButton(btn);
       if (api && api.rebuild) {
         try { api.rebuild(); } catch (e) {}
       }
+      document.dispatchEvent(
+        new CustomEvent("cognation:tower-profile-updated", { detail: { reason: "follow", face: face } })
+      );
+      return;
+    }
+    if (face === "professional") {
+      btn.setAttribute("aria-label", "Professional pages cannot friend personal profiles");
+      syncButton(btn);
       return;
     }
     var friendId = viewed && viewed._friendId;

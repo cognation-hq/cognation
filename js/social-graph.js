@@ -102,7 +102,8 @@
     });
   }
 
-  function act(profileId, profileKind) {
+  function act(profileId, profileKind, opts) {
+    opts = opts || {};
     if (!isReady()) return Promise.reject(new Error("Sign in to use member connections."));
     return relationship(profileId, profileKind).then(function (state) {
       if (state.mode === "self") throw new Error("This is your page.");
@@ -113,6 +114,10 @@
           .then(function () {
             return relationship(profileId, profileKind);
           });
+      }
+      /* Cap 250: friends are personal↔personal only. Professional cannot Friend personal. */
+      if (opts.viewerFace === "professional") {
+        return Promise.reject(new Error("Professional pages cannot friend personal profiles."));
       }
       if (state.mode === "friend" || state.mode === "requested") {
         /* SeedOps: real ↛ seed/ops friend block (client gate; RPC also enforces). */

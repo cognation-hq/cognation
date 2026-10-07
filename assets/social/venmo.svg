@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Venmo">
+  <rect width="32" height="32" rx="7" fill="#008CFF"/>
+  <path fill="#fff" d="M22.6 7.2c.55.92.84 1.88.84 3.05 0 3.82-3.26 8.78-5.9 12.55h-6.05l-1.72-15.3h5.35l.9 10.05c1.35-2.18 3.02-5.6 3.02-7.5 0-1.2-.2-2.02-.55-2.85h4.11z"/>
+</svg>

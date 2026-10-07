@@ -2998,6 +2998,16 @@ body.login-gate-open .app-topbar {
   color: var(--color-heading);
 }
 
+/* Signed in, server profile not loaded yet: muted placeholder, no text. */
+.tower-profile-name.is-loading {
+  color: var(--cgn-text-muted);
+  visibility: hidden;
+}
+.tower-avatar.is-loading {
+  background: var(--cgn-text-muted) !important;
+  opacity: 0.4;
+}
+
 .tower-profile-form .form-group {
   margin-bottom: 0.65rem;
 }
@@ -7966,6 +7976,10 @@ body { padding-top: 0 !important; }
   line-height: 1.05;
   word-break: break-word;
   font-size: var(--tower-name-size, 28px);
+  /* Same box while loading and after: short names sit left in 10ch; only
+     names over 10 letters widen it. */
+  min-width: 10ch;
+  text-align: left;
 }
 .tower-name-resize {
   position: absolute;

@@ -406,9 +406,15 @@
     if (session && session.activeProfileId) ids.push(String(session.activeProfileId));
     return ids;
   }
+  function ageFloorApi() {
+    return window.CognationAgeFloor || null;
+  }
   function getMemberProfile() {
     var p = readJson(localStorage, MEMBER_PROFILE_KEY, null);
     if (!p || typeof p !== "object") p = {};
+    /* Shared device: another signed-in user's leftover profile is not ours. */
+    var floor = ageFloorApi();
+    if (floor && typeof floor.memberProfileOwned === "function" && !floor.memberProfileOwned(p)) p = {};
     try {
       if (!p.country) {
         var c = localStorage.getItem("cognation.member.country.v1");
@@ -422,6 +428,9 @@
     var prev = getMemberProfile();
     Object.keys(prev).forEach(function (k) { next[k] = prev[k]; });
     Object.keys(fields || {}).forEach(function (k) { next[k] = fields[k]; });
+    var floorW = ageFloorApi();
+    var owner = floorW && typeof floorW.sessionUserId === "function" ? floorW.sessionUserId() : "";
+    if (owner) next.ownerUserId = owner;
     writeJson(localStorage, MEMBER_PROFILE_KEY, next);
     if (next.country) {
       try { localStorage.setItem("cognation.member.country.v1", String(next.country)); } catch (e) {}

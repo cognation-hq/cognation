@@ -23,16 +23,45 @@
 
   /* Viewer age (moved from js/news-comments.js, #68): the Commune member profile
      age; unknown counts as 0, so an unknown age gets the under-13 floor. */
+  function localStore() {
+    return root.localStorage || (typeof localStorage !== "undefined" ? localStorage : null);
+  }
+
+  /* Signed-in (Supabase) user id, or "" for signed-out / demo sessions. */
+  function sessionUserId() {
+    try {
+      var auth = root.CognationAuth;
+      var s = auth && typeof auth.getSession === "function" ? auth.getSession() : null;
+      if (!s) {
+        var store = localStore();
+        s = store ? JSON.parse(store.getItem("cognation.session.v2") || "null") : null;
+      }
+      return s && s.source === "supabase" && s.supabaseUserId ? String(s.supabaseUserId) : "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  /* Shared devices: cognation.member.profile.v1 counts only when it was written
+     for the signed-in user (ownerUserId). Another user's leftover blob is ignored.
+     Signed-out / demo sessions are unchanged. */
+  function memberProfileOwned(blob) {
+    var uid = sessionUserId();
+    if (!uid) return true;
+    return !!blob && String(blob.ownerUserId || "") === uid;
+  }
+
   function viewerAge() {
     try {
+      var store0 = localStore();
+      var own = store0 ? JSON.parse(store0.getItem("cognation.member.profile.v1") || "null") : null;
+      if (!memberProfileOwned(own)) return 0;
       var swipe = root.CognationCommuneSwipe;
       if (swipe && swipe.getMemberAge) {
         var n = swipe.getMemberAge();
         if (n != null && !isNaN(n)) return n;
       }
-      var store = root.localStorage || (typeof localStorage !== "undefined" ? localStorage : null);
-      var p = store ? JSON.parse(store.getItem("cognation.member.profile.v1") || "null") : null;
-      if (p && p.age != null) return parseInt(p.age, 10) || 0;
+      if (own && own.age != null) return parseInt(own.age, 10) || 0;
     } catch (e) {}
     return 0;
   }
@@ -55,6 +84,8 @@
     ADULT_KEYWORD_RE: ADULT_KEYWORD_RE,
     isAdultKeyword: isAdultKeyword,
     viewerAge: viewerAge,
+    sessionUserId: sessionUserId,
+    memberProfileOwned: memberProfileOwned,
     viewerIsUnder13: viewerIsUnder13,
     ratingIsGPG: ratingIsGPG,
   };

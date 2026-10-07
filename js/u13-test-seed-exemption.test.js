@@ -173,10 +173,15 @@ function testCommuneAliveSkipsDefault() {
     w.load("js/seedops-commune-alive.js");
     w.win.CognationSeedOpsCommuneAlive.ensureMemberProfile();
     assert.strictEqual(w.win.CognationCommuneSwipe.getMemberAge(), null, "commune-alive: no age-28 default for Sage");
-    var other = world({ session: SAGE_SESSION, user: { id: "u-x", user_metadata: {} }, row: null });
+    var other = world({ session: Object.assign({}, SAGE_SESSION, { supabaseUserId: "u-x" }), user: { id: "u-x", user_metadata: {} }, row: null });
     other.load("js/seedops-commune-alive.js");
+    /* Signed in but not loaded yet: "not loaded" is not "not Sage", so no default yet. */
     other.win.CognationSeedOpsCommuneAlive.ensureMemberProfile();
-    assert.strictEqual(other.win.CognationCommuneSwipe.getMemberAge(), 28, "commune-alive: default unchanged for others");
+    assert.strictEqual(other.win.CognationCommuneSwipe.getMemberAge(), null, "commune-alive: no default before the login data loads");
+    return other.win.CognationU13TestViewer.ready().then(function () {
+      other.win.CognationSeedOpsCommuneAlive.ensureMemberProfile();
+      assert.strictEqual(other.win.CognationCommuneSwipe.getMemberAge(), 28, "commune-alive: default unchanged for others once loaded");
+    });
   });
 }
 

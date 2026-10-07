@@ -9558,6 +9558,11 @@
       renderFeed(root);
       if (hashRequestsPublicSide()) applyTowerSide(root, "public");
     });
+    /* Logout / next sign-in: repaint the header now. Without this the previous
+       user's name and avatar stayed in the DOM until the new server row loaded. */
+    ["cognation:session-ended", "cognation:session-started"].forEach(function (name) {
+      document.addEventListener(name, function () { renderProfileChrome(root); });
+    });
   }
 
   /* Friends rain on the Circle page. Not followers. Capped so a full roster stays smooth. */

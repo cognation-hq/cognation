@@ -313,6 +313,23 @@
     return found;
   }
 
+  /* Shared devices: the legacy cognation.tower.profile.v1 mirror is "your" Tower
+     copy. With sign-in configured it is written only for a record stamped to the
+     signed-in user, so a seed/other-person record (hydrates) or a late write after
+     logout can't leave someone else's unstamped copy behind. Local preview keeps
+     the old mirror. */
+  function legacyMirrorAllowed(rec) {
+    var sb = window.CognationSupabase;
+    if (!sb || typeof sb.configured !== "function" || !sb.configured()) return true;
+    var uid = "";
+    try {
+      var s = JSON.parse(localStorage.getItem("cognation.session.v2") || "null");
+      if (s && s.source === "demo") return true;
+      if (s && s.source === "supabase" && s.supabaseUserId) uid = String(s.supabaseUserId);
+    } catch (e) {}
+    return !!(uid && rec && String(rec.ownerUserId || "") === uid);
+  }
+
   function saveProfileRecord(rec) {
     var doc = loadProfilesDoc();
     rec.updatedAt = Date.now();
@@ -322,7 +339,7 @@
     /* Mirror active-looking blob for older readers. A failed mirror must not
        undo the profile write that just succeeded. */
     try {
-      if (rec.kind === "personal") {
+      if (rec.kind === "personal" && legacyMirrorAllowed(rec)) {
         localStorage.setItem(LEGACY_PROFILE_KEY, JSON.stringify(stripMeta(rec)));
       }
     } catch (e) {}
@@ -512,7 +529,7 @@
             legacyNow.removedFriendPinIds.length &&
             JSON.stringify(legacyNow.removedFriendPinIds) !== JSON.stringify(personal.removedFriendPinIds || []))
         ));
-        if (!legacyRicher) {
+        if (!legacyRicher && legacyMirrorAllowed(personal)) {
           localStorage.setItem(LEGACY_PROFILE_KEY, JSON.stringify(stripMeta(personal)));
         }
       } catch (e2) {}

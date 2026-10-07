@@ -106,7 +106,10 @@
     if (!q) return [];
     var social = remoteSocial();
     if (hasRemoteSession() && social && social.memberResults) {
-      return social.memberResults(q).map(function (p) {
+      var u13 = window.CognationU13TestViewer;
+      return social.memberResults(q).filter(function (p) {
+        return !(u13 && u13.isSageRow(p));
+      }).map(function (p) {
         var professional = p.kind === "professional";
         return {
           id: p.id,

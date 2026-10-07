@@ -99,11 +99,22 @@
 
   var PROFILE_RETURN_COLUMNS = "id,user_id,kind,handle,display_name,bio";
 
+  /* Leave Sage (seed-0248, the under-13 test viewer) out of member lists. */
+  function u13() {
+    return window.CognationU13TestViewer || null;
+  }
+  function listFilter() {
+    return u13() ? "&" + u13().LIST_FILTER : "";
+  }
+  function isSageRow(row) {
+    return !!(u13() && u13().isSageRow(row));
+  }
+
   function selectProfiles() {
     return client()
       .rest("profiles", {
         query:
-          "select=id,user_id,kind,handle,display_name,bio&order=created_at.desc&limit=400",
+          "select=id,user_id,kind,handle,display_name,bio&order=created_at.desc&limit=400" + listFilter(),
       })
       .then(cacheProfiles);
   }
@@ -243,10 +254,14 @@
     return client()
       .rest("tower_posts", {
         query:
-          "select=id,author_profile_id,body,visibility,attachments,created_at,author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,bio),reactions:tower_post_reactions(face,profile_id)&order=created_at.desc&limit=100",
+          "select=id,author_profile_id,body,visibility,attachments,created_at,author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,bio,seed_fleet_id),reactions:tower_post_reactions(face,profile_id)&order=created_at.desc&limit=100",
       })
       .then(function (rows) {
-        var posts = (Array.isArray(rows) ? rows : []).map(mapPost);
+        var posts = (Array.isArray(rows) ? rows : [])
+          .filter(function (row) {
+            return !isSageRow(row && (row.author || row.profiles));
+          })
+          .map(mapPost);
         replaceTowerFeed(posts);
         return posts;
       });
@@ -419,7 +434,7 @@
         );
       })
       .filter(function (profile) {
-        return !me || profile.user_id !== me.supabaseUserId;
+        return (!me || profile.user_id !== me.supabaseUserId) && !isSageRow(profile);
       });
     return list.slice(0, 8);
   }

@@ -81,6 +81,7 @@
       "select=id,user_id,handle,display_name,bio,account_kind,seed_fleet_id,kind" +
       "&account_kind=eq.seed" +
       "&kind=eq.personal" +
+      (window.CognationU13TestViewer ? "&" + window.CognationU13TestViewer.LIST_FILTER : "") +
       "&order=seed_fleet_id.asc" +
       "&limit=" +
       Math.min(FETCH_LIMIT, HARD_CAP);

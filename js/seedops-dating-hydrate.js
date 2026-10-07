@@ -76,6 +76,20 @@
     return !!(sb && typeof sb.configured === "function" && sb.configured());
   }
 
+  /* Sage (seed-0248), the under-13 test viewer: no adult seed defaults, no prefs
+     writes. See js/seedops-u13-test-viewer.js. False until her data loads. */
+  function u13() {
+    return window.CognationU13TestViewer || null;
+  }
+  function isU13TestViewer() {
+    var h = u13();
+    return !!(h && h.isU13TestViewer());
+  }
+  function u13Ready() {
+    var h = u13();
+    return h && typeof h.ready === "function" ? h.ready() : Promise.resolve(false);
+  }
+
   function isSeedOrOpsSession() {
     try {
       if (window.CognationSeedOpsCommuneAlive && typeof window.CognationSeedOpsCommuneAlive.isSeedOrOpsSession === "function") {
@@ -402,6 +416,7 @@
       "select=id,handle,display_name,bio,account_kind,seed_fleet_id" +
       "&account_kind=eq.seed" +
       "&bio=neq." +
+      (u13() ? "&" + u13().LIST_FILTER : "") +
       "&order=seed_fleet_id.asc" +
       "&limit=" +
       Math.min(FETCH_LIMIT, HARD_CAP);
@@ -419,6 +434,7 @@
       .getUser()
       .then(function (user) {
         if (!user) return null;
+        if (u13()) u13().noteUser(user);
         return user.user_metadata || user.userMetadata || null;
       })
       .catch(function () {
@@ -440,6 +456,12 @@
        server already has. Each page load fires several hydrates and
        member-profile-updated events; unchanged prefs must not PUT /auth/v1/user. */
     var run = function () {
+      return u13Ready().then(function (sage) {
+        if (sage) return { ok: true, skipped: true, error: "u13_test_viewer" };
+        return runWrite();
+      });
+    };
+    var runWrite = function () {
       var known = serverPrefsJson != null
         ? Promise.resolve(serverPrefsJson)
         : fetchUserMetadata().then(function (meta) { rememberServerPrefs(meta); return serverPrefsJson; });
@@ -524,7 +546,7 @@
         if (prior.memberAge != null || prior.seeDating != null) {
           applyViewerPrefs(cachedPrefs, { seedDefaults: false });
           refillDeck();
-        } else if (isSeedOrOpsSession()) {
+        } else if (isSeedOrOpsSession() && !isU13TestViewer()) {
           applyViewerPrefs({}, { seedDefaults: true });
           refillDeck();
         }
@@ -533,11 +555,18 @@
     }
     hydrating = true;
     var seedish = isSeedOrOpsSession();
+    var sage = false;
     return fetchUserMetadata()
+      .then(function (meta) {
+        return u13Ready().then(function (isSage) {
+          sage = !!isSage;
+          return meta;
+        });
+      })
       .then(function (meta) {
         rememberServerPrefs(meta);
         var prefs = prefsFromMetadata(meta);
-        applyViewerPrefs(prefs, { seedDefaults: seedish });
+        applyViewerPrefs(prefs, { seedDefaults: seedish && !sage });
         if (!seedish && !opts.forceBios) {
           return { ok: true, bios: { ok: true, merged: 0, dating: 0 }, prefs: prefs, seedish: false };
         }
@@ -581,7 +610,7 @@
         hydrating = false;
         /* Seed defaults should stick server-side so the next device skips
            localStorage. persistPrefs() only writes when they differ from the server. */
-        if (seedish) {
+        if (seedish && !sage) {
           persistPrefs();
         }
         return out;
@@ -612,7 +641,7 @@
         sessionStorage.removeItem(BOOT_FLAG);
       } catch (e) {}
       /* Eager age so Classroom cards / Open session see 18+ before async getUser. */
-      if (isSeedOrOpsSession()) {
+      if (isSeedOrOpsSession() && !isU13TestViewer()) {
         try {
           applyViewerPrefs({}, { seedDefaults: true });
           refillDeck();

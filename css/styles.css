@@ -11781,7 +11781,11 @@ body.is-circle-open .app-topbar-shortcut[data-tower-anchor="circle"] {
   z-index: 1;
   overflow: hidden;
   pointer-events: none;
-  background: #101229;
+  /* Cap 250 — ring is page background (Alexa lock 2026-10-07): indigo + halo */
+  background:
+    radial-gradient(ellipse at 50% 44%, rgba(168, 244, 255, 0.16), transparent 42%),
+    radial-gradient(ellipse at 52% 52%, rgba(197, 166, 255, 0.2), transparent 58%),
+    linear-gradient(145deg, #171a3a 0%, #291b3a 100%);
   flex: 0 0 auto;
 }
 a.circle-fall-portrait {
@@ -12144,11 +12148,11 @@ a.circle-fall-portrait {
   text-shadow: 0 0 28px rgba(172, 242, 255, 0.33) !important;
 }
 
-/* Saved friendships and follows. Words only. No new frame art. */
+/* Cap 250 — ring stays full-page. Relations list is overlay, not a blank panel. */
 .circle-fall:has([data-circle-relations]) {
-  height: auto;
-  min-height: 70vh;
-  overflow: visible;
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
 }
 .circle-relations {
   position: relative;
@@ -12159,6 +12163,11 @@ a.circle-fall-portrait {
   list-style: none;
   pointer-events: auto;
 }
+.circle-relations.is-empty,
+.circle-relations.is-loading {
+  /* Empty state is the ring + five empty spots — not blank copy as the whole UI */
+  display: none;
+}
 .circle-relations li {
   margin: 0.85rem 0;
   text-align: center;
@@ -12166,6 +12175,48 @@ a.circle-fall-portrait {
   font-size: 1rem;
   line-height: 1.45;
   text-shadow: 0 2px 12px rgba(6, 10, 30, 0.7);
+}
+
+/* Five empty spots on the lightning ring (accepted 10/4; Cap 250 ships background) */
+.circle-spot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 4.4rem;
+  height: 4.4rem;
+  margin: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(168, 244, 255, 0.38);
+  box-shadow:
+    0 0 22px rgba(197, 166, 255, 0.32),
+    inset 0 0 14px rgba(168, 244, 255, 0.14);
+  background: rgba(16, 19, 48, 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: none;
+  color: #f7fbff !important;
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 10px rgba(6, 10, 30, 0.65);
+}
+.circle-spot.is-filled {
+  border-color: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 18px rgba(8, 12, 32, 0.28);
+  background-size: cover;
+  background-position: center;
+  pointer-events: auto;
+  cursor: default;
+}
+.circle-spot.is-empty {
+  /* hollow ghost — cyan/violet halo rim */
+  background:
+    radial-gradient(circle at 50% 40%, rgba(168, 244, 255, 0.12), transparent 62%),
+    rgba(16, 19, 48, 0.42);
 }
 #panel-commune .commune-swipe-header .commune-swipe-title {
   display: block;

@@ -10149,7 +10149,68 @@
     layer.appendChild(ring);
   }
 
-  function circleSpotAt(phase) {
+  /* Cap 250 — ring shell as Circle page background: lightning + five spots. */
+  function paintCircleRingShell(layer, people) {
+    if (!layer) return;
+    var old = layer.querySelector("[data-circle-ring]");
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    people = Array.isArray(people) ? people.slice(0, CIRCLE_SPOTS.length) : [];
+    var ring = document.createElement("div");
+    ring.className = "circle-ring";
+    ring.setAttribute("data-circle-ring", "");
+    ring.setAttribute("data-circle-topics", String(people.length));
+    ring.setAttribute("data-circle-shell", "1");
+    paintCircleLightning(ring);
+    var spin = document.createElement("div");
+    spin.className = "circle-ring-spin";
+    var i;
+    for (i = 0; i < CIRCLE_SPOTS.length; i++) {
+      var spotMeta = CIRCLE_SPOTS[i];
+      var spot = document.createElement("div");
+      spot.className = "circle-spot";
+      spot.setAttribute("data-circle-spot", spotMeta.id);
+      spot.setAttribute("data-circle-topic", "shell");
+      var person = people[i] || null;
+      if (person && person.name) {
+        spot.classList.add("is-filled");
+        spot.classList.remove("is-empty");
+        spot.textContent = String(person.name).trim().charAt(0).toUpperCase() || "?";
+        spot.setAttribute("aria-label", person.name);
+        if (person.userId) spot.setAttribute("data-circle-person", person.userId);
+      } else {
+        spot.classList.add("is-empty");
+        spot.classList.remove("is-filled");
+        spot.textContent = "";
+        spot.setAttribute("aria-hidden", "true");
+      }
+      spin.appendChild(spot);
+    }
+    ring.appendChild(spin);
+    layer.appendChild(ring);
+    placeCircleSpots();
+  }
+
+  function placeCircleSpots() {
+    if (!circleFallState) return;
+    var spots = document.querySelectorAll("[data-circle-ring] [data-circle-spot]");
+    if (!spots.length) return;
+    var shift = ((performance.now() - circleFallState.ringStarted) / 28000) * CIRCLE_SPOTS.length;
+    var i;
+    for (i = 0; i < spots.length; i++) {
+      var pos = circleSpotAt(i + shift);
+      spots[i].style.transform =
+        "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + pos.y.toFixed(1) + "px) scale(" + pos.s.toFixed(3) + ")";
+      spots[i].style.zIndex = String(Math.round(pos.s * 100));
+    }
+  }
+
+  function fillCircleSpots(people) {
+    var layer = document.querySelector("[data-circle-fall]");
+    if (!layer) return;
+    paintCircleRingShell(layer, people || []);
+  }
+
+    function circleSpotAt(phase) {
     var count = CIRCLE_SPOTS.length;
     var wrapped = ((phase % count) + count) % count;
     var index = Math.floor(wrapped);
@@ -10252,10 +10313,30 @@
     var shortcut = document.querySelector('[data-tower-anchor="circle"]');
     if (shortcut) shortcut.setAttribute("aria-pressed", "true");
 
-    /* Saved friendships and follows only. Do not start portraits, lightning,
-       or the 15-minute ring. That look stays with the designer. */
+    /* Cap 250 — Circle ring as page background (Alexa lock 2026-10-07 ~12:57 CT).
+       Indigo gradient + halo + cyan/violet synapse wave + five empty spots when
+       nothing to show. Keep friendships/follows hydrate; fill spots when present.
+       Do not start portrait physics or the 15-minute demo-topic loop. */
     layer.setAttribute("data-circle-count", "0");
     layer.removeAttribute("data-circle-refresh-ms");
+    layer.setAttribute("data-circle-ring-shell", "");
+    paintCircleRingShell(layer, []);
+    circleFallState = {
+      bodies: [],
+      raf: 0,
+      last: performance.now(),
+      started: performance.now(),
+      ringStarted: performance.now(),
+      refreshTimer: null,
+      shellOnly: true
+    };
+    function frameShell() {
+      var st = circleFallState;
+      if (!st || !st.shellOnly) return;
+      placeCircleSpots();
+      st.raf = requestAnimationFrame(frameShell);
+    }
+    circleFallState.raf = requestAnimationFrame(frameShell);
     var circlePage = document.querySelector("[data-circle-page]") || layer;
     if (window.CognationCircleRelations && typeof window.CognationCircleRelations.mount === "function") {
       window.CognationCircleRelations.mount(circlePage);
@@ -10361,6 +10442,10 @@
     window.addEventListener("resize", function () {
       if (!circleFallState) return;
       placeCircleFallLayer(document.querySelector("[data-circle-fall]"));
+      if (circleFallState.shellOnly) {
+        placeCircleSpots();
+        return;
+      }
       circleFallState.bodies.forEach(function (b) {
         var floor = circleFloor(b);
         var edge = 6 + circleEdgePad(b);
@@ -10405,7 +10490,10 @@
     cap: CIRCLE_FALL_CAP,
     friendIds: circleFriendIds,
     refreshMs: CIRCLE_REFRESH_MS,
+    fillSpots: fillCircleSpots,
     refresh: function () {
+      var layer = document.querySelector("[data-circle-fall]");
+      if (layer) paintCircleRingShell(layer, []);
       var page = document.querySelector("[data-circle-page]");
       if (page && window.CognationCircleRelations && typeof window.CognationCircleRelations.mount === "function") {
         window.CognationCircleRelations.mount(page);

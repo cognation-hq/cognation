@@ -5,7 +5,8 @@
  * - One level, oldest first, latest 20, text only (no reactions table), same
  *   composer/Post and ⋯ Report; seeds keep the Demo badge.
  * - No looser client path: comments come only from RLS (posts the viewer can
- *   see); keyword-flagged text stays hidden for under-13 viewers.
+ *   see). Under-13 or unknown age: no Feed thread and no requests.
+ * - Same gap under a Feed post as News uses before its thread, no divider.
  * Run: node js/feed-post-comments.test.js
  */
 "use strict";
@@ -120,15 +121,36 @@ function testLocalPostSkipped() {
   });
 }
 
-function testUnder13() {
+function testNoThreadUnder13OrUnknown() {
+  var cases = [[12, "under-13"], [null, "unknown age"]];
+  return cases.reduce(function (p, c) {
+    return p.then(function () {
+      var srv = server();
+      var t = setup(srv, ALEX, c[0], POST);
+      return tick().then(function () {
+        assert.strictEqual(t.host.hidden, true, c[1] + ": no Feed thread");
+        assert.strictEqual(t.host.innerHTML, "", c[1] + ": nothing drawn");
+        assert.strictEqual(srv.calls.length, 0, c[1] + ": zero requests");
+      });
+    });
+  }, Promise.resolve());
+}
+
+function testThreadAt13() {
   var srv = server();
-  var t = setup(srv, ALEX, null, POST);   /* unknown age = under-13 */
+  var t = setup(srv, ALEX, 13, POST);
   return tick().then(function () {
-    var html = t.host.innerHTML;
-    assert.strictEqual(t.host.hidden, false, "a post the Feed already showed this viewer keeps its RLS-filtered thread");
-    assert.ok(html.indexOf("First") !== -1);
-    assert.ok(html.indexOf("18+ night") === -1 && html.indexOf("Hidden for your age group") !== -1, "flagged text hidden for under-13");
+    assert.strictEqual(t.host.hidden, false, "13 or older: thread shown");
+    assert.ok(t.host.innerHTML.indexOf("First") !== -1);
+    assert.ok(srv.calls.length > 0);
   });
+}
+
+function testSpacing() {
+  var css = fs.readFileSync(path.join(root, "css", "styles.css"), "utf8");
+  /* Same gap as News (margin-top 0.45rem + padding-top 0.35rem), minus its divider line. */
+  assert.ok(/\.news-story-comments\[data-news-comments\] \{ margin-top: 0\.45rem; padding-top: 0\.35rem; border-top: [^}]+\}/.test(css), "News gap unchanged");
+  assert.ok(/\.tower-post > \.news-story-comments\[data-news-comments\] \{ border-top: 0; \}/.test(css), "Feed: same gap, no divider");
 }
 
 function testWiring() {
@@ -138,9 +160,11 @@ function testWiring() {
 }
 
 testWiring();
+testSpacing();
 testSignedInThread()
   .then(testSignedOutHidden)
   .then(testLocalPostSkipped)
-  .then(testUnder13)
+  .then(testNoThreadUnder13OrUnknown)
+  .then(testThreadAt13)
   .then(function () { console.log("feed-post-comments.test.js: ok"); })
   .catch(function (err) { console.error(err); process.exit(1); });

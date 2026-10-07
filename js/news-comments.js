@@ -10,16 +10,17 @@
     global: "CognationNewsComments", key: "cognation.news.comments.v1",
     table: "news_story_comments", parentCol: "story_id", reportsTable: "news_comment_reports",
     reactionsTable: "news_story_comment_reactions", postSelector: "[data-news-post][data-post-id]",
-    idAttr: "data-post-id", signedInOnly: false, postAlreadyFloored: false,
+    idAttr: "data-post-id", signedInOnly: false, under13NoThread: false,
   };
   /* Feed posts: only server posts (uuid ids) can carry comments (post_id FK).
-     The Feed already applied the post's own age floor before drawing it, and RLS
-     returns comments only for posts the viewer can see. No reactions table. */
+     RLS returns comments only for posts the viewer can see. Under-13 or unknown
+     age (same age helper as News): no Feed thread at all, nothing fetched.
+     No reactions table. */
   var FEED = {
     global: "CognationFeedComments", key: "cognation.feed.comments.v1",
     table: "tower_post_comments", parentCol: "post_id", reportsTable: "tower_post_comment_reports",
     reactionsTable: "", postSelector: "[data-tower-post]",
-    idAttr: "data-tower-post", signedInOnly: true, postAlreadyFloored: true,
+    idAttr: "data-tower-post", signedInOnly: true, under13NoThread: true,
   };
   build(NEWS);
   build(FEED);
@@ -263,7 +264,7 @@
   }
   function renderThread(host, storyId, rating) {
     if (!host) return null;
-    var vis = cfg.postAlreadyFloored ? true : isThreadVisible(rating, age());
+    var vis = cfg.under13NoThread ? age() >= 13 : isThreadVisible(rating, age());
     /* Feed: signed-in viewers of shared (server) comments only. */
     if (cfg.signedInOnly && !(remoteOn() && sessionAuthor())) vis = false;
     host.hidden = !vis;
@@ -357,7 +358,7 @@
        slow pull from an earlier call (old session or profile) loses. */
     var token = (host.__renderToken || 0) + 1;
     host.__renderToken = token;
-    if (remoteOn() && sessionAuthor()) {
+    if (remoteOn() && sessionAuthor() && !(cfg.under13NoThread && age() < 13)) {
       pullStory(storyId).then(function () {
         if (host.__renderToken === token) renderThread(host, storyId, rating);
       }, function () {

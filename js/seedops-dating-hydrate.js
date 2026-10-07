@@ -25,7 +25,9 @@
   var HARD_CAP = 250;
   var INTEREST_DEFAULT = ["tech", "mental health", "jobs", "insurance", "gamers"];
   var persistTimer = null;
-  var lastPersistJson = "";
+  /* JSON of the prefs payload the server already has (null = not read yet). */
+  var serverPrefsJson = null;
+  var persistChain = null;
   var hydrating = false;
   var ensureInFlight = null;
 
@@ -150,6 +152,26 @@
         interests
       ),
     };
+  }
+
+  /* Same shape and key order as prefsPayloadFromLocal(), from auth user_metadata. */
+  function prefsPayloadFromMetadata(meta) {
+    meta = meta || {};
+    var p = prefsFromMetadata(meta);
+    var interests = meta.member_interests || meta.memberInterests || null;
+    if (Array.isArray(interests)) interests = interests.slice();
+    return {
+      see_dating: p.seeDating,
+      member_age: p.age,
+      member_city: p.city,
+      member_state: p.state,
+      member_country: p.country,
+      member_interests: interests,
+    };
+  }
+
+  function rememberServerPrefs(meta) {
+    if (meta) serverPrefsJson = JSON.stringify(prefsPayloadFromMetadata(meta));
   }
 
   function prefsPayloadFromLocal() {
@@ -408,23 +430,34 @@
     if (!session || !session.access_token) {
       return Promise.resolve({ ok: false, skipped: true, error: "not_signed_in" });
     }
-    var payload = prefsPayloadFromLocal();
-    var json = JSON.stringify(payload);
-    if (!opts.force && json === lastPersistJson) {
-      return Promise.resolve({ ok: true, skipped: true, unchanged: true });
-    }
-    return sb.updateUser(payload).then(function () {
-      lastPersistJson = json;
-      emitLog({ action: "persist", ok: true, payload: payload });
-      return { ok: true, payload: payload };
-    }).catch(function (err) {
-      emitLog({
-        action: "persist",
-        ok: false,
-        error: (err && err.message) || "persist_failed",
+    /* One write at a time, and only when local prefs differ from what the
+       server already has. Each page load fires several hydrates and
+       member-profile-updated events; unchanged prefs must not PUT /auth/v1/user. */
+    var run = function () {
+      var known = serverPrefsJson != null
+        ? Promise.resolve(serverPrefsJson)
+        : fetchUserMetadata().then(function (meta) { rememberServerPrefs(meta); return serverPrefsJson; });
+      return known.then(function (serverJson) {
+        if (serverJson == null) return { ok: false, skipped: true, error: "server_prefs_unknown" };
+        var payload = prefsPayloadFromLocal();
+        var json = JSON.stringify(payload);
+        if (json === serverJson) return { ok: true, skipped: true, unchanged: true };
+        return sb.updateUser(payload).then(function () {
+          serverPrefsJson = json;
+          emitLog({ action: "persist", ok: true, payload: payload });
+          return { ok: true, payload: payload };
+        });
+      }).catch(function (err) {
+        emitLog({
+          action: "persist",
+          ok: false,
+          error: (err && err.message) || "persist_failed",
+        });
+        return { ok: false, error: (err && err.message) || "persist_failed" };
       });
-      return { ok: false, error: (err && err.message) || "persist_failed" };
-    });
+    };
+    persistChain = (persistChain || Promise.resolve()).then(run, run);
+    return persistChain;
   }
 
   function schedulePersist() {
@@ -481,6 +514,7 @@
     var seedish = isSeedOrOpsSession();
     return fetchUserMetadata()
       .then(function (meta) {
+        rememberServerPrefs(meta);
         var prefs = prefsFromMetadata(meta);
         applyViewerPrefs(prefs, { seedDefaults: seedish });
         if (!seedish && !opts.forceBios) {
@@ -524,9 +558,10 @@
         writeJson(sessionStorage, BOOT_FLAG, out);
         emitLog({ action: "hydrate", ok: out.ok, result: out });
         hydrating = false;
-        /* Seed defaults should stick server-side so the next device skips localStorage. */
+        /* Seed defaults should stick server-side so the next device skips
+           localStorage. persistPrefs() only writes when they differ from the server. */
         if (seedish) {
-          persistPrefs({ force: true });
+          persistPrefs();
         }
         return out;
       })

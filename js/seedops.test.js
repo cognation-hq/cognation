@@ -722,7 +722,8 @@ hydrateWin.CognationCommuneSwipe = {
     assert.ok(out && out.ok, "hydrate ok " + JSON.stringify(out));
     assert.strictEqual(hydrateSee, true, "seeDating hydrated");
     assert.strictEqual(hydrateMember.age, 29, "age from metadata");
-    assert.ok(hydrateWin.__lastUpdateUser && hydrateWin.__lastUpdateUser.see_dating === true, "persisted prefs");
+    /* Server metadata already matches the hydrated prefs, so nothing is written. */
+    assert.strictEqual(hydrateWin.__lastUpdateUser, undefined, "unchanged prefs send no PUT /auth/v1/user");
     console.log("seedops.test.js dating-hydrate: ok");
   }).catch(function (err) {
     console.error(err);

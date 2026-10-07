@@ -1146,14 +1146,6 @@
       loadMoreWire();
     }
 
-    function towerProfileSlug(name) {
-      return String(name || "neighbor")
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "") || "neighbor";
-    }
-
     function postsFromTower() {
       if (!window.CognationTowerStore || typeof window.CognationTowerStore.newsList !== "function") {
         return [];
@@ -1161,19 +1153,11 @@
       var list = window.CognationTowerStore.newsList();
       return list.map(function (p) {
         var author = p.authorName || "Neighbor";
-        var slug = towerProfileSlug(author);
-        /* Prefer profile handle badge when this post is from the local profile */
-        if (window.CognationTowerProfileStore) {
-          var me = window.CognationTowerProfileStore.get();
-          var myHandle = (me.handle || "").replace(/^@/, "").toLowerCase();
-          if (myHandle && me.displayName && author === me.displayName) {
-            slug = myHandle;
-          } else if (p.handle) {
-            slug = String(p.handle).replace(/^@/, "").toLowerCase();
-          }
-        } else if (p.handle) {
-          slug = String(p.handle).replace(/^@/, "").toLowerCase();
-        }
+        /* Author link by profile id (handle only when there is no id), never by
+           display name: two people named the same each open their own page.
+           Neither known: no link rather than a wrong person. */
+        var slug = p.handle ? String(p.handle).replace(/^@/, "").toLowerCase() : "";
+        var linkRef = p.authorProfileId ? String(p.authorProfileId) : slug;
         var bits = [];
         (p.attachments || []).forEach(function (a) {
           var k = a.kind || "document";
@@ -1207,7 +1191,7 @@
         }
         if (p.title && body.indexOf(p.title) !== 0) body = p.title + " — " + body;
         var sourceLabel = towerLabel + " · " + reactions + " reactions";
-        var sourceDetail = "Most reacted on " + towerLabel.toLowerCase() + " · @" + slug;
+        var sourceDetail = "Most reacted on " + towerLabel.toLowerCase() + (slug ? " · @" + slug : "");
         if (isFof && body.toLowerCase().indexOf("@friendsoffriends") === -1) {
           body = "@friendsoffriends · " + body;
         }
@@ -1232,7 +1216,7 @@
           kind: kind,
           source: sourceLabel,
           sourceDetail: sourceDetail,
-          profileHref: "#tower-profile-" + slug,
+          profileHref: linkRef ? "#tower-profile-" + encodeURIComponent(linkRef) : "",
           profileSlug: slug,
           likes: p.likes || 0,
           seeded: true,

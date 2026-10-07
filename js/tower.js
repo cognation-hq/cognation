@@ -423,6 +423,17 @@
        substitute the signed-in profile (often the professional page). */
     var slug = towerProfileSlug();
     if (slug) {
+      /* Author links carry the profile id (handle only when there is no id);
+         resolve the id first. Display names are never used. */
+      if (window.CognationAccounts && window.CognationAccounts.getProfileById) {
+        var byIdHash = window.CognationAccounts.getProfileById(slug);
+        if (byIdHash && byIdHash.id) return byIdHash.id;
+      }
+      var socialById = remoteSocial();
+      if (socialById && typeof socialById.getProfile === "function") {
+        var remoteById = socialById.getProfile(slug);
+        if (remoteById && remoteById.id) return remoteById.id;
+      }
       if (window.CognationAccounts && window.CognationAccounts.getProfileByHandle) {
         var byHash = window.CognationAccounts.getProfileByHandle(slug);
         if (byHash && byHash.id) return byHash.id;
@@ -1275,6 +1286,7 @@
     {
       id: "tower-1",
       authorName: "Alex Rivera",
+      authorProfileId: "alex-rivera",
       body: "East wing library late night — brought notes from the zoning packet.",
       createdAt: "2026-09-15T18:30:00.000Z",
       attachments: [{ kind: "note", label: "Zoning notes.pdf", name: "Zoning notes.pdf" }],
@@ -1283,6 +1295,7 @@
     {
       id: "tower-2",
       authorName: "Sam Okonkwo",
+      authorProfileId: "sam-okonkwo",
       body: "@friendsoffriends Market square this morning. Peach stand line hit the fountain again.",
       createdAt: "2026-09-15T17:05:00.000Z",
       attachments: [{ kind: "photo", label: "Square photo", name: "market-square.jpg" }],
@@ -1293,6 +1306,7 @@
     {
       id: "tower-3",
       authorName: "Jordan Lee",
+      authorProfileId: "jordan-lee",
       body: "Saturday block party invite — bring a dish if you can.",
       createdAt: "2026-09-15T15:40:00.000Z",
       attachments: [{ kind: "document", label: "Party invitation", name: "block-party-invite.pdf" }],
@@ -1301,6 +1315,7 @@
     {
       id: "tower-4",
       authorName: "Mira Chen",
+      authorProfileId: "mira-chen",
       body: "Short clip from the river walk mural going up.",
       createdAt: "2026-09-15T14:10:00.000Z",
       attachments: [{ kind: "video", label: "Mural clip", name: "mural-walk.mp4" }],
@@ -1309,6 +1324,7 @@
     {
       id: "tower-5",
       authorName: "Chris Patel",
+      authorProfileId: "chris-patel",
       body: "Creative study: cyan ink wash of the tower silhouette.",
       createdAt: "2026-09-15T12:55:00.000Z",
       attachments: [{ kind: "art", label: "Tower silhouette", name: "tower-ink.png" }],
@@ -1409,6 +1425,7 @@
           out.push({
             id: "pro-" + id + "-" + (post.id || idx),
             authorName: rec.displayName || rec.handle || "Professional",
+            authorProfileId: rec.id || id,
             handle: rec.handle || "",
             title: post.title || "",
             body: post.body || post.title || "",
@@ -1566,6 +1583,9 @@
       var post = {
         id: "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
         authorName: (fields && fields.authorName) || "You",
+        authorProfileId: (window.CognationTowerProfileStore &&
+          window.CognationTowerProfileStore.get() &&
+          window.CognationTowerProfileStore.get()._profileId) || "",
         body: body.slice(0, 2000),
         createdAt: new Date().toISOString(),
         attachments: (fields && fields.attachments) || [],
@@ -1905,12 +1925,10 @@
     if (handleVal) return handleVal;
     /* Demo founder without a saved handle still shares as /alexa */
     if (isFounderOwner(profile)) return "alexa";
-    var fromName = String((profile && profile.displayName) || "you")
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "");
-    return fromName || "you";
+    /* No handle: link by profile id, never by a slug of the display name
+       (two people named the same would share one link). */
+    var idVal = String((profile && (profile._profileId || profile.id)) || "").trim();
+    return idVal || "you";
   }
 
   function profilePublicHash(profile) {
@@ -9930,13 +9948,18 @@
     return [topic.kind, topic.target, (topic.people || []).map(function (person) { return person.id; }).join(",")].join("|");
   }
 
-  function circlePostByAuthor(name) {
-    var want = String(name || "").trim().toLowerCase();
-    if (!want) return null;
+  /* By author profile id (or handle), never display name: another person
+     with the same name must not stand in for this friend. */
+  function circlePostByAuthor(friend) {
+    var wantId = String((friend && friend.id) || "");
+    var wantHandle = normalizeHandle((friend && friend.handle) || "");
+    if (!wantId && !wantHandle) return null;
     var posts = [];
     try { posts = (TowerStore.list() || []).filter(towerPostVisibleToViewer); } catch (e) { return null; }
     for (var i = 0; i < posts.length; i++) {
-      if (String(posts[i].authorName || "").trim().toLowerCase() === want) return posts[i];
+      var post = posts[i] || {};
+      if (wantId && String(post.authorProfileId || "") === wantId) return post;
+      if (wantHandle && normalizeHandle(post.handle || "") === wantHandle) return post;
     }
     return null;
   }
@@ -9974,7 +9997,7 @@
       if (!since[id]) return;
       var friend = circleFriendById(id);
       if (!friend) return;
-      var post = circlePostByAuthor(friend.name);
+      var post = circlePostByAuthor(friend);
       if (!post || !post.id) return;
       topics.push({
         kind: "friends",

@@ -80,7 +80,7 @@ function testInternationalAutopullReplacesStale() {
   store.setItem(
     FEED_KEY,
     JSON.stringify({
-      version: 202610022,
+      version: 202610071,
       byEdition: {
         international: { posts: [] },
         nationwide: { posts: [{ id: "stale-us", body: "stale", seeded: true }] },
@@ -100,7 +100,7 @@ function testInternationalAutopullReplacesStale() {
   var posts = api.FeedStore.listPosts("international");
   assert.strictEqual(posts.length, pulled.count);
   assert.ok(posts.some(function (p) {
-    return p.id === "intl-2026-10-02-spain-housing";
+    return p.id === "intl-2026-10-07-korea-nuri";
   }));
   assert.ok(
     posts.every(function (p) {
@@ -130,7 +130,7 @@ function testNationwideAutopull() {
   store.setItem(
     FEED_KEY,
     JSON.stringify({
-      version: 202610022,
+      version: 202610071,
       byEdition: {
         nationwide: { posts: [] },
         international: { posts: [{ id: "keep-intl", body: "x", seeded: true }] },
@@ -142,12 +142,18 @@ function testNationwideAutopull() {
   var api = loadCommune(store);
   var pulled = api.FeedStore.pullCuratedSeedPack("nationwide");
   assert.strictEqual(pulled.ok, true);
-  assert.ok(pulled.count >= 3, "nationwide curated pack expected");
+  assert.ok(pulled.count >= 6, "nationwide curated pack expected");
   var posts = api.FeedStore.listPosts("nationwide");
   assert.strictEqual(posts.length, pulled.count);
   assert.ok(posts.some(function (p) {
-    return String(p.id).indexOf("seed-us-nat") === 0;
+    return String(p.id).indexOf("nat-2026-10-07-") === 0;
   }));
+  assert.ok(
+    posts.filter(function (p) {
+      return p.rating === "G-PG";
+    }).length >= 6,
+    "G-PG ratings expected on curated nationwide items"
+  );
   assert.strictEqual(api.FeedStore.listPosts("international")[0].id, "keep-intl");
   assert.strictEqual(api.fetchCalls.length, 0);
 }

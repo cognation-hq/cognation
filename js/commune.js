@@ -35,7 +35,7 @@
   }
 
   window.CognationMemberCountry = { get: getMemberCountry, set: setMemberCountry };
-  var FEED_SEED_REV = 5; /* refresh international broadsheet wire */
+  var FEED_SEED_REV = 6; /* Oct 7 G–PG intl + nationwide seed packs */
 
   var EDITIONS = {
     local: {
@@ -124,9 +124,9 @@
       id: "nationwide",
       label: "Nationwide",
       subtitle: "Nationwide Broadsheet",
-      dateline: "Nationwide edition · Member country",
-      volume: "Vol. II · No. 4",
-      dek: "Same broadsheet look — what’s happening in the member’s country (United States default), drawn from Google News–style national sources. Read-only.",
+      dateline: "Nationwide edition · Oct 7, 2026",
+      volume: "Vol. II · No. 5",
+      dek: "MIT for America leads a G–PG U.S. STEM-and-education desk; no politics or disaster wires.",
       topicsLeft: ["National wire", "Markets open", "Science page", "Arts & letters"],
       topicsRight: [
         "TOWER — national scaffold",
@@ -135,41 +135,77 @@
       ],
       seedPosts: [
         {
-          id: "seed-us-nat-1",
-          authorName: "National Desk",
-          kind: "news",
-          source: "Google News · US",
-          body: "NATIONAL ROUNDUP — Markets, weather, and Capitol wires lead the United States plate this hour. Sources aggregated in Google News–style national coverage.",
-          createdAt: "2026-09-16T02:00:00.000Z",
-          seeded: true
+          "id": "nat-2026-10-07-mit-for-america",
+          "authorName": "Cognation Wire",
+          "body": "BREAKING | United States / Education\nMIT LAUNCHES “MIT FOR AMERICA” TO STRENGTHEN STEM NATIONWIDE\n\nMIT announced MIT for America, an Institute-wide initiative to expand STEM learning from kindergarten through community college, emphasizing math tutoring, hands-on making, and constructive AI education across U.S. communities.\n\nSources: MIT News https://news.mit.edu/2026/mit-america-initiative-strengthens-stem-education-across-country-1006",
+          "createdAt": "2026-10-07T14:00:00.000Z",
+          "seeded": true,
+          "kind": "news",
+          "rating": "G-PG"
         },
         {
-          id: "seed-us-nat-2",
-          authorName: "Wire Service",
-          kind: "news",
-          source: "Google News · US",
-          body: "TRANSPORT & STORMS — National carriers and coastal forecasts dominate regional briefs inside the US edition.",
-          createdAt: "2026-09-16T01:30:00.000Z",
-          seeded: true
+          "id": "nat-2026-10-07-blanding-turtles",
+          "authorName": "Cognation Wire",
+          "body": "EVERGREEN | Massachusetts / Nature\nSCHOOL KIDS HELP BOOST ENDANGERED BLANDING’S TURTLES\n\nZoo New England’s classroom head-start program has helped Great Meadows (Concord) Blanding’s turtle adults grow from about 55 to about 300; this week hatchlings from a former classroom turtle’s nest will return to Alcott Elementary fourth graders.\n\nSources: GBH News https://www.wgbh.org/news/local/2026-10-06/endangered-turtles-get-a-boost-with-the-help-of-massachusetts-school-kids",
+          "createdAt": "2026-10-07T13:45:00.000Z",
+          "seeded": true,
+          "kind": "news",
+          "rating": "G-PG"
         },
         {
-          id: "seed-us-nat-3",
-          authorName: "Politics Desk",
-          kind: "news",
-          source: "Google News · US",
-          body: "CAPITOL BRIEF — Overnight filings and committee calendars shape the nationwide politics column for US members.",
-          createdAt: "2026-09-16T01:00:00.000Z",
-          seeded: true
+          "id": "nat-2026-10-07-allen-balloon",
+          "authorName": "Cognation Wire",
+          "body": "EVERGREEN | Texas / STEM\nTEXAS SCHOOL LAUNCHES CAMPUS-WIDE HIGH-ALTITUDE BALLOON\n\nAllen Academy (Bryan, Texas) involved kindergarten through eighth grade in a high-altitude balloon STEM project—prep, tracking, and analysis—marking the school’s second such launch.\n\nSources: KBTX https://www.kbtx.com/2026/10/07/allen-academy-launches-high-altitude-balloon/",
+          "createdAt": "2026-10-07T13:30:00.000Z",
+          "seeded": true,
+          "kind": "news",
+          "rating": "G-PG"
         },
+        {
+          "id": "nat-2026-10-07-usf-iss-gel",
+          "authorName": "Cognation Wire",
+          "body": "BREAKING | Florida / Space STEM\nUSF UNDERGRADS’ WOUND-HEALING GEL HEADED TO THE ISS\n\nUniversity of South Florida undergraduates’ hydrogel for better wound care in microgravity was selected for the Student Spaceflight Experiments Program and is scheduled to fly on SpaceX CRS-35 to the ISS around Oct. 13.\n\nSources: University of South Florida (via Public) https://www.pubt.io/view/29D894102359FD9F70B538835F130D07FD94948E",
+          "createdAt": "2026-10-07T13:15:00.000Z",
+          "seeded": true,
+          "kind": "news",
+          "rating": "G-PG"
+        },
+        {
+          "id": "nat-2026-10-07-minnesota-techrise",
+          "authorName": "Cognation Wire",
+          "body": "BREAKING | Minnesota / STEM\nMINNESOTA HIGH SCHOOLERS PACK NASA TECHRISE SOIL EXPERIMENT\n\nSchool of Environmental Studies (District 196, Apple Valley area) was one of 60 U.S. teams—and Minnesota’s only public school—selected for NASA TechRise; their payload on growing food beyond Earth is approved for a 2027 flight.\n\nSources: Sun Thisweek / hometownsource.com https://www.hometownsource.com/sun_thisweek/community/apple_valley/ses-students-work-with-nasa-to-take-soil-to-the-stratosphere/article_464f798f-c9e3-4afd-972a-8d6d4f9c5ae1.html",
+          "createdAt": "2026-10-07T13:00:00.000Z",
+          "seeded": true,
+          "kind": "news",
+          "rating": "G-PG"
+        },
+        {
+          "id": "nat-2026-10-07-burki-innovators",
+          "authorName": "Cognation Wire",
+          "body": "EVERGREEN | California / STEM\nCALIFORNIA 7TH-GRADER NAMED JUNIOR INNOVATORS CHALLENGE FINALIST\n\nAnkith Burki (BASIS Independent Silicon Valley, San Jose) is among 30 national finalists in the 2026 Thermo Fisher Scientific Junior Innovators Challenge for a project that boosted atmospheric water collection by 117% using low-frequency sound.\n\nSources: Education Times / Society for Science https://www.educationtimes.com/learning/meet-ankith-burki-7th-grade-indian-origin-us-student-uses-sound-to-boost-water-from-air-output-by-117-in-stem-experiment/articleshow/134725260.cms",
+          "createdAt": "2026-10-07T12:45:00.000Z",
+          "seeded": true,
+          "kind": "news",
+          "rating": "G-PG"
+        },
+        {
+          "id": "nat-2026-10-07-editors-box-gpg",
+          "authorName": "NEWS Editors",
+          "body": "EDITOR’S BOX — Oct 7 Nationwide desk (G–PG)\n\nPlaceholder US wire seeds retired. Plate rated G–PG for under-13 standing (disaster weather and politics/crime dropped). Lead: MIT for America. Six ready stories; optional TechRise package note (#7) folded here only—not a separate scoop. Watch: USF CRS-35 flight ~Oct 13; TechRise pathway. Print lock: curated from Nationwide plate draft ~07:40 CDT 2026-10-07. Autopublish OFF. Cap 250.",
+          "createdAt": "2026-10-07T12:30:00.000Z",
+          "seeded": true,
+          "kind": "news",
+          "rating": "G-PG"
+        }
       ]
     },
     international: {
       id: "international",
       label: "International",
       subtitle: "International Newspaper",
-      dateline: "International edition · Oct 2, 2026",
-      volume: "Vol. III · No. 3",
-      dek: "Spain housing and Europe politics lead a G–PG international desk; no war wires.",
+      dateline: "International edition · Oct 7, 2026",
+      volume: "Vol. III · No. 4",
+      dek: "Nuri / NEONSAT leads a G–PG space-and-STEM international desk; no war or disaster wires.",
       topicsLeft: ["World desk", "Diplomacy", "Trade winds", "Culture abroad"],
       topicsRight: [
         "TOWER — global frame",
@@ -178,100 +214,91 @@
       ],
       seedPosts: [
         {
-          "id": "intl-2026-10-02-spain-housing",
+          "id": "intl-2026-10-07-korea-nuri",
           "authorName": "Cognation Wire",
-          "body": "BREAKING | Spain / Europe\nMADRID HOUSING DECREES FAIL; EARLY-ELECTION TALK RISES\n\nSpain’s Congress rejected two government housing decrees Friday (about 178–172 and 184–166). Measures covered eviction protections, short-term-lease limits, and automatic rental renewals after protests sparked by an elderly woman’s eviction. Early-election talk rose; Sánchez opened a weekend reflection with no snap vote locked.\n\nSources: Al Jazeera https://www.aljazeera.com/news/2026/10/2/spains-parliament-rejects-govt-housing-decrees-amid-mass-protests · France 24 (AFP) https://www.france24.com/en/live-news/20261002-spain-s-government-dealt-blow-as-lawmakers-reject-housing-bills · Euronews https://www.euronews.com/2026/10/02/spanish-congress-rejects-housing-laws-despite-sanchezs-warning-theyll-be-judged-sooner-tha",
-          "createdAt": "2026-10-02T20:00:00.000Z",
+          "body": "BREAKING | South Korea / Space\nNURI ROCKET DEPLOYS FIRST DOMESTIC MICROSATELLITE CONSTELLATION\n\nSouth Korea’s homegrown Nuri rocket completed its fifth flight on Oct. 7, successfully deploying five NEONSAT Earth-observation microsatellites plus nine CubeSats. The Korea AeroSpace Administration called it a milestone for multi-satellite constellation launches.\n\nSources: Yonhap News Agency https://en.yna.co.kr/view/AEN20261007005452320",
+          "createdAt": "2026-10-07T14:00:00.000Z",
           "seeded": true,
           "kind": "news",
           "rating": "G-PG"
         },
         {
-          "id": "intl-2026-10-02-germany-merz",
+          "id": "intl-2026-10-07-nasa-webb-ngc7129",
           "authorName": "Cognation Wire",
-          "body": "BREAKING | Germany / Europe\nREFORM ROW RAISES FEARS FOR MERZ COALITION\n\nGermany’s CDU is pressing SPD partners on pension and labor-market bills ahead of coalition talks next week. Reports say conservatives may withhold support for income-tax reform until those drafts move, feeding collapse speculation.\n\nSources: DW https://www.dw.com/en/germany-news-reform-row-raises-fears-for-merzs-coalition/live-79512757",
-          "createdAt": "2026-10-02T19:45:00.000Z",
+          "body": "EVERGREEN | Space / STEM\nNASA’S WEBB REVEALS STELLAR NURSERY NGC 7129\n\nNASA’s James Webb Space Telescope released a new infrared portrait of star-forming region NGC 7129, about 3,300 light-years away, showing protostars, outflows, and glowing hydrogen once hidden by dust.\n\nSources: NASA Science (Webb Mission Team) https://science.nasa.gov/missions/webb/nasas-webb-captures-commotion-from-nebulas-stellar-jets/",
+          "createdAt": "2026-10-07T13:45:00.000Z",
           "seeded": true,
           "kind": "news",
           "rating": "G-PG"
         },
         {
-          "id": "intl-2026-10-02-brazil-amazon",
+          "id": "intl-2026-10-07-turkiye-lunar",
           "authorName": "Cognation Wire",
-          "body": "BREAKING | Brazil / Americas\nLULA vs FLÁVIO BOLSONARO — AMAZON POLICY ON THE BALLOT\n\nBrazil votes Sunday in a presidential race where Amazon rules are a central stake. Axios: Lula vs Sen. Flávio Bolsonaro; deforestation fell sharply under Lula; outcome could reshape forest policy and U.S. ties.\n\nSources: Axios https://www.axios.com/2026/10/02/brazil-election-lula-flavio-bolsonaro-trump-amazon",
-          "createdAt": "2026-10-02T19:30:00.000Z",
+          "body": "BREAKING | Türkiye / Space\nTÜRKİYE COMPLETES INTEGRATION OF ITS FIRST LUNAR SPACECRAFT\n\nTÜBİTAK UZAY finished production and integration of Türkiye’s first lunar spacecraft (over 80% domestic content). It heads to environmental testing ahead of a planned early-2027 polar lunar orbit mission.\n\nSources: TÜBİTAK (official) https://tubitak.gov.tr/en/news/integration-activities-completed-turkiyes-first-lunar-spacecraft",
+          "createdAt": "2026-10-07T13:30:00.000Z",
           "seeded": true,
           "kind": "news",
           "rating": "G-PG"
         },
         {
-          "id": "intl-2026-10-02-g7-energy",
+          "id": "intl-2026-10-07-nordspace-terra-nova",
           "authorName": "Cognation Wire",
-          "body": "BREAKING | G7 / Energy\nG7 TO RELEASE UP TO 100M BARRELS OF DIESEL AND CRUDE\n\nG7 leaders agreed to release up to 100 million barrels of diesel and crude from reserves over about four months, coordinated via the IEA, to steady fuel markets.\n\nSources: NBC News https://www.nbcnews.com/business/energy/g-7-diesel-crude-release-trump-macron-rcna601132 · BBC https://www.bbc.com/news/articles/ck87zg8jnwngo",
-          "createdAt": "2026-10-02T19:15:00.000Z",
+          "body": "BREAKING | Canada / Space\nCANADIAN COMPANY’S FIRST SATELLITE WORKING WELL IN ORBIT\n\nOntario-based NordSpace says its pathfinder satellite Terra Nova completed early-orbit checks after riding a Falcon 9, marking the firm the first aspiring Canadian rocket company with its own hardware in space.\n\nSources: CP24 / CTV News https://www.cp24.com/news/canada/2026/10/07/days-after-launch-canadian-companys-first-satellite-is-working-well-in-orbit/",
+          "createdAt": "2026-10-07T13:15:00.000Z",
           "seeded": true,
           "kind": "news",
           "rating": "G-PG"
         },
         {
-          "id": "intl-2026-10-02-us-jobs",
+          "id": "intl-2026-10-07-alma-methanol",
           "authorName": "Cognation Wire",
-          "body": "BREAKING | United States / Economy (Nationwide)\nSEPTEMBER JOBS MISS — 29,000 ADDED; PRESSURE ON GOP\n\nU.S. employers added about 29,000 jobs in September, below estimates, with unemployment near 4.2%. Soft hiring adds midterm pressure on Trump and Republicans.\n\nSources: Washington Post https://www.washingtonpost.com/business/2026/10/02/us-economy-added-29000-jobs-september-missing-estimates/",
-          "createdAt": "2026-10-02T19:00:00.000Z",
+          "body": "EVERGREEN | Astronomy / STEM\nALMA FINDS RARE “HEAVY” METHANOL AROUND A YOUNG STAR\n\nAn international ALMA COMPASS team reported the first interstellar detection of fully deuterated methanol (CD₃OD) around protostar IRAS 4A2 in the Perseus cloud, about 1,000 light-years away—a clue to organic chemistry near planet-building zones.\n\nSources: National Radio Astronomy Observatory (NSF NRAO) https://public.nrao.edu/news/cosmic-cocktail-alma-compass/",
+          "createdAt": "2026-10-07T13:00:00.000Z",
           "seeded": true,
           "kind": "news",
           "rating": "G-PG"
         },
         {
-          "id": "intl-2026-10-02-eu-return-hubs",
+          "id": "intl-2026-10-07-devon-harvest-mice",
           "authorName": "Cognation Wire",
-          "body": "BREAKING | European Union / Migration\nEU APPROVES MIGRANT “RETURN HUBS”; FIVE STATES PLAN THIRD-COUNTRY DEPORTATIONS\n\nEU rules now allow return hubs in non-EU countries under human-rights safeguards. Greece, Germany, Austria, Denmark, and the Netherlands are pursuing a joint hub (Uganda/Rwanda often named); first facility eyed for 2027.\n\nSources: CBS News https://www.cbsnews.com/news/europe-eu-immigration-asylum-seeker-third-country-deportations/",
-          "createdAt": "2026-10-02T18:45:00.000Z",
+          "body": "EVERGREEN | United Kingdom / Nature\nDEVON TEENS RECRUIT KIDS TO HELP RESTORE HARVEST MICE\n\nTwo 14-year-old conservationists in Devon, England, who previously released 250 harvest mice, launched Wild Pets to recruit ages 8–13 to breed and later release Britain’s smallest rodent, listed Near Threatened by the Mammal Society.\n\nSources: BBC News (Devon) https://www.bbc.co.uk/news/articles/cjqlnreelze9o",
+          "createdAt": "2026-10-07T12:45:00.000Z",
           "seeded": true,
           "kind": "news",
           "rating": "G-PG"
         },
         {
-          "id": "intl-2026-10-02-pacific-whale",
+          "id": "intl-2026-10-07-andaman-wildlife-week",
           "authorName": "Cognation Wire",
-          "body": "EVERGREEN | South Pacific\nWHALE SINKS YACHT; FOUR SAILORS RESCUED AFTER ~18 HOURS\n\nYacht *Tai Tam* struck a sperm whale ~250 nm north of Norfolk Island; crew abandoned to a life raft and were rescued by containership MV Sofrana Surville. All four survived.\n\nSources: CBS News https://www.cbsnews.com/news/whale-sinks-yacht-south-pacific-sailors-rescued-new-zealand/",
-          "createdAt": "2026-10-02T18:30:00.000Z",
+          "body": "EVERGREEN | India / Conservation\nANDAMAN STUDENTS EXPLORE ISLAND BIODIVERSITY FOR WILDLIFE WEEK\n\nDuring India’s 72nd Wildlife Week, South Andaman students birded and trekked at Mount Manipur National Park (about 20 bird species observed), while Andaman College students toured Chidiyatapu Biological Park for endemic flora and fauna awareness.\n\nSources: The Wave Andaman https://thewaveandaman.com/wildlife-week-andaman-students-birding-trekking-biodiversity/",
+          "createdAt": "2026-10-07T12:30:00.000Z",
           "seeded": true,
           "kind": "news",
           "rating": "G-PG"
         },
         {
-          "id": "intl-2026-10-02-apple-disk-access",
+          "id": "intl-2026-10-07-ladakh-wild-neighbour",
           "authorName": "Cognation Wire",
-          "body": "EVERGREEN | Tech / STEM\nAPPLE TIGHTENS macOS FULL DISK ACCESS OVER AI-AGENT RISK\n\nApple will require more explicit user action before granting Full Disk Access, citing rising risk from autonomous AI agents that could reach files, mail, and messages.\n\nSources: TechCrunch https://techcrunch.com/2026/10/02/apple-says-its-tightening-macos-full-disk-access-controls-due-to-new-risks-from-ai-agents/",
-          "createdAt": "2026-10-02T18:15:00.000Z",
+          "body": "EVERGREEN | India / Education\nLADAKH STUDENTS JOIN ‘KNOW YOUR WILD NEIGHBOUR’ FIELD DAY\n\nLadakh’s Department of Wildlife Protection held a Wildlife Week field tour and quiz at Government High School Chowkiyal, Drass, teaching students about high-altitude flora, fauna, and mountain habitats.\n\nSources: Administration of Union Territory of Ladakh https://ladakh.gov.in/department-of-wildlife-protection-organizes-know-your-wild-neighbour-program-at-ghs-chowkiyal-drass/",
+          "createdAt": "2026-10-07T12:15:00.000Z",
           "seeded": true,
           "kind": "news",
           "rating": "G-PG"
         },
         {
-          "id": "intl-2026-10-02-arkia-dubai",
+          "id": "intl-2026-10-07-starship-starlink",
           "authorName": "Cognation Wire",
-          "body": "BREAKING | Israel–UAE / Travel\nARKIA FLIES FIRST DUBAI REPATRIATION AFTER EL AL CANCELS\n\nAfter El Al rescue flights were canceled when landing permissions lapsed, Arkia operated the first approved repatriation flight from Dubai for Israelis stranded in the UAE.\n\nSources: Jerusalem Post https://www.jpost.com/israel-news/article-910399",
-          "createdAt": "2026-10-02T18:00:00.000Z",
+          "body": "EVERGREEN | Space / STEM\nSPACEX SHARES STARSHIP FOOTAGE OF STARLINK SATELLITE DEPLOYMENT\n\nSpaceX released camera footage of Starship deploying Starlink satellites in orbit, highlighting early communication and autonomous control as large constellations grow.\n\nSources: India Today (Science) https://www.indiatoday.in/science/story/spacex-starship-starlink-satellite-deployment-footage-orbital-communication-3011470-2026-10-07",
+          "createdAt": "2026-10-07T12:00:00.000Z",
           "seeded": true,
           "kind": "news",
           "rating": "G-PG"
         },
         {
-          "id": "intl-2026-10-02-nvidia-shield",
-          "authorName": "Cognation Wire",
-          "body": "EVERGREEN | Tech / STEM (Nationwide wire)\n7-YEAR-OLD NVIDIA SHIELD TV JUMPS ~$100 ON AI SUPPLY PRESSURE\n\nArs Technica: older Nvidia Shield TV hardware is about $100 more expensive amid AI-related supply and pricing pressure.\n\nSources: Ars Technica https://arstechnica.com/gadgets/2026/10/the-7-year-old-nvidia-shield-tv-is-now-100-more-expensive-thanks-to-ai/",
-          "createdAt": "2026-10-02T17:45:00.000Z",
-          "seeded": true,
-          "kind": "news",
-          "rating": "G-PG"
-        },
-        {
-          "id": "intl-2026-10-02-editors-box-gpg",
+          "id": "intl-2026-10-07-editors-box-gpg",
           "authorName": "NEWS Editors",
-          "body": "EDITOR’S BOX — Oct 2 International desk (G–PG)\n\nNepal Sep 15 pack retired. Adult/war draft withdrawn. Plate rated G–PG for under-13 standing (war/terror wires dropped). Watch: Spain election odds; Merz coalition; Brazil Amazon ballot; G7 fuel release; EU return hubs; Apple FDA controls. Print lock: curated from live wire ~3:30pm CT 2026-10-02. No RSS autopublish — raw /api/news has no age filters.",
-          "createdAt": "2026-10-02T17:15:00.000Z",
+          "body": "EDITOR’S BOX — Oct 7 International desk (G–PG)\n\nOct 2 Spain/Europe pack retired. Plate rated G–PG for under-13 standing (disaster weather, hunting, and intense collision wires dropped). Lead: Nuri / NEONSAT. Watch: Türkiye lunar environmental tests; NordSpace commissioning; youth wildlife programs. Print lock: curated from International plate draft ~07:40 CDT 2026-10-07. Autopublish OFF — raw /api/news has no age filters. Cap 250.",
+          "createdAt": "2026-10-07T11:45:00.000Z",
           "seeded": true,
           "kind": "news",
           "rating": "G-PG"
@@ -478,7 +505,7 @@
       }
     },
     getState: function () {
-      var FEED_SEED_VERSION = 202610022; /* Oct 2 International G–PG wire pack (11 items) */
+      var FEED_SEED_VERSION = 202610071; /* Oct 7 G–PG intl (10) + nationwide (7) seed packs */
       var data = this.load();
       if (!data) {
         data = { version: FEED_SEED_VERSION, byEdition: {} };

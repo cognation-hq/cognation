@@ -210,10 +210,20 @@
     if (!host) {
       host = document.createElement("div");
       host.className = "news-story-comments";
+      /* Mark the slot now: a signed-in render waits on pullStory(), and a second
+         mount() in that window must find this slot instead of adding another. */
+      host.setAttribute("data-news-comments", "");
       article.appendChild(host);
     }
+    /* Every mount() redraws this one slot; only the latest call may paint, so a
+       slow pull from an earlier call (old session or profile) loses. */
+    var token = (host.__renderToken || 0) + 1;
+    host.__renderToken = token;
     if (remoteOn() && sessionAuthor()) {
-      pullStory(storyId).then(function () { renderThread(host, storyId, rating); }, function () {
+      pullStory(storyId).then(function () {
+        if (host.__renderToken === token) renderThread(host, storyId, rating);
+      }, function () {
+        if (host.__renderToken !== token) return;
         var d = read(); d.byStory[storyId] = []; write(d); renderThread(host, storyId, rating);
       });
     } else renderThread(host, storyId, rating);

@@ -173,12 +173,29 @@
     return true;
   }
 
+  /* Your own profile never shows Add friend / Follow, even while it loads. */
+  function isOwnProfileId(id) {
+    if (!id) return false;
+    try {
+      var raw = localStorage.getItem("cognation.session.v2");
+      var session = raw ? JSON.parse(raw) : null;
+      return !!(session && session.activeProfileId && String(session.activeProfileId) === String(id));
+    } catch (e) {
+      return false;
+    }
+  }
+
   function syncButton(btn) {
     var api = swipeApi();
     var graph = socialApi();
     var id = resolveProfileId(btn);
     if (id) btn.setAttribute("data-profile-id", id);
     var row = btn.closest("[data-tower-follow-row]");
+    if (isOwnProfileId(id)) {
+      if (row) row.hidden = true;
+      btn.hidden = true;
+      return;
+    }
     var pro = isProfessionalContext(btn);
     if (row) row.hidden = false;
     btn.hidden = false;

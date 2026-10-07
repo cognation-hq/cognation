@@ -182,9 +182,9 @@
           if (!sessionId) sessionId = "class-insurance";
           var opened = false;
           if (swipe && typeof swipe.openClassroom === "function") {
-            /* Sage (u13 test viewer) is never raised to 18+. */
+            /* Sage (u13 test viewer) is never raised to 18+, even before her data loads. */
             var u13 = window.CognationU13TestViewer;
-            var sage = !!(u13 && u13.isU13TestViewer());
+            var sage = !!(u13 && (u13.mayBeU13TestViewer ? u13.mayBeU13TestViewer() : u13.isU13TestViewer()));
             if (!sage && swipe.setMemberProfile && (!swipe.getMemberAge || swipe.getMemberAge() == null || swipe.getMemberAge() < 18)) {
               var prev = (swipe.getMemberProfile && swipe.getMemberProfile()) || {};
               var next = {};

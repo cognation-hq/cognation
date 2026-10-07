@@ -121,9 +121,10 @@
       next[k] = prev[k];
     });
     var age = parseInt(next.age, 10);
-    /* Sage (u13 test viewer) keeps her own age; no adult default. */
+    /* Sage (u13 test viewer) keeps her own age; no adult default (also while
+       her data is still loading at sign-in). */
     var u13 = window.CognationU13TestViewer;
-    var sage = !!(u13 && u13.isU13TestViewer());
+    var sage = !!(u13 && (u13.mayBeU13TestViewer ? u13.mayBeU13TestViewer() : u13.isU13TestViewer()));
     if (!(age > 0) && !sage) next.age = DEMO_AGE;
     if (!next.city && !next.locality) next.city = DEMO_CITY;
     if (!next.state) next.state = DEMO_STATE;

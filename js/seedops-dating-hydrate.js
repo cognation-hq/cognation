@@ -85,10 +85,28 @@
     var h = u13();
     return !!(h && h.isU13TestViewer());
   }
-  function u13Ready() {
+  /* Sign-in race (SeedOps): isU13TestViewer() is false until the login state
+     and profile row load, so "not loaded" must never count as "not Sage".
+     mayBeTestViewer(): skip adult defaults while unknown. u13Settled(): for
+     writes, waits for login state + profile row; true / false / null (unknown). */
+  function mayBeTestViewer() {
     var h = u13();
+    if (h && typeof h.mayBeU13TestViewer === "function") return !!h.mayBeU13TestViewer();
+    return isU13TestViewer();
+  }
+  function u13Settled() {
+    var h = u13();
+    if (h && typeof h.settled === "function") return h.settled();
     return h && typeof h.ready === "function" ? h.ready() : Promise.resolve(false);
   }
+  /* test_role === 'u13-viewer' in the fetched auth user_metadata. */
+  function metaHasTestRole(meta) {
+    var h = u13();
+    if (h && typeof h.metadataHasTestRole === "function") return !!h.metadataHasTestRole(meta);
+    return !!meta && meta.test_role === "u13-viewer";
+  }
+  /* Last fetched user_metadata this session; undefined = not fetched yet. */
+  var lastMeta;
 
   function isSeedOrOpsSession() {
     try {
@@ -181,7 +199,8 @@
     var interests = meta.member_interests || meta.memberInterests || null;
     if (Array.isArray(interests)) interests = interests.slice();
     return {
-      see_dating: p.seeDating,
+      /* Missing see_dating means the default (off), not a change to write. */
+      see_dating: p.seeDating == null ? false : p.seeDating,
       member_age: p.age,
       member_city: p.city,
       member_state: p.state,
@@ -216,14 +235,28 @@
     };
   }
 
+  /* Shared devices (js/age-floor-keywords.js): the local member profile and
+     See dating flag count only when written for the signed-in user. */
+  function localPrefsOwned() {
+    var floor = window.CognationAgeFloor;
+    if (!floor || typeof floor.memberProfileOwned !== "function") return true;
+    return floor.memberProfileOwned(readJson(localStorage, "cognation.member.profile.v1", null));
+  }
+  function sessionOwnerId() {
+    var floor = window.CognationAgeFloor;
+    return floor && typeof floor.sessionUserId === "function" ? floor.sessionUserId() : "";
+  }
+
   function applyViewerPrefs(prefs, opts) {
     opts = opts || {};
     var swipe = window.CognationCommuneSwipe;
     var next = {};
-    var prev =
-      (swipe && typeof swipe.getMemberProfile === "function" && swipe.getMemberProfile()) ||
-      readJson(localStorage, "cognation.member.profile.v1", {}) ||
-      {};
+    var foreign = !localPrefsOwned();
+    var prev = foreign
+      ? {}
+      : (swipe && typeof swipe.getMemberProfile === "function" && swipe.getMemberProfile()) ||
+        readJson(localStorage, "cognation.member.profile.v1", {}) ||
+        {};
     Object.keys(prev).forEach(function (k) {
       next[k] = prev[k];
     });
@@ -251,6 +284,10 @@
        and dating cards must be eligible on that first rebuild (blank Card 1 race). */
     var see = prefs.seeDating;
     if (see == null && opts.seedDefaults) see = true; /* Alexa walk: no console paste */
+    /* Another user's leftover See dating flag: back to the default. */
+    if (see == null && foreign) see = false;
+    var owner = sessionOwnerId();
+    if (owner) next.ownerUserId = owner;
     if (see != null && swipe && typeof swipe.setSeeDating === "function") {
       swipe.setSeeDating(!!see);
     } else if (see != null) {
@@ -435,7 +472,8 @@
       .then(function (user) {
         if (!user) return null;
         if (u13()) u13().noteUser(user);
-        return user.user_metadata || user.userMetadata || null;
+        lastMeta = user.user_metadata || user.userMetadata || null;
+        return lastMeta;
       })
       .catch(function () {
         return null;
@@ -456,12 +494,23 @@
        server already has. Each page load fires several hydrates and
        member-profile-updated events; unchanged prefs must not PUT /auth/v1/user. */
     var run = function () {
-      return u13Ready().then(function (sage) {
-        if (sage) return { ok: true, skipped: true, error: "u13_test_viewer" };
-        return runWrite();
+      var metaP = lastMeta !== undefined
+        ? Promise.resolve(lastMeta)
+        : fetchUserMetadata().then(function (meta) { rememberServerPrefs(meta); return meta; });
+      return metaP.then(function (meta) {
+        /* test_role already in the metadata: skip, even before the profile row loads. */
+        if (metaHasTestRole(meta)) return { ok: true, skipped: true, error: "u13_test_role" };
+        /* Never save before the login state and the profile row are ready. */
+        return u13Settled().then(function (sage) {
+          if (sage === true) return { ok: true, skipped: true, error: "u13_test_viewer" };
+          if (sage !== false) return { ok: false, skipped: true, error: "u13_unknown" };
+          return runWrite();
+        });
       });
     };
     var runWrite = function () {
+      /* Only this user's own local prefs are ever written to their account. */
+      if (!localPrefsOwned()) return Promise.resolve({ ok: true, skipped: true, error: "local_prefs_not_owned" });
       var known = serverPrefsJson != null
         ? Promise.resolve(serverPrefsJson)
         : fetchUserMetadata().then(function (meta) { rememberServerPrefs(meta); return serverPrefsJson; });
@@ -546,7 +595,7 @@
         if (prior.memberAge != null || prior.seeDating != null) {
           applyViewerPrefs(cachedPrefs, { seedDefaults: false });
           refillDeck();
-        } else if (isSeedOrOpsSession() && !isU13TestViewer()) {
+        } else if (isSeedOrOpsSession() && !mayBeTestViewer()) {
           applyViewerPrefs({}, { seedDefaults: true });
           refillDeck();
         }
@@ -555,18 +604,16 @@
     }
     hydrating = true;
     var seedish = isSeedOrOpsSession();
-    var sage = false;
     return fetchUserMetadata()
       .then(function (meta) {
-        return u13Ready().then(function (isSage) {
-          sage = !!isSage;
-          return meta;
-        });
-      })
-      .then(function (meta) {
         rememberServerPrefs(meta);
+        /* Warm the test-viewer check (profile row) for the other readers; no wait. */
+        if (u13() && typeof u13().ready === "function") u13().ready();
         var prefs = prefsFromMetadata(meta);
-        applyViewerPrefs(prefs, { seedDefaults: seedish && !sage });
+        /* Age-28 etc. only once the metadata is in and has no test_role
+           (Sage always has it), so the age never reads 28 for her. */
+        var defaultsOk = seedish && !!meta && !metaHasTestRole(meta) && !isU13TestViewer();
+        applyViewerPrefs(prefs, { seedDefaults: defaultsOk });
         if (!seedish && !opts.forceBios) {
           return { ok: true, bios: { ok: true, merged: 0, dating: 0 }, prefs: prefs, seedish: false };
         }
@@ -610,8 +657,8 @@
         hydrating = false;
         /* Seed defaults should stick server-side so the next device skips
            localStorage. persistPrefs() only writes when they differ from the server. */
-        if (seedish && !sage) {
-          persistPrefs();
+        if (seedish) {
+          persistPrefs(); /* waits for login state + profile row; skips Sage */
         }
         return out;
       })
@@ -637,11 +684,13 @@
       run(false);
     }, 200);
     document.addEventListener("cognation:session-started", function () {
+      lastMeta = undefined;
       try {
         sessionStorage.removeItem(BOOT_FLAG);
       } catch (e) {}
-      /* Eager age so Classroom cards / Open session see 18+ before async getUser. */
-      if (isSeedOrOpsSession() && !isU13TestViewer()) {
+      /* Eager age so Classroom cards / Open session see 18+ before async getUser.
+         Not while the test viewer is still possible (data not loaded yet). */
+      if (isSeedOrOpsSession() && !mayBeTestViewer()) {
         try {
           applyViewerPrefs({}, { seedDefaults: true });
           refillDeck();
@@ -650,6 +699,7 @@
       run(true);
     });
     document.addEventListener("cognation:auth-changed", function () {
+      lastMeta = undefined;
       try {
         sessionStorage.removeItem(BOOT_FLAG);
       } catch (e2) {}

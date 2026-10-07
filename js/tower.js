@@ -669,12 +669,26 @@
     return window.CognationAccounts.stripMeta ? window.CognationAccounts.stripMeta(rec) : rec;
   }
 
+  /* Shared devices: the legacy cognation.tower.profile.v1 blob is one key for
+     everyone on this browser. When signed in, use it only if it was written for
+     this user (ownerUserId). Signed-out / demo sessions are unchanged. */
+  function signedInUserId() {
+    var s = getSessionObject();
+    return s && s.source === "supabase" && s.supabaseUserId ? String(s.supabaseUserId) : "";
+  }
+
+  function legacyBlobOwned(blob) {
+    var uid = signedInUserId();
+    if (!uid) return true;
+    return !!blob && String(blob.ownerUserId || "") === uid;
+  }
+
   function legacyTowerBlob() {
     try {
       var raw = localStorage.getItem(TOWER_PROFILE_KEY);
       if (!raw) return null;
       var parsed = JSON.parse(raw);
-      return parsed && typeof parsed === "object" ? parsed : null;
+      return parsed && typeof parsed === "object" && legacyBlobOwned(parsed) ? parsed : null;
     } catch (eLegacy) {
       return null;
     }
@@ -984,13 +998,7 @@
             : rec;
         }
       }
-      try {
-        var raw = localStorage.getItem(TOWER_PROFILE_KEY);
-        if (!raw) return null;
-        return JSON.parse(raw);
-      } catch (e) {
-        return null;
-      }
+      return legacyTowerBlob();
     },
     get: function () {
       var p = this.load();
@@ -1008,6 +1016,13 @@
       if (!p) {
         created = true;
         p = defaultEmptyProfileBlob();
+        /* Signed in, server row not loaded yet, and no local copy of this user's
+           own: render the muted placeholder (no name, initial or quote) until
+           cognation:remote-profile-loaded fills everything at once. */
+        if (signedInUserId() && usingRemoteSocial()) {
+          p._loading = true;
+          p.displayName = "";
+        }
       }
       if (p._remote) {
         metaKind = p._profileKind === "professional" ? "professional" : "personal";
@@ -1171,6 +1186,8 @@
       /* Only the owner may persist Tower edits (name, avatar, stickers, music,
          polaroids, top friends, bio, geometry). Others' profiles stay read-only. */
       if (!isTowerOwner(data)) return false;
+      /* The loading placeholder is never saved anywhere. */
+      if (data._loading) return false;
       this._saving = true;
       try {
       writeScrapbookLayout(data);
@@ -1205,6 +1222,9 @@
         if (k.charAt(0) === "_") return;
         towerBlob[k] = data[k];
       });
+      /* Stamp the owner so another signed-in user on this browser ignores it. */
+      var ownerId = signedInUserId();
+      if (ownerId) towerBlob.ownerUserId = ownerId;
       if (opts.geometry) {
         if (id && window.CognationAccounts && typeof window.CognationAccounts.updateProfileTower === "function") {
           try { window.CognationAccounts.updateProfileTower(id, towerBlob); } catch (eGeo) {}
@@ -8603,13 +8623,19 @@
     var nameInput = root.querySelector("#tower-display-name");
     var htmlInput = root.querySelector("[data-tower-profile-html]");
     var preview = root.querySelector("[data-tower-html-preview]");
-    if (nameEl && document.activeElement !== nameEl) nameEl.textContent = p.displayName || "You";
+    var loading = !!p._loading;
+    if (nameEl && document.activeElement !== nameEl) {
+      /* Placeholder: the slot keeps the default label's width and height, but
+         its text is hidden (css .is-loading) so no name shows. */
+      nameEl.classList.toggle("is-loading", loading);
+      nameEl.textContent = loading ? "You" : p.displayName || "You";
+    }
     applyDisplayNameSize(root, p.displayNameSize || 28);
     initDisplayNameResize(root);
     var handleBadge = root.querySelector("[data-tower-handle-badge]");
     var handleVal = normalizeHandle(p.handle || "");
     if (handleBadge && document.activeElement !== handleBadge) {
-      var ownerEditing = isTowerOwner(p) && root.getAttribute("data-tower-side") === "public";
+      var ownerEditing = !loading && isTowerOwner(p) && root.getAttribute("data-tower-side") === "public";
       handleBadge.classList.toggle("is-owner-editable", ownerEditing);
       if (handleVal) {
         handleBadge.hidden = false;
@@ -8641,6 +8667,7 @@
     var sloganDisplay = root.querySelector("[data-tower-slogan-display]");
     if (sloganDisplay) sloganDisplay.textContent = (p.slogan || "").trim();
 
+    if (avatar) avatar.classList.toggle("is-loading", loading);
     if (avatar) {
       var avatarUrl = p.avatarDataUrl && String(p.avatarDataUrl).indexOf("data:image/") === 0 ? p.avatarDataUrl : "";
       var avatarPhoto = avatar.querySelector("[data-tower-avatar-photo]");
@@ -8660,7 +8687,7 @@
       } else {
         avatar.style.removeProperty("background-image");
         if (avatarPhoto) avatarPhoto.remove();
-        avatar.textContent = initials(p.displayName);
+        avatar.textContent = loading ? "" : initials(p.displayName);
       }
     }
     var polaroidPrints = polaroidPrintList(p);

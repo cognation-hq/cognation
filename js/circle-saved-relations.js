@@ -1,6 +1,7 @@
 /**
  * Circle lists friendships and follows already stored in Supabase.
- * Newest first. The signed-in person only. No photos, rooms, or ranking.
+ * Newest first. The signed-in person only. Cap 250 fills ring spots from these rows;
+ * empty state is the ring background (no blank "No saved…" panel).
  * Run the filter test with: node js/circle-saved-relations.test.js
  */
 (function (root) {
@@ -326,12 +327,38 @@
     parent.appendChild(badge);
   }
 
+  function peopleForSpots(lines) {
+    var seen = {};
+    var out = [];
+    (lines || []).forEach(function (line) {
+      (line.people || []).forEach(function (person) {
+        if (!person) return;
+        var key = String(person.userId || person.profileId || person.name || "");
+        if (!key || seen[key] || out.length >= 5) return;
+        seen[key] = true;
+        out.push(person);
+      });
+    });
+    return out;
+  }
+
+  function fillRingSpots(people) {
+    if (root && root.CognationCircleFall && typeof root.CognationCircleFall.fillSpots === "function") {
+      root.CognationCircleFall.fillSpots(people || []);
+    }
+  }
+
   function paint(list, lines) {
     clear(list);
+    list.classList.remove("is-loading");
     if (!lines.length) {
-      message(list, "No saved friendships or follows yet.");
+      /* Cap 250 empty state = ring + five empty spots, not blank copy. */
+      list.classList.add("is-empty");
+      fillRingSpots([]);
       return;
     }
+    list.classList.remove("is-empty");
+    fillRingSpots(peopleForSpots(lines));
     lines.forEach(function (line) {
       var item = document.createElement("li");
       item.setAttribute("data-circle-relation", line.type);
@@ -372,16 +399,25 @@
     list.setAttribute("data-circle-relations", "");
     list.setAttribute("aria-label", "Friendships and follows");
     host.appendChild(list);
-    message(list, "Loading friendships and follows…");
+    list.classList.add("is-loading");
+    list.classList.remove("is-empty");
+    fillRingSpots([]);
     loadLines().then(
       function (result) {
         if (!list.parentNode) return;
-        if (result && result.message) message(list, result.message);
-        else paint(list, (result && result.lines) || []);
+        if (result && result.message) {
+          list.classList.remove("is-loading", "is-empty");
+          message(list, result.message);
+          fillRingSpots([]);
+        } else {
+          paint(list, (result && result.lines) || []);
+        }
       },
       function () {
         if (!list.parentNode) return;
+        list.classList.remove("is-loading", "is-empty");
         message(list, "Friendships and follows could not be loaded.");
+        fillRingSpots([]);
       }
     );
   }
@@ -389,6 +425,7 @@
   var api = {
     visibleRelations: visibleRelations,
     pairAllowed: pairAllowed,
+    peopleForSpots: peopleForSpots,
     mount: mount,
   };
   if (root) root.CognationCircleRelations = api;

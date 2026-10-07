@@ -1786,6 +1786,12 @@
         renderAttachments(post.attachments);
       article.appendChild(buildTowerPostReactBar(post, root));
       list.appendChild(article);
+      /* Comments under server Feed posts (signed-in only; js/news-comments.js). */
+      try {
+        if (window.CognationFeedComments && window.CognationFeedComments.mount) {
+          window.CognationFeedComments.mount(article, { id: post.id || "" });
+        }
+      } catch (eComments) {}
     });
   }
 

@@ -1,10 +1,30 @@
 /**
  * News story comments under each story. localStorage cognation.news.comments.v1
  * One level · oldest-first · latest 20 · text only · no auto-seed.
+ * The same module (same look) also serves SIGNAL Feed posts:
+ * window.CognationFeedComments on tower_post_comments (batch 06), signed-in only.
  */
 (function () {
   "use strict";
-  var KEY = "cognation.news.comments.v1";
+  var NEWS = {
+    global: "CognationNewsComments", key: "cognation.news.comments.v1",
+    table: "news_story_comments", parentCol: "story_id", reportsTable: "news_comment_reports",
+    reactionsTable: "news_story_comment_reactions", postSelector: "[data-news-post][data-post-id]",
+    idAttr: "data-post-id", signedInOnly: false, postAlreadyFloored: false,
+  };
+  /* Feed posts: only server posts (uuid ids) can carry comments (post_id FK).
+     The Feed already applied the post's own age floor before drawing it, and RLS
+     returns comments only for posts the viewer can see. No reactions table. */
+  var FEED = {
+    global: "CognationFeedComments", key: "cognation.feed.comments.v1",
+    table: "tower_post_comments", parentCol: "post_id", reportsTable: "tower_post_comment_reports",
+    reactionsTable: "", postSelector: "[data-tower-post]",
+    idAttr: "data-tower-post", signedInOnly: true, postAlreadyFloored: true,
+  };
+  build(NEWS);
+  build(FEED);
+  function build(cfg) {
+  var KEY = cfg.key;
   var MAX = 20;
   var FACES = ["❤️", "👍", "😂", "😮", "😢"];
   var REACT_CHIP_CLASS = "news-comment-react-chip";
@@ -64,14 +84,15 @@
       reactions[r.face].push(String(r.profile_id));
     });
     return {
-      id: row.id, storyId: row.story_id, authorName: author.display_name || "Member",
+      id: row.id, storyId: row[cfg.parentCol], authorName: author.display_name || "Member",
       accountKind: author.account_kind || "real", body: row.body, createdAt: row.created_at, reactions: reactions,
     };
   }
   function pullStory(storyId) {
-    var q = "select=id,story_id,body,created_at,author:profiles!author_profile_id(display_name,account_kind),reactions:news_story_comment_reactions(face,profile_id)&story_id=eq." +
+    var q = "select=id," + cfg.parentCol + ",body,created_at,author:profiles!author_profile_id(display_name,account_kind)" +
+      (cfg.reactionsTable ? ",reactions:" + cfg.reactionsTable + "(face,profile_id)" : "") + "&" + cfg.parentCol + "=eq." +
       encodeURIComponent(storyId) + "&order=created_at.desc&limit=" + MAX;
-    return window.CognationSupabase.rest("news_story_comments", { query: q }).then(function (rows) {
+    return window.CognationSupabase.rest(cfg.table, { query: q }).then(function (rows) {
       var mapped = (Array.isArray(rows) ? rows : []).map(mapRemote);
       mapped.sort(function (a, b) { return String(a.createdAt || "").localeCompare(String(b.createdAt || "")); });
       return markMyReports(mapped).then(function () {
@@ -90,7 +111,7 @@
     var ids = list.map(function (c) { return c.id; }).filter(function (id) { return UUID_RE.test(String(id)); });
     if (!ids.length) return Promise.resolve(list);
     var q = "select=comment_id&reporter_profile_id=eq." + encodeURIComponent(author.profileId) + "&comment_id=in.(" + ids.join(",") + ")";
-    return window.CognationSupabase.rest("news_comment_reports", { query: q }).then(function (rows) {
+    return window.CognationSupabase.rest(cfg.reportsTable, { query: q }).then(function (rows) {
       var mine = {};
       (Array.isArray(rows) ? rows : []).forEach(function (r) { if (r && r.comment_id) mine[String(r.comment_id)] = true; });
       list.forEach(function (c) { if (mine[String(c.id)]) c.reportedByMe = true; });
@@ -112,7 +133,7 @@
       write(d);
       return { ok: true, already: !!already };
     }
-    return window.CognationSupabase.rest("news_comment_reports", {
+    return window.CognationSupabase.rest(cfg.reportsTable, {
       method: "POST",
       body: { comment_id: commentId, reporter_profile_id: author.profileId },
     }).then(function () { return done(false); }, function (err) {
@@ -132,13 +153,14 @@
     /* clientId: the same id is sent again on a retry of the same text, so a post
        that did save (only the reply was lost) cannot be saved twice. */
     var clientId = UUID_RE.test(String(opts.clientId || "")) ? String(opts.clientId) : "";
-    var row = { story_id: storyId, author_profile_id: author.profileId, body: body };
+    var row = { author_profile_id: author.profileId, body: body };
+    row[cfg.parentCol] = storyId;
     if (clientId) row.id = clientId;
     function refreshed(res) {
       /* Saved is saved: a failed refresh afterwards must not report a failure. */
       return pullStory(storyId).then(function () { return res; }, function () { return res; });
     }
-    return window.CognationSupabase.rest("news_story_comments", { method: "POST", body: row }).then(function () {
+    return window.CognationSupabase.rest(cfg.table, { method: "POST", body: row }).then(function () {
       return refreshed({ ok: true });
     }, function (err) {
       /* 409 on a retry: that id is already taken. Count it as posted only when
@@ -241,7 +263,9 @@
   }
   function renderThread(host, storyId, rating) {
     if (!host) return null;
-    var vis = isThreadVisible(rating, age());
+    var vis = cfg.postAlreadyFloored ? true : isThreadVisible(rating, age());
+    /* Feed: signed-in viewers of shared (server) comments only. */
+    if (cfg.signedInOnly && !(remoteOn() && sessionAuthor())) vis = false;
     host.hidden = !vis;
     host.setAttribute("data-news-comments", "");
     host.setAttribute("data-story-id", storyId);
@@ -274,14 +298,14 @@
             '<p class="news-comment-body news-comment-body--hidden">' + HIDDEN_FOR_AGE + "</p>" + more(c) + "</li>";
         }
         return '<li class="news-comment-item" data-comment-id="' + esc(c.id) + '">' + author +
-          '<p class="news-comment-body">' + esc(c.body) + '</p><div class="news-comment-reacts">' +
+          '<p class="news-comment-body">' + esc(c.body) + "</p>" + (!cfg.reactionsTable ? more(c) + "</li>" : '<div class="news-comment-reacts">' +
           FACES.map(function (f) {
             var n = c.reactions && c.reactions[f] ? c.reactions[f].length : 0;
             var mine = !!(c.reactions && c.reactions[f] && c.reactions[f].indexOf(me) >= 0);
             return '<button type="button" class="' + REACT_CHIP_CLASS + (mine ? " is-mine" : "") +
               '" data-news-comment-react="' + esc(f) + '" data-comment-id="' + esc(c.id) + '">' +
               esc(f) + (n ? '<span class="news-comment-react-count">' + n + "</span>" : "") + "</button>";
-          }).join("") + "</div>" + more(c) + "</li>";
+          }).join("") + "</div>" + more(c) + "</li>");
       }).join("") +
       '</ul><form class="news-comment-composer" data-news-comment-form action="#">' +
       '<input type="text" maxlength="500" placeholder="Add a comment…" data-news-comment-input>' +
@@ -315,8 +339,9 @@
   }
   function mount(article, post) {
     if (!article) return null;
-    var storyId = (post && post.id) || article.getAttribute("data-post-id") || "";
+    var storyId = (post && post.id) || article.getAttribute(cfg.idAttr) || "";
     if (!storyId) return null;
+    if (cfg.parentCol === "post_id" && !UUID_RE.test(String(storyId))) return null;
     var rating = (post && post.rating) || article.getAttribute("data-news-rating") || "";
     if (rating) article.setAttribute("data-news-rating", String(rating));
     var host = article.querySelector("[data-news-comments]");
@@ -430,12 +455,12 @@
      (a saved session is restored after the first paint). */
   function mountAll() {
     if (typeof document === "undefined" || !document.querySelectorAll) return 0;
-    var stories = document.querySelectorAll("[data-news-post][data-post-id]");
+    var stories = document.querySelectorAll(cfg.postSelector);
     for (var i = 0; i < stories.length; i++) mount(stories[i]);
     return stories.length;
   }
 
-  window.CognationNewsComments = {
+  window[cfg.global] = {
     KEY: KEY, MAX_SHOWN: MAX, REACT_CHIP_CLASS: REACT_CHIP_CLASS,
     isGpgRating: isGpg, isThreadVisible: isThreadVisible, isFlaggedForAge: isFlaggedForAge,
     listForStory: listForStory, addComment: addComment,
@@ -448,5 +473,6 @@
       document.addEventListener(name, mountAll);
     });
     mountAll();
+  }
   }
 })();

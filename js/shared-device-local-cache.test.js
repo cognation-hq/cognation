@@ -201,7 +201,10 @@ function testTowerSource() {
   assert.ok(/towerBlob\.ownerUserId = ownerId/.test(src), "Tower saves stamp the owner");
   assert.ok(/if \(data\._loading\) return false;/.test(src), "the placeholder is never saved");
   var css = read("css/styles.css");
-  var nameRule = /\.tower-profile-name\.is-loading \{\s*color: var\(--cgn-text-muted\);\s*min-width: 10ch;\s*visibility: hidden;\s*\}/;
+  var nameRule = /\.tower-profile-name\.is-loading \{\s*color: var\(--cgn-text-muted\);\s*visibility: hidden;\s*\}/;
+  /* 10ch box kept after the name loads too (not only on the placeholder). */
+  var slotRule = /\.tower-profile-name-wrap \.tower-profile-name \{[^}]*min-width: 10ch;\s*text-align: left;\s*\}/;
+  assert.ok(slotRule.test(css), "name slot keeps min-width 10ch, left-aligned, loaded or not");
   var avatarRule = /\.tower-avatar\.is-loading \{\s*background: var\(--cgn-text-muted\) !important;\s*opacity: 0\.4;\s*\}/;
   assert.ok(nameRule.test(css), "name placeholder uses the existing muted token");
   assert.ok(avatarRule.test(css), "avatar placeholder: muted circle at 40% opacity");

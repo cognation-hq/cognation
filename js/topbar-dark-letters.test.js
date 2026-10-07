@@ -48,9 +48,12 @@ var ACTIVE = '.app-topbar .tablist [role="tab"][aria-selected="true"], body.is-c
 assert.ok(/id="tab-tower"[^>]*>TOWER</.test(html) && /id="tab-signal"[^>]*>SIGNAL</.test(html) && /id="tab-commune"[^>]*>COMMUNE</.test(html), "top-row tabs");
 assert.ok(/class="app-topbar-shortcut" data-tower-anchor="circle">CIRCLE</.test(html), "CIRCLE shortcut");
 
-/* All top-row labels: dark #1c1630, no fill, 2px underline slot (existing thickness). */
+/* Inactive top-row labels: #1c1630 at 70% on the text color (not element opacity), no fill,
+   2px underline slot, no text-shadow (Designer 2026-10-07). */
 var tabs = last(TABS);
-assert.strictEqual(decl(tabs.body, "color"), DARK, "dark letters on every top-row tab");
+assert.strictEqual(decl(tabs.body, "color"), "rgba(28, 22, 48, 0.7)", "inactive tabs #1c1630 at 70%");
+assert.strictEqual(decl(tabs.body, "opacity"), null, "70% is on color, not element opacity");
+assert.strictEqual(decl(tabs.body, "text-shadow"), "none", "no text-shadow on inactive tabs");
 assert.strictEqual(decl(tabs.body, "background"), "transparent", "no fill");
 assert.strictEqual(decl(tabs.body, "border-bottom"), "2px solid transparent", "thin underline slot, transparent when inactive");
 
@@ -60,11 +63,14 @@ assert.strictEqual(decl(active.body, "color"), DARK, "active letters dark");
 assert.strictEqual(decl(active.body, "border-bottom-color"), DARK, "active underline is the dark lock color");
 assert.strictEqual(decl(active.body, "background"), "transparent", "active has no fill");
 assert.strictEqual(decl(active.body, "box-shadow"), "none", "active has no glow");
+assert.strictEqual(decl(active.body, "text-shadow"), "none", "no text-shadow on the active tab");
+assert.strictEqual(decl(active.body, "opacity"), null, "active stays full strength");
 
 /* Hover keeps dark letters (no white flash) and the existing hover underline. */
 var hover = last(HOVER);
 assert.strictEqual(decl(hover.body, "color"), DARK, "hover letters stay dark");
-assert.strictEqual(decl(hover.body, "border-bottom-color"), "rgba(255, 255, 255, 0.72)", "existing hover underline reused");
+assert.strictEqual(decl(hover.body, "border-bottom-color"), "rgba(28, 22, 48, 0.4)", "hover underline #1c1630 at 40%");
+assert.strictEqual(decl(hover.body, "text-shadow"), "none", "no text-shadow on hover");
 
 /* The lock rules are the last word: no later top-level rule recolors the top-row tabs. */
 var lockAt = Math.max(tabs.at, active.at, hover.at);

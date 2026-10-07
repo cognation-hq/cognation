@@ -12,6 +12,7 @@ var vm = require("vm");
 var root = path.join(__dirname, "..");
 function src(rel) { return fs.readFileSync(path.join(root, rel), "utf8"); }
 var code = src("js/news-comments.js");
+var helper = src("js/age-floor-keywords.js");
 
 function mem(seed) {
   var d = Object.assign({}, seed || {});
@@ -47,7 +48,9 @@ function render(age) {
     addEventListener: function () {},
   };
   var w2 = {};
-  vm.runInNewContext(code, { window: w2, document: ctxDoc, localStorage: mem(seed), Date: Date, Math: Math });
+  var ctx = vm.createContext({ window: w2, document: ctxDoc, localStorage: mem(seed), Date: Date, Math: Math });
+  vm.runInContext(helper, ctx);
+  vm.runInContext(code, ctx);
   var host = w2.CognationNewsComments.mount(article, { id: "s1", rating: "G-PG" });
   assert.strictEqual(host.hidden, false, "G-PG thread visible");
   return { html: host.innerHTML, api: w2.CognationNewsComments };
@@ -84,14 +87,12 @@ function reacts(row) { return (row.match(/data-news-comment-react=/g) || []).len
   assert.strictEqual(reacts(row), 5, a + ": 13+ keeps the react buttons");
 });
 
-/* Same keyword test as Tower/News age floor. */
-var flagRe = /\b(21\+|nsfw|explicit)\b/i;
-assert.ok(src("js/tower.js").indexOf(String(flagRe)) !== -1, "fixture: tower.js uses the same regex");
-assert.ok(code.indexOf("var AGE_FLAG_RE = " + String(flagRe) + ";") !== -1, "news-comments shares the same regex");
+/* One shared keyword test (js/age-floor-keywords.js); no inline copies. */
+assert.ok(/window\.CognationAgeFloor/.test(code) && !/nsfw/i.test(code), "news-comments uses the shared helper");
 
 /* CSS: italic + existing muted token, nothing new. */
 var css = src("css/styles.css");
-assert.ok(/\.news-comment-body--hidden \{ font-style: italic; color: var\(--cgn-text-muted\); \}/.test(css), "muted italic style uses --cgn-text-muted");
+assert.ok(/\.news-comment-body--hidden \{ font-style: italic; color: var\(--cgn-text-muted\); opacity: 0\.75; font-size: 0\.9em; \}/.test(css), "muted italic style: --cgn-text-muted, opacity 0.75, 0.9em");
 assert.ok(/--cgn-text-muted: rgba\(232, 240, 255, 0\.66\);/.test(css), "fixture: token exists");
 
 console.log("news-comments-hide-flagged-u13.test.js: ok");

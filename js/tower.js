@@ -1373,7 +1373,9 @@
     if ((Number(post.minAge) || 0) >= 18) return false;
     if (post.audience === "21+" || post.roomKind === "21+") return false;
     var blob = String(post.title || "") + " " + String(post.body || "");
-    if (/\b(21\+|nsfw|explicit)\b/i.test(blob)) return false;
+    /* Shared age-floor keyword test (js/age-floor-keywords.js); fail closed if missing. */
+    var floor = window.CognationAgeFloor;
+    if (!floor || typeof floor.isAdultKeyword !== "function" || floor.isAdultKeyword(blob)) return false;
     return true;
   }
 
@@ -10530,6 +10532,7 @@
     normalizeFace: normalizeFollowerFace,
   };
   window.CognationTowerIsFounderOwner = isFounderOwner;
+  window.CognationTowerNewsPostAppropriate = newsPostAppropriate;
   window.CognationTowerApplySide = function (side) {
     document.querySelectorAll("[data-tower-app]").forEach(function (root) {
       applyTowerSide(root, side);

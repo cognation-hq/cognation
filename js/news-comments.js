@@ -8,9 +8,8 @@
   var MAX = 20;
   var FACES = ["❤️", "👍", "😂", "😮", "😢"];
   var REACT_CHIP_CLASS = "news-comment-react-chip";
-  /* Same keyword test Tower/News use for the age floor (tower.js newsPostAppropriate,
-     seedops-news-log.js ageFloorPassed). Keyword stopgap until comment reports land. */
-  var AGE_FLAG_RE = /\b(21\+|nsfw|explicit)\b/i;
+  /* Keyword stopgap until comment reports land: the shared age-floor test in
+     js/age-floor-keywords.js (also used by Tower and the SeedOps News log). */
   var HIDDEN_FOR_AGE = "Hidden for your age group";
 
   function read() {
@@ -128,7 +127,9 @@
     return r === "G" || r === "PG" || r === "G-PG" || r === "GPG";
   }
   function isFlaggedForAge(body) {
-    return AGE_FLAG_RE.test(String(body || ""));
+    var floor = window.CognationAgeFloor;
+    /* Fail closed: this only changes what an under-13 viewer sees. */
+    return floor && typeof floor.isAdultKeyword === "function" ? floor.isAdultKeyword(body) : true;
   }
   function isThreadVisible(rating, viewerAge) {
     if (viewerAge == null || isNaN(viewerAge)) viewerAge = age();

@@ -69,8 +69,8 @@ var docs = src("docs/seedops.md");
 /* Featured order is Classroom / ad / chat / dating / content — Personal only */
 assert.ok(/FEATURED_ORDER\s*=\s*\[[\s\S]*CLASSROOM[\s\S]*AD[\s\S]*CHAT[\s\S]*DATING[\s\S]*CONTENT/.test(swipeSrc), "FEATURED_ORDER five families");
 assert.ok(/CONTENT_SUBTYPES/.test(swipeSrc), "content subtypes pooled");
-assert.ok(swipeSrc.indexOf("Professional toggle") === -1 || /no Professional toggle/.test(swipeSrc), "no Professional toggle product");
-assert.ok(!/data-commune-mode.*professional|Personal\s*\|\s*Professional/.test(swipeSrc), "no Personal|Professional toggle UI");
+/* Personal stays the default deck; Professional lives behind the pipe switch (commune-professional-deck.test.js). */
+assert.strictEqual(loadSwipe(memoryStorage(), memoryStorage()).getMode(), "personal", "Personal is the default Commune deck");
 
 /* Ads max 3 seconds */
 assert.strictEqual(loadSwipe(memoryStorage(), memoryStorage()).AD_MAX_MS, 3000, "AD_MAX_MS is 3000");

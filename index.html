@@ -781,11 +781,11 @@
             </div><!-- /#panel-tower -->
 
             <div role="tabpanel" id="panel-signal" class="signal-tab-panel" aria-labelledby="tab-signal" hidden>
-              <!-- Second row under SIGNAL: News | Feed (same two-level stack as Personal | Professional under Tower) -->
-              <div class="signal-subtabs" data-signal-subtabs role="tablist" aria-label="SIGNAL views">
-                <button type="button" class="signal-subtab" role="tab" id="signal-sub-news" data-signal-pane-btn="news" aria-controls="signal-pane-news" aria-selected="true" tabindex="0">News</button>
-                <span class="signal-subtab-sep" aria-hidden="true">|</span>
-                <button type="button" class="signal-subtab" role="tab" id="signal-sub-feed" data-signal-pane-btn="feed" aria-controls="signal-pane-feed" aria-selected="false" tabindex="-1">Feed</button>
+              <!-- Second row under SIGNAL: News | Feed pipe-switch (same chrome as COGNATION|WAYMAKERS / Personal|Professional) -->
+              <div class="signal-subtabs site-switch" data-signal-subtabs role="tablist" aria-label="SIGNAL views">
+                <button type="button" class="signal-subtab site-switch-side is-selected" role="tab" id="signal-sub-news" data-signal-pane-btn="news" aria-controls="signal-pane-news" aria-selected="true" tabindex="0">News</button>
+                <span class="signal-subtab-sep site-switch-sep" aria-hidden="true">|</span>
+                <button type="button" class="signal-subtab site-switch-side" role="tab" id="signal-sub-feed" data-signal-pane-btn="feed" aria-controls="signal-pane-feed" aria-selected="false" tabindex="-1">Feed</button>
               </div>
 
               <div id="signal-pane-news" class="signal-pane" role="tabpanel" data-signal-pane="news" aria-labelledby="signal-sub-news">

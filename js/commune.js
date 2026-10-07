@@ -969,6 +969,11 @@
     function natIntlFloor(posts) {
       return newsNatIntlFloor(posts, editionId);
     }
+    /* Wire filler is unrated, so under-13/unknown viewers on Nationwide and
+       International never load it: no sentinel, no observer, no loadMoreWire. */
+    function wireAllowed() {
+      return !((editionId === "nationwide" || editionId === "international") && newsViewerUnder13());
+    }
 
     function makeWirePost(seq) {
       var lines = WIRE_LINES[editionId] || WIRE_LINES.local;
@@ -1103,13 +1108,13 @@
     }
 
     function loadMoreWire() {
-      if (!endlessOn || !feedList || wireLoading) return;
+      if (!endlessOn || !feedList || wireLoading || !wireAllowed()) return;
       wireLoading = true;
       if (feedList) feedList.setAttribute("aria-busy", "true");
       if (feedLoading) feedLoading.hidden = false;
       var start = wirePage * WIRE_BATCH;
       for (var i = 0; i < WIRE_BATCH; i++) {
-        natIntlFloor([makeWirePost(start + i)]).forEach(function (wp) { appendPostEl(wp); });
+        appendPostEl(makeWirePost(start + i));
       }
       wirePage += 1;
       if (feedEmpty) feedEmpty.hidden = true;
@@ -1125,7 +1130,7 @@
         feedObserver.disconnect();
         feedObserver = null;
       }
-      if (!endlessOn || !feedSentinel || typeof IntersectionObserver === "undefined") {
+      if (!endlessOn || !feedSentinel || !wireAllowed() || typeof IntersectionObserver === "undefined") {
         return;
       }
       feedObserver = new IntersectionObserver(
@@ -1265,8 +1270,9 @@
         feedSentinel.setAttribute("aria-hidden", "true");
         feedSentinel.hidden = true;
       }
-      feedList.appendChild(feedSentinel);
-      if (!posts.length && !endlessOn) {
+      var wireOn = endlessOn && wireAllowed();
+      if (wireOn) feedList.appendChild(feedSentinel);
+      if (!posts.length && !wireOn) {
         if (feedEmpty) feedEmpty.hidden = false;
       } else {
         if (feedEmpty) feedEmpty.hidden = true;
@@ -1275,7 +1281,7 @@
         });
       }
       setEndlessUi(endlessOn);
-      if (endlessOn) {
+      if (wireOn) {
         if (feedEmpty) feedEmpty.hidden = true;
         bindEndlessObserver();
       } else if (feedObserver) {

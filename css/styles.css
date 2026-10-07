@@ -12399,10 +12399,20 @@ a.circle-fall-portrait {
   backdrop-filter: blur(12px) saturate(118%) !important;
 }
 
+/* 10/4 Cognation top-bar look lock (accepted; never shipped until this PR).
+   Dark letters `#1c1630` on the lilac ombre bar; thin dark underline on the
+   active tab; no fill. Scope is the main top-row tabs only (TOWER · SIGNAL ·
+   COMMUNE · CIRCLE). COGNATION | WAYMAKERS switch and Log out stay white on
+   the lilac bar (PR #51). SIGNAL / COMMUNE / Tower sub-switches are out of
+   scope (PR #64 stays as-is).
+   Designer calls (2026-10-07): 2px underline; inactive tabs #1c1630 at 70%
+   on the text color (rgba(28, 22, 48, 0.7)), active full #1c1630; hover
+   underline #1c1630 at 40% (rgba(28, 22, 48, 0.4)); no text-shadow on these
+   tabs. Switch and Log out stay white. */
 .app-topbar .tablist [role="tab"],
 .app-topbar-shortcut {
-  color: #fff !important;
-  text-shadow: 0 1px 2px rgba(90, 50, 90, 0.28) !important;
+  color: rgba(28, 22, 48, 0.7) !important;
+  text-shadow: none !important;
   background: transparent !important;
   border: 0 !important;
   border-bottom: 2px solid transparent !important;
@@ -12413,19 +12423,19 @@ a.circle-fall-portrait {
 .app-topbar .tablist [role="tab"]:focus-visible,
 .app-topbar-shortcut:hover,
 .app-topbar-shortcut:focus-visible {
-  color: #fff !important;
-  border-bottom-color: rgba(255, 255, 255, 0.72) !important;
+  color: #1c1630 !important;
+  border-bottom-color: rgba(28, 22, 48, 0.4) !important;
   background: transparent !important;
-  text-shadow: 0 1px 3px rgba(90, 50, 90, 0.35) !important;
+  text-shadow: none !important;
 }
 
 .app-topbar .tablist [role="tab"][aria-selected="true"],
 body.is-circle-open .app-topbar-shortcut[data-tower-anchor="circle"] {
-  color: #fff !important;
-  border-bottom-color: #fff !important;
+  color: #1c1630 !important;
+  border-bottom-color: #1c1630 !important;
   background: transparent !important;
   box-shadow: none !important;
-  text-shadow: 0 1px 3px rgba(90, 50, 90, 0.4) !important;
+  text-shadow: none !important;
 }
 
 .app-topbar-actions .app-logout-btn {

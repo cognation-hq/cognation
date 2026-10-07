@@ -256,11 +256,29 @@
     return host;
   }
 
+  /* commune.js (deferred, earlier in index.html) can render the feed before this
+     file runs, so its mount() call is skipped. Mount any stories already on the
+     page, and re-render threads when the session starts, ends or switches profile
+     (a saved session is restored after the first paint). */
+  function mountAll() {
+    if (typeof document === "undefined" || !document.querySelectorAll) return 0;
+    var stories = document.querySelectorAll("[data-news-post][data-post-id]");
+    for (var i = 0; i < stories.length; i++) mount(stories[i]);
+    return stories.length;
+  }
+
   window.CognationNewsComments = {
     KEY: KEY, MAX_SHOWN: MAX, REACT_CHIP_CLASS: REACT_CHIP_CLASS,
     isGpgRating: isGpg, isThreadVisible: isThreadVisible,
     listForStory: listForStory, addComment: addComment,
     publishComment: publishComment, pullStory: pullStory, authorBadge: authorBadge,
-    toggleReact: toggleReact, mount: mount, viewerAge: age,
+    toggleReact: toggleReact, mount: mount, mountAll: mountAll, viewerAge: age,
   };
+
+  if (typeof document !== "undefined" && document.addEventListener) {
+    ["cognation:session-started", "cognation:session-ended", "cognation:active-profile-changed"].forEach(function (name) {
+      document.addEventListener(name, mountAll);
+    });
+    mountAll();
+  }
 })();

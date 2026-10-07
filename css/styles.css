@@ -646,7 +646,7 @@ main {
 
 
 /* Accessible in-page tabs
- * Tab order on Home: TOWER · NEWS · COMMUNE · PAGES (WELL hidden from public chrome).
+ * Tab order on Home: TOWER · SIGNAL · COMMUNE · CIRCLE (WELL hidden from public chrome).
  */
 .tabs-section {
   padding-top: 3rem;
@@ -2160,7 +2160,7 @@ body.screen-break-open {
 }
 
 
-/* Fixed top: centered TOWER / NEWS / COMMUNE / PAGES + whisper Grok link */
+/* Fixed top: centered TOWER / SIGNAL / COMMUNE / CIRCLE + whisper Grok link */
 .app-topbar {
   position: fixed;
   top: 0;
@@ -5505,7 +5505,7 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 }
 
 
-/* ===== TOWER two sides: My feed (private) | Public profile ===== */
+/* ===== TOWER two sides: Connections (private) | Public profile ===== */
 .tower-side-toggle {
   display: inline-flex;
   flex-wrap: wrap;
@@ -5585,11 +5585,14 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .tower-private-side .tower-lead,
 .tower-private-side label,
 .tower-private-side .tower-compose,
-.tower-private-side .tower-feed {
+.tower-private-side .tower-feed,
+.signal-feed-host .tower-compose,
+.signal-feed-host .tower-feed {
   color: inherit;
   font-family: inherit;
 }
-.tower-private-side .tower-feed {
+.tower-private-side .tower-feed,
+.signal-feed-host .tower-feed {
   font-size: inherit;
 }
 
@@ -5762,21 +5765,14 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   pointer-events: none !important;
 }
 
-/* Private side: friends browse + messages + newsfeed (not scrapbook stickers) */
+/* Private side: friends browse + messages + connections (Feed lives under SIGNAL) */
+/* Connections + friends only — Feed moved to SIGNAL */
 .tower-private-main-grid {
   display: grid;
-  grid-template-columns: minmax(11rem, 14rem) minmax(14rem, 18rem) minmax(0, 1fr);
+  grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);
   gap: 1rem 1.25rem;
   align-items: start;
   margin-top: 0.75rem;
-}
-@media (max-width: 960px) {
-  .tower-private-main-grid {
-    grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
-  }
-  .tower-friends-browse {
-    grid-column: 1 / -1;
-  }
 }
 @media (max-width: 720px) {
   .tower-private-main-grid {
@@ -5804,7 +5800,7 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 }
 
 
-/* COMMUNE shell placeholder (newspaper moved to NEWS tab) */
+/* COMMUNE shell placeholder (newspaper lives under SIGNAL → News) */
 .commune-shell-placeholder {
   padding: 2.5rem 1.25rem 3rem;
   text-align: center;
@@ -7314,18 +7310,18 @@ body.login-gate-open {
   color: var(--color-heading);
 }
 
-/* NEWS shares the quiet Cognation system instead of its legacy newspaper palette. */
-#panel-news .commune-paper,
-#panel-news .commune-paper * {
+/* SIGNAL → News shares the quiet Cognation system instead of its legacy newspaper palette. */
+#panel-signal .commune-paper,
+#panel-signal .commune-paper * {
   font-family: var(--cgn-ui) !important;
 }
 
-#panel-news .commune-paper {
+#panel-signal .commune-paper {
   color: var(--cgn-text) !important;
   background: transparent !important;
 }
 
-#panel-news .paper-masthead {
+#panel-signal .paper-masthead {
   border: 1px solid var(--cgn-border) !important;
   border-radius: var(--cgn-radius) !important;
   padding: clamp(1.25rem, 3vw, 2.5rem) !important;
@@ -7336,9 +7332,9 @@ body.login-gate-open {
   text-align: left !important;
 }
 
-#panel-news .paper-eyebrow,
-#panel-news .paper-edition-scope-label,
-#panel-news .paper-section-kicker {
+#panel-signal .paper-eyebrow,
+#panel-signal .paper-edition-scope-label,
+#panel-signal .paper-section-kicker {
   color: var(--cgn-accent) !important;
   font-size: 0.61rem !important;
   font-weight: 750 !important;
@@ -7346,7 +7342,7 @@ body.login-gate-open {
   text-transform: uppercase !important;
 }
 
-#panel-news .paper-title {
+#panel-signal .paper-title {
   margin: 0.7rem 0 0 !important;
   color: #fff !important;
   font-family: var(--cgn-ui) !important;
@@ -7357,17 +7353,17 @@ body.login-gate-open {
   text-shadow: 0 0 28px rgba(172, 242, 255, 0.33) !important;
 }
 
-#panel-news .paper-subtitle,
-#panel-news .paper-dateline,
-#panel-news .paper-volume,
-#panel-news .paper-price,
-#panel-news .paper-date {
+#panel-signal .paper-subtitle,
+#panel-signal .paper-dateline,
+#panel-signal .paper-volume,
+#panel-signal .paper-price,
+#panel-signal .paper-date {
   color: var(--cgn-text-muted) !important;
   font-size: 0.72rem !important;
   letter-spacing: 0.01em !important;
 }
 
-#panel-news .paper-grid {
+#panel-signal .paper-grid {
   gap: 1px !important;
   border: 1px solid var(--cgn-border) !important;
   border-radius: var(--cgn-radius) !important;
@@ -7375,69 +7371,69 @@ body.login-gate-open {
   overflow: hidden;
 }
 
-#panel-news .paper-col,
-#panel-news .paper-section,
-#panel-news .commune-feed-item,
-#panel-news .commune-social-card,
-#panel-news .commune-profile-card,
-#panel-news .paper-brief {
+#panel-signal .paper-col,
+#panel-signal .paper-section,
+#panel-signal .commune-feed-item,
+#panel-signal .commune-social-card,
+#panel-signal .commune-profile-card,
+#panel-signal .paper-brief {
   border: 0 !important;
   border-radius: 0 !important;
   background: rgba(16, 19, 48, 0.44) !important;
   box-shadow: none !important;
 }
 
-#panel-news .paper-col-heading,
-#panel-news .paper-brief-title,
-#panel-news .commune-profile-name,
-#panel-news .commune-feed-author {
+#panel-signal .paper-col-heading,
+#panel-signal .paper-brief-title,
+#panel-signal .commune-profile-name,
+#panel-signal .commune-feed-author {
   color: var(--cgn-text) !important;
   font-family: var(--cgn-ui) !important;
   font-weight: 700 !important;
   letter-spacing: -0.02em !important;
 }
 
-#panel-news .paper-index-label,
-#panel-news .paper-index-desc,
-#panel-news .paper-brief-body,
-#panel-news .commune-feed-body,
-#panel-news .commune-profile-bio,
-#panel-news .paper-topics,
-#panel-news .commune-feed-meta {
+#panel-signal .paper-index-label,
+#panel-signal .paper-index-desc,
+#panel-signal .paper-brief-body,
+#panel-signal .commune-feed-body,
+#panel-signal .commune-profile-bio,
+#panel-signal .paper-topics,
+#panel-signal .commune-feed-meta {
   color: var(--cgn-text-muted) !important;
   font-family: var(--cgn-ui) !important;
 }
 
-#panel-news .paper-index-btn,
-#panel-news .paper-edition-opt {
+#panel-signal .paper-index-btn,
+#panel-signal .paper-edition-opt {
   border: 1px solid transparent !important;
   border-radius: 0.65rem !important;
   background: transparent !important;
 }
 
-#panel-news .paper-index-btn:hover,
-#panel-news .paper-index-btn.is-active,
-#panel-news .paper-index-btn[aria-current="true"],
-#panel-news .paper-edition-opt:has(input:checked) {
+#panel-signal .paper-index-btn:hover,
+#panel-signal .paper-index-btn.is-active,
+#panel-signal .paper-index-btn[aria-current="true"],
+#panel-signal .paper-edition-opt:has(input:checked) {
   border-color: rgba(183, 246, 255, 0.5) !important;
   background: rgba(149, 236, 255, 0.12) !important;
 }
 
-#panel-news .paper-edition-opt span {
+#panel-signal .paper-edition-opt span {
   color: var(--cgn-text-muted) !important;
   font-family: var(--cgn-ui) !important;
   font-size: 0.65rem !important;
   letter-spacing: 0.07em !important;
 }
 
-#panel-news .paper-edition-opt:has(input:checked) span,
-#panel-news .paper-index-btn.is-active .paper-index-label,
-#panel-news .paper-index-btn[aria-current="true"] .paper-index-label {
+#panel-signal .paper-edition-opt:has(input:checked) span,
+#panel-signal .paper-index-btn.is-active .paper-index-label,
+#panel-signal .paper-index-btn[aria-current="true"] .paper-index-label {
   color: #fff !important;
 }
 
 /* News and Commune render their own panels; remove the empty shared chrome around them. */
-.tabs.tabs--chrome:has(#panel-news:not([hidden])) .tab-panels,
+.tabs.tabs--chrome:has(#panel-signal:not([hidden])) .tab-panels,
 .tabs.tabs--chrome:has(#panel-commune:not([hidden])) .tab-panels {
   border: 0 !important;
   border-radius: 0 !important;
@@ -7485,7 +7481,7 @@ body.login-gate-open {
   font-size: 0.75rem;
 }
 
-.tabs.tabs--chrome:has(#panel-news:not([hidden])) .app-topbar,
+.tabs.tabs--chrome:has(#panel-signal:not([hidden])) .app-topbar,
 .tabs.tabs--chrome:has(#panel-commune:not([hidden])) .app-topbar {
   border: 0 !important;
   border-radius: 0 !important;
@@ -7570,7 +7566,7 @@ body { padding-top: 0 !important; }
 }
 
 
-/* Top friends settings live on My feed (private); pins stay public widgets */
+/* Top friends settings live on Connections (private); pins stay public widgets */
 .tower-private-friends {
   margin: 0.75rem 0 1rem;
 }
@@ -7638,7 +7634,7 @@ body { padding-top: 0 !important; }
   margin: 0;
 }
 
-/* Badge display settings on My feed (private); pins stay public widgets */
+/* Badge display settings on Connections (private); pins stay public widgets */
 .tower-private-badges {
   margin: 0.75rem 0 1rem;
 }
@@ -7909,7 +7905,7 @@ body { padding-top: 0 !important; }
 }
 
 
-/* My feed: all emoji reacts see-through */
+/* Connections: all emoji reacts see-through */
 .tower-private-side .tower-react-face,
 .tower-private-side .tower-react-pill,
 .tower-private-side .commune-react-pill,
@@ -8104,7 +8100,7 @@ body { padding-top: 0 !important; }
   min-height: 0;
 }
 
-/* —— Friends browse (My feed private) —— */
+/* —— Friends browse (Connections private) —— */
 .tower-friends-browse {
   position: static;
   background: rgba(255, 245, 249, 0.96);
@@ -8186,7 +8182,7 @@ body { padding-top: 0 !important; }
 }
 
 
-/* ===== TOWER calendar (private My feed + public scrapbook widget) ===== */
+/* ===== TOWER calendar (private Connections + public scrapbook widget) ===== */
 .tower-private-calendar .tower-cal--private {
   max-width: 36rem;
 }
@@ -9344,7 +9340,7 @@ body { padding-top: 0 !important; }
   min-width: 0;
   align-self: start;
 }
-/* The Friends card stays off the Tower news feed. The personal profile keeps its own column. */
+/* The Friends card stays off the SIGNAL Feed. The personal profile keeps its own column. */
 .tower-private-main-grid .tower-friends-browse {
   display: none !important;
 }
@@ -10600,7 +10596,7 @@ body {
 }
 
 #panel-tower,
-#panel-news,
+#panel-signal,
 #panel-commune,
 #panel-pages,
 [data-tower-app],
@@ -10920,22 +10916,22 @@ body {
 }
 
 #panel-tower,
-#panel-news,
+#panel-signal,
 #panel-commune,
 #panel-tower :is(button, input, select, textarea, p, a, label, li, td, th, summary, figcaption, h1, h2, h3, h4, h5, h6),
-#panel-news :is(button, input, select, textarea, p, a, label, li, td, th, summary, figcaption, h1, h2, h3, h4, h5, h6),
+#panel-signal :is(button, input, select, textarea, p, a, label, li, td, th, summary, figcaption, h1, h2, h3, h4, h5, h6),
 #panel-commune :is(button, input, select, textarea, p, a, label, li, td, th, summary, figcaption, h1, h2, h3, h4, h5, h6) {
   font-family: var(--cgn-ui) !important;
 }
 
 #panel-tower,
-#panel-news,
+#panel-signal,
 #panel-commune {
   color: var(--cgn-text) !important;
 }
 
 #panel-tower :is(h1, h2, h3, h4, h5, h6),
-#panel-news :is(h1, h2, h3, h4, h5, h6),
+#panel-signal :is(h1, h2, h3, h4, h5, h6),
 #panel-commune :is(h1, h2, h3, h4, h5, h6) {
   color: var(--cgn-text) !important;
   font-weight: 680 !important;
@@ -10943,19 +10939,19 @@ body {
 }
 
 #panel-tower :is(p, li, td, th, small, time, figcaption),
-#panel-news :is(p, li, td, th, small, time, figcaption),
+#panel-signal :is(p, li, td, th, small, time, figcaption),
 #panel-commune :is(p, li, td, th, small, time, figcaption) {
   color: var(--cgn-text-muted) !important;
 }
 
 #panel-tower :is(a, .tower-post-author, .tower-friends-browse-heading, .tower-personal-calendar-heading),
-#panel-news :is(a, .paper-eyebrow, .paper-section-kicker, .commune-feed-author),
+#panel-signal :is(a, .paper-eyebrow, .paper-section-kicker, .commune-feed-author),
 #panel-commune :is(a, .commune-card-kicker, .commune-live-label) {
   color: var(--cgn-accent) !important;
 }
 
 #panel-tower :is(input, select, textarea),
-#panel-news :is(input, select, textarea),
+#panel-signal :is(input, select, textarea),
 #panel-commune :is(input, select, textarea) {
   border-color: var(--cgn-border) !important;
   border-radius: 0.65rem !important;
@@ -10965,20 +10961,20 @@ body {
 }
 
 #panel-tower :is(input, select, textarea)::placeholder,
-#panel-news :is(input, select, textarea)::placeholder,
+#panel-signal :is(input, select, textarea)::placeholder,
 #panel-commune :is(input, select, textarea)::placeholder {
   color: var(--cgn-text-soft) !important;
 }
 
 #panel-tower :is(input, select, textarea):focus,
-#panel-news :is(input, select, textarea):focus,
+#panel-signal :is(input, select, textarea):focus,
 #panel-commune :is(input, select, textarea):focus {
   border-color: var(--cgn-accent) !important;
   box-shadow: 0 0 0 3px rgba(183, 246, 255, 0.13), 0 0 20px rgba(183, 246, 255, 0.12) !important;
 }
 
 #panel-tower :is(.tower-post, .tower-compact-block, .tower-private-theme, .tower-friends-browse, .tower-personal-calendar, .tower-private-messages),
-#panel-news :is(.paper-brief, .commune-feed-item, .commune-social-card, .commune-profile-card, .paper-col),
+#panel-signal :is(.paper-brief, .commune-feed-item, .commune-social-card, .commune-profile-card, .paper-col),
 #panel-commune :is(.commune-card, .commune-live-chrome, .commune-dating-toggle-ui) {
   border-color: var(--cgn-border) !important;
   background: rgba(16, 19, 48, 0.42) !important;
@@ -10986,7 +10982,7 @@ body {
 }
 
 #panel-tower :is(.tower-side-btn, .tower-go-live-btn, .tower-attach, .tower-public-widget-check),
-#panel-news :is(.paper-index-btn, .paper-edition-opt, .paper-refresh-btn, .commune-endless-toggle),
+#panel-signal :is(.paper-index-btn, .paper-edition-opt, .paper-refresh-btn, .commune-endless-toggle),
 #panel-commune :is(.commune-swipe-btn, .commune-dating-toggle, .commune-live-btn) {
   border-color: rgba(183, 246, 255, 0.4) !important;
   background: rgba(155, 235, 255, 0.1) !important;
@@ -10994,7 +10990,7 @@ body {
 }
 
 #panel-tower :is(.tower-side-btn.is-selected, .tower-go-live-btn:hover),
-#panel-news :is(.paper-index-btn.is-active, .paper-index-btn[aria-current="true"], .paper-edition-opt:has(input:checked)),
+#panel-signal :is(.paper-index-btn.is-active, .paper-index-btn[aria-current="true"], .paper-edition-opt:has(input:checked)),
 #panel-commune :is(.commune-swipe-btn:hover, .commune-dating-toggle.is-on) {
   border-color: rgba(210, 249, 255, 0.7) !important;
   background: linear-gradient(100deg, rgba(139, 237, 255, 0.35), rgba(204, 161, 255, 0.3)) !important;
@@ -11002,17 +10998,17 @@ body {
   box-shadow: 0 0 20px rgba(142, 234, 255, 0.18) !important;
 }
 
-#panel-news .paper-title,
-#panel-news .paper-subtitle,
-#panel-news .paper-dateline,
-#panel-news .paper-edition-scope-label,
-#panel-news .paper-col-heading {
+#panel-signal .paper-title,
+#panel-signal .paper-subtitle,
+#panel-signal .paper-dateline,
+#panel-signal .paper-edition-scope-label,
+#panel-signal .paper-col-heading {
   color: var(--cgn-text) !important;
   text-shadow: none !important;
 }
 
-#panel-news .paper-rule,
-#panel-news .paper-rule-block {
+#panel-signal .paper-rule,
+#panel-signal .paper-rule-block {
   background: var(--cgn-border) !important;
   border-color: var(--cgn-border) !important;
 }
@@ -11098,7 +11094,7 @@ body.cognation-demo-on {
 
 .cgn-deferral,
 #panel-tower .cgn-deferral,
-#panel-news .cgn-deferral,
+#panel-signal .cgn-deferral,
 #panel-commune .cgn-deferral,
 #panel-well .cgn-deferral,
 .screen-break-panel .cgn-deferral {
@@ -11655,7 +11651,7 @@ body.cognation-demo-on {
 /* Circle page: header and tabs stay. Commune, News, and Tower stay off the body. */
 body.is-circle-open .tab-panels,
 body.is-circle-open #panel-tower,
-body.is-circle-open #panel-news,
+body.is-circle-open #panel-signal,
 body.is-circle-open #panel-commune,
 body.is-circle-open #panel-pages,
 body.is-circle-open .commune-swipe-shell,
@@ -11812,7 +11808,7 @@ a.circle-fall-portrait {
   text-underline-offset: 0.14em;
 }
 
-/* Pull the My feed stack together. The controls stay; only the empty gaps shrink. */
+/* Pull the Connections stack together. The controls stay; only the empty gaps shrink. */
 .tower-private-side .tower-main {
   display: flex;
   flex-direction: column;
@@ -11896,7 +11892,28 @@ a.circle-fall-portrait {
   color: #f7f9ff !important;
 }
 
-#panel-tower .tower-compose :is(.tower-event-dropdown-summary, button.btn-primary, #tower-files) {
+/* SIGNAL Feed host — same compose chrome as former Tower private feed */
+#panel-signal .signal-feed-host :is(
+  .tower-block-heading,
+  .tower-author,
+  .tower-compose label,
+  .tower-compose .btn,
+  .tower-compose .tower-event-dropdown-summary
+) {
+  font-weight: 400 !important;
+  letter-spacing: 0.02em !important;
+  text-shadow: none !important;
+}
+#panel-signal .signal-feed-host .tower-compose {
+  background: rgba(16, 19, 48, 0.42) !important;
+  border: 1px solid rgba(209, 241, 255, 0.28) !important;
+  border-radius: 1.15rem !important;
+  color: #f7f9ff !important;
+}
+
+
+#panel-tower .tower-compose :is(.tower-event-dropdown-summary, button.btn-primary, #tower-files),
+#panel-signal .tower-compose :is(.tower-event-dropdown-summary, button.btn-primary, #tower-files) {
   background: rgba(16, 19, 48, 0.55) !important;
   color: #f7f9ff !important;
   -webkit-text-fill-color: #f7f9ff !important;
@@ -11911,11 +11928,13 @@ a.circle-fall-portrait {
   line-height: 1.25 !important;
   padding: 0.28rem 0.65rem !important;
 }
-#panel-tower .tower-compose .tower-event-dropdown-summary {
+#panel-tower .tower-compose .tower-event-dropdown-summary,
+#panel-signal .tower-compose .tower-event-dropdown-summary {
   list-style: none;
   min-height: 0;
 }
-#panel-tower .tower-compose .tower-event-dropdown-summary::marker {
+#panel-tower .tower-compose .tower-event-dropdown-summary::marker,
+#panel-signal .tower-compose .tower-event-dropdown-summary::marker {
   content: "";
 }
 /* TOWER sits in the page flow under the tab row, centered like COMMUNE, above the reaction row. */
@@ -12091,7 +12110,9 @@ a.circle-fall-portrait {
 .commune-card.is-exit-right { transform: translateX(120%) rotate(8deg); opacity: 0; }
 
 #panel-tower .tower-compose #tower-files::file-selector-button,
-#panel-tower .tower-compose #tower-files::-webkit-file-upload-button {
+#panel-tower .tower-compose #tower-files::-webkit-file-upload-button,
+#panel-signal .tower-compose #tower-files::file-selector-button,
+#panel-signal .tower-compose #tower-files::-webkit-file-upload-button {
   appearance: none;
   -webkit-appearance: none;
   background: transparent !important;
@@ -12150,7 +12171,7 @@ a.circle-fall-portrait {
 /* ===== Designer lock: lilac ombre topbar + COGNATION|WAYMAKERS switch ===== */
 /* Soft lilac → pink-lilac ombre; white tab/label text. Late cascade must win. */
 .app-topbar,
-.tabs.tabs--chrome:has(#panel-news:not([hidden])) .app-topbar,
+.tabs.tabs--chrome:has(#panel-signal:not([hidden])) .app-topbar,
 .tabs.tabs--chrome:has(#panel-commune:not([hidden])) .app-topbar {
   background:
     linear-gradient(
@@ -12284,4 +12305,104 @@ a.site-switch-side:focus-visible {
   background: #111 !important;
   color: #fff !important;
   border-color: #111 !important;
+}
+
+
+/* ===== SIGNAL: News | Feed second-row subtabs (Personal | Professional stack) ===== */
+/* Narrow fit-content row under SIGNAL; lilac strip; white labels; pipe; white underline on active */
+.signal-tab-panel {
+  padding-top: 0.35rem;
+}
+.signal-subtabs {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 0.85rem;
+  padding: 0.45rem 0.85rem;
+  background:
+    linear-gradient(
+      105deg,
+      rgba(232, 214, 245, 0.98) 0%,
+      rgba(244, 220, 238, 0.97) 42%,
+      rgba(255, 220, 232, 0.96) 100%
+    );
+  border: 1px solid rgba(196, 160, 200, 0.45);
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(140, 90, 140, 0.1);
+}
+.signal-subtab {
+  appearance: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent !important;
+  color: #fff !important;
+  font-family: "Oswald", system-ui, sans-serif !important;
+  font-weight: 800 !important;
+  font-size: clamp(0.72rem, 1.6vw, 0.92rem) !important;
+  letter-spacing: 0.06em !important;
+  text-transform: none;
+  text-shadow: 0 1px 2px rgba(90, 50, 90, 0.28);
+  padding: 0.2rem 0.15rem 0.28rem;
+  margin: 0;
+  border-radius: 0;
+  cursor: pointer;
+  line-height: 1.1;
+}
+.signal-subtab:hover,
+.signal-subtab:focus-visible {
+  color: #fff !important;
+  border-bottom-color: rgba(255, 255, 255, 0.72);
+  outline: none;
+  text-shadow: 0 1px 3px rgba(90, 50, 90, 0.35);
+}
+.signal-subtab.is-selected,
+.signal-subtab[aria-selected="true"] {
+  color: #fff !important;
+  border-bottom-color: #fff;
+  text-shadow: 0 1px 3px rgba(90, 50, 90, 0.4);
+}
+.signal-subtab-sep {
+  font-family: "Oswald", system-ui, sans-serif !important;
+  font-weight: 700 !important;
+  font-size: clamp(0.72rem, 1.6vw, 0.92rem) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  text-shadow: 0 1px 2px rgba(90, 50, 90, 0.28);
+  user-select: none;
+  line-height: 1.1;
+}
+.signal-pane[hidden] {
+  display: none !important;
+}
+.signal-feed-host {
+  --tower-private-bg: #fff5f9;
+  --tower-private-font: Georgia, "Times New Roman", Times, serif;
+  --tower-private-font-size: 16px;
+  --tower-private-text: #4a2c3a;
+  background: var(--tower-private-bg);
+  color: var(--tower-private-text);
+  font-family: var(--tower-private-font);
+  font-size: var(--tower-private-font-size);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem 1.25rem;
+  box-shadow: 0 4px 16px rgba(74, 44, 58, 0.06);
+  max-width: 42rem;
+  margin: 0 auto;
+}
+.signal-feed-host .tower-compose,
+.signal-feed-host .tower-feed {
+  max-width: 100%;
+}
+@media (max-width: 640px) {
+  .signal-subtab,
+  .signal-subtab-sep {
+    font-size: 0.65rem !important;
+  }
+  .signal-subtabs {
+    gap: 0.22rem;
+    padding: 0.35rem 0.65rem;
+  }
 }

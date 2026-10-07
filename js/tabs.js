@@ -135,8 +135,12 @@
       return;
     }
     if (hash.indexOf("tower-post-") === 0) {
-      var towerForPost = document.getElementById("tab-tower");
-      if (towerForPost) towerForPost.click();
+      if (typeof window.CognationSignalOpen === "function") {
+        window.CognationSignalOpen("feed");
+      } else {
+        var signalForPost = document.getElementById("tab-signal");
+        if (signalForPost) signalForPost.click();
+      }
       var postId = hash.slice("tower-post-".length);
       window.setTimeout(function () {
         if (typeof window.CognationTowerOpenPost === "function") {
@@ -157,9 +161,15 @@
       return;
     }
     var tabIdMap = {
-      news: "tab-news",
-      "panel-news": "tab-news",
-      "tab-news": "tab-news",
+      news: "tab-signal",
+      "panel-news": "tab-signal",
+      "tab-news": "tab-signal",
+      signal: "tab-signal",
+      "panel-signal": "tab-signal",
+      "tab-signal": "tab-signal",
+      "signal-news": "tab-signal",
+      "signal-feed": "tab-signal",
+      feed: "tab-signal",
       commune: "tab-commune",
       "panel-commune": "tab-commune",
       "tab-commune": "tab-commune",
@@ -173,12 +183,33 @@
     if (tabIdMap[hash]) {
       var mapped = document.getElementById(tabIdMap[hash]);
       if (mapped && !mapped.hidden) mapped.click();
+      if (hash === "feed" || hash === "signal-feed") {
+        window.setTimeout(function () {
+          if (typeof window.CognationSignalApplyPane === "function") {
+            window.CognationSignalApplyPane("feed");
+          }
+        }, 20);
+      } else if (
+        hash === "news" ||
+        hash === "signal-news" ||
+        hash === "signal" ||
+        hash === "panel-news" ||
+        hash === "tab-news" ||
+        hash === "panel-signal" ||
+        hash === "tab-signal"
+      ) {
+        window.setTimeout(function () {
+          if (typeof window.CognationSignalApplyPane === "function") {
+            window.CognationSignalApplyPane(hash === "feed" || hash === "signal-feed" ? "feed" : "news");
+          }
+        }, 20);
+      }
       return;
     }
     if (hash.indexOf("tower-profile-") !== 0) return;
     var towerTab = document.getElementById("tab-tower");
     if (towerTab) towerTab.click();
-    /* Public profile deep-link — never open private My feed */
+    /* Public profile deep-link — never open private Connections */
     if (typeof window.CognationTowerApplySide === "function") {
       window.CognationTowerApplySide("public");
     } else {

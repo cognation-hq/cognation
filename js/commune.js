@@ -990,7 +990,7 @@
             safe = safe.replace(/@([a-z0-9_-]+)/gi, function (_, h) {
               var href =
                 h.toLowerCase() === "statewide"
-                  ? "#tab-news"
+                  ? "#tab-signal"
                   : "#tower-profile-" + h.toLowerCase();
               return (
                 '<a class="commune-at-link" href="' +

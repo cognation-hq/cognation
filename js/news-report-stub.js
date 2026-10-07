@@ -23,7 +23,7 @@
         sel.textContent.trim()
       );
     }
-    var panel = document.getElementById("panel-news");
+    var panel = document.getElementById("panel-signal");
     if (panel && panel.getAttribute("data-active-edition")) {
       return panel.getAttribute("data-active-edition");
     }
@@ -38,7 +38,7 @@
   }
 
   function init() {
-    var panel = document.getElementById("panel-news") || document;
+    var panel = document.getElementById("panel-signal") || document;
     panel.addEventListener("click", function (ev) {
       var toggle = ev.target && ev.target.closest("[data-news-report-toggle]");
       if (toggle) {

@@ -297,14 +297,14 @@
   </section>
 
   <main id="main">
-    <!-- Tab order (L→R): TOWER · NEWS · COMMUNE · CIRCLE (V2 areas stay hidden) -->
+    <!-- Tab order (L→R): TOWER · SIGNAL · COMMUNE · CIRCLE (V2 areas stay hidden) -->
     <section class="section tabs-section" aria-label="COGNATION">
       <div class="container">
         <div class="tabs tabs--chrome" data-tabs>
           <div class="app-topbar">
             <div role="tablist" aria-label="COGNATION topics" class="tablist">
               <button type="button" role="tab" id="tab-tower" aria-controls="panel-tower" aria-selected="true" tabindex="0">TOWER</button>
-              <button type="button" role="tab" id="tab-news" aria-controls="panel-news" aria-selected="false" tabindex="-1">NEWS</button>
+              <button type="button" role="tab" id="tab-signal" aria-controls="panel-signal" aria-selected="false" tabindex="-1">SIGNAL</button>
               <button type="button" role="tab" id="tab-commune" aria-controls="panel-commune" aria-selected="false" tabindex="-1">COMMUNE</button>
               <button type="button" class="app-topbar-shortcut" data-tower-anchor="circle">CIRCLE</button>
               <button type="button" role="tab" id="tab-pages" aria-controls="panel-pages" aria-selected="false" tabindex="-1" hidden>PAGES</button>
@@ -326,46 +326,13 @@
               </header>
               <div class="tower-app" data-tower-app data-tower-side="private" data-tower-is-owner="true">
                 <div class="tower-side-toggle" data-tower-side-toggle role="tablist" aria-label="Tower side">
-                  <button type="button" class="tower-side-btn" role="tab" data-tower-side-btn="private" aria-selected="true" id="tower-side-private">My feed</button>
+                  <button type="button" class="tower-side-btn" role="tab" data-tower-side-btn="private" aria-selected="true" id="tower-side-private">Connections</button>
                   <button type="button" class="tower-side-btn" role="tab" data-tower-side-btn="public" aria-selected="false" id="tower-side-public">Public profile</button>
                 </div>
 
-                <!-- PRIVATE: owner newsfeed backend (compose + friends feed) -->
+                <!-- PRIVATE: profiles + connections (Feed compose lives under SIGNAL) -->
                 <div class="tower-private-side" data-tower-private-side>
                   <div class="tower-main">
-                    <form class="tower-compose tower-compose--compact" data-tower-compose action="#" method="post">
-                      <h4 class="tower-block-heading" data-tower-block-heading>On the block</h4>
-                      <div class="form-group">
-                        <label class="visually-hidden" for="tower-body">Update</label>
-                        <textarea id="tower-body" name="body" rows="2" maxlength="2000" placeholder="Share something…"></textarea>
-                      </div>
-                      <div class="tower-upload-row">
-                        <div class="form-group">
-                          <details class="tower-event-dropdown" data-tower-event-dropdown>
-                            <summary class="tower-event-dropdown-summary">Event</summary>
-                            <div class="tower-event-fields" data-tower-event-fields>
-                              <label for="tower-event-when">when:</label>
-                              <input id="tower-event-when" type="datetime-local" required data-tower-event-when>
-                              <label for="tower-event-where">where:</label>
-                              <input id="tower-event-where" type="text" maxlength="120" placeholder="Place" data-tower-event-where>
-                              <label for="tower-event-what">what:</label>
-                              <input id="tower-event-what" type="text" maxlength="240" required placeholder="What's happening" data-tower-event-what>
-                              <button type="button" class="btn btn-primary" data-tower-event-post>Post event</button>
-                              <p class="commune-status" data-tower-event-status hidden role="status" aria-live="polite"></p>
-                            </div>
-                          </details>
-                        </div>
-                        <div class="form-group">
-                          <label for="tower-files">Files</label>
-                          <input id="tower-files" name="files" type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif,.webp,.mp4,.mov">
-                        </div>
-                      </div>
-                      <p class="commune-status" data-tower-status hidden role="status" aria-live="polite"></p>
-                      <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">Post</button>
-                      </div>
-                    </form>
-
                     <details class="tower-private-theme tower-private-friends tower-compact-block" data-tower-private-friends data-tower-top-friends>
                       <summary class="tower-private-theme-summary">Top friends</summary>
                       <div class="tower-private-theme-body">
@@ -486,7 +453,6 @@
                         <ul class="tower-friends-browse-list" data-tower-friends-browse-list role="list"></ul>
                       </div>
                     </aside>
-                    <div class="tower-feed" data-tower-feed role="feed" aria-label="Tower posts"></div>
 
                     </div>
 
@@ -764,7 +730,7 @@
                           <details class="tower-cal-friend-dropdown" data-tower-cal-friend-dropdown>
                           <summary class="tower-cal-friend-heading">Friends schedule</summary>
                           <form class="tower-cal-friend-form" data-tower-cal-friend-form action="#" method="post">
-                            <p class="form-hint">Request a hangout on this profile’s calendar (demo). Owner can accept or edit from My feed.</p>
+                            <p class="form-hint">Request a hangout on this profile’s calendar (demo). Owner can accept or edit from Connections.</p>
                             <div class="form-group">
                               <label for="tower-cal-friend-name">Your name</label>
                               <input id="tower-cal-friend-name" name="requesterName" type="text" maxlength="80" required placeholder="Friend name" data-tower-cal-friend-name autocomplete="nickname">
@@ -805,7 +771,15 @@
               </div><!-- /.tower-app -->
             </div><!-- /#panel-tower -->
 
-            <div role="tabpanel" id="panel-news" aria-labelledby="tab-news" hidden>
+            <div role="tabpanel" id="panel-signal" class="signal-tab-panel" aria-labelledby="tab-signal" hidden>
+              <!-- Second row under SIGNAL: News | Feed (same two-level stack as Personal | Professional under Tower) -->
+              <div class="signal-subtabs" data-signal-subtabs role="tablist" aria-label="SIGNAL views">
+                <button type="button" class="signal-subtab" role="tab" id="signal-sub-news" data-signal-pane-btn="news" aria-controls="signal-pane-news" aria-selected="true" tabindex="0">News</button>
+                <span class="signal-subtab-sep" aria-hidden="true">|</span>
+                <button type="button" class="signal-subtab" role="tab" id="signal-sub-feed" data-signal-pane-btn="feed" aria-controls="signal-pane-feed" aria-selected="false" tabindex="-1">Feed</button>
+              </div>
+
+              <div id="signal-pane-news" class="signal-pane" role="tabpanel" data-signal-pane="news" aria-labelledby="signal-sub-news">
               <div class="commune-paper" data-commune-app>
                 <!-- Newspaper masthead -->
                 <header class="paper-masthead">
@@ -861,7 +835,7 @@
                       <li>
                         <button type="button" class="paper-index-btn is-active" data-commune-section="feed" aria-current="true">
                           <span class="paper-index-label">Front Page</span>
-                          <span class="paper-index-desc">From Tower</span>
+                          <span class="paper-index-desc">From Feed</span>
                         </button>
                       </li>
                       <li>
@@ -889,10 +863,10 @@
                     <!-- FRONT PAGE / FEED -->
                     <section class="paper-section" data-commune-pane="feed" aria-labelledby="paper-feed-heading">
                       <h4 class="paper-section-kicker" id="paper-feed-heading">Front Page</h4>
-                      <p class="paper-dek" data-commune-feed-dek>Local plate from Tower; @friendsoffriends posts also land on friends’ friends’ Local feeds.</p>
+                      <p class="paper-dek" data-commune-feed-dek>Local plate from Feed signals; @friendsoffriends posts also land on friends’ friends’ Local feeds.</p>
 
                       <div class="commune-feed commune-feed--readonly" data-commune-feed>
-                        <p class="commune-ai-note" role="note">Generated from Tower · not a compose box</p>
+                        <p class="commune-ai-note" role="note">Generated from Feed signals · not a compose box</p>
                         <p class="commune-status" data-commune-feed-status hidden role="status" aria-live="polite"></p>
                         <label class="commune-endless-toggle">
                           <input type="checkbox" data-commune-endless checked>
@@ -1003,7 +977,48 @@
                   </aside>
                 </div>
               </div>
-            </div>
+              </div><!-- /.signal-pane-news -->
+
+              <div id="signal-pane-feed" class="signal-pane signal-pane--feed" role="tabpanel" data-signal-pane="feed" aria-labelledby="signal-sub-feed" hidden>
+                <div class="signal-feed-host" data-signal-feed-host>
+                    <form class="tower-compose tower-compose--compact" data-tower-compose action="#" method="post">
+                      <h4 class="tower-block-heading" data-tower-block-heading>Send a signal</h4>
+                      <div class="form-group">
+                        <label class="visually-hidden" for="tower-body">Update</label>
+                        <textarea id="tower-body" name="body" rows="2" maxlength="2000" placeholder="Share a signal…"></textarea>
+                      </div>
+                      <div class="tower-upload-row">
+                        <div class="form-group">
+                          <details class="tower-event-dropdown" data-tower-event-dropdown>
+                            <summary class="tower-event-dropdown-summary">Event</summary>
+                            <div class="tower-event-fields" data-tower-event-fields>
+                              <label for="tower-event-when">when:</label>
+                              <input id="tower-event-when" type="datetime-local" required data-tower-event-when>
+                              <label for="tower-event-where">where:</label>
+                              <input id="tower-event-where" type="text" maxlength="120" placeholder="Place" data-tower-event-where>
+                              <label for="tower-event-what">what:</label>
+                              <input id="tower-event-what" type="text" maxlength="240" required placeholder="What's happening" data-tower-event-what>
+                              <button type="button" class="btn btn-primary" data-tower-event-post>Post event</button>
+                              <p class="commune-status" data-tower-event-status hidden role="status" aria-live="polite"></p>
+                            </div>
+                          </details>
+                        </div>
+                        <div class="form-group">
+                          <label for="tower-files">Files</label>
+                          <input id="tower-files" name="files" type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif,.webp,.mp4,.mov">
+                        </div>
+                      </div>
+                      <p class="commune-status" data-tower-status hidden role="status" aria-live="polite"></p>
+                      <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Post</button>
+                      </div>
+                    </form>
+
+                  <div class="tower-feed" data-tower-feed role="feed" aria-label="Feed posts"></div>
+                </div>
+              </div><!-- /.signal-pane-feed -->
+            </div><!-- /#panel-signal -->
+
 
             <div role="tabpanel" id="panel-commune" aria-labelledby="tab-commune" hidden>
               <!-- CGN-007 visual shell: Engineer owns real swipe/like/follow graph behavior.
@@ -1267,6 +1282,7 @@
   <script src="js/supabase-client.js"></script>
   <script src="js/brand.js"></script>
   <script src="js/tabs.js" defer></script>
+  <script src="js/signal-nav.js" defer></script>
   <script src="js/main.js" defer></script>
   <script src="js/accounts.js" defer></script>
   <script src="js/seedops-schema.js" defer></script>

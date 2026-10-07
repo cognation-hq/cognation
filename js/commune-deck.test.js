@@ -494,6 +494,25 @@ function testClassroomAgeGateToast() {
   assert.ok(tower.indexOf("cognation:circle-friends-hydrated") !== -1, "circle restarts on hydrate");
 }
 
+function testChatroomReplyReleasesSwipe() {
+  /* Source guard: after a room reply, release roomId lock so deck swipe works again. */
+  var src = fs.readFileSync(path.join(root, "js/commune-swipe.js"), "utf8");
+  assert.ok(src.indexOf("function releaseRoomSurface") !== -1, "releaseRoomSurface helper");
+  assert.ok(src.indexOf("function clearPointer") !== -1, "clearPointer helper");
+  var submitIdx = src.indexOf('form.addEventListener("submit"');
+  assert.ok(submitIdx !== -1, "room compose submit handler");
+  var submitChunk = src.slice(submitIdx, submitIdx + 900);
+  assert.ok(submitChunk.indexOf("releaseRoomSurface()") !== -1, "submit releases room surface");
+  assert.ok(submitChunk.indexOf("friction(\"complete\", \"chat\")") !== -1, "submit still completes chat friction");
+  assert.ok(
+    submitChunk.indexOf("if (room) paintRoom(room);") === -1,
+    "submit must not leave the room open via paintRoom (that kept state.roomId and blocked swipe)"
+  );
+  assert.ok(src.indexOf("Sent. Swipe when you are ready.") !== -1, "status after send");
+  assert.ok(src.indexOf("if (state.busy || state.roomId || state.classroomId) return;") !== -1, "swipe still guards open room");
+}
+
 testClassroomSurface();
 testClassroomAgeGateToast();
+testChatroomReplyReleasesSwipe();
 console.log("commune-deck.test.js ok");

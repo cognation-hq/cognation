@@ -8,6 +8,9 @@
   var MAX = 20;
   var FACES = ["❤️", "👍", "😂", "😮", "😢"];
   var REACT_CHIP_CLASS = "news-comment-react-chip";
+  /* Keyword stopgap until comment reports land: the shared age-floor test in
+     js/age-floor-keywords.js (also used by Tower and the SeedOps News log). */
+  var HIDDEN_FOR_AGE = "Hidden for your age group";
 
   function read() {
     try {
@@ -123,6 +126,11 @@
     var r = String(rating || "").toUpperCase().replace(/[–—]/g, "-").replace(/\s+/g, "");
     return r === "G" || r === "PG" || r === "G-PG" || r === "GPG";
   }
+  function isFlaggedForAge(body) {
+    var floor = window.CognationAgeFloor;
+    /* Fail closed: this only changes what an under-13 viewer sees. */
+    return floor && typeof floor.isAdultKeyword === "function" ? floor.isAdultKeyword(body) : true;
+  }
   function isThreadVisible(rating, viewerAge) {
     if (viewerAge == null || isNaN(viewerAge)) viewerAge = age();
     return viewerAge >= 13 || isGpg(rating);
@@ -182,11 +190,16 @@
       return host;
     }
     var comments = listForStory(storyId);
+    var under13 = age() < 13;
     host.innerHTML =
       '<ul class="news-comment-list">' +
       comments.map(function (c) {
-        return '<li class="news-comment-item" data-comment-id="' + esc(c.id) + '">' +
-          '<span class="news-comment-author">' + esc(c.authorName) + authorBadge(c.accountKind) + '</span>' +
+        var author = '<span class="news-comment-author">' + esc(c.authorName) + authorBadge(c.accountKind) + '</span>';
+        if (under13 && isFlaggedForAge(c.body)) {
+          return '<li class="news-comment-item" data-comment-id="' + esc(c.id) + '" data-hidden-for-age>' + author +
+            '<p class="news-comment-body news-comment-body--hidden">' + HIDDEN_FOR_AGE + "</p></li>";
+        }
+        return '<li class="news-comment-item" data-comment-id="' + esc(c.id) + '">' + author +
           '<p class="news-comment-body">' + esc(c.body) + '</p><div class="news-comment-reacts">' +
           FACES.map(function (f) {
             var n = c.reactions && c.reactions[f] ? c.reactions[f].length : 0;
@@ -280,7 +293,7 @@
 
   window.CognationNewsComments = {
     KEY: KEY, MAX_SHOWN: MAX, REACT_CHIP_CLASS: REACT_CHIP_CLASS,
-    isGpgRating: isGpg, isThreadVisible: isThreadVisible,
+    isGpgRating: isGpg, isThreadVisible: isThreadVisible, isFlaggedForAge: isFlaggedForAge,
     listForStory: listForStory, addComment: addComment,
     publishComment: publishComment, pullStory: pullStory, authorBadge: authorBadge,
     toggleReact: toggleReact, mount: mount, mountAll: mountAll, viewerAge: age,

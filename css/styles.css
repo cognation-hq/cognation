@@ -3001,6 +3001,7 @@ body.login-gate-open .app-topbar {
 /* Signed in, server profile not loaded yet: muted placeholder, no text. */
 .tower-profile-name.is-loading {
   color: var(--cgn-text-muted);
+  min-width: 10ch;
   visibility: hidden;
 }
 .tower-avatar.is-loading {

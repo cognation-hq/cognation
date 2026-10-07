@@ -154,6 +154,8 @@ tick().then(function () {
   /* CSS reused, nothing new. */
   var css = fs.readFileSync(path.join(root, "css", "styles.css"), "utf8");
   assert.ok(/\.commune-status\.is-error \{/.test(css), "fixture: existing error style present");
+  assert.ok(/\.news-comment-submit:disabled \{ opacity: 0\.5; cursor: not-allowed; \}/.test(css),
+    "Post while sending matches the Save lock: opacity 0.5, not-allowed");
 }).then(noDuplicates).then(function () {
   console.log("news-comments-failed-post.test.js: ok");
 }).catch(function (err) { console.error(err); process.exit(1); });

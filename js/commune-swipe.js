@@ -1114,10 +1114,29 @@
     if (scroll && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
     return true;
   }
-  function closeRoom() {
-    if (state.roomId) friction("abandon", "chat", "room_back");
+  function clearPointer() {
+    var el = state.pointer && state.pointer.el;
+    if (el) {
+      el.classList.remove("is-dragging");
+      el.style.transform = "";
+    }
+    state.pointer = null;
+  }
+
+  function releaseRoomSurface() {
+    /* Drop open-room lock and restore deck/actions so the card can swipe again. */
     state.roomId = "";
     showRoom(false);
+    clearPointer();
+    try {
+      var input = state.shell && state.shell.querySelector("[data-commune-room-input]");
+      if (input && typeof input.blur === "function") input.blur();
+    } catch (eBlur) {}
+  }
+
+  function closeRoom() {
+    if (state.roomId) friction("abandon", "chat", "room_back");
+    releaseRoomSurface();
   }
 
   function paintClassroom(session) {
@@ -1469,12 +1488,7 @@
   function onPointerUp() {
     if (!state.pointer) return;
     var dx = state.pointer.dx || 0;
-    var el = state.pointer.el;
-    state.pointer = null;
-    if (el) {
-      el.classList.remove("is-dragging");
-      el.style.transform = "";
-    }
+    clearPointer();
     if (Math.abs(dx) < 80) return;
     swipe(dx < 0 ? "left" : "right");
   }
@@ -1556,10 +1570,11 @@
         });
         writeJson(localStorage, ROOM_CHAT_KEY, doc);
         if (input) input.value = "";
-        var room = null;
-        ensureSiteRooms().forEach(function (item) { if (item.id === state.roomId) room = item; });
-        if (room) paintRoom(room);
         friction("complete", "chat");
+        /* Return to the deck after send so the chatroom card stays swipeable.
+           Keeping roomId set (paintRoom) left swipe() / keyboard / actions locked. */
+        releaseRoomSurface();
+        setStatus("Sent. Swipe when you are ready.");
       });
     }
     var deck = shell.querySelector("[data-commune-deck]");

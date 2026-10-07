@@ -12260,3 +12260,17 @@ a.site-switch-side:focus-visible {
     gap: 0.22rem;
   }
 }
+
+
+/* Edit Profile: Save profile sits under the social link fields. */
+#panel-tower .tower-profile-edit-dropdown .tower-social-actions {
+  margin: 0.45rem 0 0.15rem !important;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+#panel-tower .tower-profile-edit-dropdown .tower-social-actions .btn-primary {
+  background: #111 !important;
+  color: #fff !important;
+  border-color: #111 !important;
+}

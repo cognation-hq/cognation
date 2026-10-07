@@ -556,7 +556,8 @@
     var nextQuotes = Array.isArray(p.quoteStickers) && p.quoteStickers.length
       ? p.quoteStickers
       : (Array.isArray(prev.quoteStickers) ? prev.quoteStickers : []);
-    var nextEmoji = Array.isArray(p.emojiStickers) && p.emojiStickers.length
+    /* Empty array is intentional (owner deleted every emoji). Do not revive prev. */
+    var nextEmoji = Array.isArray(p.emojiStickers)
       ? p.emojiStickers
       : (Array.isArray(prev.emojiStickers) ? prev.emojiStickers : []);
     /* An empty pin map must not replace positions already saved for this profile. */
@@ -720,6 +721,64 @@
     try { localStorage.setItem(TOP_FRIEND_LOCAL_KEY, JSON.stringify(doc)); } catch (eTopWrite) {}
   }
 
+  /* Remote Supabase profiles do not store social link URLs. Keep the owner's
+     saved circle buttons in a per-profile local note so personal and
+     professional pages both keep YouTube / IG / etc. across reload. */
+  var SOCIAL_LINKS_LOCAL_KEY = "cognation.tower.social-links.v1";
+
+  function readSocialLinksLocalDoc() {
+    try {
+      var raw = localStorage.getItem(SOCIAL_LINKS_LOCAL_KEY);
+      var parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (eSocial) {
+      return {};
+    }
+  }
+
+  function normalizeSocialLinksMap(links) {
+    var out = {};
+    var src = links && typeof links === "object" ? links : {};
+    socialLinkDefs().forEach(function (net) {
+      out[net.id] = storedSocialValue(net.id, src[net.id]);
+    });
+    return out;
+  }
+
+  function writeSocialLinksLocal(profileId, links) {
+    if (!profileId) return;
+    var doc = readSocialLinksLocalDoc();
+    doc[String(profileId)] = normalizeSocialLinksMap(links);
+    try { localStorage.setItem(SOCIAL_LINKS_LOCAL_KEY, JSON.stringify(doc)); } catch (eSocialWrite) {}
+  }
+
+  function applyOwnerSocialLinks(p, legacy, account) {
+    if (!p || p._directoryFriend) return;
+    if (p._remote && !isTowerOwner(p)) return;
+    var profileId = String(p._profileId || "");
+    var keyed = profileId ? readSocialLinksLocalDoc()[profileId] : null;
+    if (keyed && typeof keyed === "object") {
+      p.socialLinks = normalizeSocialLinksMap(keyed);
+      p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
+      p.publicWidgets.social = profileHasSocialLinks(p);
+      return;
+    }
+    if (profileHasSocialLinks(p)) return;
+    var chosen = null;
+    function take(blob) {
+      if (chosen || !blob || !blob.socialLinks || typeof blob.socialLinks !== "object") return;
+      if (!profileHasSocialLinks({ socialLinks: blob.socialLinks })) return;
+      chosen = normalizeSocialLinksMap(blob.socialLinks);
+    }
+    take(account);
+    /* Legacy blob is the personal page only — never paint it onto professional. */
+    if (p._profileKind !== "professional") take(legacy);
+    if (!chosen) return;
+    p.socialLinks = chosen;
+    p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
+    p.publicWidgets.social = true;
+  }
+
   /* Remote rows omit a top-friend removal. The signed-in profile's own note wins on reload. */
   function applyOwnerTopFriends(p, legacy, account) {
     if (!p || p._directoryFriend || p._profileKind === "professional") return;
@@ -784,6 +843,7 @@
        default 320 until sync, so the owner local width wins on paint/reload. */
     applyOwnerMusicYoutubeWidth(p, legacy, local);
     applyOwnerTopFriends(p, legacy, local);
+    applyOwnerSocialLinks(p, legacy, local);
     if (!local || !Object.keys(local).length) return p;
     if (
       (!p.avatarDataUrl || String(p.avatarDataUrl).indexOf("data:image/") !== 0) &&
@@ -3589,6 +3649,32 @@
     p.socialLinks[id] = storedSocialValue(id, value);
     p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
     p.publicWidgets.social = profileHasSocialLinks(p);
+    writeSocialLinksLocal(p._profileId, p.socialLinks);
+    TowerProfileStore.save(p);
+    var saved = TowerProfileStore.get();
+    renderSocialLinks(root, saved);
+    applyPublicWidgets(root, saved);
+  }
+
+  function flushSocialFieldsFromForm(root) {
+    if (!root || !isTowerOwner(TowerProfileStore.get())) return;
+    var p = TowerProfileStore.get();
+    if (!p.socialLinks || typeof p.socialLinks !== "object") p.socialLinks = {};
+    var changed = false;
+    socialLinkDefs().forEach(function (net) {
+      var input = root.querySelector('[data-tower-social="' + net.id + '"]');
+      if (!input) return;
+      var next = storedSocialValue(net.id, input.value);
+      if ((p.socialLinks[net.id] || "") !== next) changed = true;
+      p.socialLinks[net.id] = next;
+    });
+    if (!changed && profileHasSocialLinks(p) === !!(p.publicWidgets && p.publicWidgets.social)) {
+      writeSocialLinksLocal(p._profileId, p.socialLinks);
+      return;
+    }
+    p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
+    p.publicWidgets.social = profileHasSocialLinks(p);
+    writeSocialLinksLocal(p._profileId, p.socialLinks);
     TowerProfileStore.save(p);
     var saved = TowerProfileStore.get();
     renderSocialLinks(root, saved);
@@ -7124,6 +7210,33 @@
         setProfileStatusSafe("Restored " + (entry.label || entry.id) + ".", false);
         return;
       }
+      if (entry.type === "emoji") {
+        var pEmojiUndo = TowerProfileStore.get();
+        if (!isTowerOwner(pEmojiUndo)) return;
+        var listEmoji = normalizeEmojiStickers(pEmojiUndo.emojiStickers);
+        var already = false;
+        listEmoji.forEach(function (item) {
+          if (item.id === entry.id) already = true;
+        });
+        if (!already && entry.item) {
+          listEmoji.push({
+            id: entry.item.id,
+            glyph: entry.item.glyph,
+            size: normalizeEmojiSize(entry.item.size),
+          });
+          pEmojiUndo.emojiStickers = listEmoji;
+          if (entry.layout) {
+            if (!pEmojiUndo.widgetLayout || typeof pEmojiUndo.widgetLayout !== "object") {
+              pEmojiUndo.widgetLayout = JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT));
+            }
+            pEmojiUndo.widgetLayout[entry.id] = entry.layout;
+          }
+          TowerProfileStore.save(pEmojiUndo);
+        }
+        renderEmojiStickers(root, TowerProfileStore.get());
+        setProfileStatusSafe("Restored emoji.", false);
+        return;
+      }
       if (entry.type === "quote") {
         addQuoteSticker(root, entry.layout && entry.layout.text || "Quote", entry.layout, entry.id);
         setProfileStatusSafe("Restored quote.", false);
@@ -7582,6 +7695,43 @@
           return;
         }
 
+        /* Emoji stickers — drop from emojiStickers so removal survives reload */
+        var emojiId = selected.getAttribute("data-tower-emoji");
+        if (emojiId) {
+          clearWidgetSelection(stage);
+          syncRotateToolbar(root);
+          var pEmoji = TowerProfileStore.get();
+          if (!isTowerOwner(pEmoji)) return;
+          var beforeEmoji = normalizeEmojiStickers(pEmoji.emojiStickers);
+          var removedEmoji = null;
+          var keptEmoji = [];
+          beforeEmoji.forEach(function (item) {
+            if (item.id === emojiId) removedEmoji = item;
+            else keptEmoji.push(item);
+          });
+          pEmoji.emojiStickers = keptEmoji;
+          if (pEmoji.widgetLayout && pEmoji.widgetLayout[emojiId]) {
+            delete pEmoji.widgetLayout[emojiId];
+          }
+          pushWidgetUndo({
+            type: "emoji",
+            id: emojiId,
+            item: removedEmoji,
+            layout: removedEmoji
+              ? {
+                  x: parseFloat(selected.getAttribute("data-sticker-x") || "78"),
+                  y: parseFloat(selected.getAttribute("data-sticker-y") || "12"),
+                  z: parseInt(selected.getAttribute("data-sticker-z") || "24", 10),
+                  tilt: parseFloat(selected.style.getPropertyValue("--sticker-tilt") || "0") || 0,
+                }
+              : null,
+          });
+          TowerProfileStore.save(pEmoji);
+          renderEmojiStickers(root, TowerProfileStore.get());
+          setProfileStatusSafe("Emoji removed — Undo to restore.", false);
+          return;
+        }
+
         /* Quote / freeform stickers */
         var quoteId = selected.getAttribute("data-tower-quote-id");
         if (quoteId || selected.getAttribute("data-tower-widget") === "quote") {
@@ -7729,6 +7879,8 @@
         var avatarSticker = wrap.closest('[data-tower-widget="avatar"]');
         if (avatarSticker) avatarSticker.classList.add("is-edit-open");
       } else {
+        /* Closing without Save still commits typed social URLs so circle buttons stick. */
+        try { flushSocialFieldsFromForm(root); } catch (eFlush) {}
         panel.hidden = true;
         wrap.classList.remove("is-open");
         btn.setAttribute("aria-expanded", "false");
@@ -8606,6 +8758,7 @@
         }
         p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
         p.publicWidgets.social = profileHasSocialLinks(p);
+        writeSocialLinksLocal(p._profileId, p.socialLinks);
         if (!TowerProfileStore.save(p)) {
           setProfileStatus("Could not save profile (storage full or blocked). Try a smaller photo.", true);
           return;

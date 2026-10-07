@@ -1,10 +1,12 @@
 /**
- * COMMUNE — paced public swipe deck.
- * One card is one item. Types are interleaved so none runs in a row.
- * Dating is local, opt-in, and at least five other cards apart.
+ * COMMUNE — paced public swipe deck (Personal featured mix).
+ * Featured families rotate 1:1 — Classroom / ad / chat room / dating / content.
+ * Content lane holds fact, wellness, friend-share, public event, people-you-may-know,
+ * and Tower live seller / garage-sale listings. Dating stays opt-in + local + age-gated.
+ * Ads stay in the 1:1 mix and play at most 3 seconds. Under-13 sees G/PG only.
  * Professional ads open that profile. People-you-may-know sends a friend request.
  * A pass hides that card for this viewer after refresh. Other viewers still see it.
- * No seeded people, businesses, or events.
+ * No Instagram copycat patterns. Personal mix only — no Professional toggle/deck here.
  */
 (function () {
   "use strict";
@@ -34,15 +36,25 @@
     EVENT: "event",
     KNOW: "know",
     DATING: "dating",
+    CONTENT: "content",
   };
 
-  /* Featured mix stays 1:1 across Classroom / ad / chat / dating / content (content = fact+wellness+friend+event+know). */
-  var LANE_ORDER = [TYPE.CLASSROOM, TYPE.AD, TYPE.CHAT, TYPE.FACT, TYPE.WELLNESS, TYPE.FRIEND, TYPE.EVENT, TYPE.KNOW];
+  /* Alexa lock 2026-10-02: Personal featured mix is 1:1 across five families. */
+  var FEATURED_ORDER = [TYPE.CLASSROOM, TYPE.AD, TYPE.CHAT, TYPE.DATING, TYPE.CONTENT];
+  var CONTENT_SUBTYPES = [TYPE.FACT, TYPE.WELLNESS, TYPE.FRIEND, TYPE.EVENT, TYPE.KNOW, TYPE.CONTENT];
+  var AD_MAX_MS = 3000;
   var REPEATABLE = {};
+  /* Featured families stay repeatable so a long Personal deck holds true 1:1 rotation. */
   REPEATABLE[TYPE.CLASSROOM] = true;
+  REPEATABLE[TYPE.AD] = true;
   REPEATABLE[TYPE.CHAT] = true;
+  REPEATABLE[TYPE.DATING] = true;
   REPEATABLE[TYPE.FACT] = true;
   REPEATABLE[TYPE.WELLNESS] = true;
+  REPEATABLE[TYPE.FRIEND] = true;
+  REPEATABLE[TYPE.EVENT] = true;
+  REPEATABLE[TYPE.KNOW] = true;
+  REPEATABLE[TYPE.CONTENT] = true;
 
   var SITE_ROOM_BODY = "Cognation hosts this room.";
   var SITE_ROOMS = [
@@ -193,52 +205,79 @@
     return "You've been rated " + article + " " + shown;
   }
 
+  function featuredFamily(type) {
+    var t = String(type || "");
+    if (CONTENT_SUBTYPES.indexOf(t) >= 0) return TYPE.CONTENT;
+    return t;
+  }
+
   function paceDeck(lanes, dating, count) {
     var cursors = {};
     var out = [];
     var rot = 0;
-    var last = "";
-    var sinceDating = 99;
-    var datingAt = 0;
+    var lastFamily = "";
     var guard = 0;
     var target = count || 24;
     dating = dating || [];
-    function take(type) {
-      var list = (lanes && lanes[type]) || [];
-      if (!list.length) return null;
-      var i = cursors[type] || 0;
-      if (!REPEATABLE[type] && i >= list.length) return null;
+    var datingLane = ((lanes && lanes[TYPE.DATING]) || dating || []).slice();
+    function takeFromList(key, list, forceType) {
+      if (!list || !list.length) return null;
+      var i = cursors[key] || 0;
+      if (!REPEATABLE[key] && !REPEATABLE[forceType || key] && i >= list.length) return null;
       var src = list[i % list.length];
-      cursors[type] = i + 1;
+      cursors[key] = i + 1;
       var card = clone(src);
-      card.type = type;
-      if (i >= list.length) card.id = String(src.id || type) + "-r" + i;
+      if (forceType) card.type = forceType;
+      else if (!card.type) card.type = key;
+      if (i >= list.length) card.id = String(src.id || key) + "-r" + i;
       return card;
     }
-    while (out.length < target && guard < target * 8) {
-      guard += 1;
-      if (out.length >= 5 && sinceDating >= 5 && datingAt < dating.length && last !== TYPE.DATING) {
-        var dated = clone(dating[datingAt]);
-        dated.type = TYPE.DATING;
-        datingAt += 1;
-        out.push(dated);
-        last = TYPE.DATING;
-        sinceDating = 0;
-        continue;
+    function takeFeatured(family) {
+      if (family === TYPE.DATING) {
+        return takeFromList(TYPE.DATING, datingLane, TYPE.DATING);
       }
+      if (family === TYPE.CONTENT) {
+        var n;
+        var start = cursors._contentRot || 0;
+        for (n = 0; n < CONTENT_SUBTYPES.length; n++) {
+          var sub = CONTENT_SUBTYPES[(start + n) % CONTENT_SUBTYPES.length];
+          var list = (lanes && lanes[sub]) || [];
+          var card = takeFromList(sub, list, null);
+          if (!card) continue;
+          cursors._contentRot = (CONTENT_SUBTYPES.indexOf(sub) + 1) % CONTENT_SUBTYPES.length;
+          return card;
+        }
+        return null;
+      }
+      return takeFromList(family, (lanes && lanes[family]) || [], family);
+    }
+    while (out.length < target && guard < target * 10) {
+      guard += 1;
       var placed = false;
       var n;
-      for (n = 0; n < LANE_ORDER.length; n++) {
-        var type = LANE_ORDER[(rot + n) % LANE_ORDER.length];
-        if (type === last) continue;
-        var card = take(type);
+      for (n = 0; n < FEATURED_ORDER.length; n++) {
+        var family = FEATURED_ORDER[(rot + n) % FEATURED_ORDER.length];
+        if (family === lastFamily) continue;
+        var card = takeFeatured(family);
         if (!card) continue;
         out.push(card);
-        last = type;
-        sinceDating += 1;
-        rot = (LANE_ORDER.indexOf(type) + 1) % LANE_ORDER.length;
+        lastFamily = family;
+        rot = (FEATURED_ORDER.indexOf(family) + 1) % FEATURED_ORDER.length;
         placed = true;
         break;
+      }
+      if (!placed) {
+        /* Only one featured family still has cards — allow it to continue filling. */
+        for (n = 0; n < FEATURED_ORDER.length; n++) {
+          var only = FEATURED_ORDER[(rot + n) % FEATURED_ORDER.length];
+          var again = takeFeatured(only);
+          if (!again) continue;
+          out.push(again);
+          lastFamily = only;
+          rot = (FEATURED_ORDER.indexOf(only) + 1) % FEATURED_ORDER.length;
+          placed = true;
+          break;
+        }
       }
       if (!placed) break;
     }
@@ -522,6 +561,33 @@
     return '<video class="commune-ad-video" src="' + escapeHtml(url) + '" muted playsinline preload="metadata" tabindex="-1"></video>';
   }
 
+  /** Ads stay in the 1:1 mix and play at most 3 seconds (standing Cognation rule). */
+  function armAdMax(el, card) {
+    if (!el || !card || card.type !== TYPE.AD) return;
+    el.setAttribute("data-ad-max-ms", String(AD_MAX_MS));
+    var video = el.querySelector("video.commune-ad-video");
+    if (!video) return;
+    var stopped = false;
+    function stop() {
+      if (stopped) return;
+      stopped = true;
+      try { video.pause(); } catch (e) {}
+    }
+    function start() {
+      try {
+        if (typeof video.currentTime === "number") video.currentTime = 0;
+        var playResult = video.play();
+        if (playResult && typeof playResult.catch === "function") playResult.catch(function () {});
+      } catch (e2) {}
+      setTimeout(stop, AD_MAX_MS);
+    }
+    video.addEventListener("timeupdate", function () {
+      if (video.currentTime >= AD_MAX_MS / 1000) stop();
+    });
+    if (video.readyState >= 2) start();
+    else video.addEventListener("loadeddata", start, { once: true });
+  }
+
   function placedAds() {
     var out = [];
     eachProfile(function (rec) {
@@ -572,7 +638,7 @@
         if (!ev) return;
         if (ev.public === true || ev.visibility === "public" || ev.listing === true) lists.push(ev);
       });
-      if (rec.goingLive && typeof rec.goingLive === "object") lists.push(rec.goingLive);
+      /* Tower going-live / seller listings live in the Content featured lane, not Event. */
       lists.forEach(function (ev, idx) {
         if (!ev) return;
         var id = String(ev.id || "");
@@ -745,7 +811,48 @@
     return out;
   }
 
+  function isUnder13() {
+    var age = getMemberAge();
+    return age != null && age < 13;
+  }
+
+  /** Tower live seller / garage-sale style listings → Content featured family. */
+  function towerLiveContentCards() {
+    var out = [];
+    var now = Date.now();
+    eachProfile(function (rec) {
+      if (!rec || !rec.goingLive || typeof rec.goingLive !== "object") return;
+      var live = rec.goingLive;
+      var what = String(live.what || live.title || "").trim();
+      if (!what) return;
+      var when = String(live.when || live.liveAt || "").trim();
+      if (when && !isNaN(Date.parse(when)) && Date.parse(when) < now - 36e5) return;
+      var where = String(live.where || live.notes || "").trim();
+      out.push({
+        id: "content-live-" + rec.id,
+        type: TYPE.CONTENT,
+        profileId: rec.id,
+        handle: String(rec.handle || "").replace(/^@/, ""),
+        fromName: rec.displayName || rec.handle || "",
+        title: what,
+        body: [when, where].filter(Boolean).join(" · ") || "Tower live — garage sale / seller listing.",
+        contentKind: "tower-live",
+        interests: terms(what + " " + where + " garage sale seller"),
+      });
+    });
+    return out;
+  }
+
+  function ageSafeFeaturedCard(card) {
+    if (!card) return false;
+    if (!isUnder13()) return true;
+    /* Under-13: G/PG only — no dating, classroom (18+), or marketing ads. */
+    if (card.type === TYPE.DATING || card.type === TYPE.CLASSROOM || card.type === TYPE.AD) return false;
+    return true;
+  }
+
   function peopleYouMayKnow() {
+
     var me = viewerPersonal();
     if (!me || !Array.isArray(me.friendIds) || !me.friendIds.length) return [];
     var mine = {};
@@ -822,10 +929,11 @@
     lanes[TYPE.FRIEND] = friendShareCards();
     lanes[TYPE.EVENT] = publicEvents();
     lanes[TYPE.KNOW] = peopleYouMayKnow();
+    lanes[TYPE.CONTENT] = towerLiveContentCards();
     Object.keys(lanes).forEach(function (type) {
-      lanes[type] = omitPassed(lanes[type]);
+      lanes[type] = omitPassed((lanes[type] || []).filter(ageSafeFeaturedCard));
     });
-    var dating = omitPassed(datingPool());
+    var dating = omitPassed(datingPool().filter(ageSafeFeaturedCard));
     return { lanes: lanes, dating: dating };
   }
 
@@ -858,6 +966,7 @@
       case TYPE.EVENT: return "Public event";
       case TYPE.KNOW: return "People you may know";
       case TYPE.DATING: return "Dating";
+      case TYPE.CONTENT: return "Content";
       default: return "Commune";
     }
   }
@@ -886,7 +995,7 @@
       var age2 = getMemberAge();
       if (age2 != null && age2 <= 18) hint.textContent = "Dating cards stay off under 19.";
       else if (!getSeeDating()) hint.textContent = "Off until you turn it on. Dating cards stay hidden, and they only appear for someone local.";
-      else hint.textContent = "Dating is on. A local card shows now and then, after other cards.";
+      else hint.textContent = "Dating is on. Local dating cards share the featured mix one-to-one with Classroom, ads, chat rooms, and content.";
     }
   }
 
@@ -1035,7 +1144,7 @@
         html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
         html += '<p class="commune-card-meta">Life skills · ~18+</p>';
       }
-      if (card.type === TYPE.KNOW) html += '<span class="commune-card-badge commune-card-badge--ad">Ad</span>';
+      if (card.type === TYPE.CONTENT) html += '<span class="commune-card-badge">Live</span>';
       if (card.type === TYPE.AD) html += '<span class="commune-card-badge commune-card-badge--ad">Ad</span>';
     }
     el.innerHTML = html;
@@ -1077,6 +1186,7 @@
         openProfessionalPage(card);
       });
     }
+    armAdMax(el, card);
   }
 
   function openProfessionalPage(card) {
@@ -1511,7 +1621,7 @@
       friction("complete", "classroom");
       return;
     }
-    if (card.type === TYPE.FRIEND || card.type === TYPE.EVENT || card.type === TYPE.FACT || card.type === TYPE.WELLNESS || card.type === TYPE.CHAT) {
+    if (card.type === TYPE.FRIEND || card.type === TYPE.EVENT || card.type === TYPE.FACT || card.type === TYPE.WELLNESS || card.type === TYPE.CHAT || card.type === TYPE.CONTENT) {
       like(card);
       if (card.type !== TYPE.CHAT) recordShare(card);
       setStatus("Kept.");
@@ -1698,6 +1808,11 @@
     omitPassed: omitPassed,
     sendPersonalFriendRequest: sendPersonalFriendRequest,
     publicEvents: publicEvents,
+    towerLiveContentCards: towerLiveContentCards,
+    featuredFamily: featuredFamily,
+    FEATURED_ORDER: FEATURED_ORDER.slice(),
+    CONTENT_SUBTYPES: CONTENT_SUBTYPES.slice(),
+    AD_MAX_MS: AD_MAX_MS,
     pickLocalEventLine: pickLocalEventLine,
     formatMatchEventLine: formatMatchEventLine,
     FOLLOWS_KEY: FOLLOWS_KEY,

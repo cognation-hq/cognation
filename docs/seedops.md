@@ -186,7 +186,7 @@ CognationSeedOpsDatingHydrate.persistPrefs()
 
 ## 11. Classroom (life skills)
 
-Commune featured mix stays **1:1** across Classroom / ad / chat room / dating / content. Classroom cards (`data-card-type="classroom"`) open the honest-thin `#panel-classroom` session view (insurance, voting, small business — ~18+). Pathway `CognationSeedOpsPathways.run("classroom")` locates the surface, enters a session, and completes without `deferred_surface_missing`. Cap **250** and no public Demo unlock unchanged.
+Commune **Personal** featured mix stays **1:1** across Classroom / ad / chat room / dating / content (Alexa lock 2026-10-02; Cap 250). Content pools fact / wellness / friend-share / public event / people-you-may-know / Tower live seller. Ads max **3 seconds** and stay in the mix. Under-13 sees G/PG only. Professional toggle/deck is out of scope for this Cap. Classroom cards (`data-card-type="classroom"`) open the honest-thin `#panel-classroom` session view (insurance, voting, small business — ~18+). Pathway `CognationSeedOpsPathways.run("classroom")` locates the surface, enters a session, and completes without `deferred_surface_missing`. Cap **250** and no public Demo unlock unchanged.
 
 ## Tower seed hydrate (from existing)
 

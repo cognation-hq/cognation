@@ -12134,3 +12134,129 @@ a.circle-fall-portrait {
   /* badge is a real node; no pseudo needed */
   content: none;
 }
+
+
+/* ===== Designer lock: lilac ombre topbar + COGNATION|WAYMAKERS switch ===== */
+/* Soft lilac → pink-lilac ombre; white tab/label text. Late cascade must win. */
+.app-topbar,
+.tabs.tabs--chrome:has(#panel-news:not([hidden])) .app-topbar,
+.tabs.tabs--chrome:has(#panel-commune:not([hidden])) .app-topbar {
+  background:
+    linear-gradient(
+      105deg,
+      rgba(232, 214, 245, 0.98) 0%,
+      rgba(244, 220, 238, 0.97) 42%,
+      rgba(255, 220, 232, 0.96) 100%
+    ) !important;
+  border-bottom: 1px solid rgba(196, 160, 200, 0.45) !important;
+  box-shadow: 0 10px 28px rgba(140, 90, 140, 0.12) !important;
+  backdrop-filter: blur(12px) saturate(118%) !important;
+}
+
+.app-topbar .tablist [role="tab"],
+.app-topbar-shortcut {
+  color: #fff !important;
+  text-shadow: 0 1px 2px rgba(90, 50, 90, 0.28) !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+}
+
+.app-topbar .tablist [role="tab"]:hover,
+.app-topbar .tablist [role="tab"]:focus-visible,
+.app-topbar-shortcut:hover,
+.app-topbar-shortcut:focus-visible {
+  color: #fff !important;
+  border-bottom-color: rgba(255, 255, 255, 0.72) !important;
+  background: transparent !important;
+  text-shadow: 0 1px 3px rgba(90, 50, 90, 0.35) !important;
+}
+
+.app-topbar .tablist [role="tab"][aria-selected="true"],
+body.is-circle-open .app-topbar-shortcut[data-tower-anchor="circle"] {
+  color: #fff !important;
+  border-bottom-color: #fff !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  text-shadow: 0 1px 3px rgba(90, 50, 90, 0.4) !important;
+}
+
+.app-topbar-actions .app-logout-btn {
+  border: 1px solid rgba(255, 255, 255, 0.55) !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: #fff !important;
+  text-shadow: 0 1px 2px rgba(90, 50, 90, 0.25);
+}
+
+.app-topbar-actions .app-logout-btn:hover,
+.app-topbar-actions .app-logout-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.32) !important;
+  border-color: #fff !important;
+  color: #fff !important;
+  outline: none;
+}
+
+/* One switch: COGNATION | WAYMAKERS — Oswald bold like masthead headers */
+.site-switch {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  line-height: 1.1;
+}
+
+.site-switch-side {
+  font-family: "Oswald", system-ui, sans-serif !important;
+  font-weight: 800 !important;
+  font-size: clamp(0.72rem, 1.6vw, 0.92rem) !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase;
+  text-decoration: none !important;
+  color: rgba(255, 255, 255, 0.72) !important;
+  text-shadow: 0 1px 2px rgba(90, 50, 90, 0.28);
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0;
+  cursor: default;
+}
+
+a.site-switch-side {
+  cursor: pointer;
+}
+
+a.site-switch-side:hover,
+a.site-switch-side:focus-visible {
+  color: #fff !important;
+  text-shadow: 0 1px 3px rgba(90, 50, 90, 0.4);
+  outline: none;
+}
+
+.site-switch-side.is-active,
+.site-switch-side[aria-current="page"] {
+  color: #fff !important;
+  text-shadow: 0 1px 3px rgba(90, 50, 90, 0.4);
+  cursor: default;
+  pointer-events: none;
+}
+
+.site-switch-sep {
+  font-family: "Oswald", system-ui, sans-serif !important;
+  font-weight: 700 !important;
+  font-size: clamp(0.72rem, 1.6vw, 0.92rem) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  text-shadow: 0 1px 2px rgba(90, 50, 90, 0.28);
+  user-select: none;
+}
+
+@media (max-width: 640px) {
+  .site-switch-side,
+  .site-switch-sep {
+    font-size: 0.65rem !important;
+  }
+  .site-switch {
+    gap: 0.22rem;
+  }
+}

@@ -74,10 +74,50 @@
     return window.CognationSupabase.rest("news_story_comments", { query: q }).then(function (rows) {
       var mapped = (Array.isArray(rows) ? rows : []).map(mapRemote);
       mapped.sort(function (a, b) { return String(a.createdAt || "").localeCompare(String(b.createdAt || "")); });
-      var d = read();
-      d.byStory[storyId] = mapped;
+      return markMyReports(mapped).then(function () {
+        var d = read();
+        d.byStory[storyId] = mapped;
+        write(d);
+        return mapped;
+      });
+    });
+  }
+  /* news_comment_reports: RLS lets a reporter read only their own rows, so this
+     marks the comments you already reported. A failed lookup marks nothing. */
+  function markMyReports(list) {
+    var author = sessionAuthor();
+    if (!author || !list.length) return Promise.resolve(list);
+    var ids = list.map(function (c) { return c.id; }).filter(function (id) { return UUID_RE.test(String(id)); });
+    if (!ids.length) return Promise.resolve(list);
+    var q = "select=comment_id&reporter_profile_id=eq." + encodeURIComponent(author.profileId) + "&comment_id=in.(" + ids.join(",") + ")";
+    return window.CognationSupabase.rest("news_comment_reports", { query: q }).then(function (rows) {
+      var mine = {};
+      (Array.isArray(rows) ? rows : []).forEach(function (r) { if (r && r.comment_id) mine[String(r.comment_id)] = true; });
+      list.forEach(function (c) { if (mine[String(c.id)]) c.reportedByMe = true; });
+      return list;
+    }, function () { return list; });
+  }
+  /* One report per person per comment (unique comment_id + reporter_profile_id).
+     A 409 means you already reported it: that counts as reported. */
+  function reportComment(storyId, commentId) {
+    var author = sessionAuthor();
+    if (!author) return Promise.resolve({ ok: false, error: "signed_in_required" });
+    if (!remoteOn()) return Promise.resolve({ ok: false, error: "shared_unavailable" });
+    var d = read(), list = d.byStory[storyId] || [], found = null, i;
+    for (i = 0; i < list.length; i++) if (list[i] && list[i].id === commentId) found = list[i];
+    if (!found) return Promise.resolve({ ok: false, error: "missing" });
+    if (found.reportedByMe) return Promise.resolve({ ok: true, already: true });
+    function done(already) {
+      found.reportedByMe = true;
       write(d);
-      return mapped;
+      return { ok: true, already: !!already };
+    }
+    return window.CognationSupabase.rest("news_comment_reports", {
+      method: "POST",
+      body: { comment_id: commentId, reporter_profile_id: author.profileId },
+    }).then(function () { return done(false); }, function (err) {
+      if (err && err.status === 409) return done(true);
+      return { ok: false, error: "shared" };
     });
   }
   function publishComment(opts) {
@@ -215,13 +255,23 @@
     }
     var comments = listForStory(storyId);
     var under13 = age() < 13;
+    /* ⋯ menu with Report: signed-in shared comments only (never signed out). */
+    var canReport = remoteOn() && !!signed;
+    function more(c) {
+      if (!canReport) return "";
+      var option = c.reportedByMe
+        ? '<button type="button" class="news-report-option" disabled data-news-comment-reported>Reported</button>'
+        : '<button type="button" class="news-report-option" data-news-comment-report data-comment-id="' + esc(c.id) + '">Report</button>';
+      return '<button type="button" class="news-comment-more" data-news-comment-more aria-haspopup="true" aria-expanded="false" aria-label="More for this comment">⋯</button>' +
+        '<div class="news-report-menu" data-news-comment-menu hidden>' + option + "</div>";
+    }
     host.innerHTML =
       '<ul class="news-comment-list">' +
       comments.map(function (c) {
         var author = '<span class="news-comment-author">' + esc(c.authorName) + authorBadge(c.accountKind) + '</span>';
         if (under13 && isFlaggedForAge(c.body)) {
           return '<li class="news-comment-item" data-comment-id="' + esc(c.id) + '" data-hidden-for-age>' + author +
-            '<p class="news-comment-body news-comment-body--hidden">' + HIDDEN_FOR_AGE + "</p></li>";
+            '<p class="news-comment-body news-comment-body--hidden">' + HIDDEN_FOR_AGE + "</p>" + more(c) + "</li>";
         }
         return '<li class="news-comment-item" data-comment-id="' + esc(c.id) + '">' + author +
           '<p class="news-comment-body">' + esc(c.body) + '</p><div class="news-comment-reacts">' +
@@ -231,7 +281,7 @@
             return '<button type="button" class="' + REACT_CHIP_CLASS + (mine ? " is-mine" : "") +
               '" data-news-comment-react="' + esc(f) + '" data-comment-id="' + esc(c.id) + '">' +
               esc(f) + (n ? '<span class="news-comment-react-count">' + n + "</span>" : "") + "</button>";
-          }).join("") + "</div></li>";
+          }).join("") + "</div>" + more(c) + "</li>";
       }).join("") +
       '</ul><form class="news-comment-composer" data-news-comment-form action="#">' +
       '<input type="text" maxlength="500" placeholder="Add a comment…" data-news-comment-input>' +
@@ -248,6 +298,16 @@
     line.setAttribute("role", "status");
     line.textContent = POST_FAILED;
     form.insertAdjacentElement("afterend", line);
+  }
+  var REPORT_FAILED = "Couldn't report. Try again.";
+  function showReportError(item) {
+    if (!item || item.querySelector("[data-news-comment-report-error]")) return;
+    var line = document.createElement("p");
+    line.className = "commune-status is-error";
+    line.setAttribute("data-news-comment-report-error", "");
+    line.setAttribute("role", "status");
+    line.textContent = REPORT_FAILED;
+    item.appendChild(line);
   }
   function clearPostError(host) {
     var line = host.querySelector("[data-news-comment-error]");
@@ -321,6 +381,33 @@
         if (ev.target && ev.target.closest && ev.target.closest("[data-news-comment-input]")) clearPostError(host);
       });
       host.addEventListener("click", function (ev) {
+        var moreBtn = ev.target && ev.target.closest("[data-news-comment-more]");
+        if (moreBtn && host.contains(moreBtn)) {
+          ev.preventDefault();
+          var menu = moreBtn.parentNode && moreBtn.parentNode.querySelector("[data-news-comment-menu]");
+          if (menu) {
+            menu.hidden = !menu.hidden;
+            moreBtn.setAttribute("aria-expanded", menu.hidden ? "false" : "true");
+          }
+          return;
+        }
+        var reportBtn = ev.target && ev.target.closest("[data-news-comment-report]");
+        if (reportBtn && host.contains(reportBtn)) {
+          ev.preventDefault();
+          if (reportBtn.disabled) return;
+          reportBtn.disabled = true;
+          var item = reportBtn.closest(".news-comment-item");
+          var old = item && item.querySelector("[data-news-comment-report-error]");
+          if (old) old.remove();
+          reportComment(storyId, reportBtn.getAttribute("data-comment-id")).then(null, function () {
+            return { ok: false };
+          }).then(function (res) {
+            if (res && res.ok) return renderThread(host, storyId, rating);
+            reportBtn.disabled = false;
+            showReportError(item);
+          });
+          return;
+        }
         var btn = ev.target && ev.target.closest("[data-news-comment-react]");
         if (!btn || !host.contains(btn)) return;
         ev.preventDefault();
@@ -352,7 +439,7 @@
     KEY: KEY, MAX_SHOWN: MAX, REACT_CHIP_CLASS: REACT_CHIP_CLASS,
     isGpgRating: isGpg, isThreadVisible: isThreadVisible, isFlaggedForAge: isFlaggedForAge,
     listForStory: listForStory, addComment: addComment,
-    publishComment: publishComment, pullStory: pullStory, authorBadge: authorBadge,
+    publishComment: publishComment, pullStory: pullStory, authorBadge: authorBadge, reportComment: reportComment,
     toggleReact: toggleReact, mount: mount, mountAll: mountAll, viewerAge: age,
   };
 

@@ -1032,7 +1032,8 @@
             <div role="tabpanel" id="panel-commune" aria-labelledby="tab-commune" hidden>
               <!-- CGN-007 visual shell: Engineer owns real swipe/like/follow graph behavior.
                    Hooks: data-commune-shell, data-commune-deck, data-commune-card,
-                   data-card-type, data-classroom, data-commune-swipe=left|right, data-commune-enter-sim, data-commune-enter-classroom -->
+                   data-card-type, data-classroom, data-commune-swipe=left|right, data-commune-enter-sim, data-commune-enter-classroom,
+                   data-commune-mode-switch, data-commune-mode-btn=personal|professional, data-professional-card -->
               <div
                 class="commune-swipe-shell"
                 data-commune-shell
@@ -1043,6 +1044,12 @@
                 <header class="commune-swipe-header">
                   <h3 class="commune-swipe-title">COMMUNE</h3>
                   <p class="commune-swipe-dek">A paced deck of everyday cards. One card is one thing.</p>
+                  <!-- Personal | Professional deck switch — same pipe chrome as SIGNAL News | Feed -->
+                  <div class="commune-mode-switch signal-subtabs site-switch" data-commune-mode-switch role="tablist" aria-label="COMMUNE deck">
+                    <button type="button" class="commune-mode-btn signal-subtab site-switch-side is-selected is-active" role="tab" id="commune-mode-personal" data-commune-mode-btn="personal" aria-selected="true" tabindex="0">Personal</button>
+                    <span class="signal-subtab-sep site-switch-sep" aria-hidden="true">|</span>
+                    <button type="button" class="commune-mode-btn signal-subtab site-switch-side" role="tab" id="commune-mode-professional" data-commune-mode-btn="professional" aria-selected="false" tabindex="-1">Professional</button>
+                  </div>
                   <div class="commune-dating-toggle-row">
                     <label class="commune-dating-toggle" for="commune-see-dating">
                       <input

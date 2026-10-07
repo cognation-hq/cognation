@@ -12629,3 +12629,59 @@ a.site-switch-side:focus-visible {
     padding: 0.25rem;
   }
 }
+
+
+/* ===== COMMUNE: Personal | Professional pipe-switch + Professional type marks (2026-10-07) ===== */
+/* Switch reuses .signal-subtabs / .signal-subtab + .site-switch* chrome:
+   dark shell, lilac ombre on the active side, mute inactive. */
+.commune-mode-switch {
+  margin: 0.75rem 0 0.6rem;
+}
+.commune-swipe-shell[data-commune-mode="professional"] .commune-dating-toggle-row {
+  display: none !important;
+}
+.commune-pro-kicker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+.commune-pro-kicker .seedops-demo-badge {
+  margin-left: 0;
+}
+/* Type marks on the dark shell: glass pill + one glowing hue dot per type */
+.commune-type-mark {
+  --mark: #b7f6ff;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.65rem 0.2rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(183, 246, 255, 0.4);
+  background: rgba(155, 235, 255, 0.1);
+  color: var(--cgn-text, #f7f9ff) !important;
+  font-family: "Oswald", system-ui, sans-serif !important;
+  font-weight: 700;
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+.commune-type-mark::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--mark);
+  box-shadow: 0 0 6px var(--mark);
+}
+.commune-type-mark[data-type-mark="webinar"] { --mark: #b7f6ff; }
+.commune-type-mark[data-type-mark="know"] { --mark: #e8d6f5; }
+.commune-type-mark[data-type-mark="research"] { --mark: #a8ffd8; }
+.commune-type-mark[data-type-mark="auction"] { --mark: #ffd7a8; }
+.commune-type-mark[data-type-mark="podcast"] { --mark: #ffb8d9; }
+.commune-type-mark[data-type-mark="field"] { --mark: #c9d4ff; }
+.commune-type-mark[data-type-mark="popculture"] { --mark: #fff3a8; }
+.commune-card-why {
+  font-size: 0.78rem;
+}

@@ -186,7 +186,9 @@ CognationSeedOpsDatingHydrate.persistPrefs()
 
 ## 11. Classroom (life skills)
 
-Commune **Personal** featured mix stays **1:1** across Classroom / ad / chat room / dating / content (Alexa lock 2026-10-02; Cap 250). Content pools fact / wellness / friend-share / public event / people-you-may-know / Tower live seller. Ads max **3 seconds** and stay in the mix. Under-13 sees G/PG only. Professional toggle/deck is out of scope for this Cap. Classroom cards (`data-card-type="classroom"`) open the honest-thin `#panel-classroom` session view (insurance, voting, small business — ~18+). Pathway `CognationSeedOpsPathways.run("classroom")` locates the surface, enters a session, and completes without `deferred_surface_missing`. Cap **250** and no public Demo unlock unchanged.
+Commune **Personal** featured mix stays **1:1** across Classroom / ad / chat room / dating / content (Alexa lock 2026-10-02). Content pools fact / wellness / friend-share / public event / people-you-may-know / Tower live seller. Ads max **3 seconds** and stay in the mix. Under-13 sees G/PG only. Classroom cards (`data-card-type="classroom"`) open the honest-thin `#panel-classroom` session view (insurance, voting, small business — ~18+). Pathway `CognationSeedOpsPathways.run("classroom")` locates the surface, enters a session, and completes without `deferred_surface_missing`. Cap **250** and no public Demo unlock unchanged.
+
+Commune **Personal | Professional** pipe switch (Alexa GO 2026-10-07): Personal keeps the 1:1 mix above unchanged. Professional is its own deck, rotated 1:1 across webinar / professionals you might know / research / auction (weekly Cognation webinar + bot auction, 18+) / podcast / field / pop-culture. Every Professional card shows a type mark and a "Why you see this" line. Professional never shows dating or friends-you-may-know. Placeholder cards carry a `Demo · placeholder` label until real feeds exist; professionals-you-might-know uses real professional pages from the profile store (seed pages keep their Demo badge).
 
 ## Tower seed hydrate (from existing)
 

@@ -47,8 +47,27 @@
      Signed-out / demo sessions are unchanged. */
   function memberProfileOwned(blob) {
     var uid = sessionUserId();
-    if (!uid) return true;
+    if (!uid) return !signInPending();
     return !!blob && String(blob.ownerUserId || "") === uid;
+  }
+
+  /* Signing in: Cognation sign-in is configured but the login state isn't
+     stored yet. No local member profile counts until it is (unknown age). */
+  function signInPending() {
+    try {
+      var sb = root.CognationSupabase;
+      if (!sb || typeof sb.configured !== "function" || !sb.configured()) return false;
+      var auth = root.CognationAuth;
+      var s = auth && typeof auth.getSession === "function" ? auth.getSession() : null;
+      if (!s) {
+        var store = localStore();
+        s = store ? JSON.parse(store.getItem("cognation.session.v2") || "null") : null;
+      }
+      if (s && s.source === "demo") return false;
+      return !sessionUserId();
+    } catch (e) {
+      return false;
+    }
   }
 
   function viewerAge() {
@@ -86,6 +105,7 @@
     viewerAge: viewerAge,
     sessionUserId: sessionUserId,
     memberProfileOwned: memberProfileOwned,
+    signInPending: signInPending,
     viewerIsUnder13: viewerIsUnder13,
     ratingIsGPG: ratingIsGPG,
   };

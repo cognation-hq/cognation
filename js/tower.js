@@ -1,5 +1,5 @@
 /**
- * TOWER — private friends newsfeed + public scrapbook profile (demo / localStorage).
+ * TOWER — profiles + connections; Feed compose lives under SIGNAL (demo / localStorage).
  * Local COMMUNE Front Page is generated from Tower posts.
  *
  * Storage: cognation.tower.posts.v3 · cognation.profiles.v1 (via CognationAccounts)
@@ -1353,7 +1353,7 @@
     return score;
   }
 
-  /* NEWS stays inside what Tower already treats as appropriate. */
+  /* NEWS stays inside what Feed already treats as appropriate (examine-before-post). */
   function newsPostAppropriate(post) {
     if (!post) return false;
     if ((Number(post.minAge) || 0) >= 18) return false;
@@ -1455,7 +1455,7 @@
         return String(b.createdAt).localeCompare(String(a.createdAt));
       });
     },
-    /* NEWS reads this: most reacted personal and professional tower posts. */
+    /* NEWS reads this: most reacted personal and professional Feed posts (signals). */
     newsList: function () {
       var personal = this.list().map(function (post) {
         var copy = {};
@@ -1659,13 +1659,28 @@
     return name || "You";
   }
 
+
+  /** Compose + feed live under SIGNAL → Feed (outside [data-tower-app]). */
+  function towerFeedQuery(root, sel) {
+    if (root) {
+      var inRoot = root.querySelector(sel);
+      if (inRoot) return inRoot;
+    }
+    var host = document.querySelector("[data-signal-feed-host]");
+    if (host) {
+      var inHost = host.querySelector(sel);
+      if (inHost) return inHost;
+    }
+    return document.querySelector(sel);
+  }
+
   function renderFeed(root) {
-    var list = root.querySelector("[data-tower-feed]");
+    var list = towerFeedQuery(root, "[data-tower-feed]");
     if (!list) return;
     var posts = TowerStore.list();
     list.innerHTML = "";
     if (!posts.length) {
-      list.innerHTML = '<p class="commune-empty">No Tower posts yet — share the first update.</p>';
+      list.innerHTML = '<p class="commune-empty">No Feed posts yet — send the first signal.</p>';
       return;
     }
     posts.forEach(function (post) {
@@ -1906,16 +1921,22 @@
   function applyPrivateFeedTheme(root, theme) {
     theme = normalizePrivateFeedTheme(theme);
     var privateSide = root.querySelector("[data-tower-private-side]");
-    if (!privateSide) return;
+    var feedHost = document.querySelector("[data-signal-feed-host]");
+    var targets = [];
+    if (privateSide) targets.push(privateSide);
+    if (feedHost) targets.push(feedHost);
+    if (!targets.length) return;
     var fontStack = TOWER_FONT_MAP[theme.fontFamily] || TOWER_FONT_MAP.georgia;
-    privateSide.style.setProperty("--tower-private-bg", theme.backgroundColor);
-    privateSide.style.setProperty("--tower-private-font", fontStack);
-    privateSide.style.setProperty("--tower-private-font-size", theme.fontSize + "px");
-    privateSide.style.setProperty("--tower-private-text", theme.textColor);
-    privateSide.style.setProperty("--tower-private-btn", theme.buttonColor);
-    privateSide.setAttribute("data-tower-private-font", theme.fontFamily);
-    privateSide.setAttribute("data-author-see-through", theme.authorSeeThrough ? "true" : "false");
-    privateSide.setAttribute("data-messages-see-through", theme.messagesSeeThrough ? "true" : "false");
+    targets.forEach(function (el) {
+      el.style.setProperty("--tower-private-bg", theme.backgroundColor);
+      el.style.setProperty("--tower-private-font", fontStack);
+      el.style.setProperty("--tower-private-font-size", theme.fontSize + "px");
+      el.style.setProperty("--tower-private-text", theme.textColor);
+      el.style.setProperty("--tower-private-btn", theme.buttonColor);
+      el.setAttribute("data-tower-private-font", theme.fontFamily);
+      el.setAttribute("data-author-see-through", theme.authorSeeThrough ? "true" : "false");
+      el.setAttribute("data-messages-see-through", theme.messagesSeeThrough ? "true" : "false");
+    });
     var bgIn = root.querySelector("[data-tower-private-bg]");
     var fontIn = root.querySelector("[data-tower-private-font]");
     var sizeIn = root.querySelector("[data-tower-private-font-size]");
@@ -4233,7 +4254,7 @@
       heading.className = "tower-friends-public-label";
       heading.textContent = selected.length
         ? "Top friends"
-        : "Top friends · set on My feed";
+        : "Top friends · set on Connections";
       publicEl.appendChild(heading);
     }
 
@@ -4799,7 +4820,7 @@
   }
 
 
-  /* ===== Tower calendar (private My feed + public scrapbook widget) ===== */
+  /* ===== Tower calendar (private Connections + public scrapbook widget) ===== */
   var MONTH_NAMES = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December",
@@ -8531,13 +8552,13 @@
   function initGoingLive(root) {
     if (!root || root.__cognationGoingLiveBound) return;
     root.__cognationGoingLiveBound = true;
-    var postBtn = root.querySelector("[data-tower-event-post]");
+    var postBtn = towerFeedQuery(root, "[data-tower-event-post]");
     if (postBtn) {
       postBtn.addEventListener("click", function () {
-        var whenIn = root.querySelector("[data-tower-event-when]");
-        var whereIn = root.querySelector("[data-tower-event-where]");
-        var whatIn = root.querySelector("[data-tower-event-what]");
-        var status = root.querySelector("[data-tower-event-status]");
+        var whenIn = towerFeedQuery(root, "[data-tower-event-when]");
+        var whereIn = towerFeedQuery(root, "[data-tower-event-where]");
+        var whatIn = towerFeedQuery(root, "[data-tower-event-what]");
+        var status = towerFeedQuery(root, "[data-tower-event-status]");
         function say(msg, isError) {
           if (!status) return;
           status.hidden = !msg;
@@ -8560,7 +8581,7 @@
         if (whenIn) whenIn.value = "";
         if (whereIn) whereIn.value = "";
         if (whatIn) whatIn.value = "";
-        var drop = root.querySelector("[data-tower-event-dropdown]");
+        var drop = towerFeedQuery(root, "[data-tower-event-dropdown]");
         if (drop) drop.open = false;
         say("Posted on your personal and professional pages.", false);
         renderGoingLiveWidget(root);
@@ -8606,11 +8627,11 @@
 
   function initTower(root) {
     if (!root) return;
-    var form = root.querySelector("[data-tower-compose]");
-    var bodyInput = root.querySelector("#tower-body");
-    var fileInput = root.querySelector("#tower-files");
-    var kindSelect = root.querySelector("#tower-attach-kind");
-    var status = root.querySelector("[data-tower-status]");
+    var form = towerFeedQuery(root, "[data-tower-compose]");
+    var bodyInput = towerFeedQuery(root, "#tower-body");
+    var fileInput = towerFeedQuery(root, "#tower-files");
+    var kindSelect = towerFeedQuery(root, "#tower-attach-kind");
+    var status = towerFeedQuery(root, "[data-tower-status]");
 
     function setStatus(msg, isError) {
       if (!status) return;
@@ -9204,7 +9225,7 @@
             } catch (frConn) {}
             return;
           }
-          setStatus("Posting to Tower…", false);
+          setStatus("Posting to Feed…", false);
           social
             .createTowerPost({
               body: bodyInput ? bodyInput.value : "",
@@ -9213,7 +9234,7 @@
             .then(function () {
               if (bodyInput) bodyInput.value = "";
               if (fileInput) fileInput.value = "";
-              setStatus("Posted to Tower.", false);
+              setStatus("Posted to Feed.", false);
               try {
                 if (window.CognationFriction) window.CognationFriction.complete("tower");
               } catch (frRemote) {}
@@ -9221,7 +9242,7 @@
             })
             .catch(function (error) {
               setStatus(
-                (error && error.message) || "Could not post to Tower. Please try again.",
+                (error && error.message) || "Could not post to Feed. Please try again.",
                 true
               );
               try {
@@ -9244,7 +9265,7 @@
         }
         if (bodyInput) bodyInput.value = "";
         if (fileInput) fileInput.value = "";
-        setStatus("Posted to Tower. Local COMMUNE will pick this up.", false);
+        setStatus("Posted to Feed. Local COMMUNE will pick this up.", false);
         try {
           if (window.CognationFriction) window.CognationFriction.complete("tower");
         } catch (frOk) {}
@@ -10000,15 +10021,18 @@
 
   function openTowerPost(postId) {
     postId = String(postId || "");
-    if (typeof window.CognationTowerApplySide === "function") {
-      window.CognationTowerApplySide("private");
+    if (typeof window.CognationSignalOpen === "function") {
+      window.CognationSignalOpen("feed");
+    } else if (typeof window.CognationSignalApplyPane === "function") {
+      window.CognationSignalApplyPane("feed");
     }
     window.setTimeout(function () {
-      var post = document.querySelector('[data-tower-private-side] [data-tower-post="' + postId + '"]');
+      var host = document.querySelector("[data-signal-feed-host]") || document;
+      var post = host.querySelector('[data-tower-post="' + postId + '"]');
       var heart = post && post.querySelector('[data-tower-react="❤️"]');
-      var target = heart || post || document.querySelector("[data-tower-private-side] [data-tower-feed]");
+      var target = heart || post || host.querySelector("[data-tower-feed]");
       if (target && target.scrollIntoView) target.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 50);
+    }, 80);
     return true;
   }
 

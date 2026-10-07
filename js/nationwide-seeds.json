@@ -1,0 +1,65 @@
+[
+  {
+    "id": "nat-2026-10-07-mit-for-america",
+    "authorName": "Cognation Wire",
+    "body": "BREAKING | United States / Education\nMIT LAUNCHES “MIT FOR AMERICA” TO STRENGTHEN STEM NATIONWIDE\n\nMIT announced MIT for America, an Institute-wide initiative to expand STEM learning from kindergarten through community college, emphasizing math tutoring, hands-on making, and constructive AI education across U.S. communities.\n\nSources: MIT News https://news.mit.edu/2026/mit-america-initiative-strengthens-stem-education-across-country-1006",
+    "createdAt": "2026-10-07T14:00:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
+  },
+  {
+    "id": "nat-2026-10-07-blanding-turtles",
+    "authorName": "Cognation Wire",
+    "body": "EVERGREEN | Massachusetts / Nature\nSCHOOL KIDS HELP BOOST ENDANGERED BLANDING’S TURTLES\n\nZoo New England’s classroom head-start program has helped Great Meadows (Concord) Blanding’s turtle adults grow from about 55 to about 300; this week hatchlings from a former classroom turtle’s nest will return to Alcott Elementary fourth graders.\n\nSources: GBH News https://www.wgbh.org/news/local/2026-10-06/endangered-turtles-get-a-boost-with-the-help-of-massachusetts-school-kids",
+    "createdAt": "2026-10-07T13:45:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
+  },
+  {
+    "id": "nat-2026-10-07-allen-balloon",
+    "authorName": "Cognation Wire",
+    "body": "EVERGREEN | Texas / STEM\nTEXAS SCHOOL LAUNCHES CAMPUS-WIDE HIGH-ALTITUDE BALLOON\n\nAllen Academy (Bryan, Texas) involved kindergarten through eighth grade in a high-altitude balloon STEM project—prep, tracking, and analysis—marking the school’s second such launch.\n\nSources: KBTX https://www.kbtx.com/2026/10/07/allen-academy-launches-high-altitude-balloon/",
+    "createdAt": "2026-10-07T13:30:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
+  },
+  {
+    "id": "nat-2026-10-07-usf-iss-gel",
+    "authorName": "Cognation Wire",
+    "body": "BREAKING | Florida / Space STEM\nUSF UNDERGRADS’ WOUND-HEALING GEL HEADED TO THE ISS\n\nUniversity of South Florida undergraduates’ hydrogel for better wound care in microgravity was selected for the Student Spaceflight Experiments Program and is scheduled to fly on SpaceX CRS-35 to the ISS around Oct. 13.\n\nSources: University of South Florida (via Public) https://www.pubt.io/view/29D894102359FD9F70B538835F130D07FD94948E",
+    "createdAt": "2026-10-07T13:15:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
+  },
+  {
+    "id": "nat-2026-10-07-minnesota-techrise",
+    "authorName": "Cognation Wire",
+    "body": "BREAKING | Minnesota / STEM\nMINNESOTA HIGH SCHOOLERS PACK NASA TECHRISE SOIL EXPERIMENT\n\nSchool of Environmental Studies (District 196, Apple Valley area) was one of 60 U.S. teams—and Minnesota’s only public school—selected for NASA TechRise; their payload on growing food beyond Earth is approved for a 2027 flight.\n\nSources: Sun Thisweek / hometownsource.com https://www.hometownsource.com/sun_thisweek/community/apple_valley/ses-students-work-with-nasa-to-take-soil-to-the-stratosphere/article_464f798f-c9e3-4afd-972a-8d6d4f9c5ae1.html",
+    "createdAt": "2026-10-07T13:00:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
+  },
+  {
+    "id": "nat-2026-10-07-burki-innovators",
+    "authorName": "Cognation Wire",
+    "body": "EVERGREEN | California / STEM\nCALIFORNIA 7TH-GRADER NAMED JUNIOR INNOVATORS CHALLENGE FINALIST\n\nAnkith Burki (BASIS Independent Silicon Valley, San Jose) is among 30 national finalists in the 2026 Thermo Fisher Scientific Junior Innovators Challenge for a project that boosted atmospheric water collection by 117% using low-frequency sound.\n\nSources: Education Times / Society for Science https://www.educationtimes.com/learning/meet-ankith-burki-7th-grade-indian-origin-us-student-uses-sound-to-boost-water-from-air-output-by-117-in-stem-experiment/articleshow/134725260.cms",
+    "createdAt": "2026-10-07T12:45:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
+  },
+  {
+    "id": "nat-2026-10-07-editors-box-gpg",
+    "authorName": "NEWS Editors",
+    "body": "EDITOR’S BOX — Oct 7 Nationwide desk (G–PG)\n\nPlaceholder US wire seeds retired. Plate rated G–PG for under-13 standing (disaster weather and politics/crime dropped). Lead: MIT for America. Six ready stories; optional TechRise package note (#7) folded here only—not a separate scoop. Watch: USF CRS-35 flight ~Oct 13; TechRise pathway. Print lock: curated from Nationwide plate draft ~07:40 CDT 2026-10-07. Autopublish OFF. Cap 250.",
+    "createdAt": "2026-10-07T12:30:00.000Z",
+    "seeded": true,
+    "kind": "news",
+    "rating": "G-PG"
+  }
+]

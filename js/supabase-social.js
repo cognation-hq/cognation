@@ -67,6 +67,11 @@
       display_name: String(profile.display_name || "Member").slice(0, 80),
       bio: String(profile.bio || "").slice(0, 280),
     };
+    /* Kept for people-search ranking; rows from other queries may not carry
+       them, so keep what an earlier row already told us. */
+    var prev = state.profiles[item.id];
+    item.account_kind = profile.account_kind || (prev && prev.account_kind) || "";
+    item.created_at = profile.created_at || (prev && prev.created_at) || "";
     state.profiles[item.id] = item;
     if (item.handle) state.handles[item.handle] = item.id;
     return item;
@@ -110,13 +115,20 @@
     return !!(u13() && u13().isSageRow(row));
   }
 
+  /* Two capped fetches, merged: real people and Demo accounts (seed / ops) each
+     get their own 400, newest first, so a big seed fleet can't push real people
+     out of the cache before search ranks them. Ops stay with the Demo accounts,
+     newest first, as before. */
+  var PROFILE_LIST_COLUMNS = "id,user_id,kind,handle,display_name,bio,account_kind,created_at";
   function selectProfiles() {
-    return client()
-      .rest("profiles", {
-        query:
-          "select=id,user_id,kind,handle,display_name,bio&order=created_at.desc&limit=400" + listFilter(),
-      })
-      .then(cacheProfiles);
+    function fetchGroup(kindFilter) {
+      return client().rest("profiles", {
+        query: "select=" + PROFILE_LIST_COLUMNS + "&" + kindFilter + "&order=created_at.desc&limit=400" + listFilter(),
+      });
+    }
+    return Promise.all([fetchGroup("account_kind=eq.real"), fetchGroup("account_kind=neq.real")]).then(function (groups) {
+      return cacheProfiles([].concat(groups[0] || [], groups[1] || []));
+    });
   }
 
   function refreshMyProfiles() {
@@ -438,6 +450,14 @@
       .filter(function (profile) {
         return (!me || profile.user_id !== me.supabaseUserId) && !isSageRow(profile);
       });
+    /* Real people first, then Demo accounts (seed / ops), each newest first;
+       ranked before the cap of 8. An unknown kind never counts as real. */
+    list.sort(function (a, b) {
+      var ra = a.account_kind === "real" ? 0 : 1;
+      var rb = b.account_kind === "real" ? 0 : 1;
+      if (ra !== rb) return ra - rb;
+      return String(b.created_at || "").localeCompare(String(a.created_at || ""));
+    });
     return list.slice(0, 8);
   }
 

@@ -4342,6 +4342,12 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   border-color: var(--color-accent);
 }
 
+.people-search-rule {
+  margin: 0;
+  font-size: 0.85em;
+  color: var(--cgn-text-muted);
+}
+
 .people-search-results {
   position: absolute;
   right: 0;

@@ -121,7 +121,10 @@
       next[k] = prev[k];
     });
     var age = parseInt(next.age, 10);
-    if (!(age > 0)) next.age = DEMO_AGE;
+    /* Sage (u13 test viewer) keeps her own age; no adult default. */
+    var u13 = window.CognationU13TestViewer;
+    var sage = !!(u13 && u13.isU13TestViewer());
+    if (!(age > 0) && !sage) next.age = DEMO_AGE;
     if (!next.city && !next.locality) next.city = DEMO_CITY;
     if (!next.state) next.state = DEMO_STATE;
     if (!next.country) next.country = DEMO_COUNTRY;

@@ -24,12 +24,13 @@
     return null;
   }
 
+  /* The profile on screen decides; the attribute is only a fallback (it used to
+     stick to whatever profile was shown first, e.g. during sign-in). */
   function resolveProfileId(btn) {
-    var id = btn.getAttribute("data-profile-id");
-    if (id) return id;
     var p = activeProfile();
     if (p && p._profileId) return String(p._profileId);
-    return "";
+    if (p && p._loading) return "";
+    return btn.getAttribute("data-profile-id") || "";
   }
 
   function isProfessionalContext(btn) {
@@ -96,7 +97,7 @@
 
   function renderRemoteState(btn, pro, state) {
     var row = btn.closest("[data-tower-follow-row]");
-    if (state.mode === "self") {
+    if (state.mode === "self" || ownProfileOnScreen(btn)) {
       if (row) row.hidden = true;
       return;
     }
@@ -173,16 +174,58 @@
     return true;
   }
 
-  /* Your own profile never shows Add friend / Follow, even while it loads. */
+  function readSession() {
+    try {
+      if (window.CognationAuth && typeof window.CognationAuth.getSession === "function") {
+        return window.CognationAuth.getSession();
+      }
+      var raw = localStorage.getItem("cognation.session.v2");
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /* Signing in (sign-in configured, login state not stored yet): treat as
+     your own profile still loading, so no Add friend. */
+  function signInPending() {
+    var floor = window.CognationAgeFloor;
+    return !!(floor && typeof floor.signInPending === "function" && floor.signInPending());
+  }
+
+  /* Your own profile never shows Add friend / Follow, even while it loads:
+     any profile id of the signed-in account counts (personal or professional). */
   function isOwnProfileId(id) {
     if (!id) return false;
+    id = String(id);
+    var session = readSession();
+    if (!session) return false;
+    if (session.activeProfileId && String(session.activeProfileId) === id) return true;
+    var uid = session.source === "supabase" && session.supabaseUserId ? String(session.supabaseUserId) : "";
+    var social = window.CognationSupabaseSocial;
     try {
-      var raw = localStorage.getItem("cognation.session.v2");
-      var session = raw ? JSON.parse(raw) : null;
-      return !!(session && session.activeProfileId && String(session.activeProfileId) === String(id));
-    } catch (e) {
-      return false;
-    }
+      if (social && typeof social.getMyProfiles === "function") {
+        if ((social.getMyProfiles() || []).some(function (p) { return p && String(p.id) === id; })) return true;
+      }
+      if (uid && social && typeof social.getProfile === "function") {
+        var row = social.getProfile(id);
+        if (row && String(row.user_id || "") === uid) return true;
+      }
+    } catch (eRemote) {}
+    var accounts = window.CognationAccounts;
+    try {
+      if (accounts && session.username && typeof accounts.getProfilesForUsername === "function") {
+        if ((accounts.getProfilesForUsername(session.username) || []).some(function (p) { return p && String(p.id) === id; })) return true;
+      }
+    } catch (eLocal) {}
+    return false;
+  }
+
+  function ownProfileOnScreen(btn) {
+    var p = activeProfile();
+    if (p && p._loading) return true;
+    if (signInPending()) return true;
+    return isOwnProfileId(resolveProfileId(btn));
   }
 
   function syncButton(btn) {
@@ -191,7 +234,8 @@
     var id = resolveProfileId(btn);
     if (id) btn.setAttribute("data-profile-id", id);
     var row = btn.closest("[data-tower-follow-row]");
-    if (isOwnProfileId(id)) {
+    /* Hidden (never relabeled "Unavailable") on your own profile. */
+    if (ownProfileOnScreen(btn)) {
       if (row) row.hidden = true;
       btn.hidden = true;
       return;
@@ -330,6 +374,11 @@
   document.addEventListener("cognation:session-started", syncAll);
   document.addEventListener("cognation:tower-profile-updated", syncAll);
   document.addEventListener("cognation:social-relationship-changed", syncAll);
+  /* Sign-in / profile switches: re-check whose profile is on screen. */
+  document.addEventListener("cognation:remote-profile-loaded", syncAll);
+  document.addEventListener("cognation:auth-changed", syncAll);
+  document.addEventListener("cognation:active-profile-changed", syncAll);
+  document.addEventListener("cognation:session-ended", syncAll);
 
   function boot() {
     syncAll();

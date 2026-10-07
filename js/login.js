@@ -299,6 +299,12 @@
         : Promise.resolve();
     return remote.then(function () {
       writeLocalSession(null);
+      /* Shared devices: drop this user's local profile copies on the way out;
+         the next sign-in refills them from the server row. */
+      try {
+        localStorage.removeItem("cognation.tower.profile.v1");
+        localStorage.removeItem("cognation.member.profile.v1");
+      } catch (eClear) {}
       openGate({
         message: opts.message || "Signed out. Sign in to continue.",
         isError: !!opts.isError,

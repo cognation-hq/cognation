@@ -452,6 +452,8 @@
       var remoteId = social.getViewedProfileId();
       if (remoteId) return remoteId;
     }
+    /* Signing in: no profile yet (never the demo founder or a local record). */
+    if (signInPending()) return null;
     var session = getSessionObject();
     if (session && session.activeProfileId) return session.activeProfileId;
     if (session && session.username && window.CognationAccounts) {
@@ -688,9 +690,21 @@
     return s && s.source === "supabase" && s.supabaseUserId ? String(s.supabaseUserId) : "";
   }
 
+  /* Signing in: Cognation sign-in is configured but the login state isn't
+     stored yet (or nobody is signed in behind the gate). Treated like signed
+     in with no profile loaded: locked placeholder, no local copies, no demo
+     fallback. Local preview / demo sessions are unchanged. */
+  function signInPending() {
+    var sb = window.CognationSupabase;
+    if (!sb || typeof sb.configured !== "function" || !sb.configured()) return false;
+    var s = getSessionObject();
+    if (s && s.source === "demo") return false;
+    return !signedInUserId();
+  }
+
   function legacyBlobOwned(blob) {
     var uid = signedInUserId();
-    if (!uid) return true;
+    if (!uid) return !signInPending();
     return !!blob && String(blob.ownerUserId || "") === uid;
   }
 
@@ -1030,7 +1044,7 @@
         /* Signed in, server row not loaded yet, and no local copy of this user's
            own: render the muted placeholder (no name, initial or quote) until
            cognation:remote-profile-loaded fills everything at once. */
-        if (signedInUserId() && usingRemoteSocial()) {
+        if ((signedInUserId() && usingRemoteSocial()) || signInPending()) {
           p._loading = true;
           p.displayName = "";
         }

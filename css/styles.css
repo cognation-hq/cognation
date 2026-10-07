@@ -12685,3 +12685,43 @@ a.site-switch-side:focus-visible {
 .commune-card-why {
   font-size: 0.78rem;
 }
+
+
+/* ===== Shared pipe-switch sides: SIGNAL News | Feed + COMMUNE Personal | Professional ===== */
+/* Designer lock 2026-10-07: the active side matches the COGNATION | WAYMAKERS top switch.
+   Values come straight from that switch's own rules: lilac ombre = .app-topbar stops,
+   label color + text-shadow = .site-switch-side.is-active, label type = .site-switch-side.
+   Pill padding = .signal-subtab / .tower-kind-btn (the top switch side itself is padding 0
+   on the ombre bar). Scoped by panel ID + .signal-subtabs.site-switch so neither
+   `.site-switch-side { padding: 0 !important }` nor the generic
+   `[role="tab"][aria-selected="true"]` fill can reach these sides again.
+   The top COGNATION | WAYMAKERS switch (no .signal-subtabs) and Tower .tower-kind-btn are untouched.
+   Inactive side keeps its muted color on the dark shell. */
+:is(#panel-signal, #panel-commune) .signal-subtabs.site-switch > .site-switch-side {
+  font-family: "Oswald", system-ui, sans-serif !important;
+  font-weight: 800 !important;
+  font-size: clamp(0.72rem, 1.6vw, 0.92rem) !important;
+  letter-spacing: 0.06em !important;
+  padding: 0.4rem 0.95rem !important;
+  border: 1px solid transparent !important;
+  border-radius: 999px !important;
+}
+:is(#panel-signal, #panel-commune) .signal-subtabs.site-switch > .site-switch-side:is(.is-active, .is-selected, [aria-selected="true"]) {
+  color: #fff !important;
+  text-shadow: 0 1px 3px rgba(90, 50, 90, 0.4) !important;
+  background:
+    linear-gradient(
+      105deg,
+      rgba(232, 214, 245, 0.98) 0%,
+      rgba(244, 220, 238, 0.97) 42%,
+      rgba(255, 220, 232, 0.96) 100%
+    ) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+@media (max-width: 640px) {
+  :is(#panel-signal, #panel-commune) .signal-subtabs.site-switch > .site-switch-side {
+    font-size: 0.65rem !important;
+    padding: 0.35rem 0.75rem !important;
+  }
+}

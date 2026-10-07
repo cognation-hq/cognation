@@ -10,6 +10,8 @@ var path = require("path");
 var vm = require("vm");
 var root = path.join(__dirname, "..");
 function src(rel) { return fs.readFileSync(path.join(root, rel), "utf8"); }
+/* index.html loads the shared age-floor helper before news-comments.js. */
+function ncSrc() { return src("js/age-floor-keywords.js") + "\n" + src("js/news-comments.js"); }
 
 /* Tiny DOM: enough for mount()/renderThread(). */
 function El(tag) {
@@ -82,7 +84,7 @@ var nat = renderStory(win, doc, "nat-2026-10-07-mit-for-america", "G-PG");
 var plain = renderStory(win, doc, "nat-plain", "");
 assert.strictEqual(thread(nat), null, "before the fix point: nothing mounted yet");
 
-vm.runInNewContext(src("js/news-comments.js"), {
+vm.runInNewContext(ncSrc(), {
   window: win, document: doc, localStorage: mem(), Date: Date, Math: Math, Promise: Promise,
   encodeURIComponent: encodeURIComponent,
 });
@@ -120,7 +122,7 @@ setTimeout(function () {
 
   /* 4. No document (older vm tests) -> loads without throwing. */
   var w2 = {};
-  vm.runInNewContext(src("js/news-comments.js"), { window: w2, localStorage: mem(), Date: Date, Math: Math });
+  vm.runInNewContext(ncSrc(), { window: w2, localStorage: mem(), Date: Date, Math: Math });
   assert.strictEqual(w2.CognationNewsComments.mountAll(), 0);
   console.log("news-comments-mount-race.test.js: ok");
 }, 20);

@@ -8,7 +8,9 @@ var assert = require("assert");
 var fs = require("fs");
 var path = require("path");
 var vm = require("vm");
-var code = fs.readFileSync(path.join(__dirname, "..", "js", "news-comments.js"), "utf8");
+/* index.html loads the shared age-floor helper before news-comments.js. */
+var code = fs.readFileSync(path.join(__dirname, "..", "js", "age-floor-keywords.js"), "utf8") + "\n" +
+  fs.readFileSync(path.join(__dirname, "..", "js", "news-comments.js"), "utf8");
 
 function mem(seed) {
   var d = Object.assign({}, seed || {});

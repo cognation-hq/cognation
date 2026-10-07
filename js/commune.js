@@ -596,6 +596,30 @@
   window.CognationProfileStore = ProfileStore;
   window.CognationFeedStore = FeedStore;
 
+  /* Nationwide / International: under-13 or unknown-age viewers (shared rule in
+     js/age-floor-keywords.js) get the same floor as Local/Statewide (tower.js
+     newsPostAppropriate) plus G/PG ratings only. Unrated items (wire filler, hot
+     topics, live refresh) are hidden. The viewer's own local posts skip the
+     rating check (only they can see them). Fail closed if the helpers are
+     missing. Adults and the other editions are unchanged. */
+  function newsViewerUnder13() {
+    var floor = window.CognationAgeFloor;
+    return floor && typeof floor.viewerIsUnder13 === "function" ? floor.viewerIsUnder13() : true;
+  }
+  function newsNatIntlFloor(posts, edition) {
+    posts = Array.isArray(posts) ? posts : [];
+    if (edition !== "nationwide" && edition !== "international") return posts;
+    if (!newsViewerUnder13()) return posts;
+    var floor = window.CognationAgeFloor;
+    var appropriate = window.CognationTowerNewsPostAppropriate;
+    return posts.filter(function (post) {
+      if (typeof appropriate !== "function" || !appropriate(post)) return false;
+      if (post.seeded === false) return true;
+      return !!(floor && typeof floor.ratingIsGPG === "function" && floor.ratingIsGPG(post.rating));
+    });
+  }
+  window.CognationNewsNatIntlFloor = newsNatIntlFloor;
+
   /* —— UI —— */
   function initCommune(root) {
     if (!root) return;
@@ -941,6 +965,11 @@
       } catch (e) {}
     }
 
+    var floorUnder13AtRender = null;
+    function natIntlFloor(posts) {
+      return newsNatIntlFloor(posts, editionId);
+    }
+
     function makeWirePost(seq) {
       var lines = WIRE_LINES[editionId] || WIRE_LINES.local;
       var body = lines[seq % lines.length];
@@ -1080,7 +1109,7 @@
       if (feedLoading) feedLoading.hidden = false;
       var start = wirePage * WIRE_BATCH;
       for (var i = 0; i < WIRE_BATCH; i++) {
-        appendPostEl(makeWirePost(start + i));
+        natIntlFloor([makeWirePost(start + i)]).forEach(function (wp) { appendPostEl(wp); });
       }
       wirePage += 1;
       if (feedEmpty) feedEmpty.hidden = true;
@@ -1219,7 +1248,8 @@
       var posts =
         editionId === "local" || editionId === "statewide"
           ? postsFromTower()
-          : FeedStore.listPosts(editionId);
+          : natIntlFloor(FeedStore.listPosts(editionId));
+      floorUnder13AtRender = newsViewerUnder13();
       try {
         if (window.CognationSeedOpsNewsLog && window.CognationSeedOpsNewsLog.onTowerPostsForNews) {
           window.CognationSeedOpsNewsLog.onTowerPostsForNews(posts, editionId);
@@ -1468,6 +1498,12 @@
       }
     }
     renderFeed();
+    /* Nationwide/International: redraw only when the viewer crosses the under-13
+       line (age loaded or edited), not on every member-profile save. */
+    document.addEventListener("cognation:member-profile-updated", function () {
+      if (editionId !== "nationwide" && editionId !== "international") return;
+      if (floorUnder13AtRender !== newsViewerUnder13()) renderFeed();
+    });
   }
 
   function boot() {

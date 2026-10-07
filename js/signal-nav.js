@@ -35,6 +35,8 @@
       var on = btn.getAttribute("data-signal-pane-btn") === pane;
       btn.setAttribute("aria-selected", on ? "true" : "false");
       btn.classList.toggle("is-selected", on);
+      /* site-switch-side.is-active = same active chrome as COGNATION|WAYMAKERS */
+      btn.classList.toggle("is-active", on);
       btn.tabIndex = on ? 0 : -1;
     });
     if (opts.persist !== false) writeStoredPane(pane);

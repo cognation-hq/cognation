@@ -12471,70 +12471,76 @@ a.site-switch-side:focus-visible {
 }
 
 
-/* ===== SIGNAL: News | Feed second-row subtabs (Personal | Professional stack) ===== */
-/* Narrow fit-content row under SIGNAL; lilac strip; white labels; pipe; white underline on active */
+/* ===== SIGNAL: News | Feed pipe-switch (LOOK-YES 2026-10-07) ===== */
+/* Same chrome as COGNATION|WAYMAKERS + Personal|Professional:
+   dark shell, lilac ombre on ACTIVE side, mute inactive, same height/radius/spacing.
+   Tokens copied from .tower-profile-kind-toggle / .tower-kind-btn / .site-switch* — no new invent. */
 .signal-tab-panel {
   padding-top: 0.35rem;
 }
+/* Dark shell = .tower-profile-kind-toggle geometry */
 .signal-subtabs {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   flex-wrap: wrap;
   gap: 0.35rem;
   width: fit-content;
   max-width: 100%;
   margin: 0 0 0.85rem;
-  padding: 0.45rem 0.85rem;
+  padding: 0.25rem;
+  background: rgba(16, 19, 48, 0.32);
+  border: 1px solid var(--cgn-border, rgba(185, 238, 255, 0.22));
+  border-radius: 999px;
+  box-shadow: none;
+}
+/* Sides = Oswald pipe labels (.site-switch-side) + kind-btn padding/radius */
+.signal-subtab {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent !important;
+  color: var(--cgn-text-muted, rgba(247, 249, 255, 0.7)) !important;
+  font-family: "Oswald", system-ui, sans-serif !important;
+  font-weight: 800 !important;
+  font-size: clamp(0.72rem, 1.6vw, 0.92rem) !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase;
+  text-shadow: none;
+  padding: 0.4rem 0.95rem;
+  margin: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  line-height: 1.1;
+}
+.signal-subtab:hover,
+.signal-subtab:focus-visible {
+  color: var(--cgn-text, #f7f9ff) !important;
+  outline: none;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+/* Active = Designer lilac→pink-lilac ombre (same stops as .app-topbar lock) */
+.signal-subtab.is-selected,
+.signal-subtab[aria-selected="true"] {
+  color: #fff !important;
+  text-shadow: 0 1px 2px rgba(90, 50, 90, 0.28);
+  border-color: transparent;
   background:
     linear-gradient(
       105deg,
       rgba(232, 214, 245, 0.98) 0%,
       rgba(244, 220, 238, 0.97) 42%,
       rgba(255, 220, 232, 0.96) 100%
-    );
-  border: 1px solid rgba(196, 160, 200, 0.45);
-  border-radius: 999px;
-  box-shadow: 0 6px 18px rgba(140, 90, 140, 0.1);
-}
-.signal-subtab {
-  appearance: none;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent !important;
-  color: #fff !important;
-  font-family: "Oswald", system-ui, sans-serif !important;
-  font-weight: 800 !important;
-  font-size: clamp(0.72rem, 1.6vw, 0.92rem) !important;
-  letter-spacing: 0.06em !important;
-  text-transform: none;
-  text-shadow: 0 1px 2px rgba(90, 50, 90, 0.28);
-  padding: 0.2rem 0.15rem 0.28rem;
-  margin: 0;
-  border-radius: 0;
-  cursor: pointer;
-  line-height: 1.1;
-}
-.signal-subtab:hover,
-.signal-subtab:focus-visible {
-  color: #fff !important;
-  border-bottom-color: rgba(255, 255, 255, 0.72);
-  outline: none;
-  text-shadow: 0 1px 3px rgba(90, 50, 90, 0.35);
-}
-.signal-subtab.is-selected,
-.signal-subtab[aria-selected="true"] {
-  color: #fff !important;
-  border-bottom-color: #fff;
-  text-shadow: 0 1px 3px rgba(90, 50, 90, 0.4);
+    ) !important;
+  box-shadow: 0 4px 14px rgba(140, 90, 140, 0.18);
 }
 .signal-subtab-sep {
   font-family: "Oswald", system-ui, sans-serif !important;
   font-weight: 700 !important;
   font-size: clamp(0.72rem, 1.6vw, 0.92rem) !important;
-  color: rgba(255, 255, 255, 0.85) !important;
-  text-shadow: 0 1px 2px rgba(90, 50, 90, 0.28);
+  color: rgba(247, 249, 255, 0.55) !important;
+  text-shadow: none;
   user-select: none;
   line-height: 1.1;
+  padding: 0 0.05rem;
 }
 .signal-pane[hidden] {
   display: none !important;
@@ -12564,8 +12570,11 @@ a.site-switch-side:focus-visible {
   .signal-subtab-sep {
     font-size: 0.65rem !important;
   }
+  .signal-subtab {
+    padding: 0.35rem 0.75rem;
+  }
   .signal-subtabs {
     gap: 0.22rem;
-    padding: 0.35rem 0.65rem;
+    padding: 0.25rem;
   }
 }

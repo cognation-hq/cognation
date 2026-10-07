@@ -1059,6 +1059,22 @@
       else {
         p.followerIds = p.followerIds.map(function (id) { return String(id || ""); }).filter(Boolean);
       }
+      if (!Array.isArray(p.followerEdges)) p.followerEdges = [];
+      else {
+        p.followerEdges = p.followerEdges
+          .map(function (edge) {
+            if (!edge || typeof edge !== "object") return null;
+            var id = String(edge.id || "").trim();
+            if (!id) return null;
+            return { id: id, face: edge.face === "professional" ? "professional" : "personal" };
+          })
+          .filter(Boolean);
+      }
+      if (!p.followerEdges.length && p.followerIds.length) {
+        p.followerEdges = p.followerIds.map(function (id) {
+          return { id: String(id), face: "personal" };
+        });
+      }
       if (!Array.isArray(p.featuredFriendIds)) p.featuredFriendIds = [];
       else {
         p.featuredFriendIds = p.featuredFriendIds
@@ -2066,7 +2082,13 @@
       btn.tabIndex = on ? 0 : -1;
     });
     var toggle = root.querySelector("[data-tower-side-toggle]");
-    if (toggle) toggle.hidden = !owner;
+    /* Cap 250: drop Connections | Public profile pill chrome. Owners switch via quiet jump links. */
+    if (toggle) toggle.hidden = true;
+    root.querySelectorAll("[data-tower-side-jump]").forEach(function (jump) {
+      jump.hidden = !owner;
+      var target = jump.getAttribute("data-tower-side-jump");
+      jump.classList.toggle("is-current", target === side);
+    });
     if (opts.persist !== false && owner) writeStoredTowerSide(side);
     /* Re-apply sticker layout when showing public so positions paint after unhide */
     if (side === "public") {
@@ -2099,7 +2121,7 @@
     var initial = "public";
     if (owner) {
       if (hashRequestsPublicSide()) initial = "public";
-      else initial = readStoredTowerSide() || "private";
+      else initial = readStoredTowerSide() || "public";
     } else {
       initial = "public";
     }
@@ -2110,6 +2132,12 @@
       btn.addEventListener("click", function () {
         if (!isTowerOwner(TowerProfileStore.get())) return;
         applyTowerSide(root, btn.getAttribute("data-tower-side-btn") || "private");
+      });
+    });
+    root.querySelectorAll("[data-tower-side-jump]").forEach(function (jump) {
+      jump.addEventListener("click", function () {
+        if (!isTowerOwner(TowerProfileStore.get())) return;
+        applyTowerSide(root, jump.getAttribute("data-tower-side-jump") || "public");
       });
     });
 
@@ -2809,12 +2837,14 @@
   }
 
   var SOCIAL_NETWORKS = [
-    { id: "x", label: "X", short: "X" },
-    { id: "meta", label: "Meta", short: "Meta" },
-    { id: "instagram", label: "Instagram", short: "IG" },
-    { id: "youtube", label: "YouTube", short: "YT" },
-    { id: "tiktok", label: "TikTok", short: "TT" },
-    { id: "linkedin", label: "LinkedIn", short: "in" },
+    { id: "x", label: "X", short: "X", logo: "assets/social/x.png" },
+    { id: "meta", label: "Meta", short: "Meta", logo: "assets/social/meta.svg" },
+    { id: "instagram", label: "Instagram", short: "IG", logo: "assets/social/instagram.png" },
+    { id: "youtube", label: "YouTube", short: "YT", logo: "assets/social/youtube.png" },
+    { id: "tiktok", label: "TikTok", short: "TT", logo: "assets/social/tiktok.svg" },
+    { id: "linkedin", label: "LinkedIn", short: "in", logo: "assets/social/linkedin.png", professionalOnly: true },
+    { id: "venmo", label: "Venmo", short: "Vm", logo: "assets/social/venmo.svg", personalOnly: true },
+    { id: "linktree", label: "Linktree", short: "Lt", logo: "assets/social/linktree.svg", professionalOnly: true },
   ];
 
   function safeHttpUrl(raw) {
@@ -3641,7 +3671,14 @@
   }
 
   function socialLinkDefs() {
-    return SOCIAL_NETWORKS.concat([{ id: "venmo", label: "Venmo", short: "Venmo" }]);
+    return SOCIAL_NETWORKS.slice();
+  }
+
+  function socialNetAllowedForKind(net, profileKind) {
+    profileKind = profileKind === "professional" ? "professional" : "personal";
+    if (net && net.professionalOnly && profileKind !== "professional") return false;
+    if (net && net.personalOnly && profileKind === "professional") return false;
+    return true;
   }
 
   function venmoHref(raw) {
@@ -3706,26 +3743,56 @@
     var box = root.querySelector("[data-tower-social-links]");
     if (!box) return;
     var links = (p && p.socialLinks) || {};
+    var profileKind = (p && (p._profileKind || p.kind)) || "personal";
     socialLinkDefs().forEach(function (net) {
       var formInput = root.querySelector('[data-tower-social="' + net.id + '"]');
-      if (formInput && document.activeElement !== formInput) formInput.value = links[net.id] || "";
+      if (!formInput) return;
+      var fieldWrap =
+        formInput.closest(".tower-social-field") ||
+        formInput.closest("[data-tower-social-field]") ||
+        formInput.previousElementSibling;
+      var allowed = socialNetAllowedForKind(net, profileKind);
+      if (fieldWrap && fieldWrap.tagName === "LABEL") {
+        /* label sits above input — hide label+input via parent form-group row when possible */
+      }
+      var label = root.querySelector('label[for="' + formInput.id + '"]');
+      if (!allowed) {
+        formInput.hidden = true;
+        if (label) label.hidden = true;
+        return;
+      }
+      formInput.hidden = false;
+      if (label) label.hidden = false;
+      if (document.activeElement !== formInput) formInput.value = links[net.id] || "";
     });
     if (box.contains(document.activeElement)) return;
     box.innerHTML = "";
     var any = false;
     socialLinkDefs().forEach(function (net) {
+      if (!socialNetAllowedForKind(net, profileKind)) return;
       var raw = links[net.id] || "";
       var href = socialHref(net.id, raw);
       if (!href) return;
       any = true;
       var a = document.createElement("a");
-      a.className = "tower-social-btn tower-social-btn--" + net.id;
+      a.className = "tower-social-btn tower-social-btn--" + net.id + " is-logo";
       a.href = href;
       a.target = "_blank";
       a.rel = "noopener noreferrer";
       a.title = net.label;
-      a.setAttribute("aria-label", net.label);
-      a.textContent = net.short;
+      a.setAttribute("aria-label", "Open " + net.label + " (opens in a new tab)");
+      if (net.logo) {
+        var img = document.createElement("img");
+        img.src = net.logo;
+        img.alt = "";
+        img.setAttribute("aria-hidden", "true");
+        img.decoding = "async";
+        img.loading = "lazy";
+        a.appendChild(img);
+      } else {
+        a.textContent = net.short;
+        a.classList.remove("is-logo");
+      }
       box.appendChild(a);
     });
     box.hidden = !any;
@@ -4090,18 +4157,129 @@
     return false;
   }
 
-  /* Professional-page followers. No 6,000 cap — that limit is Tower friends only. */
-  function addProfessionalFollower(followerId) {
+  /* Professional-page followers. No 6,000 cap — that limit is Tower friends only.
+     Cap 250: same person may follow as personal + professional = two edges (id+face). */
+  function normalizeFollowerFace(face) {
+    return face === "professional" ? "professional" : "personal";
+  }
+
+  function ensureFollowerEdges(p) {
+    if (!p) return [];
+    if (!Array.isArray(p.followerEdges)) p.followerEdges = [];
+    if (!Array.isArray(p.followerIds)) p.followerIds = [];
+    /* Migrate legacy id-only rows once. */
+    if (!p.followerEdges.length && p.followerIds.length) {
+      p.followerEdges = p.followerIds.map(function (id) {
+        return { id: String(id), face: "personal" };
+      });
+    }
+    return p.followerEdges;
+  }
+
+  function followerEdgeKey(id, face) {
+    return String(id || "") + "::" + normalizeFollowerFace(face);
+  }
+
+  function addProfessionalFollower(followerId, face) {
     followerId = String(followerId || "").trim();
+    face = normalizeFollowerFace(face);
     if (!followerId) return { ok: false, error: "missing" };
     var p = TowerProfileStore.get();
     if (!p || p._profileKind !== "professional") return { ok: false, error: "not-professional" };
     if (professionalFollowerIsSelf(p, followerId)) return { ok: false, error: "self" };
-    if (!Array.isArray(p.followerIds)) p.followerIds = [];
-    if (p.followerIds.indexOf(followerId) >= 0) return { ok: true, already: true, count: p.followerIds.length };
-    p.followerIds.push(followerId);
+    var edges = ensureFollowerEdges(p);
+    var key = followerEdgeKey(followerId, face);
+    for (var i = 0; i < edges.length; i++) {
+      if (followerEdgeKey(edges[i].id, edges[i].face) === key) {
+        return { ok: true, already: true, count: edges.length, face: face };
+      }
+    }
+    edges.push({ id: followerId, face: face });
+    p.followerEdges = edges;
+    /* Keep legacy id list unique for older readers. */
+    if (p.followerIds.indexOf(followerId) === -1) p.followerIds.push(followerId);
     if (!TowerProfileStore.save(p)) return { ok: false, error: "storage" };
-    return { ok: true, count: p.followerIds.length };
+    return { ok: true, count: edges.length, face: face };
+  }
+
+  function followerDisplayName(id) {
+    id = String(id || "").trim();
+    if (!id) return "";
+    var friend = DEMO_FRIENDS.filter(function (entry) { return entry.id === id; })[0];
+    if (friend && friend.name) return String(friend.name);
+    if (window.CognationAccounts && typeof window.CognationAccounts.getProfileById === "function") {
+      var rec = window.CognationAccounts.getProfileById(id);
+      if (rec) {
+        if (recordIsSeed(rec) || recordIsOps(rec)) {
+          return String(rec.displayName || rec.handle || id).split(/\s+/)[0];
+        }
+        return String(rec.displayName || rec.handle || id);
+      }
+    }
+    try {
+      var session = getSessionObject();
+      if (session && (session.username === id || session.activeProfileId === id)) {
+        return String(session.displayName || session.username || "You");
+      }
+    } catch (eName) {}
+    return id;
+  }
+
+  function viewerIsSeedOrOps() {
+    var personal = viewerPersonalRecord();
+    if (personal && (recordIsSeed(personal) || recordIsOps(personal))) return true;
+    try {
+      var session = getSessionObject();
+      if (session && window.CognationAccounts && typeof window.CognationAccounts.getProfileById === "function") {
+        var active = window.CognationAccounts.getProfileById(session.activeProfileId);
+        if (active && (recordIsSeed(active) || recordIsOps(active))) return true;
+      }
+    } catch (eSeed) {}
+    return false;
+  }
+
+  function mutualFollowerNamesForPro(p) {
+    var edges = ensureFollowerEdges(p);
+    var personal = viewerPersonalRecord();
+    var friendIds = personal && Array.isArray(personal.friendIds) ? personal.friendIds.map(String) : [];
+    var viewerSeed = viewerIsSeedOrOps();
+    var names = [];
+    var seen = {};
+    friendIds.forEach(function (fid) {
+      var hit = null;
+      for (var i = 0; i < edges.length; i++) {
+        if (String(edges[i].id) === String(fid)) {
+          hit = edges[i];
+          break;
+        }
+      }
+      if (!hit) return;
+      var rec = null;
+      try {
+        if (window.CognationAccounts && window.CognationAccounts.getProfileById) {
+          rec = window.CognationAccounts.getProfileById(fid);
+        }
+      } catch (eRec) {}
+      /* Seeds NEVER appear in a real person's mutual line. */
+      if (!viewerSeed && rec && (recordIsSeed(rec) || recordIsOps(rec))) return;
+      if (!viewerSeed) {
+        var demo = DEMO_FRIENDS.filter(function (entry) { return entry.id === fid; })[0];
+        if (demo && (demo.isSeed || demo.accountKind === "seed")) return;
+      }
+      var label = followerDisplayName(fid);
+      if (!label || seen[label]) return;
+      seen[label] = true;
+      names.push(label);
+    });
+    return names.slice(0, 4);
+  }
+
+  function formatMutualFollowersLine(names, subjectName) {
+    if (!names || !names.length) return "";
+    var who = subjectName || "this person";
+    if (names.length === 1) return names[0] + " follows " + who;
+    if (names.length === 2) return names[0] + " and " + names[1] + " follow " + who;
+    return names[0] + ", " + names[1] + ", and " + (names.length - 2) + " more follow " + who;
   }
 
   function renderProfessionalFollowers(root) {
@@ -4111,43 +4289,41 @@
     var pro = !!(p && p._profileKind === "professional" && root.getAttribute("data-tower-side") === "public");
     box.hidden = !pro;
     if (!pro) return;
-    var ids = Array.isArray(p.followerIds) ? p.followerIds : [];
+    var edges = ensureFollowerEdges(p);
     var note = box.querySelector("[data-tower-followers-note]");
+    var mutual = box.querySelector("[data-tower-followers-mutual]");
     var list = box.querySelector("[data-tower-followers-results]");
     var input = box.querySelector("[data-tower-followers-find]");
-    var q = input ? String(input.value || "").trim().toLowerCase() : "";
+    if (input) {
+      input.hidden = true;
+      input.setAttribute("hidden", "");
+      var searchLabel = box.querySelector('label[for="' + input.id + '"]');
+      if (searchLabel) searchLabel.hidden = true;
+    }
     if (list) list.innerHTML = "";
-    if (!q) {
-      if (note) {
-        note.textContent = ids.length
-          ? ids.length + " followers. Search to find someone."
-          : "No followers yet.";
-      }
-      return;
+    if (note) {
+      note.textContent = edges.length
+        ? edges.length + (edges.length === 1 ? " follower" : " followers")
+        : "No followers yet.";
     }
-    var matches = [];
-    for (var i = 0; i < ids.length && matches.length < 8; i++) {
-      var id = ids[i];
-      var friend = DEMO_FRIENDS.filter(function (entry) { return entry.id === id; })[0];
-      var label = friend ? friend.name : id;
-      if (String(label).toLowerCase().indexOf(q) === -1 && String(id).toLowerCase().indexOf(q) === -1) continue;
-      matches.push(label);
+    if (mutual) {
+      var subject = String((p && (p.displayName || p.handle)) || "this person").trim() || "this person";
+      var line = formatMutualFollowersLine(mutualFollowerNamesForPro(p), subject);
+      mutual.textContent = line;
+      mutual.hidden = !line;
     }
-    if (note) note.textContent = matches.length ? "" : "No matches";
     if (!list) return;
-    matches.forEach(function (label, index) {
-      var id = "";
-      for (var n = 0; n < ids.length; n++) {
-        var friend = DEMO_FRIENDS.filter(function (entry) { return entry.id === ids[n]; })[0];
-        var name = friend ? friend.name : ids[n];
-        if (name === label) {
-          id = ids[n];
-          break;
-        }
-      }
+    edges.slice(0, 12).forEach(function (edge) {
+      var id = String(edge.id || "");
+      var face = normalizeFollowerFace(edge.face);
+      var label = followerDisplayName(id) || id;
       var li = document.createElement("li");
       li.className = "tower-followers-hit";
+      li.setAttribute("data-follower-face", face);
       var handle = professionalHandleForFollower(id);
+      var faceTag = document.createElement("span");
+      faceTag.className = "tower-follower-face";
+      faceTag.textContent = face === "professional" ? "Pro" : "Personal";
       if (handle) {
         var link = document.createElement("a");
         link.href = "#tower-profile-" + handle;
@@ -4155,10 +4331,12 @@
         link.textContent = label;
         li.appendChild(link);
       } else {
-        li.textContent = label;
+        var span = document.createElement("span");
+        span.textContent = label;
+        li.appendChild(span);
       }
+      li.appendChild(faceTag);
       list.appendChild(li);
-      if (index < 0) return;
     });
   }
 
@@ -10258,6 +10436,7 @@
   };
   window.CognationTowerFollowers = {
     add: addProfessionalFollower,
+    normalizeFace: normalizeFollowerFace,
   };
   window.CognationTowerIsFounderOwner = isFounderOwner;
   window.CognationTowerApplySide = function (side) {

@@ -4474,6 +4474,94 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .tower-social-btn--tiktok { background: #010101; color: #fff; border-color: #010101; }
 .tower-social-btn--linkedin { background: #0a66c2; color: #fff; border-color: #0a66c2; }
 .tower-social-btn--venmo { background: #008cff; color: #fff; border-color: #0074d4; }
+
+.tower-social-btn--linktree { background: #43e55e; color: #111; border-color: #2ecc71; }
+
+/* Cap 250: circular company logo buttons (each saved URL = its own link) */
+.tower-social-btn.is-logo {
+  background: transparent !important;
+  background-image: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  min-width: 0;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 999px;
+  overflow: hidden;
+  color: inherit;
+}
+.tower-social-btn.is-logo:hover {
+  filter: brightness(1.06);
+  border-color: transparent !important;
+  color: inherit;
+  opacity: 0.92;
+}
+.tower-social-btn.is-logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: transparent !important;
+  border: none;
+  pointer-events: none;
+}
+
+/* Cap 250: quiet Connections ↔ Public jumps (no Connections | Public pill) */
+.tower-side-jump-row {
+  margin: 0 0 0.65rem;
+  padding: 0;
+}
+.tower-side-jump {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--color-accent, #9b7dff);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 650;
+  cursor: pointer;
+  padding: 0.15rem 0;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+.tower-side-jump:hover {
+  color: var(--color-heading, #fff);
+}
+.tower-side-jump[hidden],
+.tower-side-jump-row:has(.tower-side-jump[hidden]) {
+  display: none !important;
+}
+.tower-followers-mutual {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--color-muted, #b9b0d0);
+}
+.tower-followers-mutual[hidden] {
+  display: none !important;
+}
+.tower-followers-find[hidden] {
+  display: none !important;
+}
+.tower-followers-hit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.tower-follower-face {
+  flex: 0 0 auto;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(155, 125, 255, 0.18);
+  color: var(--color-accent, #cbb6ff);
+}
+
 [data-tower-app]:not([data-tower-is-owner="true"]) .tower-sticker--polaroid .tower-avatar-upload {
   display: none !important;
 }
@@ -5520,6 +5608,9 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .tower-side-toggle[hidden] {
   display: none !important;
 }
+/* Cap 250: Connections|Public pill dropped from Tower chrome */
+[data-tower-side-toggle] { display: none !important; }
+
 .tower-side-btn {
   appearance: none;
   border: 0;

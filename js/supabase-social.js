@@ -144,7 +144,9 @@
     if (raw.indexOf("#tower-profile-") === 0) {
       var slug = raw.slice("#tower-profile-".length);
       try { slug = decodeURIComponent(slug); } catch (eHash) {}
-      var byHash = slug ? profileForHandle(slug) : null;
+      /* Author links carry the profile id (handle when there is no id). */
+      var byId = slug && Object.prototype.hasOwnProperty.call(state.profiles, slug) ? state.profiles[slug] : null;
+      var byHash = byId || (slug ? profileForHandle(slug) : null);
       /* Missing handle must not fall through to the signed-in profile. */
       return byHash && byHash.id ? byHash.id : "";
     }

@@ -89,12 +89,41 @@
     var author = sessionAuthor();
     if (!author) return Promise.resolve({ ok: false, error: "signed_in_required" });
     if (!remoteOn()) return Promise.resolve({ ok: false, error: "shared_unavailable" });
-    return window.CognationSupabase.rest("news_story_comments", {
-      method: "POST",
-      body: { story_id: storyId, author_profile_id: author.profileId, body: body },
-    }).then(function () { return pullStory(storyId); }).then(function () {
-      return { ok: true };
-    }, function () { return { ok: false, error: "shared" }; });
+    /* clientId: the same id is sent again on a retry of the same text, so a post
+       that did save (only the reply was lost) cannot be saved twice. */
+    var clientId = UUID_RE.test(String(opts.clientId || "")) ? String(opts.clientId) : "";
+    var row = { story_id: storyId, author_profile_id: author.profileId, body: body };
+    if (clientId) row.id = clientId;
+    function refreshed(res) {
+      /* Saved is saved: a failed refresh afterwards must not report a failure. */
+      return pullStory(storyId).then(function () { return res; }, function () { return res; });
+    }
+    return window.CognationSupabase.rest("news_story_comments", { method: "POST", body: row }).then(function () {
+      return refreshed({ ok: true });
+    }, function (err) {
+      /* 409 on a retry: that id is already taken. Count it as posted only when
+         the comment with this id is really there. */
+      if (!clientId || !err || err.status !== 409) return { ok: false, error: "shared" };
+      return pullStory(storyId).then(function (rows) {
+        var found = (rows || []).some(function (c) { return c && String(c.id) === clientId; });
+        return found ? { ok: true, already: true } : { ok: false, error: "shared" };
+      }, function () { return { ok: false, error: "shared" }; });
+    });
+  }
+  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  function newClientId() {
+    try {
+      var c = window.crypto || (typeof crypto !== "undefined" ? crypto : null);
+      if (c && typeof c.randomUUID === "function") return c.randomUUID();
+      if (c && typeof c.getRandomValues === "function") {
+        var b = c.getRandomValues(new Uint8Array(16));
+        b[6] = (b[6] & 15) | 64;
+        b[8] = (b[8] & 63) | 128;
+        var h = Array.prototype.map.call(b, function (x) { return (x + 256).toString(16).slice(1); }).join("");
+        return h.slice(0, 8) + "-" + h.slice(8, 12) + "-" + h.slice(12, 16) + "-" + h.slice(16, 20) + "-" + h.slice(20);
+      }
+    } catch (e) {}
+    return "";
   }
   function toggleReactShared(storyId, commentId, face) {
     var author = sessionAuthor();
@@ -209,6 +238,21 @@
       '<button type="submit" class="btn btn-secondary news-comment-submit">Post</button></form>';
     return host;
   }
+  /* Reuses the News feed's own error line style (.commune-status.is-error). */
+  var POST_FAILED = "Couldn't post. Try again.";
+  function showPostError(host, form) {
+    if (host.querySelector("[data-news-comment-error]")) return;
+    var line = document.createElement("p");
+    line.className = "commune-status is-error";
+    line.setAttribute("data-news-comment-error", "");
+    line.setAttribute("role", "status");
+    line.textContent = POST_FAILED;
+    form.insertAdjacentElement("afterend", line);
+  }
+  function clearPostError(host) {
+    var line = host.querySelector("[data-news-comment-error]");
+    if (line) line.remove();
+  }
   function mount(article, post) {
     if (!article) return null;
     var storyId = (post && post.id) || article.getAttribute("data-post-id") || "";
@@ -246,8 +290,23 @@
         var val = input ? String(input.value || "").trim() : "";
         if (!val) return;
         if (remoteOn()) {
-          publishComment({ storyId: storyId, body: val }).then(function (res) {
-            if (!res || !res.ok) return;
+          /* One post at a time: a second submit while one is in flight is ignored. */
+          if (host.__posting) return;
+          host.__posting = true;
+          /* Retrying the same text reuses its id (see publishComment). */
+          var pending = host.__pendingPost;
+          if (!pending || pending.body !== val) pending = host.__pendingPost = { body: val, id: newClientId() };
+          clearPostError(host);
+          var btn = form.querySelector(".news-comment-submit");
+          if (btn) btn.disabled = true;
+          publishComment({ storyId: storyId, body: val, clientId: pending.id }).then(null, function () {
+            return { ok: false, error: "shared" };
+          }).then(function (res) {
+            host.__posting = false;
+            if (btn) btn.disabled = false;
+            /* Failed: keep the typed text, say so under the composer, allow a retry. */
+            if (!res || !res.ok) return showPostError(host, form);
+            host.__pendingPost = null;
             if (input) input.value = "";
             renderThread(host, storyId, rating);
           });
@@ -256,7 +315,10 @@
         if (addComment({ storyId: storyId, body: val }).ok) {
           if (input) input.value = "";
           renderThread(host, storyId, rating);
-        }
+        } else showPostError(host, form);
+      });
+      host.addEventListener("input", function (ev) {
+        if (ev.target && ev.target.closest && ev.target.closest("[data-news-comment-input]")) clearPostError(host);
       });
       host.addEventListener("click", function (ev) {
         var btn = ev.target && ev.target.closest("[data-news-comment-react]");

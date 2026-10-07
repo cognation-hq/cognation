@@ -493,12 +493,55 @@
     logout({ message: "Signed out. Sign in to continue." });
   });
 
+  /* Signed-in (Supabase) sessions: the server profile row is the source of the
+     session name. A local CognationAccounts record is only a placeholder until
+     that row is cached, and only when it belongs to the same user id. */
+  function serverRowForSession(session) {
+    var social = window.CognationSupabaseSocial;
+    var row = social && typeof social.getProfile === "function" ? social.getProfile(session.activeProfileId) : null;
+    return row && String(row.user_id || "") === String(session.supabaseUserId || "") ? row : null;
+  }
+
+  function applyServerRow(session) {
+    var row = session && session.activeProfileId ? serverRowForSession(session) : null;
+    if (!row) return false;
+    session.profileKind = row.kind === "professional" ? "professional" : "personal";
+    session.profileHandle = row.handle || "";
+    session.profileDisplayName = row.display_name || "";
+    writeLocalSession(session);
+    return true;
+  }
+
+  function hydrateRemoteSessionProfile(session) {
+    if (applyServerRow(session)) return session;
+    var local =
+      session.activeProfileId && window.CognationAccounts && window.CognationAccounts.getProfileById
+        ? window.CognationAccounts.getProfileById(session.activeProfileId)
+        : null;
+    var owner = local && (local.userId || local.user_id || local.supabaseUserId);
+    if (local && owner && String(owner) === String(session.supabaseUserId)) {
+      session.profileKind = local.kind === "professional" ? "professional" : "personal";
+      session.profileHandle = local.handle || session.profileHandle || "";
+      session.profileDisplayName = local.displayName || session.profileDisplayName || "";
+      writeLocalSession(session);
+    }
+    return session;
+  }
+
+  document.addEventListener("cognation:remote-profile-loaded", function () {
+    var current = readLocalSession();
+    if (current && current.source === "supabase" && current.supabaseUserId) applyServerRow(current);
+  });
+
   function hydrateSessionProfile(session) {
     if (!session || !session.username) return session;
     if (window.CognationAccounts) {
       try {
         window.CognationAccounts.ensureSeeded();
       } catch (e) {}
+    }
+    if (session.source === "supabase" && session.supabaseUserId) {
+      return hydrateRemoteSessionProfile(session);
     }
     if (session.activeProfileId) {
       var still =

@@ -28,6 +28,12 @@
   /* JSON of the prefs payload the server already has (null = not read yet). */
   var serverPrefsJson = null;
   var persistChain = null;
+  /* Failed writes: one retry per changed value per page load, with backoff. */
+  var PERSIST_MAX_ATTEMPTS = 2;
+  var PERSIST_RETRY_MS = 2000;
+  var persistAttempts = {};
+  var retryTimer = null;
+  var retryJson = "";
   var hydrating = false;
   var ensureInFlight = null;
 
@@ -442,10 +448,25 @@
         var payload = prefsPayloadFromLocal();
         var json = JSON.stringify(payload);
         if (json === serverJson) return { ok: true, skipped: true, unchanged: true };
+        var tries = persistAttempts[json] || 0;
+        if (tries >= PERSIST_MAX_ATTEMPTS) return { ok: false, skipped: true, error: "persist_gave_up" };
+        /* A retry for this value is already queued: don't queue or send another. */
+        if (retryTimer && retryJson === json) return { ok: false, skipped: true, error: "retry_pending" };
+        persistAttempts[json] = tries + 1;
         return sb.updateUser(payload).then(function () {
           serverPrefsJson = json;
           emitLog({ action: "persist", ok: true, payload: payload });
           return { ok: true, payload: payload };
+        }, function (err) {
+          if (persistAttempts[json] < PERSIST_MAX_ATTEMPTS && !retryTimer) {
+            retryJson = json;
+            retryTimer = setTimeout(function () {
+              retryTimer = null;
+              retryJson = "";
+              persistPrefs();
+            }, PERSIST_RETRY_MS * persistAttempts[json]);
+          }
+          throw err;
         });
       }).catch(function (err) {
         emitLog({

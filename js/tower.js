@@ -1379,6 +1379,18 @@
     return true;
   }
 
+  /* Tower feed: under-13 or unknown-age viewers (js/age-floor-keywords.js rule)
+     don't see posts that fail the News floor (adult keywords, 18+/21+ markers).
+     Hidden entirely, no placeholder. Fail closed if the helper is missing. */
+  function viewerUnder13() {
+    var floor = window.CognationAgeFloor;
+    return floor && typeof floor.viewerIsUnder13 === "function" ? floor.viewerIsUnder13() : true;
+  }
+
+  function towerPostVisibleToViewer(post) {
+    return !viewerUnder13() || newsPostAppropriate(post);
+  }
+
   function newsProfessionalPosts() {
     var out = [];
     try {
@@ -1693,7 +1705,8 @@
   function renderFeed(root) {
     var list = towerFeedQuery(root, "[data-tower-feed]");
     if (!list) return;
-    var posts = TowerStore.list();
+    list.__ageFloorUnder13 = viewerUnder13();
+    var posts = TowerStore.list().filter(towerPostVisibleToViewer);
     list.innerHTML = "";
     if (!posts.length) {
       list.innerHTML = '<p class="commune-empty">No Feed posts yet — send the first signal.</p>';
@@ -9476,6 +9489,11 @@
     document.addEventListener("cognation:tower-updated", function () {
       renderFeed(root);
     });
+    /* Redraw only when the viewer crosses the under-13 line (age loaded or edited). */
+    document.addEventListener("cognation:member-profile-updated", function () {
+      var list = towerFeedQuery(root, "[data-tower-feed]");
+      if (list && list.__ageFloorUnder13 !== viewerUnder13()) renderFeed(root);
+    });
     document.addEventListener("cognation:remote-profile-loaded", function () {
       renderProfileChrome(root);
       renderFeed(root);
@@ -9916,7 +9934,7 @@
     var want = String(name || "").trim().toLowerCase();
     if (!want) return null;
     var posts = [];
-    try { posts = TowerStore.list() || []; } catch (e) { return null; }
+    try { posts = (TowerStore.list() || []).filter(towerPostVisibleToViewer); } catch (e) { return null; }
     for (var i = 0; i < posts.length; i++) {
       if (String(posts[i].authorName || "").trim().toLowerCase() === want) return posts[i];
     }
@@ -10533,6 +10551,7 @@
   };
   window.CognationTowerIsFounderOwner = isFounderOwner;
   window.CognationTowerNewsPostAppropriate = newsPostAppropriate;
+  window.CognationTowerPostVisibleToViewer = towerPostVisibleToViewer;
   window.CognationTowerApplySide = function (side) {
     document.querySelectorAll("[data-tower-app]").forEach(function (root) {
       applyTowerSide(root, side);

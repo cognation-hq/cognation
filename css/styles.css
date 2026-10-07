@@ -10053,8 +10053,9 @@ body { padding-top: 0 !important; }
   color: #4a2c3a;
   cursor: pointer;
 }
-.news-report-option:hover,
-.news-report-option:focus-visible { background: #FF907D; outline: none; }
+.news-report-option:not(:disabled):hover,
+.news-report-option:not(:disabled):focus-visible { background: #FF907D; outline: none; }
+.news-report-option:disabled { opacity: 0.5; cursor: not-allowed; }
 .news-report-status { font-size: 0.75rem; color: #9a6b7d; }
 
 /* News story comments — react chips ~X chip size only */

@@ -168,6 +168,8 @@ function testCss() {
   var css = fs.readFileSync(path.join(root, "css", "styles.css"), "utf8");
   assert.ok(/\.news-comment-more \{[^}]*position: absolute; top: 0; right: 0; width: 22px; height: 22px;[^}]*color: var\(--cgn-text-muted\);/.test(css), "22px ⋯, top-right, muted token");
   assert.ok(/\.news-report-menu \{/.test(css) && /\.commune-status\.is-error \{/.test(css), "existing menu and error styles reused");
+  assert.ok(/\.news-report-option:disabled \{ opacity: 0\.5; cursor: not-allowed; \}/.test(css), "Reported: same lock as Save/Post");
+  assert.ok(/\.news-report-option:not\(:disabled\):hover,\s*\.news-report-option:not\(:disabled\):focus-visible \{ background: #FF907D;/.test(css), "no hover/focus fill when disabled");
 }
 
 testCss();

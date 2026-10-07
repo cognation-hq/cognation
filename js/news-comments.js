@@ -27,7 +27,8 @@
       var p = JSON.parse(localStorage.getItem("cognation.member.profile.v1") || "null");
       if (p && p.age != null) return parseInt(p.age, 10) || 0;
     } catch (e) {}
-    return 21;
+    /* Unknown age is treated as under-13, so the G/PG floor applies. */
+    return 0;
   }
   function who() {
     var name = "you", kind = "real";

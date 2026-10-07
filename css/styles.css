@@ -11828,9 +11828,81 @@ a.circle-fall-portrait {
   padding-top: 0.12rem !important;
   padding-bottom: 0.15rem !important;
 }
+
 .tower-private-side .paper-rule-block {
   margin: 0 !important;
 }
+
+/* Tower densify — Top friends / Badges / Calendar: arrows off, sections condensed.
+   Same dark shell (Designer look lock). No other Connections chrome. */
+#panel-tower .tower-private-side :is(
+  .tower-private-friends,
+  .tower-private-badges,
+  .tower-private-calendar
+).tower-densify-section > summary.tower-private-theme-summary {
+  list-style: none;
+  cursor: default;
+  padding: 0.18rem 0.35rem 0.1rem !important;
+  font-size: 0.82rem !important;
+  line-height: 1.2 !important;
+}
+#panel-tower .tower-private-side :is(
+  .tower-private-friends,
+  .tower-private-badges,
+  .tower-private-calendar
+).tower-densify-section > summary.tower-private-theme-summary::-webkit-details-marker {
+  display: none;
+}
+#panel-tower .tower-private-side :is(
+  .tower-private-friends,
+  .tower-private-badges,
+  .tower-private-calendar
+).tower-densify-section > summary.tower-private-theme-summary::marker {
+  content: "";
+}
+#panel-tower .tower-private-side :is(
+  .tower-private-friends,
+  .tower-private-badges,
+  .tower-private-calendar
+).tower-densify-section {
+  margin: 0 !important;
+  padding: 0.08rem 0.5rem 0.28rem !important;
+}
+#panel-tower .tower-private-side :is(
+  .tower-private-friends,
+  .tower-private-badges,
+  .tower-private-calendar
+).tower-densify-section .tower-private-theme-body {
+  margin-top: 0.12rem;
+  padding-top: 0;
+  gap: 0.28rem;
+}
+#panel-tower .tower-private-side :is(
+  .tower-private-friends,
+  .tower-private-badges,
+  .tower-private-calendar
+).tower-densify-section .form-hint {
+  margin: 0 0 0.2rem;
+  line-height: 1.25;
+}
+#panel-tower .tower-private-side :is(
+  .tower-private-friends,
+  .tower-private-badges
+).tower-densify-section .tower-friends-save-row {
+  margin-top: 0.28rem !important;
+}
+#panel-tower .tower-private-side .tower-private-badges.tower-densify-section .tower-badge-upload {
+  margin-top: 0.35rem;
+  padding: 0.45rem 0.55rem;
+  gap: 0.28rem;
+}
+#panel-tower .tower-private-side .tower-private-calendar.tower-densify-section .tower-cal-google {
+  margin-top: 0.28rem;
+}
+#panel-tower .tower-private-side .tower-private-calendar.tower-densify-section .tower-cal--compact {
+  font-size: 0.78rem;
+}
+
 
 /* Add event stays short, with black type on a white card. Edit Profile is untouched. */
 #panel-tower .tower-private-calendar .tower-cal-editor {

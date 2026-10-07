@@ -8625,6 +8625,22 @@
     });
   }
 
+
+  /* Top friends / Badges / Calendar densify: no disclosure chrome; stay open. */
+  function initDensifySections(root) {
+    if (!root) return;
+    root.querySelectorAll("details.tower-densify-section").forEach(function (el) {
+      el.open = true;
+      var summary = el.querySelector(":scope > summary");
+      if (!summary || summary.dataset.towerDensifyBound === "1") return;
+      summary.dataset.towerDensifyBound = "1";
+      summary.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        el.open = true;
+      });
+    });
+  }
+
   function initTower(root) {
     if (!root) return;
     var form = towerFeedQuery(root, "[data-tower-compose]");
@@ -8667,6 +8683,7 @@
     initAddProfile(root);
     initFriendsBrowse(root);
     initProfessionalFollowers(root);
+    initDensifySections(root);
     initTowerCalendar(root);
     initGoingLive(root);
 

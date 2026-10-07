@@ -10061,6 +10061,8 @@ body { padding-top: 0 !important; }
 /* News story comments — react chips ~X chip size only */
 .news-story-comments[data-news-comments] { margin-top: 0.45rem; padding-top: 0.35rem; border-top: 1px solid rgba(245, 182, 208, 0.55); }
 .news-story-comments[hidden] { display: none !important; }
+/* Feed posts: the same gap as News before the thread, without the divider line. */
+.tower-post > .news-story-comments[data-news-comments] { border-top: 0; }
 .news-comment-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
 .news-comment-item { font-size: 0.82rem; color: #4a2c3a; }
 /* ⋯ (Report) top-right of each comment; menu reuses .news-report-menu. */

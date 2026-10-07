@@ -39,6 +39,8 @@ function makeDocument() {
     readyState: "interactive",
     createElement: function (t) { return new El(t); },
     querySelectorAll: function (sel) {
+      /* The Feed instance of the same module scans Feed posts; none here. */
+      if (sel === "[data-tower-post]") return [];
       assert.strictEqual(sel, "[data-news-post][data-post-id]");
       return stories.filter(function (a) { return a.getAttribute("data-news-post") !== null && a.getAttribute("data-post-id"); });
     },
@@ -96,7 +98,7 @@ assert.strictEqual(host.getAttribute("data-story-id"), "nat-2026-10-07-mit-for-a
 assert.ok(thread(plain), "every rendered story gets a slot");
 assert.strictEqual(typeof win.CognationNewsComments.mountAll, "function");
 ["cognation:session-started", "cognation:session-ended", "cognation:active-profile-changed"].forEach(function (n) {
-  assert.strictEqual(doc.listenerCount(n), 1, "listens for " + n);
+  assert.strictEqual(doc.listenerCount(n), 2, "listens for " + n + " (News + Feed instances)");
 });
 
 /* Later renders still mount directly (commune path) and do not double-bind. */

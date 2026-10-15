@@ -492,7 +492,7 @@
   }
   function datingAllowed() {
     var age = getMemberAge();
-    return !!(getSeeDating() && age != null && age > 18);
+    return !!(getSeeDating() && age != null && age >= 18);
   }
 
   /* Algorithm Manager — Friends' shares (default on). */
@@ -951,8 +951,43 @@
     if (rec && (rec.audience === "21+" || rec.datingAudience === "21+")) return 21;
     return 18;
   }
+  function accountKindOf(rec) {
+    if (!rec) return "real";
+    var k = String(rec.accountKind || rec.account_kind || "").toLowerCase();
+    if (k === "seed" || k === "ops") return k;
+    if (rec.isSeed || rec.isOpsBot) return rec.isOpsBot ? "ops" : "seed";
+    var fleet = String(rec.seedFleetId || rec.seed_fleet_id || "");
+    if (/^seed-/.test(fleet) || /^seed-/.test(String(rec.handle || ""))) return "seed";
+    if (/^ops-/.test(fleet)) return "ops";
+    return "real";
+  }
+  function viewerAccountKind() {
+    try {
+      var auth = window.CognationAuth && typeof window.CognationAuth.getSession === "function"
+        ? window.CognationAuth.getSession()
+        : null;
+      if (auth) {
+        var ak = String(auth.accountKind || auth.account_kind || "").toLowerCase();
+        if (ak === "seed" || ak === "ops") return ak;
+        if (auth.isSeed) return "seed";
+        var fleet = String(auth.seedFleetId || auth.seed_fleet_id || "");
+        if (/^seed-/.test(fleet) || /^seed-/.test(String(auth.username || ""))) return "seed";
+        if (/^ops-/.test(fleet)) return "ops";
+      }
+    } catch (eKind) {}
+    return accountKindOf(viewerPersonal());
+  }
+  /* Seeds match seed↔seed only (never real). Real viewers see real only. */
+  function datingKindsCompatible(rec) {
+    var viewerKind = viewerAccountKind();
+    var otherKind = accountKindOf(rec);
+    var viewerSeedish = viewerKind === "seed" || viewerKind === "ops";
+    var otherSeedish = otherKind === "seed" || otherKind === "ops";
+    return viewerSeedish === otherSeedish;
+  }
   function viewerCanSeeDating(rec) {
     if (!datingAllowed() || !datingOptIn(rec) || !isLocal(rec)) return false;
+    if (!datingKindsCompatible(rec)) return false;
     var photo = profilePhoto(rec);
     if (!photo) return false;
     var age = getMemberAge();
@@ -1724,7 +1759,8 @@
   function mapChatRoomError(err) {
     var text = chatErrorText(err);
     var codes = [
-      ["under_13", "Chat rooms are for members 13+. Update your birth year and month in your profile."],
+      ["no_birth", "Add your birth year and month in your profile to join chat rooms"],
+      ["under_13", "Chat rooms are for members 13 and up."],
       ["rating_blocked", "This room's rating is not available for your account."],
       ["blocked", "You can't join this room because of a block."],
       ["room_full", "This room is full (12 people). Try another room or come back later."],

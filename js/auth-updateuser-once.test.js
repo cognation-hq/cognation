@@ -94,7 +94,7 @@ pageLoad(seedServer, SEED, null).then(function (puts) {
   assert.ok(puts.length <= 1, "fresh seed page load: at most one PUT /auth/v1/user (got " + puts.length + ")");
   assert.strictEqual(puts.length, 1, "seed defaults are written once");
   assert.strictEqual(puts[0].see_dating, true);
-  assert.strictEqual(puts[0].member_age, 28);
+  assert.strictEqual(puts[0].member_age, 22);
   /* Reload: server now matches local -> zero PUTs. */
   return pageLoad(seedServer, SEED, null);
 }).then(function (puts) {

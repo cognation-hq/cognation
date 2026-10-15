@@ -2,7 +2,7 @@
  * Sage (seed-0248) is the under-13 test viewer. isU13TestViewer() needs all
  * three of: account_kind 'seed' (profiles row or app_metadata), seed_fleet_id
  * 'seed-0248', user_metadata.test_role 'u13-viewer'. It is false on any missing
- * data and only ever restricts: no age-28 default, no prefs PUT, no under-18
+ * data and only ever restricts: no age-22 default, no prefs PUT, no under-18
  * raise, and she is left out of member lists and the Tower feed.
  * Run: node js/u13-test-seed-exemption.test.js
  */
@@ -144,7 +144,7 @@ function testSageNoAdultDefaultsNoPut() {
   rerenders(w, 10);
   return settle(700).then(function () {
     assert.strictEqual(w.calls.puts.length, 0, "Sage: no PUT /auth/v1/user (got " + w.calls.puts.length + ")");
-    assert.strictEqual(w.win.CognationCommuneSwipe.getMemberAge(), 11, "Sage keeps age 11, not the age-28 default");
+    assert.strictEqual(w.win.CognationCommuneSwipe.getMemberAge(), 11, "Sage keeps age 11, not the age-22 default");
     assert.strictEqual(w.win.CognationU13TestViewer.isU13TestViewer(), true);
     var bios = w.calls.queries.filter(function (q) { return /account_kind=eq\.seed/.test(q); });
     assert.ok(bios.length > 0, "seed bios list was fetched");
@@ -161,7 +161,7 @@ function testSeedWithoutTestRoleStillGetsDefaults() {
   setTimeout(function () { w.doc.dispatchEvent(new CustomEvent("cognation:session-started")); }, 5);
   rerenders(w, 6);
   return settle(700).then(function () {
-    assert.strictEqual(w.win.CognationCommuneSwipe.getMemberAge(), 28, "non-test seed still gets age 28");
+    assert.strictEqual(w.win.CognationCommuneSwipe.getMemberAge(), 22, "non-test seed still gets age 22");
     assert.strictEqual(w.calls.puts.length, 1, "non-test seed still saves defaults once");
   });
 }
@@ -172,7 +172,7 @@ function testCommuneAliveSkipsDefault() {
     assert.strictEqual(isSage, true);
     w.load("js/seedops-commune-alive.js");
     w.win.CognationSeedOpsCommuneAlive.ensureMemberProfile();
-    assert.strictEqual(w.win.CognationCommuneSwipe.getMemberAge(), null, "commune-alive: no age-28 default for Sage");
+    assert.strictEqual(w.win.CognationCommuneSwipe.getMemberAge(), null, "commune-alive: no age-22 default for Sage");
     var other = world({ session: Object.assign({}, SAGE_SESSION, { supabaseUserId: "u-x" }), user: { id: "u-x", user_metadata: {} }, row: null });
     other.load("js/seedops-commune-alive.js");
     /* Signed in but not loaded yet: "not loaded" is not "not Sage", so no default yet. */
@@ -180,7 +180,7 @@ function testCommuneAliveSkipsDefault() {
     assert.strictEqual(other.win.CognationCommuneSwipe.getMemberAge(), null, "commune-alive: no default before the login data loads");
     return other.win.CognationU13TestViewer.ready().then(function () {
       other.win.CognationSeedOpsCommuneAlive.ensureMemberProfile();
-      assert.strictEqual(other.win.CognationCommuneSwipe.getMemberAge(), 28, "commune-alive: default unchanged for others once loaded");
+      assert.strictEqual(other.win.CognationCommuneSwipe.getMemberAge(), 22, "commune-alive: default unchanged for others once loaded");
     });
   });
 }

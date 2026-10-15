@@ -17,10 +17,30 @@
 
   var LOG_CHANNEL = "dating-hydrate";
   var BOOT_FLAG = "cognation.seedops.datingHydrate.v1";
+
+  /* Deterministic seed age from fleet id (matches 20261016_seed_birth_backfill.sql).
+     Ages 13..26; seed-0248 is the under-13 test viewer (age 11) until removed. */
+  function seedAgeFromFleetId(fleetId) {
+    var m = /^seed-(\d{4})$/.exec(String(fleetId || ""));
+    if (!m) return null;
+    var nnn = parseInt(m[1], 10);
+    if (nnn === 248) return 11;
+    if (!nnn || nnn < 1) return null;
+    return 13 + ((nnn - 1) % 14);
+  }
+  /* Most seeds aged 18–26 date on (nnn % 5 !== 0); 13–17 off. */
+  function seedDatingOn(fleetId, age) {
+    var m = /^seed-(\d{4})$/.exec(String(fleetId || ""));
+    if (!m) return false;
+    var nnn = parseInt(m[1], 10);
+    if (!(age >= 18 && age <= 26)) return false;
+    return nnn % 5 !== 0;
+  }
+
   var DEMO_CITY = "Demo City";
   var DEMO_STATE = "Demo";
   var DEMO_COUNTRY = "United States";
-  var DEMO_AGE = 28;
+  var DEMO_AGE = 22; /* within seed ages 13–26 */
   var FETCH_LIMIT = 100; /* covers the ~79 enriched bios; hard cap below */
   var HARD_CAP = 250;
   var INTEREST_DEFAULT = ["tech", "mental health", "jobs", "insurance", "gamers"];
@@ -317,17 +337,25 @@
       rec.bio = String(rec.bio).trim().slice(0, 280);
     }
     var fleet = String(rec.seedFleetId || "");
+    var mappedAge = seedAgeFromFleetId(fleet);
+    if (mappedAge != null) rec.age = mappedAge;
+    else if (!rec.age) rec.age = 22 + (Math.abs(Number(index) || 0) % 14); /* stay in 13–26 */
+    var ageNum = parseInt(rec.age, 10);
+    var datingOn = seedDatingOn(fleet, ageNum);
     if (viewerFleet && fleet && fleet === viewerFleet) {
       rec.datingEnabled = false;
       rec.datingContent = false;
       rec.showDatingContent = false;
-    } else {
+    } else if (datingOn) {
       rec.datingEnabled = true;
       rec.datingContent = true;
       rec.showDatingContent = true;
       rec.datingMinAge = rec.datingMinAge || 18;
+    } else {
+      rec.datingEnabled = false;
+      rec.datingContent = false;
+      rec.showDatingContent = false;
     }
-    if (!rec.age) rec.age = 22 + (Math.abs(Number(index) || 0) % 20);
     if (!rec.avatarDataUrl && !rec.photo && !rec.avatarUrl) {
       rec.avatarDataUrl = svgAvatar(rec.displayName || "S", index);
     }
@@ -610,8 +638,8 @@
         /* Warm the test-viewer check (profile row) for the other readers; no wait. */
         if (u13() && typeof u13().ready === "function") u13().ready();
         var prefs = prefsFromMetadata(meta);
-        /* Age-28 etc. only once the metadata is in and has no test_role
-           (Sage always has it), so the age never reads 28 for her. */
+        /* Adult demo age only once the metadata is in and has no test_role
+           (Sage always has it), so the age never reads the adult default for her. */
         var defaultsOk = seedish && !!meta && !metaHasTestRole(meta) && !isU13TestViewer();
         applyViewerPrefs(prefs, { seedDefaults: defaultsOk });
         if (!seedish && !opts.forceBios) {
@@ -736,6 +764,8 @@
     prefsFromMetadata: prefsFromMetadata,
     applyViewerPrefs: applyViewerPrefs,
     isSeedOrOpsSession: isSeedOrOpsSession,
+    seedAgeFromFleetId: seedAgeFromFleetId,
+    seedDatingOn: seedDatingOn,
     datingBiosReady: datingBiosReady,
     ensureDatingContent: ensureDatingContent,
   };

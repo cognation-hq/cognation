@@ -206,7 +206,7 @@ function testFailingPutCapped() {
     assert.ok(puts.length <= 2, "failing PUT: at most 2 per load (got " + puts.length + ")");
     assert.strictEqual(puts.length, 2, "one retry after the first failure");
     assert.strictEqual(JSON.stringify(puts[0].data), JSON.stringify(puts[1].data), "retry is the same value");
-    assert.strictEqual(puts[0].data.member_age, 28, "seedDefaults age 28 is the value that was written");
+    assert.strictEqual(puts[0].data.member_age, 22, "seedDefaults age 22 is the value that was written");
     assert.ok(puts[1].at - puts[0].at >= 2000 / SCALE - 20, "retry waits for the backoff");
   });
 }
@@ -228,13 +228,13 @@ function testRealChangeWritesOnce() {
 }
 
 function testUnchangedSeedDefaultsNoPut() {
-  /* seedDefaults (age 28 + demo place/interests) already on the server: no PUT. */
-  var meta = { see_dating: true, member_age: 28, member_city: "Demo City", member_state: "Demo", member_country: "United States",
+  /* seedDefaults (age 22 + demo place/interests) already on the server: no PUT. */
+  var meta = { see_dating: true, member_age: 22, member_city: "Demo City", member_state: "Demo", member_country: "United States",
     member_interests: ["tech", "mental health", "jobs", "insurance", "gamers"] };
   var script = [];
   for (var i = 1; i <= 10; i++) script.push(at(i * 60, function (s, d, rerender) { rerender(); }));
   return pageLoad({ meta: meta }, SEED, null, script).then(function (puts) {
-    assert.strictEqual(puts.length, 0, "age 28 already saved: no PUT (got " + puts.length + ")");
+    assert.strictEqual(puts.length, 0, "age 22 already saved: no PUT (got " + puts.length + ")");
   });
 }
 

@@ -17,7 +17,7 @@ assert.ok(/join_chat_room/.test(src), "joins via RPC");
 assert.ok(/leave_chat_room/.test(src), "leaves via RPC");
 assert.ok(/post_chat_room_message/.test(src), "posts via RPC");
 assert.ok(/chat_room_messages/.test(src), "reads messages via rest");
-assert.ok(/under_13/.test(src) && /room_full/.test(src) && /rating_blocked/.test(src), "surfaces server errors");
+assert.ok(/under_13/.test(src) && /no_birth/.test(src) && /room_full/.test(src) && /rating_blocked/.test(src), "surfaces server errors");
 assert.ok(/blocked/.test(src) && /not_a_member/.test(src), "surfaces block + membership errors");
 assert.ok(/Enter room \(local demo\)/.test(src), "demo Enter label kept for fallback");
 assert.ok(/Live group chat — up to 12/.test(src), "live Enter meta");

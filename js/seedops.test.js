@@ -465,12 +465,12 @@ aliveWin.CognationAuth.getSession = function () {
 })();
 var alive = aliveWin.CognationSeedOpsCommuneAlive;
 assert.ok(alive, "CognationSeedOpsCommuneAlive exports");
-assert.strictEqual(alive.DEMO_AGE, 28);
+assert.strictEqual(alive.DEMO_AGE, 22);
 assert.strictEqual(alive.DEMO_CITY, "Demo City");
 assert.ok(alive.isSeedOrOpsSession());
 var boot = alive.bootstrap({ force: true, count: 12 });
 assert.ok(boot.ok, "bootstrap ok: " + JSON.stringify(boot));
-assert.strictEqual(boot.memberAge, 28);
+assert.strictEqual(boot.memberAge, 22);
 assert.strictEqual(boot.memberCity, "Demo City");
 assert.ok(boot.materialized >= 12, "materialized dating sample");
 assert.ok(boot.datingProfiles >= 12, "dating profiles flagged");
@@ -509,12 +509,12 @@ win.document = {
   addEventListener: function () {},
 };
 win.CognationCommuneSwipe = {
-  _age: 28,
+  _age: 22,
   _open: "",
   getMemberAge: function () { return this._age; },
   getMemberProfile: function () { return { age: this._age }; },
   setMemberProfile: function (p) {
-    if (p && p.age != null) this._age = parseInt(p.age, 10) || 28;
+    if (p && p.age != null) this._age = parseInt(p.age, 10) || 22;
   },
   classroomCatalog: function () {
     return [
@@ -590,10 +590,17 @@ var hydrateWin = {
     rest: function () {
       return Promise.resolve([
         {
+          id: "srv-6",
+          seed_fleet_id: "seed-0006",
+          display_name: "Andre",
+          bio: "Weekend farmer-market regular. Dogs welcome.",
+          account_kind: "seed",
+        },
+        {
           id: "srv-2",
           seed_fleet_id: "seed-0002",
           display_name: "Aisha",
-          bio: "Weekend farmer-market regular. Dogs welcome.",
+          bio: "Quiet library mornings.",
           account_kind: "seed",
         },
         {
@@ -675,16 +682,26 @@ hydrateWin.CognationCommuneSwipe = {
   assert.strictEqual(fromMeta.age, 29);
   var merged = api.mergeServerBios([
     {
+      id: "srv-6",
+      seed_fleet_id: "seed-0006",
+      display_name: "Andre",
+      bio: "Weekend farmer-market regular. Dogs welcome.",
+    },
+    {
       id: "srv-2",
       seed_fleet_id: "seed-0002",
       display_name: "Aisha",
-      bio: "Weekend farmer-market regular. Dogs welcome.",
+      bio: "Quiet library mornings.",
     },
   ]);
-  assert.ok(merged.ok && merged.merged === 1, "merge bios");
-  var rec = hydrateWin.CognationAccounts.getProfileById("prof-seed-0002");
-  assert.ok(rec && rec.datingContent, "dating opt-in after merge");
+  assert.ok(merged.ok && merged.merged === 2, "merge bios");
+  var rec = hydrateWin.CognationAccounts.getProfileById("prof-seed-0006");
+  assert.ok(rec && rec.datingContent, "dating opt-in after merge for age-18 seed");
   assert.strictEqual(rec.bio, "Weekend farmer-market regular. Dogs welcome.");
+  assert.strictEqual(rec.age, 18, "fleet map age 18 for seed-0006");
+  var young = hydrateWin.CognationAccounts.getProfileById("prof-seed-0002");
+  assert.ok(young && !young.datingContent, "dating off for age-14 seed");
+  assert.strictEqual(young.age, 14, "fleet map age 14 for seed-0002");
   assert.ok(rec.avatarDataUrl && rec.avatarDataUrl.indexOf("data:image/svg") === 0, "svg avatar");
   assert.ok(typeof api.datingBiosReady === "function", "datingBiosReady export");
   assert.ok(typeof api.ensureDatingContent === "function", "ensureDatingContent export");
@@ -711,7 +728,7 @@ hydrateWin.CognationCommuneSwipe = {
   api.hydrate({ force: false }).then(function (staleOut) {
     assert.ok(staleOut && staleOut.ok, "stale cache rehydrate ok " + JSON.stringify(staleOut));
     assert.ok(!staleOut.cached, "stale cache must not short-circuit");
-    var revived = hydrateWin.CognationAccounts.getProfileById("prof-seed-0002");
+    var revived = hydrateWin.CognationAccounts.getProfileById("prof-seed-0006");
     assert.ok(revived && revived.datingContent, "dating opt-in revived");
     assert.ok(String(revived.bio || "").trim().length > 0, "dating Card 1 bio revived");
     return api.ensureDatingContent({ minCount: 1 });

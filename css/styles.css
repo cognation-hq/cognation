@@ -4486,8 +4486,9 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .tower-social-btn--venmo { background: #008cff; color: #fff; border-color: #0074d4; }
 
 .tower-social-btn--linktree { background: #43e55e; color: #111; border-color: #2ecc71; }
-/* Pro "Hire me / Buy an ad": owner-set outbound link, a text pill, not a logo. */
-.tower-social-btn--hire.is-cta { background: #f4f1ff; color: #1c1630; border-color: #8e7cff; border-radius: 999px; padding: 0.35rem 0.9rem; width: auto; font-weight: 600; white-space: nowrap; }
+/* Pro money links (Venmo, Pay for services, Buy ads): quiet secondary buttons in the muted widget chrome. */
+.tower-social-btn.is-quiet { background: transparent; color: var(--cgn-text-muted); border: 1px solid var(--cgn-border); border-radius: 0.5rem; padding: 0.3rem 0.75rem; width: auto; height: auto; font-size: 0.8rem; font-weight: 400; white-space: nowrap; }
+.tower-social-btn.is-quiet:hover, .tower-social-btn.is-quiet:focus-visible { color: inherit; }
 
 /* Cap 250: circular company logo buttons (each saved URL = its own link) */
 .tower-social-btn.is-logo {

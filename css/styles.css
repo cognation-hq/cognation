@@ -9500,8 +9500,8 @@ body { padding-top: 0 !important; }
   margin: 0;
   padding: 20px;
   box-sizing: border-box;
-  /* SIGNAL Feed empty: dark glass, readable light text (AA). No black border. */
-  background: rgba(16, 19, 48, 0.42);
+  /* SIGNAL Feed empty: SOLID dark panel, readable light text (AA). No black border. */
+  background: #101330; /* SOLID (opaque) dark panel, no glass over pink */
   border: 1px solid rgba(209, 241, 255, 0.28);
   border-radius: 1.15rem;
   color: var(--cgn-text, #f7f9ff);
@@ -9510,11 +9510,18 @@ body { padding-top: 0 !important; }
   text-shadow: none;
 }
 #panel-signal .signal-feed-host .tower-feed[data-tower-feed] .commune-empty {
-  background: rgba(16, 19, 48, 0.42);
+  background: #101330; /* SOLID (opaque) */
   border: 1px solid rgba(209, 241, 255, 0.28);
   border-radius: 1.15rem;
   color: var(--cgn-text, #f7f9ff);
   padding: 20px;
+}
+/* SIGNAL Feed EMPTY only: outer host frame goes solid dark too (no pale #fff5f9 box). */
+#panel-signal .signal-feed-host:has(.tower-feed[data-tower-feed] .commune-empty) {
+  --tower-private-bg: #0b0d24;
+  --tower-private-text: #f7f9ff;
+  background: #0b0d24;
+  color: #f7f9ff;
 }
 .tower-friends-browse,
 .tower-friends-browse-note,

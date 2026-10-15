@@ -11353,6 +11353,9 @@
         spot.textContent = String(person.name).trim().charAt(0).toUpperCase() || "?";
         spot.setAttribute("aria-label", person.name);
         if (person.userId) spot.setAttribute("data-circle-person", person.userId);
+        /* Real friend photo (profiles.photo_url); no photo or a bad URL keeps the letter. */
+        var photoApi = window.CognationProfilePhoto;
+        if (person.photoUrl && photoApi && typeof photoApi.applyPhoto === "function") photoApi.applyPhoto(spot, person.photoUrl);
       } else {
         spot.classList.add("is-empty");
         spot.classList.remove("is-filled");

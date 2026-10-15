@@ -110,6 +110,16 @@ assert.ok(/\[data-tower-app\]:not\(\[data-tower-is-owner="true"\]\) \[data-tower
 assert.ok(/data-tower-followers-find/.test(html), "Search followers box in markup");
 assert.ok(/input\.hidden = false;/.test(tower) && !/searchOwner/.test(tower) && /shownEdges = edges\.filter/.test(tower), "Search followers shows for owner and visitors on Professional, and filters");
 
+/* Owner edit: myProfiles / _userId match; Tower tab returns home; Add a professional page in Edit profile */
+assert.ok(/getMyProfiles/.test(tower) && /profile\._userId/.test(tower), "owner check matches myProfiles and server user id");
+assert.ok(/window\.CognationTowerOpenOwn = function/.test(tower), "CognationTowerOpenOwn returns to own Tower");
+assert.ok(/name === "tower" && typeof window\.CognationTowerOpenOwn === "function"/.test(fs.readFileSync(path.join(__dirname, "tabs.js"), "utf8")), "Tower tab click opens own Tower");
+assert.ok(/data-tower-add-profile/.test(html) && /Add a professional page/.test(html), "Add a professional page in Edit profile markup");
+assert.ok(/btn\.textContent = "Add a professional page"/.test(tower), "Add a professional page button label");
+assert.ok(/if \(!anyDragged\) return null;/.test(tower), "never-dragged layouts use default grid (no overlap)");
+assert.ok(/var handleHit = ev\.target\.closest\("\[data-tower-sticker-handle\]"\);/.test(tower), "sticker handle starts a drag");
+assert.ok(/_userId: profile\.user_id \|\| ""/.test(fs.readFileSync(path.join(__dirname, "supabase-social.js"), "utf8")), "remote Tower profile carries user id for owner check");
+
 /* ---- Tower widget drag (from #127), run in its own scope ---- */
 (function () {
 /**
@@ -189,7 +199,7 @@ function ownerDrag(t, env, id, dxPct, dyPct, p) {
   sticker.setAttribute("data-sticker-y", String(sy + dyPct));
   var layout = t.getWidgetLayout(p) || {};
   t.freeze(env.root, layout); /* drop */
-  layout[id] = { x: sx + dxPct, y: sy + dyPct, z: 9, tilt: 0 };
+  layout[id] = { x: sx + dxPct, y: sy + dyPct, z: 9, tilt: 0, dragged: true };
   p.widgetLayout = layout;
   return { sx: sx, sy: sy };
 }
@@ -227,10 +237,11 @@ Object.keys(PAGES).forEach(function (kind) {
 /* Broken 0,0 pile-up resets to the default grid. */
 var tr = load();
 assert.strictEqual(tr.getWidgetLayout({ widgetLayout: { avatar: { x: 0, y: 0 }, identity: { x: 0, y: 0 }, music: { x: 0, y: 0 }, calendar: { x: 40, y: 30 } } }), null, "0,0 pile-up resets");
-assert.ok(tr.getWidgetLayout({ widgetLayout: { avatar: { x: 0, y: 0 }, calendar: { x: 40, y: 30 } } }), "one widget at 0,0 is a real layout");
+assert.strictEqual(tr.getWidgetLayout({ widgetLayout: { avatar: { x: 0, y: 0 }, calendar: { x: 40, y: 30, dragged: true } } }).calendar.x, 40, "one dragged widget at a free spot is a real layout");
+assert.strictEqual(tr.getWidgetLayout({ widgetLayout: { avatar: { x: 0, y: 0 }, calendar: { x: 40, y: 30 } } }), null, "never-dragged layout uses default grid");
 
 /* Wiring in the real handler / store (static, so a refactor that drops it fails). */
-var down = grab("      /* Drag from anywhere on the sticker.", "    stage.addEventListener(\"pointerdown\", onPointerDown);");
+var down = grab("      /* Drag from anywhere on the sticker", "    stage.addEventListener(\"pointerdown\", onPointerDown);");
 assert.ok(/dragStarted = true;\s*\n\s*if \(liftDefaultGrid\(stage\)\)/.test(down), "drag start lifts the default grid");
 assert.ok(/if \(!dragStarted\) \{[^}]*return;/.test(down), "no save when the pointer never dragged");
 assert.ok(/freezeSpawnedWidgets\(root, layout\)/.test(down) && /TowerProfileStore\.save\(p, \{ geometry: true \}\)/.test(down), "drop freezes others and saves geometry");
@@ -299,7 +310,9 @@ assert.strictEqual(ctx.getWidgetLayout(withLayout(personal, dragged)), dragged, 
 var proDrag = { youtube: { x: 20, y: 20, dragged: true }, calendar: { x: 22, y: 24, dragged: true } };
 assert.strictEqual(ctx.getWidgetLayout(withLayout(pro, proDrag)), proDrag, "drag-made overlap kept (Pro)");
 var spread = { avatar: { x: 2, y: 3 }, identity: { x: 30, y: 3 }, calendar: { x: 60, y: 40 } };
-assert.strictEqual(ctx.getWidgetLayout(withLayout(personal, spread)), spread, "normal layout kept");
+assert.strictEqual(ctx.getWidgetLayout(withLayout(personal, spread)), null, "never-dragged spread uses default grid (no overlap)");
+var spreadDrag = { avatar: { x: 2, y: 3 }, identity: { x: 30, y: 3 }, calendar: { x: 60, y: 40, dragged: true } };
+assert.strictEqual(ctx.getWidgetLayout(withLayout(personal, spreadDrag)), spreadDrag, "layout with an owner drag is kept");
 
 /* MP3 is Personal only (Alexa, Oct 7); YouTube stays on Pro. */
 assert.ok(ctx.SPAWN_ROWS.professional.every(function (r) { return r.indexOf("music") < 0; }), "Pro spawn has no music");

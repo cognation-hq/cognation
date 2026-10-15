@@ -158,6 +158,7 @@
     return {
       _profileId: profile.id,
       _profileKind: profile.kind,
+      _userId: profile.user_id || "",
       _remote: true,
       displayName: profile.display_name,
       handle: profile.handle,

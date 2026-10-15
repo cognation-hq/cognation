@@ -2345,6 +2345,29 @@
     ) {
       return true;
     }
+    /* Same Cognation account owns every face (Personal + Professional). Match by
+       server user id or myProfiles so a stale activeProfileId / handle mismatch
+       (e.g. seed-0003 vs seed-alex-0003) never locks the owner out. */
+    if (
+      remoteSession &&
+      remoteSession.source === "supabase" &&
+      remoteSession.supabaseUserId
+    ) {
+      if (
+        profile._userId &&
+        String(profile._userId) === String(remoteSession.supabaseUserId)
+      ) {
+        return true;
+      }
+      var socialOwn = remoteSocial();
+      if (socialOwn && typeof socialOwn.getMyProfiles === "function") {
+        var mineRemote = socialOwn.getMyProfiles() || [];
+        var pidOwn = String(profile._profileId || "");
+        for (var mi = 0; mi < mineRemote.length; mi++) {
+          if (mineRemote[mi] && String(mineRemote[mi].id) === pidOwn) return true;
+        }
+      }
+    }
     var user = getSessionUsername();
     if (!user) return false;
     if (window.CognationAccounts) {
@@ -5281,6 +5304,14 @@
     /* Old saved Pro layouts may still carry the MP3 spot: it never shows on Pro,
        so it never counts toward a pile. */
     if (isAutoPileLayout(layout, isProTower(p) ? { music: true } : null)) return null;
+    /* Never-dragged layouts (factory defaults, old absolute scrapbooks) use the
+       CSS grid so the default spawn never overlaps. A real owner drop marks
+       dragged: true; companions frozen beside it keep their spots. */
+    var anyDragged = false;
+    Object.keys(layout).forEach(function (id) {
+      if (layout[id] && layout[id].dragged === true) anyDragged = true;
+    });
+    if (!anyDragged) return null;
     return layout;
   }
 
@@ -6983,7 +7014,7 @@
     }
     btn.hidden = false;
     if (!hasPro) {
-      btn.textContent = "Add professional page";
+      btn.textContent = "Add a professional page";
       btn.setAttribute("data-add-kind", "professional");
     } else {
       btn.textContent = "Add personal page";
@@ -8330,11 +8361,18 @@
         return;
       }
 
-      /* Drag from anywhere on the sticker. Real controls keep their clicks. */
-      if (ev.target.closest("a, button, input, textarea, select, label, summary, iframe, [contenteditable='true'], [data-tower-rotate], [data-tower-avatar-resize], [data-tower-name-resize], [data-tower-emoji-resize], [data-tower-polaroid-resize], [data-tower-youtube-resize]")) {
+      /* Drag from anywhere on the sticker (including the move handle). Real
+         controls keep their clicks; the handle is the move affordance. */
+      var handleHit = ev.target.closest("[data-tower-sticker-handle]");
+      if (
+        !handleHit &&
+        ev.target.closest("a, button, input, textarea, select, label, summary, iframe, [contenteditable='true'], [data-tower-rotate], [data-tower-avatar-resize], [data-tower-name-resize], [data-tower-emoji-resize], [data-tower-polaroid-resize], [data-tower-youtube-resize]")
+      ) {
         return;
       }
-      var sticker = ev.target.closest("[data-tower-widget]");
+      var sticker = handleHit
+        ? handleHit.closest("[data-tower-widget]")
+        : ev.target.closest("[data-tower-widget]");
       if (!sticker || !stage.contains(sticker)) return;
       var wid = sticker.getAttribute("data-tower-widget");
       if (wid === "feed" || wid === "messages") return;
@@ -11423,6 +11461,47 @@
       }
       return [];
     }
+  };
+
+  /* Return to the signed-in account's own Tower (clears a friend deep-link). */
+  window.CognationTowerOpenOwn = function () {
+    var session = getSessionObject();
+    var social = remoteSocial();
+    var ownHandle = session && session.profileHandle
+      ? normalizeHandle(session.profileHandle)
+      : "";
+    if (!ownHandle && social && typeof social.getMyProfiles === "function") {
+      var mine = social.getMyProfiles() || [];
+      var active = session && session.activeProfileId ? String(session.activeProfileId) : "";
+      var hit = null;
+      for (var i = 0; i < mine.length; i++) {
+        if (active && String(mine[i].id) === active) { hit = mine[i]; break; }
+      }
+      if (!hit) hit = mine[0];
+      if (hit && hit.handle) ownHandle = normalizeHandle(hit.handle);
+    }
+    var slug = normalizeHandle(towerProfileSlug());
+    if (slug && ownHandle && slug !== ownHandle) {
+      try {
+        if (window.history && typeof window.history.replaceState === "function") {
+          window.history.replaceState(null, "", (location.pathname || "/") + (location.search || ""));
+        } else {
+          location.hash = ownHandle ? "tower-profile-" + ownHandle : "";
+        }
+      } catch (eClear) {
+        try { location.hash = ownHandle ? "tower-profile-" + ownHandle : ""; } catch (e2) {}
+      }
+    }
+    document.querySelectorAll("[data-tower-app]").forEach(function (root) {
+      var side = readStoredTowerSide() || "public";
+      if (hashRequestsPublicSide()) side = "public";
+      applyTowerSide(root, side);
+      renderProfileChrome(root);
+      syncProfileKindToggle(root);
+      syncAddProfileUi(root);
+    });
+    document.dispatchEvent(new CustomEvent("cognation:tower-view-changed"));
+    return true;
   };
 
   window.CognationTowerOpenProfile = function (handle) {

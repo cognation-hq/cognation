@@ -36,6 +36,10 @@
       try {
         var tab = tabs[index];
         var name = String((tab && tab.id) || "").replace(/^tab-/, "");
+        /* Tower tab while on a friend deep-link: return to the signed-in own Tower. */
+        if (name === "tower" && typeof window.CognationTowerOpenOwn === "function") {
+          try { window.CognationTowerOpenOwn(); } catch (eOwn) {}
+        }
         document.dispatchEvent(new CustomEvent("cognation:tab-change", { detail: { tab: name } }));
       } catch (e) {}
     }

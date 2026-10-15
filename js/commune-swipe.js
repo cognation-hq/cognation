@@ -513,20 +513,51 @@
     emit("cognation:see-friend-shares-changed", { seeFriendShares: next });
   }
 
+  /* Tag learning is sandboxed: seed swipes never feed individual real users' tag
+     counts and vice versa. A shared aggregate trending/topic signal for ECHO does
+     not exist yet — do not invent one here; when Eng adds it, seed swipes may
+     contribute aggregate-only counts. */
+  function learnSandbox() {
+    var st = resolveViewerSeedStatus();
+    if (st === true) return "seed";
+    if (st === false) return "real";
+    return null; /* unknown — do not learn into either pool */
+  }
   function learnDoc() {
-    var doc = readJson(localStorage, LEARN_KEY, null);
-    if (!doc || typeof doc !== "object" || Array.isArray(doc)) {
-      doc = { confirmed: {}, left: {} };
+    var box = learnSandbox();
+    if (!box) return { confirmed: {}, left: {} };
+    var raw = readJson(localStorage, LEARN_KEY, null);
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) raw = {};
+    /* Legacy flat {confirmed,left} → real sandbox only. */
+    if (raw.confirmed || raw.left) {
+      if (!raw.real && !raw.seed) {
+        raw = { real: { confirmed: raw.confirmed || {}, left: raw.left || {} }, seed: { confirmed: {}, left: {} } };
+      }
     }
+    if (!raw.real || typeof raw.real !== "object") raw.real = { confirmed: {}, left: {} };
+    if (!raw.seed || typeof raw.seed !== "object") raw.seed = { confirmed: {}, left: {} };
+    var doc = raw[box] || { confirmed: {}, left: {} };
     if (!doc.confirmed || typeof doc.confirmed !== "object") doc.confirmed = {};
     if (!doc.left || typeof doc.left !== "object") doc.left = {};
     return doc;
   }
   function writeLearnDoc(doc) {
-    writeJson(localStorage, LEARN_KEY, {
-      confirmed: doc.confirmed || {},
-      left: doc.left || {},
-    });
+    var box = learnSandbox();
+    if (!box) return; /* unknown: never write tags */
+    var raw = readJson(localStorage, LEARN_KEY, null);
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) raw = {};
+    if (raw.confirmed || raw.left) {
+      if (!raw.real && !raw.seed) {
+        raw = { real: { confirmed: raw.confirmed || {}, left: raw.left || {} }, seed: { confirmed: {}, left: {} } };
+      }
+    }
+    if (!raw.real || typeof raw.real !== "object") raw.real = { confirmed: {}, left: {} };
+    if (!raw.seed || typeof raw.seed !== "object") raw.seed = { confirmed: {}, left: {} };
+    raw[box] = {
+      confirmed: (doc && doc.confirmed) || {},
+      left: (doc && doc.left) || {},
+    };
+    writeJson(localStorage, LEARN_KEY, raw);
   }
   function cardInterestTags(card) {
     var tags = terms(card && card.interests);
@@ -572,8 +603,10 @@
 
   /* Server truth for seed/real (ECHO friend shares). Client accountKind/isSeed/
      seedFleetId/handle are NOT trusted — live seeds often lack them. Cache is
-     filled from cognation_am_i_seed() and profiles.account_kind. Fail closed:
-     unknown → treat as seed (do not write a share; hide share cards). */
+     filled from cognation_am_i_seed() and profiles.account_kind.
+     Seed sandbox: known seeds write shares + learn their own tags; those shares
+     (and mutual-share lines) show only to seed viewers. Real/unknown viewers
+     fail closed — nothing from seeds reaches their ECHO/PULSE/tags/PYMK. */
   var viewerSeedStatus = null; /* null unknown | true seed/ops | false real */
   var profileSeedById = {}; /* profileId → true|false */
 
@@ -655,10 +688,33 @@
       .catch(function () {});
   }
 
+  function demoSessionLooksReal() {
+    try {
+      var auth = window.CognationAuth && typeof window.CognationAuth.getSession === "function"
+        ? window.CognationAuth.getSession()
+        : null;
+      if (auth && auth.source === "demo") return true;
+      var raw = null;
+      try { raw = localStorage.getItem("cognation.session.v2"); } catch (eLs) {}
+      var sess = raw ? JSON.parse(raw) : null;
+      return !!(sess && sess.source === "demo");
+    } catch (eDemo) {
+      return false;
+    }
+  }
+
+  function resolveViewerSeedStatus() {
+    if (viewerSeedStatus === true || viewerSeedStatus === false) return viewerSeedStatus;
+    /* Local demo has no cognation_am_i_seed — treat as real so ECHO works.
+       Signed-in unknown stays null (fail closed). */
+    if (demoSessionLooksReal()) return false;
+    return null;
+  }
+
   function viewerIsSeedOrOps() {
-    /* Fail closed: unknown counts as seed so we never write a share. */
-    if (viewerSeedStatus === false) return false;
-    if (viewerSeedStatus === true) return true;
+    var st = resolveViewerSeedStatus();
+    /* Fail closed: unknown counts as seedish for gates that ask "are you seed?" */
+    if (st === false) return false;
     return true;
   }
 
@@ -1181,7 +1237,11 @@
   }
 
   function peopleYouMayKnow() {
-
+    /* Fail closed: unknown viewer → nothing. Seeds never appear for real viewers;
+       reals never appear for seed viewers. */
+    var viewerSt = resolveViewerSeedStatus();
+    if (viewerSt !== true && viewerSt !== false) return [];
+    var wantSeed = viewerSt === true;
     var me = viewerPersonal();
     if (!me || !Array.isArray(me.friendIds) || !me.friendIds.length) return [];
     var mine = {};
@@ -1202,6 +1262,7 @@
         if (!id || mine[id] || seen[id]) return;
         var rec = profileById(id);
         if (!rec || rec.kind === "professional" || !rec.displayName) return;
+        if (profileLooksSeed(rec) !== wantSeed) return;
         seen[id] = true;
         out.push({
           id: "know-" + rec.id,
@@ -1228,6 +1289,22 @@
     return false;
   }
 
+
+  function shareSeedFlag(share, sharer) {
+    if (!share) return null;
+    if (share.swiperIsSeed === true || share.fromSeed === true) return true;
+    if (sharer) {
+      var id = String(sharer.id || share.swiperId || "");
+      var kindFlag = accountKindMeansSeed(sharer.account_kind || sharer.accountKind);
+      if (kindFlag === true) return true;
+      if (kindFlag === false) return false;
+      if (id && profileSeedById[id] === true) return true;
+      if (id && profileSeedById[id] === false) return false;
+    }
+    if (share.swiperIsSeed === false) return false;
+    return null;
+  }
+
   function friendShareCards() {
     if (!getSeeFriendShares()) return [];
     var shares = readJson(localStorage, SHARES_KEY, []);
@@ -1242,13 +1319,18 @@
     warmProfileSeedStatuses(need);
     var interests = viewerInterests();
     var out = [];
+    /* Fail closed: unknown viewer sees no shares. Seed sandbox ↔ seed shares only;
+       real ↔ real only. */
+    var viewerSt = resolveViewerSeedStatus();
+    if (viewerSt !== true && viewerSt !== false) return [];
+    var viewerWantsSeed = viewerSt === true;
     shares.forEach(function (share) {
       if (!share || !share.swiperId || !friends[String(share.swiperId)]) return;
       if (viewerIds().indexOf(String(share.swiperId)) >= 0) return;
-      /* Real users never see seed shares. */
-      if (share.swiperIsSeed || share.fromSeed) return;
       var sharer = profileById(share.swiperId);
-      if (profileLooksSeed(sharer)) return;
+      var shareIsSeed = shareSeedFlag(share, sharer);
+      if (shareIsSeed == null) return; /* unknown sharer: hide from everyone */
+      if (viewerWantsSeed !== shareIsSeed) return;
       if (shareAuthorBlocked(share)) return;
       var tags = terms(share.interests);
       if (!tags.length) tags = terms((share.title || "") + " " + (share.body || ""));
@@ -2470,8 +2552,11 @@
   }
 
   function recordShare(card) {
-    /* Seed swipes are excluded — real users never see seed shares. */
-    if (viewerIsSeedOrOps()) return;
+    /* Known seeds and known reals both write shares into the shared store, tagged
+       with swiperIsSeed. Unknown viewer: fail closed — do not write. */
+    var st = resolveViewerSeedStatus();
+    if (st !== true && st !== false) return;
+    var fromSeed = st === true;
     var interests = terms(card.interests);
     if (!interests.length) interests = terms((card.title || "") + " " + (card.body || ""));
     if (!interests.length) return;
@@ -2489,7 +2574,8 @@
       profileId: card.profileId || "",
       interests: interests,
       swiperId: currentProfileId(),
-      swiperIsSeed: false,
+      swiperIsSeed: fromSeed,
+      fromSeed: fromSeed,
       at: Date.now(),
     });
     writeJson(localStorage, SHARES_KEY, shares.slice(-200));
@@ -3066,7 +3152,9 @@
     recordShare: recordShare,
     viewerIsSeedOrOps: viewerIsSeedOrOps,
     profileLooksSeed: profileLooksSeed,
+    shareSeedFlag: shareSeedFlag,
     noteViewerSeedStatus: noteViewerSeedStatus,
+    learnSandbox: learnSandbox,
     noteProfileSeedStatus: noteProfileSeedStatus,
     refreshViewerSeedStatus: refreshViewerSeedStatus,
     refreshSeedGates: refreshSeedGates,

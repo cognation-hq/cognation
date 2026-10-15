@@ -120,6 +120,12 @@ function adultStores() {
 
 var stores = adultStores();
 var adult = loadSwipe(stores.local, stores.session);
+if (adult.noteViewerSeedStatus) adult.noteViewerSeedStatus(false);
+if (adult.noteProfileSeedStatus) {
+  adult.noteProfileSeedStatus("ada", false);
+  adult.noteProfileSeedStatus("friend", false);
+  adult.noteProfileSeedStatus("sam", false);
+}
 var personalDeck = adult.sampleDeck(24);
 assert.ok(personalDeck.some(function (c) { return c.type === "know"; }), "Personal keeps people you may know");
 assert.ok(personalDeck.every(function (c) { return !/^pro-/.test(c.type); }), "Personal has no Professional cards");

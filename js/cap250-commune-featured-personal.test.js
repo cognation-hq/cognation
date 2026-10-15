@@ -153,6 +153,12 @@ knowLocal.setItem("cognation.profiles.v1", JSON.stringify({
   },
 }));
 var knowApi = loadSwipe(knowLocal, memoryStorage());
+if (knowApi.noteViewerSeedStatus) knowApi.noteViewerSeedStatus(false);
+if (knowApi.noteProfileSeedStatus) {
+  knowApi.noteProfileSeedStatus("ada", false);
+  knowApi.noteProfileSeedStatus("friend", false);
+  knowApi.noteProfileSeedStatus("sam", false);
+}
 assert.ok(knowApi.sampleDeck(24).some(function (c) { return c.type === "know" && c.id === "know-sam"; }), "friends-you-might-know in Personal mix");
 
 console.log("cap250-commune-featured-personal.test.js: OK");

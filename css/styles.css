@@ -5294,12 +5294,35 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   min-height: 3.2rem;
 }
 
-/* Grab circles are gone. The whole sticker moves; controls keep their own cursor. */
-.tower-sticker-handle,
+/* Move handle: visible for the owner on Public. Body drag still works too. */
+.tower-sticker-handle {
+  display: none;
+  pointer-events: none;
+}
 [data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker-handle,
 [data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker-handle[hidden] {
-  display: none !important;
-  pointer-events: none !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto !important;
+  position: absolute;
+  top: 0.35rem;
+  left: 0.35rem;
+  z-index: 5;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid rgba(209, 241, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(16, 19, 48, 0.72);
+  color: #e8e4ff;
+  font-size: 0.7rem;
+  line-height: 1;
+  cursor: grab;
+}
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker-handle:active {
+  cursor: grabbing;
 }
 [data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-layout--scrapbook.is-sticker-stage > .tower-sticker {
   cursor: grab;
@@ -12864,10 +12887,10 @@ a.site-switch-side:focus-visible {
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  gap: 16px;
   max-width: 1120px;
   margin-inline: auto;
-  padding: 24px;
+  padding: 14px;
   min-height: 0;
   width: 100%;
   box-sizing: border-box;
@@ -12885,9 +12908,9 @@ a.site-switch-side:focus-visible {
   z-index: 1;
   background: rgba(16, 19, 48, 0.42);
   border: 1px solid rgba(209, 241, 255, 0.28);
-  border-radius: 1.15rem;
-  padding: 20px;
-  min-height: 150px;
+  border-radius: 1rem;
+  padding: 8px 12px;
+  min-height: 0;
   box-shadow: none;
   box-sizing: border-box;
 }
@@ -12897,19 +12920,112 @@ a.site-switch-side:focus-visible {
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker.is-spawned.is-spawn-half {
   grid-column: auto;
 }
-/* Profile stack (avatar / identity / slogan): no min-height, tight card look */
-.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--avatar.is-spawned,
-.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--identity.is-spawned,
-.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--slogan.is-spawned {
-  min-height: 0;
-  padding: 12px 20px;
-}
-.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--followers.is-spawned {
+/* LOOK lock v3.2 — hamburger strips + split links (Alexa). Profile ~72–88px;
+   YouTube thumb band ~96–112px; each link its own widget (social-split PR).
+   Quote under handle, no divider. SPAWN_ROWS order unchanged. */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
   background: rgba(16, 19, 48, 0.42);
   border: 1px solid rgba(209, 241, 255, 0.28);
-  border-radius: 1.15rem;
-  padding: 20px;
-  min-height: 150px;
+  border-radius: 1rem;
+  padding: 8px 12px;
+  min-height: 0;
+  box-sizing: border-box;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker.is-spawned {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  min-height: 0 !important;
+  box-shadow: none;
+  grid-column: auto;
+  width: auto;
+  max-width: none;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] {
+  min-height: 72px;
+  max-height: 88px;
+  overflow: hidden;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned .tower-avatar,
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned .tower-avatar-mat,
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned .tower-avatar-wrap {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--identity.is-spawned {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 2px;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--identity.is-spawned .tower-profile-name-wrap,
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--identity.is-spawned .tower-handle-badge {
+  margin: 0;
+  text-align: left;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--identity.is-spawned .tower-profile-name {
+  font-size: 1rem;
+  line-height: 1.1;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--slogan.is-spawned {
+  /* Quote lives under the handle inside the identity column via strip layout:
+     identity and slogan stack in a text column after the avatar. */
+  display: none !important;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] .tower-profile-strip-quote {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: #e8e4ff;
+  max-width: 16rem;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] .tower-profile-strip-quote::before,
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] .tower-profile-strip-quote::after {
+  content: none !important;
+  display: none !important;
+}
+/* Half-height media / followers strips on default grid */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--youtube.is-spawned {
+  max-height: 112px;
+  overflow: hidden;
+  padding: 6px 10px;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--youtube.is-spawned .tower-pro-youtube-screen,
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--youtube.is-spawned [data-tower-pro-youtube-frame],
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--youtube.is-spawned iframe {
+  max-height: 96px;
+  height: 96px;
+  aspect-ratio: auto;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--music.is-spawned .tower-ipod {
+  max-height: 72px;
+  transform: none;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--followers.is-spawned {
+  min-height: 0;
+  padding: 8px 12px;
 }
 /* Going live is an owner action, not a grid widget in the public default. */
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--going-live {
@@ -12934,7 +13050,8 @@ a.site-switch-side:focus-visible {
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid.is-phone-stack,
 .tower-layout--scrapbook.is-sticker-stage.is-phone-stack.is-default-grid {
   grid-template-columns: 1fr;
-  padding: 24px 16px;
+  gap: 12px;
+  padding: 12px;
   max-width: none;
 }
 .tower-layout--scrapbook.is-sticker-stage.is-phone-stack .tower-sticker {
@@ -12944,19 +13061,22 @@ a.site-switch-side:focus-visible {
 @media (max-width: 767px) {
   .tower-layout--scrapbook.is-sticker-stage.is-default-grid {
     grid-template-columns: 1fr;
-    padding: 24px 16px;
+    gap: 12px;
+    padding: 12px;
   }
 }
 @media (min-width: 768px) and (max-width: 1023px) {
   .tower-layout--scrapbook.is-sticker-stage.is-default-grid {
     grid-template-columns: 1fr 1fr;
-    padding: 24px;
+    gap: 16px;
+    padding: 14px;
   }
 }
 @media (min-width: 1024px) {
   .tower-layout--scrapbook.is-sticker-stage.is-default-grid {
     max-width: 1120px;
-    padding: 24px;
+    gap: 16px;
+    padding: 14px;
     grid-template-columns: 1fr 1fr;
   }
 }

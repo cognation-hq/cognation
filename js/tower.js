@@ -218,6 +218,51 @@
 
   /* Place every visible, unplaced widget in its spawn spot (no overlap, 24px gap).
      Owner-placed widgets never move. Nothing is saved here. */
+  function unwrapProfileStrip(stage) {
+    if (!stage) return;
+    stage.querySelectorAll("[data-tower-profile-strip]").forEach(function (strip) {
+      var parent = strip.parentNode;
+      if (!parent) return;
+      while (strip.firstChild) parent.insertBefore(strip.firstChild, strip);
+      parent.removeChild(strip);
+    });
+    stage.querySelectorAll(".tower-profile-strip-quote").forEach(function (q) {
+      if (q.parentNode) q.parentNode.removeChild(q);
+    });
+  }
+
+  /* v3.1 hamburger strip: avatar | name/@handle/quote. SPAWN_ROWS order unchanged. */
+  function ensureProfileStrip(stage, p) {
+    if (!stage) return;
+    unwrapProfileStrip(stage);
+    var avatar = stage.querySelector('[data-tower-widget="avatar"]');
+    var identity = stage.querySelector('[data-tower-widget="identity"]');
+    var slogan = stage.querySelector('[data-tower-widget="slogan"]');
+    if (!avatar || !identity) return;
+    if (avatar.parentNode !== stage || identity.parentNode !== stage) return;
+    var strip = document.createElement("div");
+    strip.setAttribute("data-tower-profile-strip", "");
+    stage.insertBefore(strip, avatar);
+    strip.appendChild(avatar);
+    strip.appendChild(identity);
+    if (slogan && slogan.parentNode === stage) strip.appendChild(slogan);
+    var quoteText = "";
+    if (p && typeof p.slogan === "string") quoteText = String(p.slogan || "").trim();
+    if (!quoteText && slogan) {
+      var card = slogan.querySelector("[data-tower-slogan-display], .tower-slogan-card");
+      quoteText = card ? String(card.textContent || "").trim() : "";
+    }
+    identity.querySelectorAll(".tower-profile-strip-quote").forEach(function (n) {
+      if (n.parentNode) n.parentNode.removeChild(n);
+    });
+    if (quoteText) {
+      var q = document.createElement("blockquote");
+      q.className = "tower-profile-strip-quote";
+      q.textContent = quoteText;
+      identity.appendChild(q);
+    }
+  }
+
   function spawnUnplacedWidgets(root, p) {
     var stage = root && root.querySelector("[data-tower-scrapbook]");
     if (!stage || !stage.classList.contains("is-sticker-stage")) return;
@@ -251,6 +296,7 @@
     var useGrid = phone || !anyPlaced;
     stage.classList.toggle("is-default-grid", useGrid);
     stage.classList.toggle("is-desktop-grid", useGrid && !phone);
+    if (!useGrid) unwrapProfileStrip(stage);
 
     if (useGrid) {
       var ordered = [];
@@ -276,6 +322,7 @@
         });
       });
       ordered.forEach(function (el) { stage.appendChild(el); });
+      ensureProfileStrip(stage, p);
       /* Friend pins: in default grid they sit inside the Top Friends card flow via CSS;
          clear absolute spawn marks so they do not float over the grid. */
       stage.querySelectorAll("[data-tower-friend-pin].is-spawned").forEach(function (pin) {
@@ -1135,9 +1182,9 @@
     try { localStorage.setItem(TOP_FRIEND_LOCAL_KEY, JSON.stringify(doc)); } catch (eTopWrite) {}
   }
 
-  /* Remote Supabase profiles do not store social link URLs. Keep the owner's
-     saved circle buttons in a per-profile local note so personal and
-     professional pages both keep YouTube / IG / etc. across reload. */
+  /* Social / Venmo / Pay / Buy ads also live on the server under
+     tower_widget_layouts.layout._public (see CognationTowerLayoutSync.savePublic).
+     A per-profile local note still speeds same-browser reloads. */
   var SOCIAL_LINKS_LOCAL_KEY = "cognation.tower.social-links.v1";
 
   function readSocialLinksLocalDoc() {
@@ -1172,10 +1219,14 @@
     var profileId = String(p._profileId || "");
     var keyed = profileId ? readSocialLinksLocalDoc()[profileId] : null;
     if (keyed && typeof keyed === "object") {
-      p.socialLinks = normalizeSocialLinksMap(keyed);
-      p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
-      p.publicWidgets.social = profileHasSocialLinks(p);
-      return;
+      var localMap = normalizeSocialLinksMap(keyed);
+      /* Empty local must not wipe server _public links on a fresh browser. */
+      if (profileHasSocialLinks({ socialLinks: localMap })) {
+        p.socialLinks = localMap;
+        p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
+        p.publicWidgets.social = true;
+        return;
+      }
     }
     if (profileHasSocialLinks(p)) return;
     var chosen = null;
@@ -3884,6 +3935,11 @@
       if (next === String(cur.musicUrl || "")) return;
       cur.musicUrl = next;
       if (!TowerProfileStore.save(cur)) return;
+      try {
+        if (window.CognationTowerLayoutSync && CognationTowerLayoutSync.savePublic) {
+          CognationTowerLayoutSync.savePublic(TowerProfileStore.get());
+        }
+      } catch (eYt) {}
       var saved = TowerProfileStore.get();
       applyPublicWidgets(root, saved);
       initTowerMusic(root, saved);
@@ -4271,6 +4327,12 @@
     p.publicWidgets.social = profileHasSocialLinks(p);
     writeSocialLinksLocal(p._profileId, p.socialLinks);
     TowerProfileStore.save(p);
+    /* Venmo / Pay / Buy ads / socials: server copy so a fresh browser sees them. */
+    try {
+      if (window.CognationTowerLayoutSync && CognationTowerLayoutSync.savePublic) {
+        CognationTowerLayoutSync.savePublic(TowerProfileStore.get());
+      }
+    } catch (ePub) {}
     var saved = TowerProfileStore.get();
     renderSocialLinks(root, saved);
     applyPublicWidgets(root, saved);
@@ -4296,6 +4358,11 @@
     p.publicWidgets.social = profileHasSocialLinks(p);
     writeSocialLinksLocal(p._profileId, p.socialLinks);
     TowerProfileStore.save(p);
+    try {
+      if (window.CognationTowerLayoutSync && CognationTowerLayoutSync.savePublic) {
+        CognationTowerLayoutSync.savePublic(TowerProfileStore.get());
+      }
+    } catch (eFlush) {}
     var saved = TowerProfileStore.get();
     renderSocialLinks(root, saved);
     applyPublicWidgets(root, saved);
@@ -5502,7 +5569,8 @@
     var onPublic = root.getAttribute("data-tower-side") === "public";
     var show = owner && onPublic;
     stage.querySelectorAll("[data-tower-sticker-handle]").forEach(function (h) {
-      h.hidden = true;
+      /* Owner on Public: show the move handle (CSS also un-hides [hidden]). */
+      h.hidden = !show;
     });
     stage.querySelectorAll("[data-tower-friend-pin]").forEach(function (pin) {
       pin.classList.toggle("is-arrangeable", show);
@@ -9772,6 +9840,11 @@
           setProfileStatus("Could not save profile (storage full or blocked). Try a smaller photo.", true);
           return;
         }
+        try {
+          if (window.CognationTowerLayoutSync && CognationTowerLayoutSync.savePublic) {
+            CognationTowerLayoutSync.savePublic(TowerProfileStore.get());
+          }
+        } catch (eSavePub) {}
         setProfileStatus("Profile saved — refreshing…", false);
         try {
           sessionStorage.setItem("cognation.tower.stay", "1");

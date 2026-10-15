@@ -374,4 +374,55 @@ assert.ok(/function commitSocialDraft\(root, id, value\) \{\s*if \(!isTowerOwner
 assert.ok(/a\.target = "_blank";\s*a\.rel = "noopener noreferrer";/.test(tower), "opens outside Cognation");
 })();
 
+
+/* ---- #131 live fails + LOOK v3.2/v3.3 density (tabs, handle, Pro server, strip) ---- */
+(function () {
+  var assert = require("assert");
+  var fs = require("fs");
+  var path = require("path");
+  var tabs = fs.readFileSync(path.join(__dirname, "tabs.js"), "utf8");
+  var tower = fs.readFileSync(path.join(__dirname, "tower.js"), "utf8");
+  var css = fs.readFileSync(path.join(__dirname, "..", "css", "styles.css"), "utf8");
+  var layoutSync = fs.readFileSync(path.join(__dirname, "tower-layout-sync.js"), "utf8");
+  var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+
+  /* Friend tap-through / visitor Tower: do not OpenOwn while a profile hash is open. */
+  assert.ok(/viewingOther = hash\.indexOf\("tower-profile-"\) === 0/.test(tabs), "tabs skip OpenOwn when viewing a profile");
+  assert.ok(/if \(!viewingOther\)/.test(tabs) && /CognationTowerOpenOwn/.test(tabs), "OpenOwn only when no profile viewed");
+
+  /* Drag handle visible for owner on Public. */
+  assert.ok(/display: flex !important/.test(css) && /\.tower-sticker-handle/.test(css), "handle shown for owner");
+  assert.ok(!/\.tower-sticker-handle,\s*\[data-tower-app\]\[data-tower-is-owner="true"\]\[data-tower-side="public"\] \.tower-sticker-handle,\s*\[data-tower-app\]\[data-tower-is-owner="true"\]\[data-tower-side="public"\] \.tower-sticker-handle\[hidden\] \{\s*display: none !important/.test(css), "old hide-all-handles rule gone");
+  assert.ok(/h\.hidden = !show;/.test(tower), "syncOwnerStickerHandles unhides for owner");
+
+  /* Pro YouTube + Venmo/Pay/Buy ads persist on server (layout._public), not local only. */
+  assert.ok(/function savePublic\(/.test(layoutSync) && /_public/.test(layoutSync), "layout sync savePublic");
+  assert.ok(/CognationTowerLayoutSync\.savePublic/.test(tower), "Tower calls savePublic on social/YouTube save");
+  assert.ok(/Empty local must not wipe server _public links/.test(tower), "empty localStorage does not clear server socials");
+
+  /* v3.2/v3.3 density: profile strip ~72–88px, YouTube band ~96–112px, quote under handle. */
+  assert.ok(/data-tower-profile-strip/.test(tower) && /ensureProfileStrip/.test(tower), "profile strip wrapper");
+  assert.ok(/max-height:\s*88px/.test(css) && /min-height:\s*72px/.test(css), "profile strip height band");
+  assert.ok(/max-height:\s*112px/.test(css) && /max-height:\s*96px/.test(css), "YouTube thumb band");
+  assert.ok(/tower-profile-strip-quote/.test(css) && /content: none !important/.test(css), "quote under handle, no divider");
+  assert.ok(/SPAWN_ROWS/.test(tower) && /personal: \[\[\"avatar\"\]/.test(tower), "SPAWN_ROWS order kept");
+
+  /* Behavioral: server public round-trip. */
+  var sync = require("./tower-layout-sync.js");
+  var pub = sync._cleanPublic({
+    musicUrl: "https://youtube.com/watch?v=abcdefghijk",
+    socialLinks: { venmo: "@lex", services: "https://pay.example/x", ads: "https://ads.example/y", instagram: "https://instagram.com/lex" },
+  });
+  assert.strictEqual(pub.musicUrl.indexOf("youtube.com") > 0, true, "YouTube URL kept");
+  assert.ok(pub.socialLinks.venmo && pub.socialLinks.services && pub.socialLinks.ads && pub.socialLinks.instagram, "Venmo/Pay/Buy ads/IG in _public");
+  var profile = { _profileId: "22222222-2222-4222-8222-222222222222", socialLinks: {}, musicUrl: "" };
+  sync._cache[profile._profileId] = { _public: pub, avatar: { x: 2, y: 3, z: 1, tilt: 0, dragged: true } };
+  sync._publicCache[profile._profileId] = pub;
+  sync.apply(profile);
+  assert.ok(profile.musicUrl.indexOf("youtube") > 0, "fresh apply loads YouTube from server");
+  assert.strictEqual(profile.socialLinks.venmo, "@lex", "fresh apply loads Venmo from server");
+  assert.ok(profile.widgetLayout.avatar.dragged === true, "dragged preserved through apply");
+})();
+
+
 console.log("still-here.test.js: OK");

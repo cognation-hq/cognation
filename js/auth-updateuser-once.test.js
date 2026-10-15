@@ -69,6 +69,7 @@ function pageLoad(server, session, local) {
     rebuild: function () {},
   };
   win.window = win;
+  win.CognationDatingFlag = { enabled: function () { return true; } }; /* dating-on path (post kill-switch flip) */
   vm.runInNewContext(code, {
     window: win, document: doc, localStorage: ls, sessionStorage: store(), console: console,
     setTimeout: setTimeout, clearTimeout: clearTimeout, CustomEvent: CustomEvent,

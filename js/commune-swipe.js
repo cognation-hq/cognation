@@ -484,13 +484,19 @@
     try { return localStorage.getItem(SEE_DATING_KEY) === "1"; } catch (e) { return false; }
   }
   function setSeeDating(on) {
-    var next = !!on;
+    var next = !!on && datingSwitchOn();
     var prev = getSeeDating();
     try { localStorage.setItem(SEE_DATING_KEY, next ? "1" : "0"); } catch (e) {}
     if (prev === next) return;
     emit("cognation:see-dating-changed", { seeDating: next });
   }
+  /* P0 kill switch: js/dating-flag.js. Missing flag = off (fail closed). */
+  function datingSwitchOn() {
+    var f = window.CognationDatingFlag;
+    return !!(f && typeof f.enabled === "function" && f.enabled());
+  }
   function datingAllowed() {
+    if (!datingSwitchOn()) return false;
     var age = getMemberAge();
     return !!(getSeeDating() && age != null && age >= 18);
   }
@@ -1575,6 +1581,16 @@
 
   function syncDatingVisibility() {
     if (!state.shell) return;
+    var entry = state.shell.querySelector("[data-dating-entry]") ||
+      (document.querySelector && document.querySelector("[data-dating-entry]"));
+    if (!datingSwitchOn()) {
+      if (entry) entry.hidden = true;
+      state.shell.removeAttribute("data-dating-visible");
+      if (getSeeDating()) setSeeDating(false);
+      syncFriendSharesVisibility();
+      return;
+    }
+    if (entry) entry.hidden = false;
     var allowed = datingAllowed();
     if (allowed) state.shell.setAttribute("data-dating-visible", "true");
     else state.shell.removeAttribute("data-dating-visible");

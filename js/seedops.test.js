@@ -59,6 +59,7 @@ function load(rel, windowStub) {
     },
   });
   context.window = windowStub;
+  /* Exercises dating-on behavior (post kill-switch flip). */ windowStub.CognationDatingFlag = { enabled: function () { return true; } };
   context.window.document = context.document;
   context.window.sessionStorage = context.sessionStorage;
   context.window.localStorage = context.localStorage;
@@ -667,6 +668,7 @@ hydrateWin.CognationCommuneSwipe = {
   hydrateWin.sessionStorage = context.sessionStorage;
   hydrateWin.localStorage = context.localStorage;
   context.window = hydrateWin;
+  hydrateWin.CognationDatingFlag = { enabled: function () { return true; } }; /* dating-on path */
   vm.runInContext(fs.readFileSync(path.join(root, "js/seedops-schema.js"), "utf8"), context);
   vm.runInContext(hydrateSrc, context);
   var api = hydrateWin.CognationSeedOpsDatingHydrate;

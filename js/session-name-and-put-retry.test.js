@@ -76,6 +76,7 @@ function bootLogin(opts) {
     setTimeout: function () { return 0; }, clearTimeout: function () {},
   };
   win.window = win;
+  win.CognationDatingFlag = { enabled: function () { return true; } }; /* dating-on path (post kill-switch flip) */
   vm.runInNewContext(read("js/login.js"), {
     window: win, document: doc, localStorage: ls, location: win.location, CustomEvent: CustomEvent,
     console: console, Promise: Promise, JSON: JSON, Date: Date, setTimeout: win.setTimeout, clearTimeout: win.clearTimeout,
@@ -176,6 +177,7 @@ function pageLoad(server, session, local, script) {
     rebuild: function () {},
   };
   win.window = win;
+  win.CognationDatingFlag = { enabled: function () { return true; } }; /* dating-on path (post kill-switch flip) */
   vm.runInNewContext(dating, {
     window: win, document: doc, localStorage: ls, sessionStorage: store(), console: console,
     setTimeout: function (fn, ms) { return setTimeout(fn, (ms || 0) / SCALE); }, clearTimeout: clearTimeout,

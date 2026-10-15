@@ -80,12 +80,14 @@
     var raw = chosen ? (chosen.display_name || chosen.displayName || "") : "";
     var name = kind === "seed" || kind === "ops" ? fleetFirstName(raw) : String(raw || "").trim();
     if (!name) name = "Someone";
-    return {
+    var out = {
       userId: String(userId || ""),
       name: name,
       accountKind: kind,
       badge: badgeFor(kind),
     };
+    if (chosen && typeof chosen.photo_url === "string" && chosen.photo_url) out.photoUrl = chosen.photo_url;
+    return out;
   }
 
   function displayForProfile(profile) {
@@ -93,13 +95,15 @@
     var raw = profile ? (profile.display_name || profile.displayName || "") : "";
     var name = kind === "seed" || kind === "ops" ? fleetFirstName(raw) : String(raw || "").trim();
     if (!name) name = "Someone";
-    return {
+    var out = {
       userId: profile ? String(profile.user_id || "") : "",
       profileId: profile ? String(profile.id || "") : "",
       name: name,
       accountKind: kind,
       badge: badgeFor(kind),
     };
+    if (profile && typeof profile.photo_url === "string" && profile.photo_url) out.photoUrl = profile.photo_url;
+    return out;
   }
 
   function stamp(value) {
@@ -289,11 +293,12 @@
         if (!filters.length) {
           return { viewerId: id, friendships: friendships, follows: follows, profiles: mine };
         }
-        return restGet(
-          client,
-          "profiles",
-          "select=" + cols + "&or=(" + filters.join(",") + ")&limit=400"
-        ).then(function (profiles) {
+        var orQuery = "&or=(" + filters.join(",") + ")&limit=400";
+        /* profiles.photo_url (20261016_profiles_photo_url.sql, run 2026-10-15) gives
+           halo spots real photos; if the column is ever missing, read without it. */
+        return restGet(client, "profiles", "select=" + cols + ",photo_url" + orQuery).then(null, function () {
+          return restGet(client, "profiles", "select=" + cols + orQuery);
+        }).then(function (profiles) {
           return {
             viewerId: id,
             friendships: friendships,
@@ -427,6 +432,7 @@
     pairAllowed: pairAllowed,
     peopleForSpots: peopleForSpots,
     mount: mount,
+    _fetchBundle: fetchBundle,
   };
   if (root) root.CognationCircleRelations = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

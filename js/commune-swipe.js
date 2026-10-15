@@ -1841,6 +1841,11 @@
     });
     var open = el.querySelector("[data-commune-open-profile]");
     if (open) open.addEventListener("click", function (ev) { ev.stopPropagation(); openProfessionalPage(card); });
+    if (card.type === TYPE.CLASSROOM) {
+      wireClassroomCardClick(el, card, openClassroom);
+    } else if (card.type === PRO.AUCTION) {
+      wireClassroomCardClick(el, card, function () { openAuction(card, true); });
+    }
     if (card.type === TYPE.AD && card.handle) {
       el.addEventListener("click", function (ev) {
         if (ev.target.closest("button, a, input, video, iframe")) return;
@@ -1848,6 +1853,19 @@
       });
     }
     armAdMax(el, card);
+  }
+
+  /* Whole Classroom / Auction card opens its full view on tap/click, like ad cards open
+     their page. Controls inside the card keep their own action, and a drag
+     that turned into a swipe attempt (>= 10px) is not a tap. */
+  function wireClassroomCardClick(el, card, open) {
+    if (!el || !card) return;
+    el.addEventListener("click", function (ev) {
+      var t = ev && ev.target;
+      if (t && t.closest && t.closest("button, a, input, textarea, label, video, iframe")) return;
+      if (Math.abs(state.lastDragDx || 0) >= 10) return;
+      open(card.id, true);
+    });
   }
 
   function openProfessionalPage(card) {
@@ -1870,6 +1888,11 @@
     if (classroom) classroom.hidden = kind !== "classroom";
     if (deck) deck.hidden = on;
     if (actions) actions.hidden = on;
+    /* Full views hide all deck swipe chrome; Back to deck restores it. */
+    [".commune-swipe-hint", "[data-commune-dots]", "[data-commune-index]"].forEach(function (sel) {
+      var chrome = state.shell && state.shell.querySelector(sel);
+      if (chrome) chrome.hidden = on;
+    });
   }
 
   function showRoom(on) {
@@ -2432,10 +2455,74 @@
 
   function closeRoom() {
     if (state.roomId) friction("abandon", "chat", "room_back");
+    if (state.cardView) {
+      if (state.cardView === "classroom" && state.classroomId) friction("abandon", "classroom", "classroom_back");
+      if (state.cardView === "auction" && state.auctionId) friction("abandon", "auction", "auction_back");
+      state.classroomId = "";
+      closeCardView();
+    }
     releaseRoomSurface();
   }
 
+  /* Classroom and Auction open in the chat-room full view (same dark shell,
+     same Back to deck), not a demo card. Compose is hidden: these are not chats. */
+  function paintCardView(kind, item, notesText) {
+    var panel = state.shell && state.shell.querySelector("[data-commune-room]");
+    if (!panel || !item) return false;
+    var title = panel.querySelector("[data-commune-room-title]");
+    var topic = panel.querySelector("[data-commune-room-topic]");
+    var log = panel.querySelector("[data-commune-room-log]");
+    var kicker = panel.querySelector(".commune-card-kicker");
+    var label = kind === "auction" ? "Auction" : "Classroom";
+    if (kicker) kicker.textContent = label + " · hosted by Cognation";
+    if (title) title.textContent = item.title || label;
+    if (topic) topic.textContent = item.body || "";
+    if (log) {
+      log.innerHTML = "";
+      if (notesText) {
+        var p = document.createElement("p");
+        p.className = "commune-room-line";
+        p.textContent = notesText;
+        log.appendChild(p);
+      }
+    }
+    panel.setAttribute("data-commune-room-view", kind);
+    state.roomId = "";
+    state.liveRoom = false;
+    state.roomSqlId = "";
+    state.cardView = kind;
+    showSubpanel("room");
+    return true;
+  }
+
+  function openAuction(card, scroll) {
+    if (!card || !state.shell) return false;
+    closeClassroom();
+    releaseRoomSurface();
+    if (!paintCardView("auction", card, card.why || "")) return false;
+    state.auctionId = card.id;
+    friction("begin", "auction", "auction:" + card.id);
+    if (scroll && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
+    return true;
+  }
+
+  function closeCardView() {
+    var panel = state.shell && state.shell.querySelector("[data-commune-room]");
+    if (panel) panel.removeAttribute("data-commune-room-view");
+    state.cardView = "";
+    state.auctionId = "";
+  }
+
   function paintClassroom(session) {
+    var notesText =
+      "Honest thin session: Cognation hosts short life-skills webinars here (insurance, voting, business). Full curriculum arrives later — this seat is real.";
+    if (paintCardView("classroom", {
+      title: session && session.title || "Classroom",
+      body: (session && session.topic ? "Topic · " + session.topic + " — " : "") + (session && session.body || CLASSROOM_BODY),
+    }, notesText)) {
+      state.classroomId = session.id;
+      return;
+    }
     var panel = state.shell && state.shell.querySelector("[data-classroom], #panel-classroom, [data-commune-classroom]");
     if (!panel || !session) return;
     var title = panel.querySelector("[data-classroom-title]");
@@ -2503,6 +2590,11 @@
   function closeClassroom() {
     if (state.classroomId) friction("abandon", "classroom", "classroom_back");
     state.classroomId = "";
+    if (state.cardView === "classroom") {
+      closeCardView();
+      showSubpanel("");
+      return;
+    }
     showClassroom(false);
   }
 
@@ -2885,6 +2977,7 @@
     if (!front) return;
     if (ev.target.closest && ev.target.closest("button, a, input, textarea, label, video, iframe")) return;
     var point = ev.touches ? ev.touches[0] : ev;
+    state.lastDragDx = 0;
     state.pointer = { x0: point.clientX, dx: 0, el: front };
     front.classList.add("is-dragging");
   }
@@ -2898,6 +2991,7 @@
   function onPointerUp() {
     if (!state.pointer) return;
     var dx = state.pointer.dx || 0;
+    state.lastDragDx = dx;
     clearPointer();
     if (Math.abs(dx) < 80) return;
     swipe(dx < 0 ? "left" : "right");
@@ -3127,6 +3221,8 @@
     liveChatEligible: liveChatEligible,
     mapChatRoomError: mapChatRoomError,
     openClassroom: openClassroom,
+    openAuction: openAuction,
+    wireClassroomCardClick: wireClassroomCardClick,
     closeClassroom: closeClassroom,
     classroomCatalog: classroomCatalog,
     visibleClassroomSessions: visibleClassroomSessions,

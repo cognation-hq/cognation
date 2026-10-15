@@ -316,4 +316,9 @@ assert.ok(/if \(id === "music" && isProTower\(p\)\) \{\s*el\.hidden = true;/.tes
 assert.ok(/dragged: true,/.test(tower), "owner drop marks the widget as dragged");
 })();
 
+/* Pro YouTube paste box (Alexa: tutorials, brand marketing, creators' top videos). */
+assert.ok(/data-tower-widget="youtube"[\s\S]*?data-tower-pro-youtube-owner[\s\S]*?<input[^>]*type="url"[^>]*placeholder="Paste a YouTube link"[^>]*data-tower-pro-youtube-url/.test(html), "Pro YouTube paste box in markup");
+assert.ok(/if \(!personal\) \{[\s\S]*?showYoutubeSticker\(root, true\);\s*bindProYoutubeUrl\(root\);/.test(tower), "Pro page shows the YouTube widget and binds the paste box");
+assert.ok(/function bindProYoutubeUrl[\s\S]*?!isTowerOwner\(cur\) \|\| !profileIsProfessional\(cur\)\) return;[\s\S]*?cur\.musicUrl = next;[\s\S]*?addEventListener\("paste"/.test(tower), "paste saves the link, owner + Pro only");
+
 console.log("still-here.test.js: OK");

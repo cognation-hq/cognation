@@ -10976,6 +10976,24 @@
     if (window.CognationCircleRelations && typeof window.CognationCircleRelations.mount === "function") {
       window.CognationCircleRelations.mount(circlePage);
     }
+    /* PULSE falling friends restored (removed by #49 early return). Every
+       server friend's Tower circle falls BEHIND the halo ring; tap opens Tower. */
+    if (window.CognationPulseFall && typeof window.CognationPulseFall.mount === "function") {
+      window.CognationPulseFall.mount(layer, {
+        paint: function (el, friend, i) {
+          paintFriendPicture(el, { id: friend.handle || friend.userId, name: friend.name }, i);
+        },
+        open: function (handle) {
+          if (!handle) return;
+          if (window.CognationTowerOpenProfile) {
+            try { window.CognationTowerOpenProfile(handle); } catch (eOpen) {}
+          } else {
+            try { location.hash = "tower-profile-" + handle; } catch (eHash) {}
+          }
+          try { stopCircleFall(); } catch (eStop) {}
+        }
+      });
+    }
     return;
 
     var w = window.innerWidth || 800;

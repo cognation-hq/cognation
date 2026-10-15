@@ -77,6 +77,7 @@
     slogan: { x: 22, y: 16, z: 4, tilt: 0 },
     social: { x: 2, y: 22, z: 4, tilt: 0 },
     music: { x: 2, y: 28, z: 6, tilt: 0 },
+    youtube: { x: 2, y: 28, z: 6, tilt: 0 },
     badges: { x: 2, y: 38, z: 5, tilt: 0 },
     friends: { x: 2, y: 52, z: 4, tilt: 0 },
     html: { x: 22, y: 3, z: 3, tilt: 0 },
@@ -3415,6 +3416,46 @@
     if (!on) musicSticker.classList.remove("is-widget-selected");
   }
 
+  /* Professional pages: the YouTube player is its own widget. Personal pages never show it. */
+  function showYoutubeSticker(root, on) {
+    var yt = root.querySelector('[data-tower-widget="youtube"]');
+    if (!yt) return;
+    yt.hidden = !on;
+    yt.classList.toggle("is-widget-off", !on);
+    if (!on) yt.classList.remove("is-widget-selected");
+  }
+
+  function bindProYoutubeUrl(root) {
+    var input = root.querySelector("[data-tower-pro-youtube-url]");
+    if (!input || input.__cognationProYtBound) return;
+    input.__cognationProYtBound = true;
+    function commit() {
+      var cur = TowerProfileStore.get();
+      if (!isTowerOwner(cur) || !profileIsProfessional(cur)) return;
+      var next = (input.value || "").trim().slice(0, 500);
+      if (next === String(cur.musicUrl || "")) return;
+      cur.musicUrl = next;
+      if (!TowerProfileStore.save(cur)) return;
+      var saved = TowerProfileStore.get();
+      applyPublicWidgets(root, saved);
+      initTowerMusic(root, saved);
+    }
+    input.addEventListener("change", commit);
+    input.addEventListener("paste", function () {
+      setTimeout(commit, 0);
+    });
+    input.addEventListener("input", function () {
+      if (parseYoutubeVideoId(input.value)) commit();
+    });
+    input.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        commit();
+        input.blur();
+      }
+    });
+  }
+
   function initTowerMusic(root, p) {
     var wrap = root.querySelector("[data-tower-music]");
     var audio = root.querySelector("[data-tower-audio]");
@@ -3437,22 +3478,22 @@
     var proBox = root.querySelector("[data-tower-pro-youtube]");
     var looks = root.querySelector(".tower-music-looks");
     if (!personal) {
+      /* No music player on Professional. YouTube lives in its own widget. */
       hideMusicSkins(root);
       clearYoutubeEmbed(root);
       clearTowerAudio(audio);
-      if (looks) looks.hidden = true;
-      wrap.hidden = false;
-      wrap.setAttribute("data-music-skin", "pro");
-      showMusicSticker(root, true);
-      if (ytId) {
-        wrap.setAttribute("data-music-mode", "pro-youtube");
-        ensureProYoutubeIframe(root, ytId);
-      } else {
-        wrap.setAttribute("data-music-mode", "pro-empty");
-        showEmptyProYoutube(root);
-      }
+      wrap.hidden = true;
+      wrap.removeAttribute("data-music-mode");
+      showMusicSticker(root, false);
+      showYoutubeSticker(root, true);
+      bindProYoutubeUrl(root);
+      var proInput = root.querySelector("[data-tower-pro-youtube-url]");
+      if (proInput && document.activeElement !== proInput) proInput.value = url;
+      if (ytId) ensureProYoutubeIframe(root, ytId);
+      else showEmptyProYoutube(root);
       return;
     }
+    showYoutubeSticker(root, false);
     if (proBox) {
       proBox.hidden = true;
       proBox.classList.remove("has-video");
@@ -4776,7 +4817,8 @@
       if (id === "music") {
         var personalMusic = !p || p._profileKind !== "professional";
         if (!personalMusic) {
-          on = true;
+          /* Professional has no music player (YouTube is its own widget). */
+          on = false;
         } else {
           var skinChoice = visibleMusicSkin(p && p.musicSkin);
           if (skinChoice === "none" || (p && p.musicEnabled === false)) on = false;
@@ -4793,6 +4835,7 @@
       el.classList.toggle("is-widget-off", !on);
       if (!on) el.classList.remove("is-widget-selected");
     });
+    showYoutubeSticker(root, !!p && p._profileKind === "professional");
     var avatar = root.querySelector('[data-tower-widget="avatar"]');
     if (avatar) {
       avatar.hidden = false;
@@ -6963,6 +7006,8 @@
       var el = stage.querySelector('[data-tower-widget="' + id + '"]');
       if (!el || el.classList.contains("is-dragging")) return;
       var pos = layout[id] || DEFAULT_WIDGET_LAYOUT[id];
+      /* YouTube split from Music: a Professional page that already placed Music keeps that spot. */
+      if (id === "youtube" && !layout.youtube && layout.music) pos = layout.music;
       var fallback = DEFAULT_WIDGET_LAYOUT[id] || { x: 8, y: 8, z: zBase, tilt: 0 };
       var x = layoutCoord(pos && pos.x, fallback.x);
       var y = layoutCoord(pos && pos.y, fallback.y);

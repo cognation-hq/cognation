@@ -11377,7 +11377,7 @@ body.cognation-demo-on {
 .tower-music[data-music-skin="pro"] .tower-music-looks {
   display: none !important;
 }
-.tower-music[data-music-skin="pro"] .tower-pro-youtube {
+.tower-sticker--youtube:not([hidden]) .tower-pro-youtube {
   display: block !important;
 }
 .tower-pro-youtube {

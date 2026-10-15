@@ -321,4 +321,44 @@ assert.ok(/data-tower-widget="youtube"[\s\S]*?data-tower-pro-youtube-owner[\s\S]
 assert.ok(/if \(!personal\) \{[\s\S]*?showYoutubeSticker\(root, true\);\s*bindProYoutubeUrl\(root\);/.test(tower), "Pro page shows the YouTube widget and binds the paste box");
 assert.ok(/function bindProYoutubeUrl[\s\S]*?!isTowerOwner\(cur\) \|\| !profileIsProfessional\(cur\)\) return;[\s\S]*?cur\.musicUrl = next;[\s\S]*?addEventListener\("paste"/.test(tower), "paste saves the link, owner + Pro only");
 
+/* ---- Venmo on Personal AND Pro; Pro "Pay for services" + "Buy ads" links (new, owner-set, https only, quiet) ---- */
+(function () {
+var assert = require("assert");
+var fs = require("fs");
+var path = require("path");
+var vm = require("vm");
+var tower = fs.readFileSync(path.join(__dirname, "tower.js"), "utf8");
+var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+function grab(a, b) { var i = tower.indexOf(a), j = tower.indexOf(b, i); assert.ok(i !== -1 && j > i, "found " + a); return tower.slice(i, j); }
+var ctx = vm.createContext({ URL: URL, String: String });
+vm.runInContext([
+  grab("  var SOCIAL_NETWORKS = [", "  function socialLinkDefs()"),
+  grab("  function socialNetAllowedForKind(", "  function commitSocialDraft("),
+  "this.nets = SOCIAL_NETWORKS; this.allowed = socialNetAllowedForKind; this.href = socialHref; this.stored = storedSocialValue;",
+].join("\n"), ctx);
+function net(id) { return ctx.nets.filter(function (n) { return n.id === id; })[0]; }
+assert.ok(net("venmo") && ctx.allowed(net("venmo"), "personal") && ctx.allowed(net("venmo"), "professional"), "Venmo on Personal and Pro");
+assert.strictEqual(ctx.href("venmo", "@alexa"), "https://venmo.com/u/alexa", "Venmo handle links out");
+assert.ok(/data-tower-social="venmo"/.test(html), "Venmo field in Edit profile");
+["services", "ads"].forEach(function (id) {
+  var n = net(id);
+  assert.ok(n && n.label === (id === "services" ? "Pay for services" : "Buy ads") && n.quiet && !n.cta, id + " link defined, quiet");
+  assert.ok(ctx.allowed(n, "professional") && !ctx.allowed(n, "personal"), id + " on Pro only");
+  assert.strictEqual(ctx.href(id, "https://example.org/x"), "https://example.org/x", id + ": https kept");
+  assert.strictEqual(ctx.href(id, "example.org/x"), "https://example.org/x", id + ": bare domain becomes https");
+  ["http://example.org", "javascript:alert(1)", "data:text/html,x", "ftp://example.org"].forEach(function (bad) {
+    assert.strictEqual(ctx.href(id, bad), "", id + " rejected: " + bad);
+    assert.strictEqual(ctx.stored(id, bad), "", id + " not stored: " + bad);
+  });
+  assert.ok(new RegExp('<input id="tower-social-' + id + '"[^>]*type="url"[^>]*data-tower-social="' + id + '"').test(html), "owner sets " + id + " in Edit profile");
+});
+assert.ok(!net("hire") && !/is-cta/.test(tower) && !/data-tower-social="hire"/.test(html), "single Hire/Buy CTA gone");
+var css = fs.readFileSync(path.join(__dirname, "..", "css", "styles.css"), "utf8");
+assert.ok(/var quiet = net\.quiet \|\| \(net\.id === "venmo" && profileKind === "professional"\);/.test(tower), "Venmo, services, ads quiet on Pro");
+assert.ok(/\.tower-social-btn\.is-quiet \{[^}]*background: transparent;[^}]*color: var\(--cgn-text-muted\);[^}]*border: 1px solid var\(--cgn-border\);/.test(css), "muted secondary chrome");
+assert.ok(!/\.is-quiet[^{]*\{[^}]*#8e7cff/.test(css) && !/is-cta/.test(css), "no purple CTA pill");
+assert.ok(/function commitSocialDraft\(root, id, value\) \{\s*if \(!isTowerOwner\(TowerProfileStore\.get\(\)\)\) return;/.test(tower), "only the owner can edit links");
+assert.ok(/a\.target = "_blank";\s*a\.rel = "noopener noreferrer";/.test(tower), "opens outside Cognation");
+})();
+
 console.log("still-here.test.js: OK");

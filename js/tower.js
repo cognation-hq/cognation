@@ -3323,9 +3323,26 @@
     { id: "youtube", label: "YouTube", short: "YT", logo: "assets/social/youtube.png" },
     { id: "tiktok", label: "TikTok", short: "TT", logo: "assets/social/tiktok.svg" },
     { id: "linkedin", label: "LinkedIn", short: "in", logo: "assets/social/linkedin.png", professionalOnly: true },
-    { id: "venmo", label: "Venmo", short: "Vm", logo: "assets/social/venmo.svg", personalOnly: true },
+    { id: "venmo", label: "Venmo", short: "Vm", logo: "assets/social/venmo.svg" },
     { id: "linktree", label: "Linktree", short: "Lt", logo: "assets/social/linktree.svg", professionalOnly: true },
+    /* NEW (not restored): owner-set outbound link on Pro. A plain https link out;
+       Cognation takes no payment, stores no card data and calls no service. */
+    { id: "services", label: "Pay for services", short: "Pay for services", professionalOnly: true, quiet: true, httpsOnly: true },
+    { id: "ads", label: "Buy ads", short: "Buy ads", professionalOnly: true, quiet: true, httpsOnly: true },
   ];
+
+  /* https only (no http, no javascript:, no other schemes). */
+  function safeHttpsUrl(raw) {
+    var u = String(raw || "").trim();
+    if (!u) return "";
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) u = "https://" + u;
+    try {
+      var parsed = new URL(u);
+      return parsed.protocol === "https:" ? parsed.href : "";
+    } catch (e) {
+      return "";
+    }
+  }
 
   function safeHttpUrl(raw) {
     var u = String(raw || "").trim();
@@ -4212,11 +4229,13 @@
 
   function socialHref(id, raw) {
     if (id === "venmo") return venmoHref(raw);
+    if (id === "services" || id === "ads") return safeHttpsUrl(raw);
     return safeHttpUrl(raw);
   }
 
   function storedSocialValue(id, value) {
     if (id === "venmo") return String(value || "").trim().slice(0, 500);
+    if (id === "services" || id === "ads") return safeHttpsUrl(value);
     return safeHttpUrl(value);
   }
 
@@ -4295,13 +4314,15 @@
       if (!href) return;
       any = true;
       var a = document.createElement("a");
-      a.className = "tower-social-btn tower-social-btn--" + net.id + " is-logo";
+      /* Pro money links (Venmo, Pay for services, Buy ads): quiet secondary text buttons. */
+      var quiet = net.quiet || (net.id === "venmo" && profileKind === "professional");
+      a.className = "tower-social-btn tower-social-btn--" + net.id + (quiet ? " is-quiet" : " is-logo");
       a.href = href;
       a.target = "_blank";
       a.rel = "noopener noreferrer";
       a.title = net.label;
       a.setAttribute("aria-label", "Open " + net.label + " (opens in a new tab)");
-      if (net.logo) {
+      if (net.logo && !quiet) {
         var img = document.createElement("img");
         img.src = net.logo;
         img.alt = "";
@@ -4310,7 +4331,7 @@
         img.loading = "lazy";
         a.appendChild(img);
       } else {
-        a.textContent = net.short;
+        a.textContent = quiet ? net.label : net.short;
         a.classList.remove("is-logo");
       }
       box.appendChild(a);

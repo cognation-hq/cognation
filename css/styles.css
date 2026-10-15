@@ -13456,3 +13456,69 @@ svg.circle-bolt {
 @media (prefers-reduced-motion: reduce) {
   svg.circle-bolt { animation: none; }
 }
+
+
+/* LOOK v3.3 — each social/link is its own short chip widget (no LINKS box). */
+.tower-layout--scrapbook .tower-sticker--social-chip {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  max-height: 56px;
+  padding: 6px 10px;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--social-chip.is-spawned {
+  min-height: 40px;
+  max-height: 56px;
+  padding: 6px 10px;
+}
+.tower-social-chip-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+.tower-social-chip-body .tower-social-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  max-width: 100%;
+}
+.tower-social-chip-body .tower-social-btn img {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.tower-social-chip-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tower-social-chip-remove {
+  flex: 0 0 auto;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(209, 241, 255, 0.28);
+  background: rgba(16, 19, 48, 0.55);
+  color: #e8e4ff;
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  display: none;
+}
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-social-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Grouped LINKS / social box is gone. */
+.tower-layout--scrapbook [data-tower-widget="social"]:not([data-tower-social-chip]) {
+  display: none !important;
+}

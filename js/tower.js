@@ -92,11 +92,10 @@
      appears. Rows are DOM/phone order; a row of two is left | right. */
   var SPAWN_GAP = 24;
   var SPAWN_ROWS = {
-    /* Designer LOOK: Profile, MP3, Top Friends|Links, Badges|Calendar, Polaroid|HTML, Instax left. */
-    personal: [["avatar"], ["identity"], ["slogan"], ["music"], ["friends", "social"], ["badges", "calendar"], ["polaroid", "html"], ["instax"]],
-    /* Designer LOOK: Profile, YouTube, Links|Badges, Followers|Calendar, Custom HTML left.
-       No music / Top Friends / Polaroid / Instax on Pro. */
-    professional: [["avatar"], ["identity"], ["slogan"], ["youtube"], ["social", "badges"], ["followers", "calendar"], ["html"]],
+    /* LOOK v3.3: each social/link is its own widget. __socials__ expands to opted-in
+       chips (pairs on desktop). No grouped LINKS box. */
+    personal: [["avatar"], ["identity"], ["slogan"], ["music"], ["friends"], ["__socials__"], ["badges", "calendar"], ["polaroid", "html"], ["instax"]],
+    professional: [["avatar"], ["identity"], ["slogan"], ["youtube"], ["__socials__"], ["badges"], ["followers", "calendar"], ["html"]],
   };
   /* Factory seeds that were never a user's choice. An entry equal to one of these
      is treated as unplaced, so old overlapping defaults get a real spawn spot. */
@@ -140,8 +139,60 @@
     return !!(p && (p._profileKind === "professional" || p.kind === "professional"));
   }
 
+  function socialWidgetId(netId) {
+    return "social-" + String(netId || "");
+  }
+
+  function socialNetIdFromWidget(wid) {
+    wid = String(wid || "");
+    return wid.indexOf("social-") === 0 ? wid.slice("social-".length) : "";
+  }
+
+  function optedInSocialNetIds(p) {
+    var links = (p && p.socialLinks) || {};
+    var kind = (p && (p._profileKind || p.kind)) || "personal";
+    var widgets = (p && p.publicWidgets) || {};
+    var out = [];
+    socialLinkDefs().forEach(function (net) {
+      if (!socialNetAllowedForKind(net, kind)) return;
+      if (!socialHref(net.id, links[net.id])) return;
+      if (widgets[socialWidgetId(net.id)] === false) return;
+      out.push(net.id);
+    });
+    return out;
+  }
+
+  function expandSpawnRows(rows, p) {
+    var out = [];
+    (rows || []).forEach(function (row) {
+      if (row.length === 1 && row[0] === "__socials__") {
+        var ids = optedInSocialNetIds(p).map(socialWidgetId);
+        var i;
+        for (i = 0; i < ids.length; i += 2) {
+          out.push(ids.slice(i, i + 2));
+        }
+        return;
+      }
+      out.push(row.slice());
+    });
+    return out;
+  }
+
   function spawnRowsFor(p) {
-    return isProTower(p) ? SPAWN_ROWS.professional : SPAWN_ROWS.personal;
+    var base = isProTower(p) ? SPAWN_ROWS.professional : SPAWN_ROWS.personal;
+    return expandSpawnRows(base, p);
+  }
+
+  function migrateGroupedSocialLayout(p) {
+    if (!p || !p.widgetLayout || typeof p.widgetLayout !== "object") return;
+    var old = p.widgetLayout.social;
+    if (!old || typeof old !== "object") return;
+    var first = optedInSocialNetIds(p)[0];
+    if (first) {
+      var wid = socialWidgetId(first);
+      if (!p.widgetLayout[wid]) p.widgetLayout[wid] = old;
+    }
+    delete p.widgetLayout.social;
   }
 
   function rectsOverlap(a, b, gap) {
@@ -231,7 +282,7 @@
     });
   }
 
-  /* v3.1 hamburger strip: avatar | name/@handle/quote. SPAWN_ROWS order unchanged. */
+  /* v3.2/v3.3 hamburger strip: avatar | name/@handle/quote. */
   function ensureProfileStrip(stage, p) {
     if (!stage) return;
     unwrapProfileStrip(stage);
@@ -3392,13 +3443,13 @@
 
   var SOCIAL_NETWORKS = [
     { id: "x", label: "X", short: "X", logo: "assets/social/x.png" },
-    { id: "meta", label: "Meta", short: "Meta", logo: "assets/social/meta.svg" },
+    { id: "meta", label: "Facebook", short: "FB", logo: "assets/social/meta.svg" },
     { id: "instagram", label: "Instagram", short: "IG", logo: "assets/social/instagram.png" },
     { id: "youtube", label: "YouTube", short: "YT", logo: "assets/social/youtube.png" },
     { id: "tiktok", label: "TikTok", short: "TT", logo: "assets/social/tiktok.svg" },
     { id: "linkedin", label: "LinkedIn", short: "in", logo: "assets/social/linkedin.png", professionalOnly: true },
     { id: "venmo", label: "Venmo", short: "Vm", logo: "assets/social/venmo.svg" },
-    { id: "linktree", label: "Linktree", short: "Lt", logo: "assets/social/linktree.svg", professionalOnly: true },
+    { id: "linktree", label: "Website", short: "Web", logo: "assets/social/linktree.svg", professionalOnly: true },
     /* NEW (not restored): owner-set outbound link on Pro. A plain https link out;
        Cognation takes no payment, stores no card data and calls no service. */
     { id: "services", label: "Pay for services", short: "Pay for services", professionalOnly: true, quiet: true, httpsOnly: true },
@@ -4368,22 +4419,13 @@
     applyPublicWidgets(root, saved);
   }
 
-  function renderSocialLinks(root, p) {
-    var box = root.querySelector("[data-tower-social-links]");
-    if (!box) return;
+  function syncEditSocialFields(root, p) {
     var links = (p && p.socialLinks) || {};
     var profileKind = (p && (p._profileKind || p.kind)) || "personal";
     socialLinkDefs().forEach(function (net) {
       var formInput = root.querySelector('[data-tower-social="' + net.id + '"]');
       if (!formInput) return;
-      var fieldWrap =
-        formInput.closest(".tower-social-field") ||
-        formInput.closest("[data-tower-social-field]") ||
-        formInput.previousElementSibling;
       var allowed = socialNetAllowedForKind(net, profileKind);
-      if (fieldWrap && fieldWrap.tagName === "LABEL") {
-        /* label sits above input — hide label+input via parent form-group row when possible */
-      }
       var label = root.querySelector('label[for="' + formInput.id + '"]');
       if (!allowed) {
         formInput.hidden = true;
@@ -4394,44 +4436,129 @@
       if (label) label.hidden = false;
       if (document.activeElement !== formInput) formInput.value = links[net.id] || "";
     });
-    if (box.contains(document.activeElement)) return;
-    box.innerHTML = "";
-    var any = false;
-    socialLinkDefs().forEach(function (net) {
-      if (!socialNetAllowedForKind(net, profileKind)) return;
-      var raw = links[net.id] || "";
-      var href = socialHref(net.id, raw);
-      if (!href) return;
-      any = true;
-      var a = document.createElement("a");
-      /* Pro money links (Venmo, Pay for services, Buy ads): quiet secondary text buttons. */
-      var quiet = net.quiet || (net.id === "venmo" && profileKind === "professional");
-      a.className = "tower-social-btn tower-social-btn--" + net.id + (quiet ? " is-quiet" : " is-logo");
-      a.href = href;
-      a.target = "_blank";
-      a.rel = "noopener noreferrer";
-      a.title = net.label;
-      a.setAttribute("aria-label", "Open " + net.label + " (opens in a new tab)");
-      if (net.logo && !quiet) {
-        var img = document.createElement("img");
-        img.src = net.logo;
-        img.alt = "";
-        img.setAttribute("aria-hidden", "true");
-        img.decoding = "async";
-        img.loading = "lazy";
-        a.appendChild(img);
-      } else {
-        a.textContent = quiet ? net.label : net.short;
-        a.classList.remove("is-logo");
-      }
-      box.appendChild(a);
-    });
-    box.hidden = !any;
-    var sticker = box.closest('[data-tower-widget="social"]');
-    if (sticker) {
-      sticker.hidden = !any;
-      sticker.classList.toggle("is-widget-off", !any);
+  }
+
+  function removeSocialWidget(root, netId) {
+    if (!isTowerOwner(TowerProfileStore.get())) return;
+    var p = TowerProfileStore.get();
+    if (!p.socialLinks || typeof p.socialLinks !== "object") p.socialLinks = {};
+    p.socialLinks[netId] = "";
+    writeSocialLinksLocal(p._profileId, p.socialLinks);
+    if (p.widgetLayout && p.widgetLayout[socialWidgetId(netId)]) {
+      delete p.widgetLayout[socialWidgetId(netId)];
     }
+    TowerProfileStore.save(p);
+    try {
+      if (window.CognationTowerLayoutSync && CognationTowerLayoutSync.savePublic) {
+        CognationTowerLayoutSync.savePublic(TowerProfileStore.get());
+      }
+    } catch (eRem) {}
+    renderSocialLinks(root, TowerProfileStore.get());
+    applyPublicWidgets(root, TowerProfileStore.get());
+    try { spawnUnplacedWidgets(root, TowerProfileStore.get()); } catch (eSp) {}
+  }
+
+  /* v3.3: one [data-tower-widget] per linked social — never a grouped LINKS box. */
+  function renderSocialLinks(root, p) {
+    if (!root) return;
+    migrateGroupedSocialLayout(p);
+    syncEditSocialFields(root, p);
+    var stage = root.querySelector("[data-tower-scrapbook]");
+    if (!stage) return;
+    var links = (p && p.socialLinks) || {};
+    var profileKind = (p && (p._profileKind || p.kind)) || "personal";
+    var wanted = {};
+    optedInSocialNetIds(p).forEach(function (id) { wanted[id] = true; });
+
+    /* Drop legacy grouped box and any social chip that is no longer opted in. */
+    stage.querySelectorAll('[data-tower-widget="social"]').forEach(function (el) {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    });
+    stage.querySelectorAll("[data-tower-widget]").forEach(function (el) {
+      var wid = el.getAttribute("data-tower-widget") || "";
+      var netId = socialNetIdFromWidget(wid);
+      if (!netId) return;
+      if (!wanted[netId]) {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      }
+    });
+
+    socialLinkDefs().forEach(function (net) {
+      if (!wanted[net.id]) return;
+      var wid = socialWidgetId(net.id);
+      var href = socialHref(net.id, links[net.id]);
+      var el = stage.querySelector('[data-tower-widget="' + wid + '"]');
+      if (!el) {
+        el = document.createElement("div");
+        el.className = "tower-sticker tower-sticker--social-chip tower-sticker--social-" + net.id;
+        el.setAttribute("data-tower-widget", wid);
+        el.setAttribute("data-tower-social-chip", net.id);
+        el.setAttribute("data-sticker-label", net.label);
+        var handle = document.createElement("button");
+        handle.type = "button";
+        handle.className = "tower-sticker-handle";
+        handle.setAttribute("data-tower-sticker-handle", "");
+        handle.setAttribute("aria-label", "Move " + net.label + " sticker");
+        handle.tabIndex = -1;
+        handle.hidden = true;
+        handle.textContent = "⋮⋮";
+        el.appendChild(handle);
+        var body = document.createElement("div");
+        body.className = "tower-social-chip-body";
+        el.appendChild(body);
+        var rm = document.createElement("button");
+        rm.type = "button";
+        rm.className = "tower-social-chip-remove";
+        rm.setAttribute("data-tower-social-remove", net.id);
+        rm.setAttribute("aria-label", "Remove " + net.label);
+        rm.textContent = "×";
+        el.appendChild(rm);
+        stage.appendChild(el);
+      }
+      var quiet = net.quiet || (net.id === "venmo" && profileKind === "professional");
+      var bodyEl = el.querySelector(".tower-social-chip-body");
+      if (bodyEl) {
+        bodyEl.innerHTML = "";
+        var a = document.createElement("a");
+        a.className = "tower-social-btn tower-social-btn--" + net.id + (quiet ? " is-quiet" : " is-logo");
+        a.href = href;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.title = net.label;
+        a.setAttribute("aria-label", "Open " + net.label + " (opens in a new tab)");
+        if (net.logo && !quiet) {
+          var img = document.createElement("img");
+          img.src = net.logo;
+          img.alt = "";
+          img.setAttribute("aria-hidden", "true");
+          img.decoding = "async";
+          img.loading = "lazy";
+          a.appendChild(img);
+          var lab = document.createElement("span");
+          lab.className = "tower-social-chip-label";
+          lab.textContent = net.label;
+          a.appendChild(lab);
+        } else {
+          a.textContent = quiet ? net.label : net.short;
+          a.classList.remove("is-logo");
+        }
+        bodyEl.appendChild(a);
+      }
+      el.hidden = false;
+      el.classList.remove("is-widget-off");
+    });
+
+    if (!root.__cognationSocialRemoveBound) {
+      root.__cognationSocialRemoveBound = true;
+      root.addEventListener("click", function (ev) {
+        var btn = ev.target && ev.target.closest && ev.target.closest("[data-tower-social-remove]");
+        if (!btn || !root.contains(btn)) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        removeSocialWidget(root, btn.getAttribute("data-tower-social-remove"));
+      });
+    }
+    syncOwnerStickerHandles(root);
   }
 
   function getFriendPinLayout(p) {
@@ -5423,6 +5550,7 @@
   }
 
   function applyPublicWidgets(root, p) {
+    try { renderSocialLinks(root, p); } catch (eSoc) {}
     applyPublicWidgetsInner(root, p);
     /* Visibility changed: give newly shown, unplaced widgets their spawn spot. */
     spawnUnplacedWidgets(root, p);
@@ -5454,7 +5582,11 @@
       if (id === "slogan" && !sloganText) on = false;
       /* Auto-prune empty shells so ghost handles do not linger on personal scrapbooks */
       if (id === "html" && !htmlText) on = false;
-      if (id === "social") on = profileHasSocialLinks(p);
+      if (id === "social") on = false; /* grouped LINKS box removed (v3.3) */
+      if (socialNetIdFromWidget(id)) {
+        var netFromW = socialNetIdFromWidget(id);
+        on = optedInSocialNetIds(p).indexOf(netFromW) >= 0;
+      }
       if (id === "music") {
         var personalMusic = !isProTower(p);
         if (!personalMusic) {
@@ -9527,6 +9659,8 @@
     if (publicHtml) {
       publicHtml.innerHTML = sanitizeProfileHtml(p.customHtml || "");
     }
+    /* Social chips must exist before spawn packs __socials__ rows. */
+    renderSocialLinks(root, p);
     applyWidgetLayout(root, p);
     applyPublicWidgets(root, p);
     syncPublicWidgetsForm(root, p);
@@ -9540,7 +9674,6 @@
     renderFriendsPicker(root, p);
     applyPublicWidgets(root, p);
     syncOwnerStickerHandles(root);
-    renderSocialLinks(root, p);
 
     var titleIn = root.querySelector("[data-tower-music-title]");
     var artistIn = root.querySelector("[data-tower-music-artist]");

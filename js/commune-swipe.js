@@ -61,23 +61,24 @@
   REPEATABLE[TYPE.CONTENT] = true;
 
   var SITE_ROOM_BODY = "Cognation hosts this room.";
+  /* sqlId matches supabase/migrations/20261015_chat_rooms.sql catalog seed. */
   var SITE_ROOMS = [
-    { id: "room-site-18-21", title: "18–21", topic: "18–21", gate: "age-18-21" },
-    { id: "room-site-highschool", title: "Highschool", topic: "highschool", gate: "highschool" },
-    { id: "room-site-moms", title: "Moms", topic: "moms", gate: "interest", interests: ["mom", "moms", "mother", "mothers"] },
-    { id: "room-site-tech-ai", title: "Tech/AI", topic: "tech/ai", gate: "interest", interests: ["tech", "technology", "ai", "artificial intelligence"] },
-    { id: "room-site-speed-dating", title: "Speed dating", topic: "speed dating", gate: "speed-dating" },
-    { id: "room-site-21", title: "21+", topic: "21+", gate: "age-21" },
-    { id: "room-site-disability", title: "Disability help", topic: "disability help", gate: "interest", interests: ["disability", "disabilities", "disability help"] },
-    { id: "room-site-mental-health", title: "Mental health", topic: "mental health", gate: "interest", interests: ["mental health"] },
-    { id: "room-site-military", title: "Military", topic: "military", gate: "interest", interests: ["military", "veteran", "veterans"] },
-    { id: "room-site-lgbtq", title: "LGBTQ", topic: "lgbtq", gate: "interest", interests: ["lgbtq", "lgbtq+", "lgbt"] },
-    { id: "room-site-public-policy", title: "Public policy", topic: "public policy", gate: "interest", interests: ["public policy"] },
-    { id: "room-site-gamers", title: "Gamers", topic: "gamers", gate: "interest", interests: ["gamer", "gamers", "gaming"] },
-    { id: "room-site-jobs", title: "Jobs", topic: "jobs", gate: "interest", interests: ["job", "jobs"] },
-    { id: "room-site-garage-sale", title: "Garage sale", topic: "garage sale", gate: "interest", interests: ["garage sale"] },
-    { id: "room-site-reality", title: "Reality shows", topic: "reality shows", gate: "interest", interests: ["reality show", "reality shows", "reality tv"] },
-    { id: "room-site-insurance", title: "Insurance", topic: "insurance", gate: "interest", interests: ["insurance"] },
+    { id: "room-site-18-21", sqlId: "a1000000-0000-4000-8000-000000000001", slug: "18-21", title: "18–21", topic: "18–21", gate: "age-18-21" },
+    { id: "room-site-highschool", sqlId: "a1000000-0000-4000-8000-000000000002", slug: "highschool", title: "Highschool", topic: "highschool", gate: "highschool" },
+    { id: "room-site-moms", sqlId: "a1000000-0000-4000-8000-000000000003", slug: "moms", title: "Moms", topic: "moms", gate: "interest", interests: ["mom", "moms", "mother", "mothers"] },
+    { id: "room-site-tech-ai", sqlId: "a1000000-0000-4000-8000-000000000004", slug: "tech-ai", title: "Tech/AI", topic: "tech/ai", gate: "interest", interests: ["tech", "technology", "ai", "artificial intelligence"] },
+    { id: "room-site-speed-dating", sqlId: "a1000000-0000-4000-8000-000000000005", slug: "speed-dating", title: "Speed dating", topic: "speed dating", gate: "speed-dating" },
+    { id: "room-site-21", sqlId: "a1000000-0000-4000-8000-000000000006", slug: "21-plus", title: "21+", topic: "21+", gate: "age-21" },
+    { id: "room-site-disability", sqlId: "a1000000-0000-4000-8000-000000000007", slug: "disability-help", title: "Disability help", topic: "disability help", gate: "interest", interests: ["disability", "disabilities", "disability help"] },
+    { id: "room-site-mental-health", sqlId: "a1000000-0000-4000-8000-000000000008", slug: "mental-health", title: "Mental health", topic: "mental health", gate: "interest", interests: ["mental health"] },
+    { id: "room-site-military", sqlId: "a1000000-0000-4000-8000-000000000009", slug: "military", title: "Military", topic: "military", gate: "interest", interests: ["military", "veteran", "veterans"] },
+    { id: "room-site-lgbtq", sqlId: "a1000000-0000-4000-8000-00000000000a", slug: "lgbtq", title: "LGBTQ", topic: "lgbtq", gate: "interest", interests: ["lgbtq", "lgbtq+", "lgbt"] },
+    { id: "room-site-public-policy", sqlId: "a1000000-0000-4000-8000-00000000000b", slug: "public-policy", title: "Public policy", topic: "public policy", gate: "interest", interests: ["public policy"] },
+    { id: "room-site-gamers", sqlId: "a1000000-0000-4000-8000-00000000000c", slug: "gamers", title: "Gamers", topic: "gamers", gate: "interest", interests: ["gamer", "gamers", "gaming"] },
+    { id: "room-site-jobs", sqlId: "a1000000-0000-4000-8000-00000000000d", slug: "jobs", title: "Jobs", topic: "jobs", gate: "interest", interests: ["job", "jobs"] },
+    { id: "room-site-garage-sale", sqlId: "a1000000-0000-4000-8000-00000000000e", slug: "garage-sale", title: "Garage sale", topic: "garage sale", gate: "interest", interests: ["garage sale"] },
+    { id: "room-site-reality", sqlId: "a1000000-0000-4000-8000-00000000000f", slug: "reality-shows", title: "Reality shows", topic: "reality shows", gate: "interest", interests: ["reality show", "reality shows", "reality tv"] },
+    { id: "room-site-insurance", sqlId: "a1000000-0000-4000-8000-000000000010", slug: "insurance", title: "Insurance", topic: "insurance", gate: "interest", interests: ["insurance"] },
   ];
 
   /* Honest-thin Classroom / webinar cards — life skills for ~18+ (insurance, voting, business). */
@@ -558,6 +559,8 @@
   function roomCard(room) {
     return {
       id: room.id,
+      sqlId: room.sqlId || "",
+      slug: room.slug || "",
       type: TYPE.CHAT,
       title: room.title,
       body: SITE_ROOM_BODY,
@@ -1145,6 +1148,11 @@
     pointer: null,
     roomId: "",
     classroomId: "",
+    /* Live chat_rooms SQL path (step 2b). chatSchema: null | "ok" | "missing" */
+    liveRoom: false,
+    roomSqlId: "",
+    chatSchema: null,
+    liveMessages: [],
   };
 
   function typeLabel(t) {
@@ -1350,8 +1358,13 @@
         html += '<p class="commune-card-meta">Book on the calendar, or follow this professional page.</p>';
       }
       if (card.type === TYPE.CHAT) {
-        html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room (local demo)</button>';
-        html += '<p class="commune-card-meta">Local demo on this device — not a live group yet. Messages stay in this browser.</p>';
+        if (liveChatEligible()) {
+          html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room</button>';
+          html += '<p class="commune-card-meta">Live group chat — up to 12 people. Keep it kind.</p>';
+        } else {
+          html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room (local demo)</button>';
+          html += '<p class="commune-card-meta">Local demo on this device — not a live group yet. Messages stay in this browser.</p>';
+        }
       }
       if (card.type === TYPE.CLASSROOM) {
         html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
@@ -1442,6 +1455,205 @@
     }
   }
 
+
+  /* ---- Live chat_rooms (SQL / RPCs) — step 2b -------------------------------- */
+  function supabaseLiveSession() {
+    var sb = window.CognationSupabase;
+    if (!sb || typeof sb.configured !== "function" || !sb.configured()) return null;
+    if (typeof sb.getSession !== "function") return null;
+    var sess = sb.getSession();
+    if (!sess || !sess.access_token) return null;
+    return sess;
+  }
+
+  function liveChatEligible() {
+    /* Signed-in Supabase session + schema not known-missing. */
+    if (!supabaseLiveSession()) return false;
+    if (state.chatSchema === "missing") return false;
+    return typeof window.CognationSupabase.rpc === "function"
+      && typeof window.CognationSupabase.rest === "function";
+  }
+
+  function chatErrorText(err) {
+    var parts = [];
+    if (!err) return "";
+    if (err.message) parts.push(String(err.message));
+    var body = err.body;
+    if (body && typeof body === "object") {
+      ["message", "details", "hint", "code", "error", "msg"].forEach(function (k) {
+        if (body[k]) parts.push(String(body[k]));
+      });
+    } else if (typeof body === "string") {
+      parts.push(body);
+    }
+    return parts.join(" ");
+  }
+
+  function isChatSchemaMissing(err) {
+    var text = chatErrorText(err);
+    if (!text) return false;
+    var tableGone =
+      /chat_rooms|chat_room_members|chat_room_messages/i.test(text) &&
+      /(does not exist|PGRST205|PGRST116|42P01|schema cache|Could not find the table|relation)/i.test(text);
+    var rpcGone =
+      /Could not find the function.*join_chat_room/i.test(text) ||
+      (/PGRST202/.test(text) && /join_chat_room/i.test(text));
+    return tableGone || rpcGone;
+  }
+
+  function mapChatRoomError(err) {
+    var text = chatErrorText(err);
+    var codes = [
+      ["under_13", "Chat rooms are for members 13+. Update your birth year and month in your profile."],
+      ["rating_blocked", "This room's rating is not available for your account."],
+      ["blocked", "You can't join this room because of a block."],
+      ["room_full", "This room is full (12 people). Try another room or come back later."],
+      ["not_a_member", "Join the room before posting."],
+      ["room_not_found", "That room is not available right now."],
+      ["bad_body", "Message must be 1–500 characters."],
+      ["Sign in first", "Sign in to join the live room."],
+    ];
+    var i;
+    for (i = 0; i < codes.length; i++) {
+      if (text.indexOf(codes[i][0]) !== -1) {
+        return { code: codes[i][0], message: codes[i][1] };
+      }
+    }
+    return { code: "unknown", message: "Could not open the live room. Try again in a moment." };
+  }
+
+  function seedBadgeForAuthor(author) {
+    if (!author) return "";
+    var rec = {
+      accountKind: author.account_kind || author.accountKind || "real",
+      handle: author.handle || "",
+      display_name: author.display_name || author.displayName || "",
+      seedFleetId: author.seed_fleet_id || author.seedFleetId || "",
+      isSeed: author.account_kind === "seed" || author.accountKind === "seed",
+      isOpsBot: author.account_kind === "ops" || author.accountKind === "ops",
+    };
+    if (window.CognationSeedOpsBadge && typeof window.CognationSeedOpsBadge.badgeHtml === "function") {
+      try {
+        return window.CognationSeedOpsBadge.badgeHtml(rec) || "";
+      } catch (eB) {}
+    }
+    if (rec.isOpsBot) {
+      return '<span class="seedops-demo-badge" role="status" data-account-kind="ops">Ops · demo</span>';
+    }
+    if (rec.isSeed || /^seed-/.test(String(rec.handle || "").toLowerCase())) {
+      return '<span class="seedops-demo-badge" role="status" data-account-kind="seed">Demo · seed</span>';
+    }
+    return "";
+  }
+
+  function mapLiveMessage(row) {
+    var author = (row && row.author) || {};
+    var name = author.display_name || author.handle || "Member";
+    return {
+      id: row.id,
+      senderName: name,
+      body: row.body || "",
+      at: row.created_at || "",
+      authorUserId: row.author_user_id || "",
+      authorProfileId: row.author_profile_id || (author.id || ""),
+      accountKind: author.account_kind || "real",
+      handle: author.handle || "",
+      seedFleetId: author.seed_fleet_id || "",
+      author: author,
+    };
+  }
+
+  function fetchLiveMessages(sqlId) {
+    var sb = window.CognationSupabase;
+    var q =
+      "select=id,body,created_at,author_user_id,author_profile_id," +
+      "author:profiles!author_profile_id(id,display_name,handle,account_kind,seed_fleet_id)" +
+      "&room_id=eq." + encodeURIComponent(sqlId) +
+      "&order=created_at.asc&limit=100";
+    return sb.rest("chat_room_messages", { query: q }).then(
+      function (rows) {
+        state.chatSchema = "ok";
+        return (Array.isArray(rows) ? rows : []).map(mapLiveMessage);
+      },
+      function (err) {
+        if (isChatSchemaMissing(err)) {
+          state.chatSchema = "missing";
+          throw err;
+        }
+        /* Embed may fail on older PostgREST; fall back without author join. */
+        var plain =
+          "select=id,body,created_at,author_user_id,author_profile_id" +
+          "&room_id=eq." + encodeURIComponent(sqlId) +
+          "&order=created_at.asc&limit=100";
+        return sb.rest("chat_room_messages", { query: plain }).then(function (rows) {
+          state.chatSchema = "ok";
+          return (Array.isArray(rows) ? rows : []).map(mapLiveMessage);
+        });
+      }
+    );
+  }
+
+  function joinLiveRoom(sqlId) {
+    return window.CognationSupabase.rpc("join_chat_room", { p_room_id: sqlId }).then(
+      function (row) {
+        state.chatSchema = "ok";
+        return row;
+      },
+      function (err) {
+        if (isChatSchemaMissing(err)) state.chatSchema = "missing";
+        throw err;
+      }
+    );
+  }
+
+  function leaveLiveRoom(sqlId) {
+    if (!sqlId || !liveChatEligible()) return Promise.resolve();
+    return window.CognationSupabase.rpc("leave_chat_room", { p_room_id: sqlId }).then(
+      function () { return true; },
+      function () { return false; }
+    );
+  }
+
+  function postLiveMessage(sqlId, body) {
+    return window.CognationSupabase.rpc("post_chat_room_message", {
+      p_room_id: sqlId,
+      p_body: body,
+    }).then(
+      function (row) {
+        state.chatSchema = "ok";
+        return row;
+      },
+      function (err) {
+        if (isChatSchemaMissing(err)) state.chatSchema = "missing";
+        throw err;
+      }
+    );
+  }
+
+  function paintLiveLog(messages) {
+    var panel = state.shell && state.shell.querySelector("[data-commune-room]");
+    if (!panel) return;
+    var log = panel.querySelector("[data-commune-room-log]");
+    if (!log) return;
+    log.innerHTML = "";
+    if (!messages || !messages.length) {
+      var empty = document.createElement("p");
+      empty.className = "commune-room-line commune-room-line--meta";
+      empty.textContent = "Live room — say hello. Keep it kind.";
+      log.appendChild(empty);
+      return;
+    }
+    messages.forEach(function (msg) {
+      var p = document.createElement("p");
+      p.className = "commune-room-line";
+      var name = escapeHtml(msg.senderName || "Member");
+      var badge = seedBadgeForAuthor(msg.author || msg);
+      var body = escapeHtml(msg.body || "");
+      p.innerHTML = "<strong>" + name + "</strong>" + (badge ? " " + badge : "") + ": " + body;
+      log.appendChild(p);
+    });
+  }
+
   function roomLog(roomId) {
     var doc = readJson(localStorage, ROOM_CHAT_KEY, {});
     if (!doc[roomId]) {
@@ -1455,32 +1667,87 @@
     }
     return doc;
   }
-  function paintRoom(room) {
+  function paintRoom(room, opts) {
+    opts = opts || {};
     var panel = state.shell.querySelector("[data-commune-room]");
     if (!panel || !room) return;
     var title = panel.querySelector("[data-commune-room-title]");
     var topic = panel.querySelector("[data-commune-room-topic]");
     var log = panel.querySelector("[data-commune-room-log]");
+    var kicker = panel.querySelector(".commune-card-kicker");
     if (title) title.textContent = room.title || "Room";
     if (topic) topic.textContent = room.body || room.topic || "";
+    if (kicker) {
+      kicker.textContent = opts.live
+        ? "Chatroom · live · hosted by Cognation"
+        : "Chatroom · local demo · hosted by Cognation";
+    }
     if (log) {
-      log.innerHTML = "";
-      var doc = roomLog(room.id);
-      (doc[room.id] || []).forEach(function (msg) {
-        var p = document.createElement("p");
-        p.className = "commune-room-line";
-        p.textContent = (msg.senderName || "Cognation") + ": " + (msg.body || "");
-        log.appendChild(p);
-      });
+      if (opts.live) {
+        paintLiveLog(opts.messages || state.liveMessages || []);
+      } else {
+        log.innerHTML = "";
+        var doc = roomLog(room.id);
+        (doc[room.id] || []).forEach(function (msg) {
+          var p = document.createElement("p");
+          p.className = "commune-room-line";
+          p.textContent = (msg.senderName || "Cognation") + ": " + (msg.body || "");
+          log.appendChild(p);
+        });
+      }
     }
     showRoom(true);
     state.roomId = room.id;
+    state.liveRoom = !!opts.live;
+    state.roomSqlId = opts.live ? String(room.sqlId || opts.sqlId || "") : "";
+    if (opts.live && opts.messages) state.liveMessages = opts.messages;
   }
+  function openDemoRoom(room, scroll) {
+    closeClassroom();
+    paintRoom(room, { live: false });
+    setStatus("Local demo room — only you are here. Live group chat comes later.");
+    friction("begin", "chat", "chatroom:" + room.id);
+    if (scroll && state.shell && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
+    return true;
+  }
+
+  function openLiveRoom(room, scroll) {
+    var sqlId = String(room.sqlId || "");
+    if (!sqlId) return Promise.resolve(openDemoRoom(room, scroll));
+    setStatus("Joining live room…");
+    closeClassroom();
+    return joinLiveRoom(sqlId).then(function () {
+      return fetchLiveMessages(sqlId).then(function (messages) {
+        paintRoom(room, { live: true, sqlId: sqlId, messages: messages });
+        setStatus("You're in " + (room.title || "the room") + " — live group chat (up to 12).");
+        friction("begin", "chat", "chatroom:" + room.id);
+        if (scroll && state.shell && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
+        return true;
+      });
+    }).catch(function (err) {
+      if (isChatSchemaMissing(err) || state.chatSchema === "missing") {
+        setStatus("Live rooms aren't ready yet — opening local demo.");
+        return openDemoRoom(room, scroll);
+      }
+      var mapped = mapChatRoomError(err);
+      setStatus(mapped.message);
+      return false;
+    });
+  }
+
   function openRoom(roomId, scroll) {
     roomId = String(roomId || "");
     var rooms = ensureSiteRooms();
     var room = null;
-    rooms.forEach(function (item) { if (item.id === roomId) room = item; });
+    /* Prefer catalog match; also accept sqlId for live wiring. */
+    rooms.forEach(function (item) {
+      if (item.id === roomId || item.sqlId === roomId) room = item;
+    });
+    if (!room) {
+      SITE_ROOMS.forEach(function (item) {
+        if (item.id === roomId || item.sqlId === roomId) room = roomCard(item);
+      });
+    }
     if (!room) {
       setStatus("That room is not available right now.");
       return false;
@@ -1489,12 +1756,11 @@
       setStatus("Commune is still loading. Try Open again in a moment.");
       return false;
     }
-    closeClassroom();
-    paintRoom(room);
-    setStatus("Local demo room — only you are here. Live group chat comes later.");
-    friction("begin", "chat", "chatroom:" + roomId);
-    if (scroll && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
-    return true;
+    if (liveChatEligible()) {
+      openLiveRoom(room, scroll);
+      return true;
+    }
+    return openDemoRoom(room, scroll);
   }
   function clearPointer() {
     var el = state.pointer && state.pointer.el;
@@ -1507,13 +1773,21 @@
 
   function releaseRoomSurface() {
     /* Drop open-room lock and restore deck/actions so the card can swipe again. */
+    var wasLive = state.liveRoom;
+    var sqlId = state.roomSqlId;
     state.roomId = "";
+    state.liveRoom = false;
+    state.roomSqlId = "";
+    state.liveMessages = [];
     showRoom(false);
     clearPointer();
     try {
       var input = state.shell && state.shell.querySelector("[data-commune-room-input]");
       if (input && typeof input.blur === "function") input.blur();
     } catch (eBlur) {}
+    if (wasLive && sqlId) {
+      try { leaveLiveRoom(sqlId); } catch (eLeave) {}
+    }
   }
 
   function closeRoom() {
@@ -2022,20 +2296,41 @@
       form.addEventListener("submit", function (ev) {
         ev.preventDefault();
         var input = shell.querySelector("[data-commune-room-input]");
-        var text = input ? String(input.value || "").trim() : "";
-        if (!text || !state.roomId) return;
+        var body = input ? String(input.value || "").trim() : "";
+        if (!body || !state.roomId) return;
+        body = body.slice(0, 500);
+        if (state.liveRoom && state.roomSqlId) {
+          var sqlId = state.roomSqlId;
+          setStatus("Sending…");
+          postLiveMessage(sqlId, body).then(function () {
+            if (input) input.value = "";
+            return fetchLiveMessages(sqlId).then(function (messages) {
+              state.liveMessages = messages;
+              paintLiveLog(messages);
+              friction("complete", "chat");
+              setStatus("Sent to the live room.");
+            });
+          }).catch(function (err) {
+            if (isChatSchemaMissing(err)) {
+              setStatus("Live rooms dropped — message not sent. Try again after the migration.");
+              return;
+            }
+            var mapped = mapChatRoomError(err);
+            setStatus(mapped.message);
+          });
+          return;
+        }
         var doc = roomLog(state.roomId);
         doc[state.roomId].push({
           id: "m" + Date.now().toString(36),
           senderName: "You",
-          body: text.slice(0, 500),
+          body: body,
           at: new Date().toISOString(),
         });
         writeJson(localStorage, ROOM_CHAT_KEY, doc);
         if (input) input.value = "";
         friction("complete", "chat");
-        /* Return to the deck after send so the chatroom card stays swipeable.
-           Keeping roomId set (paintRoom) left swipe() / keyboard / actions locked. */
+        /* Demo path: return to the deck after send so the card stays swipeable. */
         releaseRoomSurface();
         setStatus("Sent. Swipe when you are ready.");
       });
@@ -2077,6 +2372,8 @@
   window.CognationCommuneSwipe = {
     rebuild: rebuildDeck,
     openRoom: openRoom,
+    liveChatEligible: liveChatEligible,
+    mapChatRoomError: mapChatRoomError,
     openClassroom: openClassroom,
     closeClassroom: closeClassroom,
     classroomCatalog: classroomCatalog,

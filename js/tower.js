@@ -2514,8 +2514,8 @@
       btn.tabIndex = on ? 0 : -1;
     });
     var toggle = root.querySelector("[data-tower-side-toggle]");
-    /* Cap 250: drop Connections | Public profile pill chrome. Owners switch via quiet jump links. */
-    if (toggle) toggle.hidden = true;
+    /* Private | Public switch restored (hidden by #59). Owner only. */
+    if (toggle) toggle.hidden = !owner;
     root.querySelectorAll("[data-tower-side-jump]").forEach(function (jump) {
       jump.hidden = !owner;
       var target = jump.getAttribute("data-tower-side-jump");
@@ -4813,11 +4813,23 @@
     var mutual = box.querySelector("[data-tower-followers-mutual]");
     var list = box.querySelector("[data-tower-followers-results]");
     var input = box.querySelector("[data-tower-followers-find]");
+    /* Search followers restored (hidden by #59, moved by #117). Shown to owner and
+       visitors on Professional pages, as before #59. */
+    var q = "";
     if (input) {
-      input.hidden = true;
-      input.setAttribute("hidden", "");
+      input.hidden = false;
+      input.removeAttribute("hidden");
       var searchLabel = box.querySelector('label[for="' + input.id + '"]');
-      if (searchLabel) searchLabel.hidden = true;
+      if (searchLabel) searchLabel.hidden = false;
+      q = String(input.value || "").trim().toLowerCase();
+    }
+    var shownEdges = edges;
+    if (q) {
+      shownEdges = edges.filter(function (edge) {
+        var fid = String((edge && edge.id) || "");
+        var label = String(followerDisplayName(fid) || fid).toLowerCase();
+        return label.indexOf(q) !== -1 || fid.toLowerCase().indexOf(q) !== -1;
+      });
     }
     if (list) list.innerHTML = "";
     if (note) {
@@ -4832,7 +4844,7 @@
       mutual.hidden = !line;
     }
     if (!list) return;
-    edges.slice(0, 12).forEach(function (edge) {
+    shownEdges.slice(0, 12).forEach(function (edge) {
       var id = String(edge.id || "");
       var face = normalizeFollowerFace(edge.face);
       var label = followerDisplayName(id) || id;

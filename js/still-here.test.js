@@ -101,4 +101,13 @@ assert.ok(strokes.length >= 50, "bolt has visible strokes (" + strokes.length + 
 assert.ok(!/\.circle-lightning\s*\{[^}]*(display:\s*none|opacity:\s*0[;\s]|visibility:\s*hidden)/.test(css), "lightning not hidden by CSS");
 assert.ok(/svg\.circle-bolt\s*\{[^}]*opacity:\s*1/.test(css) && /pulse-bolt-crackle/.test(css), "bolt visible with crackle");
 
+/* Tower Private|Public switch and Search followers (restored after #59/#117), switch owner only, Search followers for everyone on Professional */
+assert.ok(/data-tower-side-toggle[^>]*>/.test(html) && !/data-tower-side-toggle[^>]*hidden>/.test(html), "Private|Public switch in markup, not hard-hidden");
+assert.ok(/data-tower-side-btn="private"/.test(html) && /data-tower-side-btn="public"/.test(html), "both side buttons");
+assert.ok(/toggle\.hidden = !owner;/.test(tower), "switch shows for owner only");
+assert.ok(!/\[data-tower-side-toggle\]\s*\{\s*display:\s*none/.test(css), "switch not forced off by CSS");
+assert.ok(/\[data-tower-app\]:not\(\[data-tower-is-owner="true"\]\) \[data-tower-side-toggle\]/.test(css), "non-owners never see the switch");
+assert.ok(/data-tower-followers-find/.test(html), "Search followers box in markup");
+assert.ok(/input\.hidden = false;/.test(tower) && !/searchOwner/.test(tower) && /shownEdges = edges\.filter/.test(tower), "Search followers shows for owner and visitors on Professional, and filters");
+
 console.log("still-here.test.js: OK");

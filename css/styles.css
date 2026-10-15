@@ -5619,8 +5619,6 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .tower-side-toggle[hidden] {
   display: none !important;
 }
-/* Cap 250: Connections|Public pill dropped from Tower chrome */
-[data-tower-side-toggle] { display: none !important; }
 
 .tower-side-btn {
   appearance: none;

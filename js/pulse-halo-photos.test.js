@@ -44,7 +44,7 @@ Promise.all([rel._fetchBundle(ok, me), rel._fetchBundle(bad, me)]).then(function
   /* Kept: friend-tap opens that friend's Tower, 6,000 falling friends with photos. */
   var fall = fs.readFileSync(path.join(__dirname, "pulse-falling-friends.js"), "utf8");
   assert.ok(/var PULSE_FALL_CAP = 6000;/.test(fall), "6k falling kept");
-  assert.ok(/BASE_COLS \+ ",photo_url"/.test(fall) && /photo\.applyPhoto\(el, friend\.photoUrl\)/.test(fall), "falling friends use photo_url");
+  assert.ok(/BASE_COLS \+ ",photo_url"/.test(fall) && /paintPhotoWhenLoaded\(el, friend\.photoUrl\)/.test(fall) && /paintLetter\(el, friend\)/.test(fall), "falling friends use photo_url");
   assert.ok(/opts\.open\(friend\.handle, friend\)/.test(fall) && /CognationTowerOpenProfile\(handle\)/.test(tower), "friend tap opens that friend's Tower");
   var tabs = fs.readFileSync(path.join(__dirname, "tabs.js"), "utf8");
   assert.ok(/if \(!viewingOther\)/.test(tabs), "tabs never bounce a friend open to own Tower");

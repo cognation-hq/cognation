@@ -13027,7 +13027,8 @@ a.site-switch-side:focus-visible {
   border-radius: 999px;
   width: 100%;
   text-align: left;
-  padding: 0.35rem 0.65rem;
+  padding: 0.18rem 0.45rem;
+  font-size: 0.68rem;
 }
 .news-comment-item .news-report-option:not(:disabled):hover,
 .news-comment-item .news-report-option:not(:disabled):focus-visible {

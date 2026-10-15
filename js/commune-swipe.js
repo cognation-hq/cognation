@@ -1350,7 +1350,8 @@
         html += '<p class="commune-card-meta">Book on the calendar, or follow this professional page.</p>';
       }
       if (card.type === TYPE.CHAT) {
-        html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room</button>';
+        html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room (local demo)</button>';
+        html += '<p class="commune-card-meta">Local demo on this device — not a live group yet. Messages stay in this browser.</p>';
       }
       if (card.type === TYPE.CLASSROOM) {
         html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
@@ -1490,6 +1491,7 @@
     }
     closeClassroom();
     paintRoom(room);
+    setStatus("Local demo room — only you are here. Live group chat comes later.");
     friction("begin", "chat", "chatroom:" + roomId);
     if (scroll && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
     return true;
@@ -1601,7 +1603,13 @@
       card = currentCard();
     }
     if (!card) {
-      state.deck.innerHTML = '<p class="commune-swipe-empty">Nothing public to show yet.</p>';
+      var roomsOpen = ensureSiteRooms().length;
+      var empty =
+        '<p class="commune-swipe-empty">No more ECHO cards right now.</p>' +
+        (roomsOpen
+          ? ''
+          : '<p class="commune-swipe-empty commune-swipe-empty--rooms">No chat rooms match your age and interests yet. Update age or interests in your profile, then come back.</p>');
+      state.deck.innerHTML = empty;
       syncActionLabels();
       return;
     }
@@ -1718,6 +1726,24 @@
     return null;
   }
 
+  function topUpDeck() {
+    /* Keep 1:1 pacing via sampleDeck/paceDeck. Never re-add passed cards. */
+    var guard = 0;
+    while (state.cards.length - state.index < 4 && guard < 6) {
+      guard += 1;
+      var more = omitPassed(sampleDeck(8));
+      var added = 0;
+      more.forEach(function (card) {
+        var stable = stableCardId(card.id);
+        var dup = state.cards.some(function (c) { return stableCardId(c.id) === stable; });
+        if (dup) return;
+        state.cards.push(card);
+        added += 1;
+      });
+      if (!added) break;
+    }
+  }
+
   function finishSwipe() {
     var passed = passedSet();
     var dropAt = state.index;
@@ -1733,15 +1759,18 @@
       kept.push(card);
     });
     state.cards = kept;
+    /* Next eligible card takes the same slot. Clamp so we never sit past the end
+       (that left a blank deck after swipe-left on the last queued card). */
     state.index = Math.max(0, dropAt - removedBefore);
+    if (state.index > state.cards.length) state.index = state.cards.length;
     state.seen += 1;
-    if (state.cards.length < 4) {
-      var more = omitPassed(sampleDeck(8));
-      more.forEach(function (card) {
-        var stable = stableCardId(card.id);
-        var dup = state.cards.some(function (c) { return stableCardId(c.id) === stable; });
-        if (!dup) state.cards.push(card);
-      });
+    topUpDeck();
+    if (state.index >= state.cards.length) {
+      var fresh = omitPassed(sampleDeck(12));
+      if (fresh.length) {
+        state.cards = fresh;
+        state.index = 0;
+      }
     }
     state.busy = false;
     paintDeck();

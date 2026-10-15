@@ -4813,16 +4813,15 @@
     var mutual = box.querySelector("[data-tower-followers-mutual]");
     var list = box.querySelector("[data-tower-followers-results]");
     var input = box.querySelector("[data-tower-followers-find]");
-    /* Search followers restored (hidden by #59, moved by #117). Owner only. */
-    var searchOwner = isTowerOwner(p);
+    /* Search followers restored (hidden by #59, moved by #117). Shown to owner and
+       visitors on Professional pages, as before #59. */
     var q = "";
     if (input) {
-      input.hidden = !searchOwner;
-      if (searchOwner) input.removeAttribute("hidden");
-      else input.setAttribute("hidden", "");
+      input.hidden = false;
+      input.removeAttribute("hidden");
       var searchLabel = box.querySelector('label[for="' + input.id + '"]');
-      if (searchLabel) searchLabel.hidden = !searchOwner;
-      if (searchOwner) q = String(input.value || "").trim().toLowerCase();
+      if (searchLabel) searchLabel.hidden = false;
+      q = String(input.value || "").trim().toLowerCase();
     }
     var shownEdges = edges;
     if (q) {

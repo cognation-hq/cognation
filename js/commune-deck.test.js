@@ -558,13 +558,14 @@ function testChatroomReplyReleasesSwipe() {
   var submitChunk = src.slice(submitIdx, submitIdx + 2200);
   assert.ok(submitChunk.indexOf("state.liveRoom") !== -1, "submit branches on liveRoom");
   assert.ok(submitChunk.indexOf("postLiveMessage") !== -1, "live submit uses RPC");
-  assert.ok(submitChunk.indexOf("releaseRoomSurface()") !== -1, "demo submit releases room surface");
-  assert.ok(submitChunk.indexOf('friction("complete", "chat")') !== -1, "submit still completes chat friction");
+  assert.ok(submitChunk.indexOf("releaseRoomSurface()") !== -1, "non-live submit releases room surface");
+  assert.ok(submitChunk.indexOf('friction("complete", "chat")') !== -1, "live submit completes chat friction");
+  assert.ok(submitChunk.indexOf("writeJson(localStorage, ROOM_CHAT_KEY") === -1, "no local-only room messages");
   assert.ok(
     submitChunk.indexOf("if (room) paintRoom(room);") === -1,
     "submit must not leave the demo room open via paintRoom (that kept state.roomId and blocked swipe)"
   );
-  assert.ok(src.indexOf("Sent. Swipe when you are ready.") !== -1, "demo status after send");
+  assert.ok(src.indexOf("This room isn't live — message not sent.") !== -1, "non-live send is refused honestly");
   assert.ok(src.indexOf("Sent to the live room.") !== -1, "live status after send");
   assert.ok(src.indexOf("if (state.busy || state.roomId || state.classroomId) return;") !== -1, "swipe still guards open room");
 }

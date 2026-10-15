@@ -1153,6 +1153,9 @@
     roomSqlId: "",
     chatSchema: null,
     liveMessages: [],
+    /* Step 2c: viewer-local hide after Block; Reported markers. */
+    roomBlockedUserIds: {},
+    roomReportedMsgIds: {},
   };
 
   function typeLabel(t) {
@@ -1522,6 +1525,173 @@
     return { code: "unknown", message: "Could not open the live room. Try again in a moment." };
   }
 
+  function currentLiveUserId() {
+    var sess = supabaseLiveSession();
+    if (sess && sess.user && sess.user.id) return String(sess.user.id);
+    try {
+      var auth = window.CognationAuth && typeof window.CognationAuth.getSession === "function"
+        ? window.CognationAuth.getSession()
+        : null;
+      if (auth && auth.supabaseUserId) return String(auth.supabaseUserId);
+    } catch (eUid) {}
+    return "";
+  }
+
+  function currentReporterProfileId() {
+    try {
+      var auth = window.CognationAuth && typeof window.CognationAuth.getSession === "function"
+        ? window.CognationAuth.getSession()
+        : null;
+      if (auth && auth.activeProfileId) return String(auth.activeProfileId);
+    } catch (ePid) {}
+    return "";
+  }
+
+  function isRoomAuthorBlocked(userId) {
+    if (!userId) return false;
+    return !!state.roomBlockedUserIds[String(userId)];
+  }
+
+  function filterBlockedLiveMessages(messages) {
+    return (messages || []).filter(function (msg) {
+      return !isRoomAuthorBlocked(msg && msg.authorUserId);
+    });
+  }
+
+  function roomMessageMoreHtml(msg) {
+    /* Live room only; needs an author to Block/Report. No menu on own lines. No DM path. */
+    if (!state.liveRoom) return "";
+    var uid = msg && msg.authorUserId ? String(msg.authorUserId) : "";
+    if (!uid) return "";
+    var me = currentLiveUserId();
+    if (me && uid === me) return "";
+    var mid = msg && msg.id ? String(msg.id) : "";
+    var reported = !!(mid && state.roomReportedMsgIds[mid]);
+    var reportBtn = reported
+      ? '<button type="button" class="news-report-option" disabled data-commune-room-reported>Reported</button>'
+      : '<button type="button" class="news-report-option" data-commune-room-report data-message-id="' +
+        escapeHtml(mid) +
+        '" data-author-user-id="' +
+        escapeHtml(uid) +
+        '">Report</button>';
+    var blockBtn =
+      '<button type="button" class="news-report-option" data-commune-room-block data-author-user-id="' +
+      escapeHtml(uid) +
+      '">Block</button>';
+    return (
+      '<button type="button" class="commune-room-more" data-commune-room-more aria-haspopup="true" aria-expanded="false" aria-label="More for this message">⋯</button>' +
+      '<div class="news-report-menu commune-room-report-menu" data-commune-room-menu hidden>' +
+      reportBtn +
+      blockBtn +
+      "</div>"
+    );
+  }
+
+  function hideLiveMessagesFromAuthor(userId) {
+    userId = String(userId || "");
+    if (!userId) return;
+    state.roomBlockedUserIds[userId] = true;
+    state.liveMessages = filterBlockedLiveMessages(state.liveMessages);
+    paintLiveLog(state.liveMessages);
+  }
+
+  function reportLiveRoomMessage(msgId, authorUserId) {
+    msgId = String(msgId || "");
+    authorUserId = String(authorUserId || "");
+    if (!msgId) return Promise.resolve({ ok: false, error: "missing" });
+    if (state.roomReportedMsgIds[msgId]) return Promise.resolve({ ok: true, already: true });
+
+    var msg = null;
+    (state.liveMessages || []).forEach(function (m) {
+      if (m && String(m.id) === msgId) msg = m;
+    });
+    var body = msg ? String(msg.body || "") : "";
+    var authorName = msg ? String(msg.senderName || "") : "";
+
+    /* Existing Investigator queue (CognationModeration). */
+    try {
+      if (window.CognationModeration && typeof window.CognationModeration.enqueue === "function") {
+        window.CognationModeration.enqueue({
+          postId: msgId,
+          reason: "harmful",
+          post: {
+            id: msgId,
+            authorName: authorName,
+            kind: "chat_room_message",
+            body: body.slice(0, 500),
+            createdAt: (msg && msg.at) || new Date().toISOString(),
+            reporterNote: "Chat room message report",
+          },
+        });
+      }
+    } catch (eMod) {}
+
+    /* Optional SQL table (Alexa runs migration). Fail soft if missing. */
+    var profileId = currentReporterProfileId();
+    var sb = window.CognationSupabase;
+    function markDone() {
+      state.roomReportedMsgIds[msgId] = true;
+      paintLiveLog(state.liveMessages);
+      return { ok: true };
+    }
+    if (!profileId || !sb || typeof sb.rest !== "function") {
+      return Promise.resolve(markDone());
+    }
+    return sb
+      .rest("chat_room_message_reports", {
+        method: "POST",
+        body: {
+          message_id: msgId,
+          reporter_profile_id: profileId,
+          reason: "harmful",
+        },
+      })
+      .then(
+        function () {
+          return markDone();
+        },
+        function (err) {
+          if (err && err.status === 409) return markDone();
+          /* Table/RPC missing or other error: still keep moderation enqueue + local Reported. */
+          return markDone();
+        }
+      );
+  }
+
+  function blockLiveRoomAuthor(userId) {
+    userId = String(userId || "");
+    if (!userId) return Promise.resolve({ ok: false });
+    if (!window.CognationBlock || typeof window.CognationBlock.blockUser !== "function") {
+      hideLiveMessagesFromAuthor(userId);
+      setStatus("Blocked — their messages are hidden for you.");
+      return Promise.resolve({ ok: true, local: true });
+    }
+    return window.CognationBlock.blockUser(userId).then(
+      function () {
+        hideLiveMessagesFromAuthor(userId);
+        setStatus("Blocked — their messages are hidden for you.");
+        /* Server RLS already hides blocked authors on next fetch. */
+        if (state.liveRoom && state.roomSqlId) {
+          return fetchLiveMessages(state.roomSqlId).then(
+            function (messages) {
+              state.liveMessages = filterBlockedLiveMessages(messages);
+              paintLiveLog(state.liveMessages);
+              return { ok: true };
+            },
+            function () {
+              return { ok: true };
+            }
+          );
+        }
+        return { ok: true };
+      },
+      function () {
+        setStatus("Couldn't block right now. Try again.");
+        return { ok: false };
+      }
+    );
+  }
+
   function seedBadgeForAuthor(author) {
     if (!author) return "";
     var rec = {
@@ -1636,6 +1806,7 @@
     var log = panel.querySelector("[data-commune-room-log]");
     if (!log) return;
     log.innerHTML = "";
+    messages = filterBlockedLiveMessages(messages);
     if (!messages || !messages.length) {
       var empty = document.createElement("p");
       empty.className = "commune-room-line commune-room-line--meta";
@@ -1646,10 +1817,14 @@
     messages.forEach(function (msg) {
       var p = document.createElement("p");
       p.className = "commune-room-line";
+      if (msg.id) p.setAttribute("data-message-id", String(msg.id));
+      if (msg.authorUserId) p.setAttribute("data-author-user-id", String(msg.authorUserId));
       var name = escapeHtml(msg.senderName || "Member");
       var badge = seedBadgeForAuthor(msg.author || msg);
       var body = escapeHtml(msg.body || "");
-      p.innerHTML = "<strong>" + name + "</strong>" + (badge ? " " + badge : "") + ": " + body;
+      var more = roomMessageMoreHtml(msg);
+      p.innerHTML =
+        "<strong>" + name + "</strong>" + (badge ? " " + badge : "") + ": " + body + more;
       log.appendChild(p);
     });
   }
@@ -1718,7 +1893,7 @@
     closeClassroom();
     return joinLiveRoom(sqlId).then(function () {
       return fetchLiveMessages(sqlId).then(function (messages) {
-        paintRoom(room, { live: true, sqlId: sqlId, messages: messages });
+        paintRoom(room, { live: true, sqlId: sqlId, messages: filterBlockedLiveMessages(messages) });
         setStatus("You're in " + (room.title || "the room") + " — live group chat (up to 12).");
         friction("begin", "chat", "chatroom:" + room.id);
         if (scroll && state.shell && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
@@ -2289,6 +2464,62 @@
     });
     var back = shell.querySelector("[data-commune-room-back]");
     if (back) back.addEventListener("click", closeRoom);
+    /* Step 2c: Block / Report ⋯ on live room messages. */
+    shell.addEventListener("click", function (ev) {
+      var roomPanel = shell.querySelector("[data-commune-room]");
+      if (!roomPanel || roomPanel.hidden) return;
+      var moreBtn = ev.target && ev.target.closest("[data-commune-room-more]");
+      if (moreBtn && roomPanel.contains(moreBtn)) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var menu = moreBtn.parentNode && moreBtn.parentNode.querySelector("[data-commune-room-menu]");
+        if (menu) {
+          var open = !!menu.hidden;
+          roomPanel.querySelectorAll("[data-commune-room-menu]").forEach(function (m) {
+            m.hidden = true;
+          });
+          roomPanel.querySelectorAll("[data-commune-room-more]").forEach(function (b) {
+            b.setAttribute("aria-expanded", "false");
+          });
+          if (open) {
+            menu.hidden = false;
+            moreBtn.setAttribute("aria-expanded", "true");
+          }
+        }
+        return;
+      }
+      var blockBtn = ev.target && ev.target.closest("[data-commune-room-block]");
+      if (blockBtn && roomPanel.contains(blockBtn)) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var blockUid = blockBtn.getAttribute("data-author-user-id");
+        if (!blockUid) return;
+        blockBtn.disabled = true;
+        blockLiveRoomAuthor(blockUid).then(function (res) {
+          if (!res || !res.ok) blockBtn.disabled = false;
+          else blockBtn.textContent = "Blocked";
+        });
+        return;
+      }
+      var reportBtn = ev.target && ev.target.closest("[data-commune-room-report]");
+      if (reportBtn && roomPanel.contains(reportBtn)) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (reportBtn.disabled) return;
+        reportBtn.disabled = true;
+        var mid = reportBtn.getAttribute("data-message-id");
+        var rUid = reportBtn.getAttribute("data-author-user-id");
+        reportLiveRoomMessage(mid, rUid).then(function (res) {
+          if (!res || !res.ok) {
+            reportBtn.disabled = false;
+            setStatus("Couldn't report. Try again.");
+            return;
+          }
+          setStatus("Reported. Thanks for looking out for the room.");
+        });
+        return;
+      }
+    });
     var classBack = shell.querySelector("[data-classroom-back], [data-commune-classroom-back]");
     if (classBack) classBack.addEventListener("click", closeClassroom);
     var form = shell.querySelector("[data-commune-room-compose]");

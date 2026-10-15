@@ -1,5 +1,5 @@
 /**
- * ECHO chat rooms live wiring (step 2b) — contract only.
+ * ECHO chat rooms live wiring (step 2b + 2c Block/Report) — contract only.
  * Run: node js/chat-rooms-live.test.js
  */
 "use strict";
@@ -27,7 +27,16 @@ assert.ok(/seedops-demo-badge/.test(src) && /Demo · seed/.test(src), "Demo badg
 assert.ok(/chatSchema === "missing"/.test(src) || /chatSchema = "missing"/.test(src), "schema-missing fallback");
 assert.ok(/a1000000-0000-4000-8000-000000000004/.test(src), "sqlId for tech-ai");
 assert.ok(/a1000000-0000-4000-8000-000000000004/.test(sql), "SQL seed still has tech-ai uuid");
-/* 2c is out of scope — no Block/Report ⋯ in room for this PR. */
-assert.ok(!/data-commune-room-report/.test(src), "no room Report control yet (2c)");
-assert.ok(!/data-commune-room-block/.test(src), "no room Block control yet (2c)");
+
+/* Step 2c — Block / Report in live room ⋯ */
+assert.ok(/data-commune-room-report/.test(src), "room Report control");
+assert.ok(/data-commune-room-block/.test(src), "room Block control");
+assert.ok(/data-commune-room-more/.test(src) && /⋯/.test(src), "⋯ menu on room messages");
+assert.ok(/CognationBlock\.blockUser/.test(src), "Block uses existing RPC helper");
+assert.ok(/CognationModeration\.enqueue/.test(src), "Report uses existing moderation queue");
+assert.ok(/chat_room_message_reports/.test(src), "Report also posts to message reports table");
+assert.ok(/filterBlockedLiveMessages/.test(src), "hides blocked authors client-side");
+assert.ok(/roomBlockedUserIds/.test(src), "tracks blocked authors in room state");
+assert.ok(!/send_dm|openDm|direct.?message/i.test(src) || /Seeds never DM|No DM path/.test(src), "no DM path from room");
+
 console.log("chat-rooms-live tests passed");

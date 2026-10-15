@@ -245,10 +245,48 @@
       el.classList.remove("is-spawned");
       occupied.push({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
     });
+    /* Top Friends on default spots: one evenly spaced row right below the MP3
+       (24px gap). Owner-moved pins stay where they were saved. */
+    var autoPins = [];
+    if (!(p && (p._profileKind === "professional" || p.kind === "professional"))) {
+      var pinLayout = (p && p.friendPinLayout) || {};
+      var pinIds = [];
+      try { pinIds = resolveTopFriendIds(p); } catch (e) { pinIds = []; }
+      pinIds.forEach(function (fid, index) {
+        var pin = stage.querySelector('[data-tower-friend-pin="' + fid + '"]');
+        if (!pin || pin.hidden || pin.classList.contains("is-dragging")) return;
+        if (!phone && !isDefaultFriendPinPos(p, index, pinLayout[fid])) {
+          occupied.push({ x: pin.offsetLeft, y: pin.offsetTop, w: pin.offsetWidth, h: pin.offsetHeight });
+          return;
+        }
+        autoPins.push(pin);
+      });
+    }
+    if (autoPins.length) {
+      var pinW = 0, pinH = 0;
+      autoPins.forEach(function (pin) { pinW += pin.offsetWidth || 0; pinH = Math.max(pinH, pin.offsetHeight || 0); });
+      sizes.__friendpins = { w: pinW + (autoPins.length - 1) * SPAWN_GAP, h: pinH };
+      var mi = -1;
+      rows.forEach(function (r, i) { if (r.indexOf("music") >= 0) mi = i; });
+      rows.splice(mi >= 0 ? mi + 1 : rows.length, 0, ["__friendpins"]);
+    }
     var placed = packSpawn(rows, sizes, occupied, stageW, phone);
     var stageH = Math.max(stage.clientHeight || 0, placed.__bottom);
     if (placed.__bottom > (stage.clientHeight || 0)) stage.style.minHeight = Math.ceil(placed.__bottom) + "px";
     spawnCache = {};
+    if (autoPins.length && placed.__friendpins) {
+      var px = placed.__friendpins.x;
+      autoPins.forEach(function (pin, i) {
+        if (i) px += (autoPins[i - 1].offsetWidth || 0) + SPAWN_GAP; /* even 24px gaps */
+        applyFriendPinPosition(pin, {
+          x: Math.round((px / stageW) * 10000) / 100,
+          y: Math.round((placed.__friendpins.y / stageH) * 10000) / 100,
+          z: 12 + i,
+          tilt: 0,
+        });
+        pin.classList.add("is-spawned");
+      });
+    }
     Object.keys(placed).forEach(function (id) {
       if (id.indexOf("__") === 0) return;
       var el = stage.querySelector('[data-tower-widget="' + id + '"]');
@@ -4144,6 +4182,22 @@
     };
   }
 
+  /* A Top Friend pin still on a generated default spot (never moved by the owner).
+     Matches the dock formula for any base the friends widget has had, so existing
+     saved defaults are recognized without a migration. */
+  function isDefaultFriendPinPos(p, index, pos) {
+    if (!pos || typeof pos.x !== "number" || typeof pos.y !== "number") return true;
+    var bases = [widgetPos(p, "friends"), spawnCache.friends, DEFAULT_WIDGET_LAYOUT.friends];
+    FACTORY_SEED_LAYOUTS.forEach(function (f) { if (f.friends) bases.push({ x: f.friends[0], y: f.friends[1] }); });
+    var col = index % 4, row = Math.floor(index / 4);
+    return bases.some(function (b) {
+      if (!b || typeof b.x !== "number" || typeof b.y !== "number") return false;
+      var dx = Math.max(0, Math.min(88, b.x + 18 + col * 9));
+      var dy = Math.max(0, Math.min(88, b.y + row * 12));
+      return Math.abs(dx - pos.x) < 0.05 && Math.abs(dy - pos.y) < 0.05;
+    });
+  }
+
   /** Assign dock positions only for newly featured friends missing a saved layout. Never overwrite. */
   function ensureFriendPinPositions(p, selectedIds) {
     var pinLayout = getFriendPinLayout(p);
@@ -4398,6 +4452,7 @@
       pin.hidden = false;
       pin.classList.remove("is-widget-off");
     });
+    spawnUnplacedWidgets(root, p);
   }
 
   var TOWER_FRIEND_CAP = 6000;

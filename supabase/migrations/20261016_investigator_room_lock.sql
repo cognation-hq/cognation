@@ -25,7 +25,7 @@
 -- Incident report forms: username + what was found. No mailbox addresses. No image bytes.
 create table if not exists public.incident_report_forms (
   id uuid primary key default gen_random_uuid(),
-  generated_by uuid not null references auth.users(id) on delete set null,
+  generated_by uuid not null references auth.users(id) on delete restrict,
   subject_handle text not null check (char_length(subject_handle) between 1 and 64),
   subject_user_id uuid references auth.users(id) on delete set null,
   findings text not null check (char_length(findings) between 1 and 2000),

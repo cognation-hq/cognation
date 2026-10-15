@@ -13,6 +13,8 @@ assert.ok(/create table if not exists public\.incident_report_forms/.test(code))
 assert.ok(/subject_handle/.test(code) && /findings/.test(code));
 assert.ok(/investigator_pattern_check/.test(code));
 assert.ok(/investigator_incident_takedown/.test(code));
+assert.ok(/generated_by uuid not null references auth\.users\(id\) on delete restrict/.test(code),
+  "generated_by NOT NULL must use ON DELETE RESTRICT");
 assert.ok(/cognation_attachment_meta/.test(code));
 assert.ok(/'deleted', false/.test(code) || /deleted', false/.test(code));
 assert.ok(!/\bdelete from public\.(tower_posts|profiles|auth)/i.test(code), "never delete account/content");

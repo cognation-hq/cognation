@@ -402,7 +402,15 @@ assert.ok(/a\.target = "_blank";\s*a\.rel = "noopener noreferrer";/.test(tower),
   vm.runInContext(tower.slice(tower.indexOf("  function renderSchedulerPanel("), tower.indexOf("  /* Visitor books an open time")), ctx);
   assert.ok(!/data-tower-cal-book=/.test(ctx.renderSchedulerPanel([], "2026-10-20", { visitor: true, picked: "" })), "no Book before a time is picked");
   assert.ok(/data-tower-cal-book="09:00"[^>]*>Book</.test(ctx.renderSchedulerPanel([], "2026-10-20", { visitor: true, picked: "09:00" })), "Book shows once a time is selected");
-  assert.ok(/sb\.rpc\("request_hangout"/.test(tower), "Book saves on the server");
+  assert.ok(/var HANGOUT_BOOKING_LIVE = false;/.test(tower), "Book does not send until the owner inbox ships");
+  assert.ok(/if \(!HANGOUT_BOOKING_LIVE\) \{[\s\S]{0,200}Booking is coming soon\.[\s\S]{0,80}return;/.test(tower), "Book says coming soon and returns before request_hangout");
+  assert.ok(!/Request sent\./.test(tower.slice(tower.indexOf("if (!HANGOUT_BOOKING_LIVE)") - 400, tower.indexOf("if (!HANGOUT_BOOKING_LIVE)"))), "no sent claim before the flag");
+  /* Designer color lock */
+  assert.ok(/\.tower-cal-event \{[^}]*border: 1px solid var\(--cgn-border, rgba\(255, 255, 255, 0\.14\)\);[^}]*background: rgba\(18, 16, 38, 0\.92\);[^}]*color: #f7f9ff;/.test(css), "card bg/border/title lock");
+  assert.ok(/\.tower-cal-event\.is-pending \{[^}]*background: rgba\(44, 30, 18, 0\.92\);/.test(css), "pending bg lock");
+  assert.ok(/\.tower-cal-event-time \{[^}]*color: #d9d2f0;/.test(css) && /\.tower-cal-event-notes \{[^}]*color: #d9d2f0;/.test(css), "time/notes lock");
+  assert.ok(/var schedulerHtml = view\.schedulerOpen\s*\? renderSchedulerPanel\(owner \? shared : events, selected, \{\s*visitor: !owner,\s*picked: owner \? "" :/.test(tower), "owner gets full scheduler, never Book");
+  assert.ok(!/data-tower-cal-book=/.test(ctx.renderSchedulerPanel([], "2026-10-20", { visitor: false, picked: "09:00" })), "owner never sees Book");
   assert.ok(/create or replace function public\.request_hangout/.test(src("supabase/migrations/20261016_hangout_requests.sql")), "request_hangout migration");
 })();
 

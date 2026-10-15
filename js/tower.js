@@ -6255,6 +6255,9 @@
     );
   }
 
+  /* Off until the owner can see requests (owner inbox PR). */
+  var HANGOUT_BOOKING_LIVE = false;
+
   /* Visitor books an open time: one hangout request to the Tower owner, saved on the server. */
   function requestHangoutOnServer(profileId, iso, time) {
     var sb = window.CognationSupabase;
@@ -6626,6 +6629,12 @@
         var bookTime = bookBtn.getAttribute("data-tower-cal-book") || "";
         var bookIso = viewB.selected;
         if (!/^\d{2}:\d{2}$/.test(bookTime) || !/^\d{4}-\d{2}-\d{2}$/.test(bookIso)) return;
+        if (!HANGOUT_BOOKING_LIVE) {
+          /* Owner inbox not shipped yet: say so honestly, send nothing. */
+          viewB.bookStatus = "Booking is coming soon.";
+          refreshTowerCalendars(root);
+          return;
+        }
         var bookProfile = TowerProfileStore.get();
         bookBtn.disabled = true;
         requestHangoutOnServer(bookProfile && bookProfile._profileId, bookIso, bookTime).then(

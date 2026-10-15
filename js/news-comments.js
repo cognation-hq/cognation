@@ -488,6 +488,19 @@
     ["cognation:session-started", "cognation:session-ended", "cognation:active-profile-changed"].forEach(function (name) {
       document.addEventListener(name, mountAll);
     });
+    /* Fresh browser (empty storage): the first mountAll runs before the viewer's
+       age is known on this device, so every thread starts hidden as unknown
+       age. The age lands later (server hydrate writes the member profile), so
+       redraw when it changes. Same age rules; nothing is shown before it's known. */
+    var lastAge = age();
+    ["cognation:member-profile-updated", "cognation:seedops-dating-hydrate"].forEach(function (name) {
+      document.addEventListener(name, function () {
+        var now = age();
+        if (now === lastAge) return;
+        lastAge = now;
+        mountAll();
+      });
+    });
     mountAll();
   }
   }

@@ -12793,3 +12793,59 @@ a.site-switch-side:focus-visible {
   transform: none !important;
   cursor: default;
 }
+
+/* Edit profile opens as a panel / sheet, not inside the avatar widget, so the
+   widget keeps its size and position and covers nothing. */
+#panel-tower .tower-profile-edit-dropdown.is-sheet {
+  position: fixed !important;
+  top: 4.5rem;
+  right: 1rem;
+  left: auto;
+  bottom: auto;
+  transform: none !important;
+  width: min(22rem, calc(100vw - 2rem)) !important;
+  max-height: calc(100vh - 6rem) !important;
+  overflow: auto;
+  z-index: 1000;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+}
+@media (max-width: 767px) {
+  #panel-tower .tower-profile-edit-dropdown.is-sheet {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100% !important;
+    max-height: 78vh !important;
+    border-radius: 1rem 1rem 0 0;
+    padding: 0.6rem 1rem 1rem !important;
+  }
+}
+.tower-profile-edit-sheet-head {
+  display: none;
+}
+#panel-tower .tower-profile-edit-dropdown.is-sheet .tower-profile-edit-sheet-head {
+  position: sticky;
+  top: -0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -0.4rem -0.5rem 0.4rem;
+  padding: 0.45rem 0.5rem;
+  background: #fff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  z-index: 1;
+}
+#panel-tower .tower-profile-edit-sheet-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+#panel-tower .tower-profile-edit-close {
+  background: transparent !important;
+  border: 0 !important;
+  font-size: 1.3rem;
+  line-height: 1;
+  padding: 0.1rem 0.4rem !important;
+  cursor: pointer;
+  box-shadow: none !important;
+}

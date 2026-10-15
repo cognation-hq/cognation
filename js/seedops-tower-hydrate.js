@@ -229,7 +229,16 @@
       if (row.handle) existing.handle = String(row.handle).replace(/^@/, "").slice(0, 40);
       var first = firstNameOnly(row.display_name || existing.displayName || base.displayName);
       if (first) existing.displayName = first;
-      if (row.bio && !existing.slogan) existing.slogan = String(row.bio).slice(0, 400);
+      /* The server bio wins: refresh the cached slogan whenever it differs (set,
+         changed or cleared), and keep its display in step with it. */
+      var bioChanged = false;
+      if (Object.prototype.hasOwnProperty.call(row, "bio")) {
+        var serverBio = String(row.bio == null ? "" : row.bio).slice(0, 400);
+        if (serverBio !== String(existing.slogan || "")) {
+          existing.slogan = serverBio;
+          bioChanged = true;
+        }
+      }
       if (!Array.isArray(existing.friendIds)) existing.friendIds = [];
       if (!Array.isArray(existing.featuredFriendIds)) existing.featuredFriendIds = [];
       if (!existing.friendsDisplayCount) existing.friendsDisplayCount = 3;
@@ -244,6 +253,8 @@
           html: false,
           calendar: false,
         };
+      } else if (bioChanged) {
+        existing.publicWidgets.slogan = !!String(existing.slogan || "").trim();
       }
       accounts.saveProfileRecord(existing);
       merged += 1;
@@ -499,6 +510,7 @@
     firstNameOnly: firstNameOnly,
     hydrate: hydrate,
     fetchSeedProfiles: fetchSeedProfiles,
+    mergeSeedProfiles: mergeSeedProfiles,
   };
 
   if (document.readyState === "loading") {

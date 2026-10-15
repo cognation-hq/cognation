@@ -8456,13 +8456,15 @@ body { padding-top: 0 !important; }
   justify-content: space-between;
   gap: 0.35rem 0.5rem;
   padding: 0.4rem 0.5rem;
-  border: 1px solid var(--color-border, #f0cfe0);
+  border: 1px solid var(--cgn-border, rgba(255, 255, 255, 0.14));
   border-radius: var(--radius, 8px);
-  background: rgba(255, 245, 249, 0.9);
+  /* Readable on the dark theme: dark card, light text. */
+  background: rgba(18, 16, 38, 0.92);
+  color: #f7f9ff;
 }
 .tower-cal-event.is-pending {
   border-style: solid;
-  background: rgba(255, 248, 240, 0.95);
+  background: rgba(44, 30, 18, 0.92);
 }
 .tower-cal-event-main {
   display: flex;
@@ -8475,7 +8477,7 @@ body { padding-top: 0 !important; }
 .tower-cal-event-time {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #8a6575;
+  color: #d9d2f0;
   min-width: 3.5rem;
 }
 .tower-cal-event-title {
@@ -8485,7 +8487,7 @@ body { padding-top: 0 !important; }
 .tower-cal-event-notes {
   flex-basis: 100%;
   font-size: 0.78rem;
-  color: #8a6575;
+  color: #d9d2f0;
 }
 .tower-cal-badge {
   display: inline-block;
@@ -8515,34 +8517,6 @@ body { padding-top: 0 !important; }
 .tower-cal--public {
   position: relative;
 }
-.tower-cal-friend-dropdown {
-  margin-top: 0.75rem;
-}
-.tower-cal-friend-dropdown > summary {
-  cursor: pointer;
-  list-style: disclosure-closed;
-}
-.tower-cal-friend-dropdown[open] > summary {
-  list-style: disclosure-open;
-  margin-bottom: 0;
-}
-/* Closed schedule stays out of the month grid. Open schedule floats so the grid box does not grow. */
-.tower-cal-friend-dropdown:not([open]) > :not(summary) {
-  display: none !important;
-}
-.tower-cal-friend-dropdown[open] > .tower-cal-friend-form {
-  position: absolute;
-  z-index: 6;
-  left: 0;
-  right: 0;
-  top: calc(100% + 0.35rem);
-  margin-top: 0;
-  background: rgba(255, 245, 249, 0.98);
-  border: 1px solid rgba(212, 137, 176, 0.55);
-  border-radius: 0.4rem;
-  padding: 0.55rem 0.65rem 0.7rem;
-  box-shadow: 0 8px 18px rgba(74, 44, 58, 0.14);
-}
 .tower-cal-scheduler {
   margin-top: 0.75rem;
   padding-top: 0.55rem;
@@ -8557,8 +8531,14 @@ body { padding-top: 0 !important; }
 .tower-cal-suggest {
   text-align: left;
 }
+.tower-cal-suggest.is-picked {
+  outline: 2px solid var(--cgn-accent, #7fd6ff);
+}
+.tower-cal-book {
+  margin-top: 0.45rem;
+  align-self: flex-start;
+}
 .tower-cal-editor,
-.tower-cal-friend-form,
 .tower-cal-google {
   margin-top: 0.75rem;
   padding-top: 0.65rem;

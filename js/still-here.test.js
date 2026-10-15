@@ -390,6 +390,46 @@ assert.ok(/a\.target = "_blank";\s*a\.rel = "noopener noreferrer";/.test(tower),
 })();
 
 
+/* Calendar: readable event cards, no demo Friends schedule panel, visitor Book */
+(function () {
+  var card = css.match(/\.tower-cal-event \{[^}]*\}/)[0];
+  var bg = card.match(/background:\s*rgba\((\d+),\s*(\d+),\s*(\d+)/);
+  var fg = card.match(/color:\s*#([0-9a-f]{6})/i);
+  assert.ok(bg && fg, "calendar event card sets background and text color");
+  function lum(r, g, b) {
+    return [r, g, b].map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); })
+      .reduce(function (a, v, i) { return a + v * [0.2126, 0.7152, 0.0722][i]; }, 0);
+  }
+  var h = fg[1];
+  var lf = lum(parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16));
+  var lb = lum(+bg[1], +bg[2], +bg[3]);
+  var ratio = (Math.max(lf, lb) + 0.05) / (Math.min(lf, lb) + 0.05);
+  assert.ok(ratio >= 4.5, "calendar event card text contrasts with its card (" + ratio.toFixed(1) + ":1)");
+  assert.ok(!/\.tower-cal-event-(time|who|notes)[^{]*\{[^}]*#8a6575/.test(css), "no pink-grey text on calendar cards");
+  assert.ok(!/Friends schedule|tower-cal-friend-dropdown|tower-cal-friend-form|Request \/ add|Request a hangout/.test(html + tower + css), "Friends schedule panel gone");
+  assert.ok(!/\(demo\)/.test(tower.slice(tower.indexOf("function renderSchedulerPanel"), tower.indexOf("function renderPrivateCalendar"))), "no demo copy in scheduler");
+  assert.ok(html.indexOf('data-tower-widget="calendar"') > 0, "calendar widget kept");
+  var vm = require("vm");
+  var ctx = { escapeHtml: function (x) { return String(x); }, formatEventTime: function (x) { return x; },
+    eventsForDate: function () { return []; },
+    suggestHangoutTimes: function () { return [{ time: "09:00", label: "Morning" }]; } };
+  vm.createContext(ctx);
+  vm.runInContext(tower.slice(tower.indexOf("  function renderSchedulerPanel("), tower.indexOf("  /* Visitor books an open time")), ctx);
+  assert.ok(!/data-tower-cal-book=/.test(ctx.renderSchedulerPanel([], "2026-10-20", { visitor: true, picked: "" })), "no Book before a time is picked");
+  assert.ok(/data-tower-cal-book="09:00"[^>]*>Book</.test(ctx.renderSchedulerPanel([], "2026-10-20", { visitor: true, picked: "09:00" })), "Book shows once a time is selected");
+  assert.ok(/var HANGOUT_BOOKING_LIVE = false;/.test(tower), "Book does not send until the owner inbox ships");
+  assert.ok(/if \(!HANGOUT_BOOKING_LIVE\) \{[\s\S]{0,200}Booking is coming soon\.[\s\S]{0,80}return;/.test(tower), "Book says coming soon and returns before request_hangout");
+  assert.ok(!/Request sent\./.test(tower.slice(tower.indexOf("if (!HANGOUT_BOOKING_LIVE)") - 400, tower.indexOf("if (!HANGOUT_BOOKING_LIVE)"))), "no sent claim before the flag");
+  /* Designer color lock */
+  assert.ok(/\.tower-cal-event \{[^}]*border: 1px solid var\(--cgn-border, rgba\(255, 255, 255, 0\.14\)\);[^}]*background: rgba\(18, 16, 38, 0\.92\);[^}]*color: #f7f9ff;/.test(css), "card bg/border/title lock");
+  assert.ok(/\.tower-cal-event\.is-pending \{[^}]*background: rgba\(44, 30, 18, 0\.92\);/.test(css), "pending bg lock");
+  assert.ok(/\.tower-cal-event-time \{[^}]*color: #d9d2f0;/.test(css) && /\.tower-cal-event-notes \{[^}]*color: #d9d2f0;/.test(css), "time/notes lock");
+  assert.ok(/var schedulerHtml = view\.schedulerOpen\s*\? renderSchedulerPanel\(owner \? shared : events, selected, \{\s*visitor: !owner,\s*picked: owner \? "" :/.test(tower), "owner gets full scheduler, never Book");
+  assert.ok(!/data-tower-cal-book=/.test(ctx.renderSchedulerPanel([], "2026-10-20", { visitor: false, picked: "09:00" })), "owner never sees Book");
+  assert.ok(/create or replace function public\.request_hangout/.test(src("supabase/migrations/20261016_hangout_requests.sql")), "request_hangout migration");
+})();
+
+
 /* ---- #131 live fails + LOOK v3.2/v3.3 density (tabs, handle, Pro server, strip) ---- */
 (function () {
   var assert = require("assert");

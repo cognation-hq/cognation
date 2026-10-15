@@ -132,8 +132,16 @@
     return !!(layout && layout[id] && !isFactorySeedPos(id, layout[id]));
   }
 
+  /* One Pro check for spawn rows AND the music gate. The music gate read only
+     _profileKind while the spawn rows also read kind, so a Pro page whose
+     _profileKind came back "personal" got Pro rows (no music slot) plus a
+     visible MP3 parked at its old absolute spot on top of the grid. */
+  function isProTower(p) {
+    return !!(p && (p._profileKind === "professional" || p.kind === "professional"));
+  }
+
   function spawnRowsFor(p) {
-    return p && (p._profileKind === "professional" || p.kind === "professional") ? SPAWN_ROWS.professional : SPAWN_ROWS.personal;
+    return isProTower(p) ? SPAWN_ROWS.professional : SPAWN_ROWS.personal;
   }
 
   function rectsOverlap(a, b, gap) {
@@ -384,6 +392,40 @@
     return spawnCache[id] || DEFAULT_WIDGET_LAYOUT[id];
   }
 
+  /* Drag out of the default CSS grid (#117). The grid has no x/y, so before any
+     owner drag (or freeze/save) pin every grid widget at its rendered spot as
+     free x/y %, then drop the grid classes. Without this a drag cannot move the
+     widget and the freeze saves every widget at 0,0 (3rd drag break). */
+  function liftDefaultGrid(stage) {
+    if (!stage || !stage.classList || !stage.classList.contains("is-default-grid")) return false;
+    if (isPhoneStage(stage)) return false;
+    var sr = stage.getBoundingClientRect();
+    var w = sr.width || stage.clientWidth || 1;
+    var h = sr.height || stage.clientHeight || 1;
+    var spots = [];
+    stage.querySelectorAll("[data-tower-widget]").forEach(function (el) {
+      if (el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
+      var r = el.getBoundingClientRect();
+      spots.push({ el: el, x: Math.round(((r.left - sr.left) / w) * 1000) / 10, y: Math.round(((r.top - sr.top) / h) * 1000) / 10, w: r.width });
+    });
+    stage.style.minHeight = Math.ceil(h) + "px";
+    stage.classList.remove("is-default-grid", "is-desktop-grid");
+    spots.forEach(function (sp) {
+      var el = sp.el;
+      el.classList.remove("is-spawn-full", "is-spawn-half");
+      if (sp.w) el.style.setProperty("--spawn-max-w", Math.ceil(sp.w) + "px");
+      el.style.setProperty("--sticker-x", sp.x + "%");
+      el.style.setProperty("--sticker-y", sp.y + "%");
+      el.style.setProperty("--sticker-z", el.getAttribute("data-sticker-z") || "2");
+      el.style.setProperty("--sticker-tilt", "0deg");
+      el.setAttribute("data-sticker-x", String(sp.x));
+      el.setAttribute("data-sticker-y", String(sp.y));
+      if (!el.getAttribute("data-sticker-z")) el.setAttribute("data-sticker-z", "2");
+      spawnCache[el.getAttribute("data-tower-widget")] = { x: sp.x, y: sp.y, z: 2, tilt: 0 };
+    });
+    return true;
+  }
+
   /* Before saving any layout, pin every on-screen spawned widget where it is now,
      so moving one widget never makes the others jump. */
   function freezeSpawnedWidgets(root, layout) {
@@ -391,6 +433,7 @@
     if (!stage) return layout;
     /* Phone positions are a stacked view, never the website layout. */
     if (isPhoneStage(stage)) return layout;
+    liftDefaultGrid(stage);
     stage.querySelectorAll("[data-tower-widget].is-spawned").forEach(function (el) {
       var id = el.getAttribute("data-tower-widget");
       if (!id || el.hidden || el.classList.contains("is-widget-off")) return;
@@ -786,7 +829,11 @@
         return prefer.id;
       }
     }
-    if (window.CognationAccounts && window.CognationAccounts.DEMO_ALEXA) {
+    /* Demo founder id only in local preview (sign-in not configured). On a real
+       site it leaked prof-alexa-personal into seed sessions. */
+    var supa = window.CognationSupabase;
+    var signInConfigured = !!(supa && typeof supa.configured === "function" && supa.configured());
+    if (!signInConfigured && window.CognationAccounts && window.CognationAccounts.DEMO_ALEXA) {
       return window.CognationAccounts.DEMO_ALEXA.personalId;
     }
     return null;
@@ -1544,7 +1591,9 @@
       this._saving = true;
       try {
       writeScrapbookLayout(data);
-      if (window.CognationTowerLayoutSync) window.CognationTowerLayoutSync.save(data);
+      /* Account layout row is written only on a real geometry edit (drag end,
+         rotate, resize). Opening the Tower must never POST a layout. */
+      if (opts.geometry && window.CognationTowerLayoutSync) window.CognationTowerLayoutSync.save(data);
       var id = data._profileId || resolveActiveProfileId();
       /* A drop only changes x/y. Never PATCH the profile: that reload paints
          the remote row, which has no sticker coordinates, and the widget
@@ -3825,7 +3874,7 @@
     initYoutubeResize(root);
     var url = (p.musicUrl || "").trim();
     var skin = visibleMusicSkin(p.musicSkin || "classic");
-    var personal = !p || p._profileKind !== "professional";
+    var personal = !isProTower(p);
     var ownerPublic = isTowerOwner(p) && root.getAttribute("data-tower-side") === "public";
     var enabled = p.musicEnabled !== false && skin !== "none" && personal;
     var ytId = parseYoutubeVideoId(url);
@@ -5168,9 +5217,49 @@
     });
   }
 
+  /* Broken pile-up (the #117 drag bug saved every other widget at 0,0): two or
+     more widgets at the top-left corner is never a real owner layout. */
+  function isPileupLayout(layout) {
+    if (!layout || typeof layout !== "object") return false;
+    var n = 0;
+    Object.keys(layout).forEach(function (id) {
+      var pos = layout[id];
+      if (pos && typeof pos === "object" && (Number(pos.x) || 0) <= 0.5 && (Number(pos.y) || 0) <= 0.5) n += 1;
+    });
+    return n >= 2;
+  }
+
+  /* Auto-spawn pile: two or more widgets saved on the same spot, and at least
+     one of them was never dragged there by the owner (no dragged mark). An
+     overlap the owner made by dragging is free placement and is kept. */
+  function isAutoPileLayout(layout, skip) {
+    if (!layout || typeof layout !== "object") return false;
+    var spots = [];
+    Object.keys(layout).forEach(function (id) {
+      var pos = layout[id];
+      if (skip && skip[id]) return;
+      if (!pos || typeof pos !== "object") return;
+      var x = Number(pos.x), y = Number(pos.y);
+      if (isNaN(x) || isNaN(y)) return;
+      spots.push({ x: x, y: y, dragged: pos.dragged === true });
+    });
+    for (var i = 0; i < spots.length; i++) {
+      for (var j = i + 1; j < spots.length; j++) {
+        var a = spots[i], b = spots[j];
+        if (Math.abs(a.x - b.x) <= 0.5 && Math.abs(a.y - b.y) <= 0.5 && !(a.dragged && b.dragged)) return true;
+      }
+    }
+    return false;
+  }
+
   function getWidgetLayout(p) {
     var layout = (p && p.widgetLayout) || null;
     if (!layout || typeof layout !== "object") return null;
+    /* Safe reset: a pile-up falls back to the default grid (not saved until a real drag). */
+    if (isPileupLayout(layout)) return null;
+    /* Old saved Pro layouts may still carry the MP3 spot: it never shows on Pro,
+       so it never counts toward a pile. */
+    if (isAutoPileLayout(layout, isProTower(p) ? { music: true } : null)) return null;
     return layout;
   }
 
@@ -5248,7 +5337,7 @@
       if (id === "html" && !htmlText) on = false;
       if (id === "social") on = profileHasSocialLinks(p);
       if (id === "music") {
-        var personalMusic = !p || p._profileKind !== "professional";
+        var personalMusic = !isProTower(p);
         if (!personalMusic) {
           /* Professional has no music player (YouTube is its own widget). */
           on = false;
@@ -7440,6 +7529,12 @@
       if (id === "feed" || id === "messages") return;
       var el = stage.querySelector('[data-tower-widget="' + id + '"]');
       if (!el || el.classList.contains("is-dragging")) return;
+      /* MP3 is Personal only (Alexa, Oct 7): an old saved Pro layout's music spot is ignored. */
+      if (id === "music" && isProTower(p)) {
+        el.hidden = true;
+        el.classList.add("is-widget-off");
+        return;
+      }
       var pos = layout[id] || DEFAULT_WIDGET_LAYOUT[id];
       /* YouTube split from Music: a Professional page that already placed Music keeps that spot. */
       if (id === "youtube" && !layout.youtube && isPlacedPos(layout, "music")) pos = layout.music;
@@ -8237,6 +8332,11 @@
         if (!dragStarted) {
           if (Math.abs(dxPx) < 5 && Math.abs(dyPx) < 5) return;
           dragStarted = true;
+          if (liftDefaultGrid(stage)) {
+            rect = stage.getBoundingClientRect();
+            startX = parseFloat(sticker.getAttribute("data-sticker-x") || "0");
+            startY = parseFloat(sticker.getAttribute("data-sticker-y") || "0");
+          }
           stickerZCounter += 1;
           sticker.style.setProperty("--sticker-z", String(stickerZCounter));
           sticker.classList.add("is-dragging");
@@ -8309,6 +8409,8 @@
             y: dropY,
             z: dropZ,
             tilt: typeof prev.tilt === "number" ? prev.tilt : dropTilt,
+            /* Owner drag: free placement, never treated as an auto-spawn pile. */
+            dragged: true,
           };
           p.widgetLayout = layout;
           TowerProfileStore.save(p, { geometry: true });

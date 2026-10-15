@@ -188,6 +188,10 @@
           username: fields.username,
           handle: fields.handle || fields.username,
           display_name: fields.displayName,
+          /* Year + month only (never the day); the DB trigger moves them to the
+             owner-only user_birth table and strips them from auth metadata. */
+          birth_year: fields.birthYear || undefined,
+          birth_month: fields.birthMonth || undefined,
         },
       }),
     }).then(function (result) {

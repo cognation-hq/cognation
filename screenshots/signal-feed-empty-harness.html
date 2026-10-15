@@ -1,0 +1,30 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:system-ui,sans-serif;
+  background:radial-gradient(circle at 30% 10%,#2a2160,#0b0d24 70%);color:#e8eeff;padding:24px}
+.bar{height:48px;background:#1c1630;display:flex;align-items:center;gap:20px;padding:0 20px;margin:-24px -24px 24px;font-size:13px;letter-spacing:.12em}
+.bar b{color:#b7f6ff}
+/* Before (pale) for reference strip */
+.before{max-width:42rem;margin:0 auto 24px;padding:1rem 1.1rem;background:#fff5f9;color:#4a2c3a;border:1px solid #000;border-radius:8px}
+.before .commune-empty{margin:0;color:#c4b4c8;font-size:.95rem;padding:1.2rem .7rem;min-height:6rem}
+/* After */
+.signal-feed-host{max-width:42rem;margin:0 auto;padding:1rem 1.1rem;background:rgba(16,19,48,.25);border:1px solid rgba(209,241,255,.18);border-radius:1.15rem}
+.tower-feed[data-tower-feed] .commune-empty{
+  display:block;width:100%;min-height:10rem;margin:0;padding:20px;box-sizing:border-box;
+  background:rgba(16,19,48,.42);border:1px solid rgba(209,241,255,.28);border-radius:1.15rem;
+  color:var(--cgn-text,#f7f9ff);font-size:1rem;line-height:1.45
+}
+.lbl{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#9aa3c7;margin:0 0 8px}
+</style></head><body>
+<div class="bar"><b>SIGNAL</b><span>Feed empty state</span></div>
+<p class="lbl">Before (nearly invisible)</p>
+<div class="before"><p class="commune-empty">No Feed posts yet — send the first signal.</p></div>
+<p class="lbl">After (dark glass)</p>
+<div class="signal-feed-host" id="panel-signal">
+  <div class="tower-feed" data-tower-feed role="feed">
+    <p class="commune-empty">No Feed posts yet — send the first signal.</p>
+  </div>
+</div>
+</body></html>

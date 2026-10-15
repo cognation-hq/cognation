@@ -9498,8 +9498,23 @@ body { padding-top: 0 !important; }
   width: 100%;
   min-height: 10rem;
   margin: 0;
-  padding: 1.2rem 0.7rem;
+  padding: 20px;
   box-sizing: border-box;
+  /* SIGNAL Feed empty: dark glass, readable light text (AA). No black border. */
+  background: rgba(16, 19, 48, 0.42);
+  border: 1px solid rgba(209, 241, 255, 0.28);
+  border-radius: 1.15rem;
+  color: var(--cgn-text, #f7f9ff);
+  font-size: 1rem;
+  line-height: 1.45;
+  text-shadow: none;
+}
+#panel-signal .signal-feed-host .tower-feed[data-tower-feed] .commune-empty {
+  background: rgba(16, 19, 48, 0.42);
+  border: 1px solid rgba(209, 241, 255, 0.28);
+  border-radius: 1.15rem;
+  color: var(--cgn-text, #f7f9ff);
+  padding: 20px;
 }
 .tower-friends-browse,
 .tower-friends-browse-note,

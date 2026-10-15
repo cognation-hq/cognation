@@ -73,6 +73,10 @@ photo.saveOwnPhoto(client, me, "https://cdn.example.com/me.jpg").then(function (
   El.prototype.addEventListener = function () {};
   El.prototype.querySelector = function () { return null; };
   global.document = { createElement: function () { return new El(); } };
+  El.prototype.removeAttribute = function (k) { delete this.attrs[k]; };
+  /* Image stub: URLs containing "broken" fail, others load. */
+  var pending = [];
+  global.Image = function () { var img = this; Object.defineProperty(img, "src", { set: function (v) { pending.push([img, v]); } }); };
   var layer = new El();
   var stack = pulse.render(layer, [
     { userId: "a", name: "Ada", handle: "ada", photoUrl: "https://cdn.example.com/ada.jpg" },
@@ -80,10 +84,26 @@ photo.saveOwnPhoto(client, me, "https://cdn.example.com/me.jpg").then(function (
     { userId: "c", name: "Mia", handle: "mia", photoUrl: "javascript:alert(1)" },
   ], { width: 390, height: 700 });
   var c = stack.children[0].children;
-  assert.ok(/ada\.jpg/.test(c[0].style.backgroundImage) && "data-pulse-photo" in c[0].attrs, "photo circle");
+  /* Before the photo loads every circle already shows its letter (never blank). */
+  assert.deepStrictEqual(c.map(function (e) { return e.textContent; }), ["A", "L", "M"], "letters first");
+  pending.forEach(function (p) { if (/broken/.test(p[1])) p[0].onerror(); else p[0].onload(); });
+  assert.ok(/ada\.jpg/.test(c[0].style.backgroundImage) && "data-pulse-photo" in c[0].attrs, "photo circle after it loads");
+  assert.strictEqual(pending.length, 1, "only the https URL is fetched (empty / null / javascript: never)");
   assert.strictEqual(c[1].textContent, "L", "letter fallback");
   assert.ok(!c[1].style.backgroundImage);
   assert.strictEqual(c[2].textContent, "M", "bad URL keeps letters");
+  /* Null photo, a local avatar from the painter, and a URL that fails to load all keep the letter. */
+  pending.length = 0;
+  var s2 = pulse.render(new El(), [
+    { userId: "d", name: "Luna", handle: "luna", photoUrl: null },
+    { userId: "e", name: "Omar", handle: "omar", photoUrl: "https://cdn.example.com/broken.jpg" },
+  ], { width: 390, height: 700, paint: function (el) { el.textContent = ""; el.style.backgroundImage = 'url("data:image/png;base64,AAAA")'; } });
+  var c2 = s2.children[0].children;
+  pending.forEach(function (p) { if (/broken/.test(p[1])) p[0].onerror(); else p[0].onload(); });
+  assert.strictEqual(c2[0].textContent, "L", "null photo_url → letter");
+  assert.ok(!c2[0].style.backgroundImage, "local painter avatar dropped");
+  assert.strictEqual(c2[1].textContent, "O", "broken photo → letter stays");
+  assert.ok(!("data-pulse-photo" in c2[1].attrs));
 
   /* SQL file: owner write, public read, https check */
   var sql = fs.readFileSync(path.join(__dirname, "..", "supabase/migrations/20261016_profiles_photo_url.sql"), "utf8");

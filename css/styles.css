@@ -5235,6 +5235,7 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--html,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--calendar,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--music,
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--youtube,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--video,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--social,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--slogan,
@@ -9239,6 +9240,7 @@ body { padding-top: 0 !important; }
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--html,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--calendar,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--music,
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--youtube,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--video,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--social,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--slogan,
@@ -11148,6 +11150,7 @@ body {
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--calendar,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--going-live,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--music,
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--youtube,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--video,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--social,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--slogan,
@@ -11412,7 +11415,8 @@ body.cognation-demo-on {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
-.tower-layout--scrapbook.is-sticker-stage .tower-sticker--music {
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--music,
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--youtube {
   transform: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -11430,6 +11434,7 @@ body.cognation-demo-on {
 
 /* Pink click-wheel player. The black screen holds a normal YouTube embed. */
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--music,
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--youtube,
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker--instax {
   border: 1px solid var(--cgn-border) !important;
   border-radius: var(--radius) !important;

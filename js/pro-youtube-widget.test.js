@@ -44,6 +44,11 @@ assert.ok(/\.tower-pro-youtube \{\s*width: 18\.5rem;\s*max-width: 100%;/.test(cs
 assert.ok(/\.tower-pro-youtube-screen \{[\s\S]*?aspect-ratio: 16 \/ 9;[\s\S]*?background: rgba\(5, 8, 28, 0\.55\);/.test(css), "screen unchanged");
 assert.ok(/\.tower-sticker--youtube:not\(\[hidden\]\) \.tower-pro-youtube \{\s*display: block !important;/.test(css), "box shows in its sticker");
 
+/* Same sticker chrome as the Music sticker it came from. */
+var musicSel = (css.match(/\.tower-sticker--music[,{ ]/g) || []).length;
+var ytSel = (css.match(/\.tower-sticker--youtube[,{ ]/g) || []).length;
+assert.ok(ytSel >= 5 && musicSel >= 5, "YouTube sticker shares Music sticker chrome");
+
 /* Behavior: Professional hides Music and shows YouTube; Personal does the opposite. */
 var pro = tower.slice(tower.indexOf("    if (!personal) {\n      /* No music player on Professional"), tower.indexOf("    showYoutubeSticker(root, false);"));
 assert.ok(pro.length > 0, "professional branch found");

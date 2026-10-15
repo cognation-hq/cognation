@@ -1841,6 +1841,9 @@
     });
     var open = el.querySelector("[data-commune-open-profile]");
     if (open) open.addEventListener("click", function (ev) { ev.stopPropagation(); openProfessionalPage(card); });
+    if (card.type === TYPE.CLASSROOM) {
+      wireClassroomCardClick(el, card, openClassroom);
+    }
     if (card.type === TYPE.AD && card.handle) {
       el.addEventListener("click", function (ev) {
         if (ev.target.closest("button, a, input, video, iframe")) return;
@@ -1848,6 +1851,19 @@
       });
     }
     armAdMax(el, card);
+  }
+
+  /* Whole Classroom card opens its session on tap/click, like ad cards open
+     their page. Controls inside the card keep their own action, and a drag
+     that turned into a swipe attempt (>= 10px) is not a tap. */
+  function wireClassroomCardClick(el, card, open) {
+    if (!el || !card) return;
+    el.addEventListener("click", function (ev) {
+      var t = ev && ev.target;
+      if (t && t.closest && t.closest("button, a, input, textarea, label, video, iframe")) return;
+      if (Math.abs(state.lastDragDx || 0) >= 10) return;
+      open(card.id, true);
+    });
   }
 
   function openProfessionalPage(card) {
@@ -2885,6 +2901,7 @@
     if (!front) return;
     if (ev.target.closest && ev.target.closest("button, a, input, textarea, label, video, iframe")) return;
     var point = ev.touches ? ev.touches[0] : ev;
+    state.lastDragDx = 0;
     state.pointer = { x0: point.clientX, dx: 0, el: front };
     front.classList.add("is-dragging");
   }
@@ -2898,6 +2915,7 @@
   function onPointerUp() {
     if (!state.pointer) return;
     var dx = state.pointer.dx || 0;
+    state.lastDragDx = dx;
     clearPointer();
     if (Math.abs(dx) < 80) return;
     swipe(dx < 0 ? "left" : "right");
@@ -3127,6 +3145,7 @@
     liveChatEligible: liveChatEligible,
     mapChatRoomError: mapChatRoomError,
     openClassroom: openClassroom,
+    wireClassroomCardClick: wireClassroomCardClick,
     closeClassroom: closeClassroom,
     classroomCatalog: classroomCatalog,
     visibleClassroomSessions: visibleClassroomSessions,

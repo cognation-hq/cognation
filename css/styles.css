@@ -12941,3 +12941,18 @@ a.site-switch-side:focus-visible {
     padding-left: 0 !important;
   }
 }
+
+/* Desktop Edit profile panel: 16px inside the page content's right edge, never off-screen. */
+@media (min-width: 768px) {
+  #panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown.is-sheet {
+    right: var(--tower-edit-right, 16px);
+    max-width: calc(100vw - 32px) !important;
+    width: min(22rem, calc(100vw - 16px - var(--tower-edit-right, 16px))) !important;
+  }
+  #panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown.is-sheet .tower-social-actions {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    width: 100% !important;
+    justify-content: flex-start !important;
+  }
+}

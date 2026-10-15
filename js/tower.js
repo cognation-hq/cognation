@@ -8452,9 +8452,20 @@
       showScrim(true);
       if (panel.parentNode !== root) root.appendChild(panel);
       panel.classList.add("is-sheet");
+      alignPanelToPage();
       panel.setAttribute("role", "dialog");
       panel.setAttribute("aria-label", "Edit profile");
     }
+    /* Desktop: keep the panel 16px inside the page content's right edge (never off-screen). */
+    function alignPanelToPage() {
+      var edge = root.getBoundingClientRect().right;
+      var vw = document.documentElement.clientWidth || window.innerWidth;
+      var right = Math.max(16, Math.round(vw - Math.min(edge, vw) + 16));
+      panel.style.setProperty("--tower-edit-right", right + "px");
+    }
+    window.addEventListener("resize", function () {
+      if (panel.classList.contains("is-sheet")) alignPanelToPage();
+    });
     function returnPanelHome() {
       showScrim(false);
       panel.classList.remove("is-sheet");

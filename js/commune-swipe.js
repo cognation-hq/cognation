@@ -476,9 +476,26 @@
     emit("cognation:member-profile-updated", next);
     return next;
   }
+  /* Access age. Signed-in (live) sessions: ONLY the user_birth age counts.
+     Missing/unreadable birth = 13 for access (no dating, no 18+/MA) but never
+     under-13: a lower stored age (e.g. Sage 11) still wins. The stale
+     member_age (28) in auth metadata / local cache can no longer lift it. */
+  var ACCESS_AGE_UNKNOWN = 13;
+  function liveSignedIn() {
+    try {
+      var sb = window.CognationSupabase;
+      var sess = sb && typeof sb.getSession === "function" ? sb.getSession() : null;
+      return !!(sess && (sess.user || sess.access_token));
+    } catch (eLive) { return false; }
+  }
   function getMemberAge() {
     var n = parseInt(getMemberProfile().age, 10);
-    return !isNaN(n) && n > 0 ? n : null;
+    var stored = !isNaN(n) && n > 0 ? n : null;
+    if (datingBirthAge != null) return datingBirthAge;
+    if (birthMissing || liveSignedIn()) {
+      return stored != null && stored < ACCESS_AGE_UNKNOWN ? stored : ACCESS_AGE_UNKNOWN;
+    }
+    return stored;
   }
   function getSeeDating() {
     try { return localStorage.getItem(SEE_DATING_KEY) === "1"; } catch (e) { return false; }
@@ -495,10 +512,23 @@
     var f = window.CognationDatingFlag;
     return !!(f && typeof f.enabled === "function" && f.enabled());
   }
+  /* Dating age = user_birth (year + month) only, set by seedops-dating-hydrate.
+     NOT getMemberAge(): that reads auth member_age / local cache, which held a
+     stale 28 for every seed. Unknown age fails closed. */
+  var datingBirthAge = null;
+  var birthMissing = false;
+  function setDatingBirthAge(age) {
+    var n = parseInt(age, 10);
+    datingBirthAge = !isNaN(n) && n > 0 ? n : null;
+    birthMissing = datingBirthAge == null;
+  }
+  function getDatingBirthAge() { return datingBirthAge; }
+  function datingAgeOk(age) {
+    return typeof age === "number" && age >= 18;
+  }
   function datingAllowed() {
     if (!datingSwitchOn()) return false;
-    var age = getMemberAge();
-    return !!(getSeeDating() && age != null && age >= 18);
+    return !!(getSeeDating() && datingAgeOk(datingBirthAge));
   }
 
   /* Algorithm Manager — Friends' shares (default on). */
@@ -1139,11 +1169,18 @@
     var otherSeedish = otherKind === "seed" || otherKind === "ops";
     return viewerSeedish === otherSeedish;
   }
+  /* Candidate pool: 18+ with a KNOWN age only. Unknown / under-18 never shown. */
+  function datingCandidateAgeOk(rec) {
+    var n = parseInt(rec && rec.age, 10);
+    if (isNaN(n) || n <= 0) return false;
+    return n >= Math.max(18, datingMinAge(rec));
+  }
   function viewerCanSeeDating(rec) {
     if (!datingAllowed() || !datingOptIn(rec) || !isLocal(rec)) return false;
     if (!datingKindsCompatible(rec)) return false;
     var photo = profilePhoto(rec);
     if (!photo) return false;
+    if (!datingCandidateAgeOk(rec)) return false;
     var age = getMemberAge();
     if (datingMinAge(rec) >= 21 && !(age != null && age >= 21)) return false;
     var mine = viewerIds();
@@ -3250,9 +3287,13 @@
     getMemberProfile: getMemberProfile,
     setMemberProfile: setMemberProfile,
     getMemberAge: getMemberAge,
+    datingCandidateAgeOk: datingCandidateAgeOk,
+    datingAgeOk: datingAgeOk,
+    setDatingBirthAge: setDatingBirthAge,
+    getDatingBirthAge: getDatingBirthAge,
+    datingAllowed: datingAllowed,
     getSeeDating: getSeeDating,
     setSeeDating: setSeeDating,
-    datingAllowed: datingAllowed,
     getSeeFriendShares: getSeeFriendShares,
     setSeeFriendShares: setSeeFriendShares,
     confirmInterestTags: confirmInterestTags,

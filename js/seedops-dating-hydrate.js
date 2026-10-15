@@ -16,7 +16,7 @@
   "use strict";
 
   var LOG_CHANNEL = "dating-hydrate";
-  var BOOT_FLAG = "cognation.seedops.datingHydrate.v1";
+  var BOOT_FLAG = "cognation.seedops.datingHydrate.v2"; /* v2: drops cached ages read from member_age (the stale 28) */
 
   /* Deterministic seed age from fleet id (matches 20261016_seed_birth_backfill.sql).
      Ages 13..26; seed-0248 is the under-13 test viewer (age 11) until removed. */
@@ -344,7 +344,7 @@
     var fleet = String(rec.seedFleetId || "");
     var mappedAge = seedAgeFromFleetId(fleet);
     if (mappedAge != null) rec.age = mappedAge;
-    else if (!rec.age) rec.age = 22 + (Math.abs(Number(index) || 0) % 14); /* stay in 13–26 */
+    else rec.age = null; /* unknown age: never a dating candidate (fail closed) */
     var ageNum = parseInt(rec.age, 10);
     var datingOn = datingSwitchOn() && seedDatingOn(fleet, ageNum);
     if (viewerFleet && fleet && fleet === viewerFleet) {
@@ -495,6 +495,40 @@
     });
   }
 
+  var lastUserId = null;
+  /* Age from the owner-only user_birth row (year + month) the backfill stored.
+     This is the ONLY dating age source; auth metadata member_age / the local
+     profile cache / DEMO_AGE never gate dating (seed metadata carried a stale
+     member_age 28). Unknown -> null -> dating refused. */
+  function ageFromBirth(year, month, now) {
+    var y = parseInt(year, 10);
+    var m = parseInt(month, 10);
+    if (isNaN(y) || y < 1900 || isNaN(m) || m < 1 || m > 12) return null;
+    now = now || new Date();
+    var age = now.getFullYear() - y;
+    if (now.getMonth() + 1 < m) age -= 1;
+    return age >= 0 && age < 130 ? age : null;
+  }
+  function setDatingBirthAge(age) {
+    var swipe = window.CognationCommuneSwipe;
+    if (swipe && typeof swipe.setDatingBirthAge === "function") swipe.setDatingBirthAge(age);
+  }
+  function fetchBirthAge() {
+    var sb = client();
+    if (!sb || typeof sb.rest !== "function" || !lastUserId) return Promise.resolve(null);
+    return sb
+      .rest("user_birth", {
+        query: "select=birth_year,birth_month&user_id=eq." + encodeURIComponent(lastUserId) + "&limit=1",
+      })
+      .then(function (rows) {
+        var row = Array.isArray(rows) && rows.length ? rows[0] : null;
+        return row ? ageFromBirth(row.birth_year, row.birth_month) : null;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
   function fetchUserMetadata() {
     var sb = client();
     if (!sb || typeof sb.getUser !== "function") {
@@ -506,6 +540,7 @@
         if (!user) return null;
         if (u13()) u13().noteUser(user);
         lastMeta = user.user_metadata || user.userMetadata || null;
+        lastUserId = user.id || null;
         return lastMeta;
       })
       .catch(function () {
@@ -624,6 +659,7 @@
       } else {
         /* Re-apply age + seeDating so Classroom/dating gates match last hydrate. */
         var cachedPrefs = { age: prior.memberAge };
+        setDatingBirthAge(prior.birthAge != null ? prior.birthAge : null);
         if (prior.seeDating != null) cachedPrefs.seeDating = !!prior.seeDating;
         if (prior.memberAge != null || prior.seeDating != null) {
           applyViewerPrefs(cachedPrefs, { seedDefaults: false });
@@ -637,12 +673,20 @@
     }
     hydrating = true;
     var seedish = isSeedOrOpsSession();
+    var birthAge = null;
     return fetchUserMetadata()
+      .then(function (meta) {
+        return fetchBirthAge().then(function (a) {
+          birthAge = a;
+          return meta;
+        });
+      })
       .then(function (meta) {
         rememberServerPrefs(meta);
         /* Warm the test-viewer check (profile row) for the other readers; no wait. */
         if (u13() && typeof u13().ready === "function") u13().ready();
         var prefs = prefsFromMetadata(meta);
+        setDatingBirthAge(birthAge);
         /* Adult demo age only once the metadata is in and has no test_role
            (Sage always has it), so the age never reads the adult default for her. */
         var defaultsOk = seedish && !!meta && !metaHasTestRole(meta) && !isU13TestViewer();
@@ -676,6 +720,7 @@
             window.CognationCommuneSwipe && window.CognationCommuneSwipe.getSeeDating
               ? !!window.CognationCommuneSwipe.getSeeDating()
               : null,
+          birthAge: birthAge,
           memberAge:
             window.CognationCommuneSwipe && window.CognationCommuneSwipe.getMemberAge
               ? window.CognationCommuneSwipe.getMemberAge()
@@ -770,6 +815,7 @@
     applyViewerPrefs: applyViewerPrefs,
     isSeedOrOpsSession: isSeedOrOpsSession,
     seedAgeFromFleetId: seedAgeFromFleetId,
+    ageFromBirth: ageFromBirth,
     seedDatingOn: seedDatingOn,
     datingBiosReady: datingBiosReady,
     ensureDatingContent: ensureDatingContent,

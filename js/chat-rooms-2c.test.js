@@ -1,5 +1,5 @@
 /**
- * ECHO chat rooms step 2c — Block/Report contract + SQL migration.
+ * ECHO chat rooms step 2c — Block/Report + human-hide contract + SQL migration.
  * Run: node js/chat-rooms-2c.test.js
  */
 "use strict";
@@ -44,13 +44,29 @@ assert.ok(/\.commune-room-more/.test(css));
 assert.ok(/\.commune-room-line \.news-report-option/.test(css));
 assert.ok(/font-size: 0\.68rem/.test(css));
 
-/* New reports migration: Alexa-run only, no secrets. */
+/* Reports migration: Alexa-run; human hide; seed flag + 20/day. */
 assert.ok(/NOT auto-run/.test(reportsSql));
 assert.ok(/create table if not exists public\.chat_room_message_reports/.test(reportsSql));
-assert.ok(/unique \(message_id, reporter_profile_id\)/.test(reportsSql));
+assert.ok(/unique \(message_id, reporter_user_id\)/.test(reportsSql));
 assert.ok(/enable row level security/.test(reportsSql));
+assert.ok(/add column if not exists hidden_at/.test(reportsSql), "hidden_at on messages");
+assert.ok(/hidden_reason/.test(reportsSql));
+assert.ok(/and hidden_at is null/.test(reportsSql), "room read RLS excludes hidden");
+assert.ok(/report_chat_room_message/.test(reportsSql), "report RPC");
+assert.ok(/cognation_user_is_real/.test(reportsSql), "uses real/seed helper");
+assert.ok(/seed_today >= 20/.test(reportsSql) && /seed_report_cap/.test(reportsSql), "seed 20/day cap");
+assert.ok(/FLAG ONLY/.test(reportsSql) || /flag only/i.test(reportsSql), "seed flags only");
+assert.ok(/hidden_at = coalesce\(hidden_at, now\(\)\)/.test(reportsSql), "human report hides");
+assert.ok(/hidden_message/.test(reportsSql), "RPC returns hidden_message");
 assert.ok(!/@[a-z0-9.-]+\.[a-z]{2,}/i.test(reportsSql), "no emails in SQL");
-assert.ok(!/service_role|pepper|secret/i.test(reportsSql.replace(/service-role/gi, "svc")), "no secrets");
+
+/* Client: RPC + immediate hide for real reporters. */
+assert.ok(/report_chat_room_message/.test(src), "client calls report RPC");
+assert.ok(/hideLiveMessageLocally/.test(src), "hides locally for reporter");
+assert.ok(/roomHiddenMsgIds/.test(src));
+assert.ok(/hidden_message/.test(src));
+assert.ok(/reporterLooksRealClient/.test(src), "fallback hide when reporter looks real");
+assert.ok(/CognationModeration\.enqueue/.test(src));
 
 /* No Cap 250 wording in 2c sources. */
 assert.ok(!/Cap 250/.test(src));

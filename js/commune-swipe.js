@@ -1156,6 +1156,7 @@
     /* Step 2c: viewer-local hide after Block; Reported markers. */
     roomBlockedUserIds: {},
     roomReportedMsgIds: {},
+    roomHiddenMsgIds: {},
   };
 
   function typeLabel(t) {
@@ -1554,8 +1555,32 @@
 
   function filterBlockedLiveMessages(messages) {
     return (messages || []).filter(function (msg) {
-      return !isRoomAuthorBlocked(msg && msg.authorUserId);
+      if (!msg) return false;
+      if (isRoomAuthorBlocked(msg.authorUserId)) return false;
+      if (msg.id && state.roomHiddenMsgIds[String(msg.id)]) return false;
+      return true;
     });
+  }
+
+  function hideLiveMessageLocally(msgId) {
+    msgId = String(msgId || "");
+    if (!msgId) return;
+    state.roomHiddenMsgIds[msgId] = true;
+    state.liveMessages = filterBlockedLiveMessages(state.liveMessages);
+    paintLiveLog(state.liveMessages);
+  }
+
+  function reporterLooksRealClient() {
+    try {
+      var auth = window.CognationAuth && typeof window.CognationAuth.getSession === "function"
+        ? window.CognationAuth.getSession()
+        : null;
+      if (!auth) return true;
+      if (auth.accountKind === "seed" || auth.accountKind === "ops" || auth.isSeed) return false;
+      return true;
+    } catch (eReal) {
+      return true;
+    }
   }
 
   function roomMessageMoreHtml(msg) {
@@ -1626,34 +1651,42 @@
       }
     } catch (eMod) {}
 
-    /* Optional SQL table (Alexa runs migration). Fail soft if missing. */
-    var profileId = currentReporterProfileId();
-    var sb = window.CognationSupabase;
-    function markDone() {
+    function finish(hidden) {
       state.roomReportedMsgIds[msgId] = true;
-      paintLiveLog(state.liveMessages);
-      return { ok: true };
+      /* Locked: human report hides for everyone — reporter sees it gone immediately. */
+      if (hidden) hideLiveMessageLocally(msgId);
+      else paintLiveLog(state.liveMessages);
+      return { ok: true, hidden: !!hidden };
     }
-    if (!profileId || !sb || typeof sb.rest !== "function") {
-      return Promise.resolve(markDone());
+
+    var sb = window.CognationSupabase;
+    if (!sb || typeof sb.rpc !== "function") {
+      return Promise.resolve(finish(reporterLooksRealClient()));
     }
+
     return sb
-      .rest("chat_room_message_reports", {
-        method: "POST",
-        body: {
-          message_id: msgId,
-          reporter_profile_id: profileId,
-          reason: "harmful",
-        },
+      .rpc("report_chat_room_message", {
+        p_message_id: msgId,
+        p_reason: "harmful",
       })
       .then(
-        function () {
-          return markDone();
+        function (row) {
+          var hidden = !!(row && (row.hidden_message === true || row.hidden_message === "true"));
+          if (!hidden && row && row.reporter_is_seed === false) hidden = true;
+          return finish(hidden);
         },
         function (err) {
-          if (err && err.status === 409) return markDone();
-          /* Table/RPC missing or other error: still keep moderation enqueue + local Reported. */
-          return markDone();
+          var text = chatErrorText(err);
+          if (/seed_report_cap/i.test(text)) {
+            setStatus("Daily report limit reached for demo accounts.");
+            return { ok: false, error: "seed_report_cap" };
+          }
+          if (/cannot_report_own/i.test(text)) {
+            setStatus("You can't report your own message.");
+            return { ok: false, error: "cannot_report_own" };
+          }
+          /* RPC/table missing: still mark Reported; hide locally if reporter looks real. */
+          return finish(reporterLooksRealClient());
         }
       );
   }
@@ -2512,10 +2545,16 @@
         reportLiveRoomMessage(mid, rUid).then(function (res) {
           if (!res || !res.ok) {
             reportBtn.disabled = false;
+            if (res && res.error === "seed_report_cap") return;
+            if (res && res.error === "cannot_report_own") return;
             setStatus("Couldn't report. Try again.");
             return;
           }
-          setStatus("Reported. Thanks for looking out for the room.");
+          setStatus(
+            res.hidden
+              ? "Reported — message hidden for the room until review."
+              : "Reported. Thanks for looking out for the room."
+          );
         });
         return;
       }

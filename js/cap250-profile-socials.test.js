@@ -48,6 +48,6 @@ assert.ok(/CognationTowerFollowers\.add\(String\(followerId\), face\)/.test(foll
 assert.ok(/opts\.viewerFace === "professional"/.test(graph), "social-graph blocks pro→Friend");
 
 assert.ok(/data-tower-social="linktree"/.test(html), "Linktree field on Edit Profile");
-assert.ok(/professionalOnly:\s*true/.test(tower) && /personalOnly:\s*true/.test(tower), "kind-gated social networks");
+assert.ok(/professionalOnly:\s*true/.test(tower) && /net\.personalOnly && profileKind === "professional"/.test(tower), "kind-gated social networks (Venmo now on both faces)");
 
 console.log("cap250-profile-socials.test.js: OK");

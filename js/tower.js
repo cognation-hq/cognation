@@ -3323,9 +3323,25 @@
     { id: "youtube", label: "YouTube", short: "YT", logo: "assets/social/youtube.png" },
     { id: "tiktok", label: "TikTok", short: "TT", logo: "assets/social/tiktok.svg" },
     { id: "linkedin", label: "LinkedIn", short: "in", logo: "assets/social/linkedin.png", professionalOnly: true },
-    { id: "venmo", label: "Venmo", short: "Vm", logo: "assets/social/venmo.svg", personalOnly: true },
+    { id: "venmo", label: "Venmo", short: "Vm", logo: "assets/social/venmo.svg" },
     { id: "linktree", label: "Linktree", short: "Lt", logo: "assets/social/linktree.svg", professionalOnly: true },
+    /* NEW (not restored): owner-set outbound link on Pro. A plain https link out;
+       Cognation takes no payment, stores no card data and calls no service. */
+    { id: "hire", label: "Hire me / Buy an ad", short: "Hire me / Buy an ad", professionalOnly: true, cta: true },
   ];
+
+  /* https only (no http, no javascript:, no other schemes). */
+  function safeHttpsUrl(raw) {
+    var u = String(raw || "").trim();
+    if (!u) return "";
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) u = "https://" + u;
+    try {
+      var parsed = new URL(u);
+      return parsed.protocol === "https:" ? parsed.href : "";
+    } catch (e) {
+      return "";
+    }
+  }
 
   function safeHttpUrl(raw) {
     var u = String(raw || "").trim();
@@ -4212,11 +4228,13 @@
 
   function socialHref(id, raw) {
     if (id === "venmo") return venmoHref(raw);
+    if (id === "hire") return safeHttpsUrl(raw);
     return safeHttpUrl(raw);
   }
 
   function storedSocialValue(id, value) {
     if (id === "venmo") return String(value || "").trim().slice(0, 500);
+    if (id === "hire") return safeHttpsUrl(value);
     return safeHttpUrl(value);
   }
 
@@ -4295,7 +4313,7 @@
       if (!href) return;
       any = true;
       var a = document.createElement("a");
-      a.className = "tower-social-btn tower-social-btn--" + net.id + " is-logo";
+      a.className = "tower-social-btn tower-social-btn--" + net.id + " is-logo" + (net.cta ? " is-cta" : "");
       a.href = href;
       a.target = "_blank";
       a.rel = "noopener noreferrer";

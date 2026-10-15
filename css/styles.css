@@ -4486,6 +4486,8 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .tower-social-btn--venmo { background: #008cff; color: #fff; border-color: #0074d4; }
 
 .tower-social-btn--linktree { background: #43e55e; color: #111; border-color: #2ecc71; }
+/* Pro "Hire me / Buy an ad": owner-set outbound link, a text pill, not a logo. */
+.tower-social-btn--hire.is-cta { background: #f4f1ff; color: #1c1630; border-color: #8e7cff; border-radius: 999px; padding: 0.35rem 0.9rem; width: auto; font-weight: 600; white-space: nowrap; }
 
 /* Cap 250: circular company logo buttons (each saved URL = its own link) */
 .tower-social-btn.is-logo {

@@ -927,13 +927,18 @@
     return null;
   }
 
-  function writeScrapbookLayout(p) {
+  function writeScrapbookLayout(p, opts) {
     if (!p) return;
+    opts = opts || {};
     var doc = readScrapbookLayouts();
     var prev = readSavedScrapbook(p) || {};
     var ownId = p._profileId || p.id || "";
     var prevOwn = ownId && doc[ownId] ? doc[ownId] : {};
-    var nextLayout = p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : prev.widgetLayout || null;
+    /* A profile/social save must not overwrite the saved layout. Only a real
+       geometry edit (drag/rotate/resize) may replace widget positions. */
+    var nextLayout = opts.keepLayout
+      ? (prev.widgetLayout && typeof prev.widgetLayout === "object" ? prev.widgetLayout : (p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : null))
+      : (p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : prev.widgetLayout || null);
     var nextQuotes = Array.isArray(p.quoteStickers) && p.quoteStickers.length
       ? p.quoteStickers
       : (Array.isArray(prev.quoteStickers) ? prev.quoteStickers : []);
@@ -1590,7 +1595,7 @@
       if (data._loading) return false;
       this._saving = true;
       try {
-      writeScrapbookLayout(data);
+      writeScrapbookLayout(data, { keepLayout: !opts.geometry });
       /* Account layout row is written only on a real geometry edit (drag end,
          rotate, resize). Opening the Tower must never POST a layout. */
       if (opts.geometry && window.CognationTowerLayoutSync) window.CognationTowerLayoutSync.save(data);
@@ -9772,14 +9777,17 @@
           setProfileStatus("Could not save profile (storage full or blocked). Try a smaller photo.", true);
           return;
         }
-        setProfileStatus("Profile saved — refreshing…", false);
+        setProfileStatus("Profile saved.", false);
+        /* Re-paint in place. A full location.reload() re-ran auth boot and
+           friend hydrate, which rewrote the layout and looked like a sign-out. */
         try {
-          sessionStorage.setItem("cognation.tower.stay", "1");
-        } catch (err) {}
-        /* Auto-refresh so scrapbook, frames, font, and feed color paint cleanly */
-        window.setTimeout(function () {
-          window.location.reload();
-        }, 250);
+          var savedP = TowerProfileStore.get();
+          renderProfileChrome(root);
+          applyPublicWidgets(root, savedP);
+          applyWidgetLayout(root, savedP);
+          renderSocialLinks(root, savedP);
+          syncOwnerStickerHandles(root);
+        } catch (errPaint) {}
       });
     }
 

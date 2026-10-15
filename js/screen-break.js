@@ -537,8 +537,10 @@
           beginBreak(true, data);
         }
       })
-      .catch(function () {
+      .catch(function (err) {
+        /* 405 (method not allowed) and network misses are noise — never sign out. */
         state.apiAvailable = false;
+        if (err && (err.status === 405 || err.status === 404)) return;
       });
   }
 

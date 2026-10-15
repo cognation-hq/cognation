@@ -28,7 +28,11 @@
     Object.keys(layout).slice(0, 80).forEach(function (id) {
       var pos = layout[id];
       if (!pos || typeof pos !== "object" || String(id).length > 64) return;
-      out[id] = { x: num(pos.x, 0), y: num(pos.y, 0), z: num(pos.z, 1), tilt: num(pos.tilt, 0) };
+      var entry = { x: num(pos.x, 0), y: num(pos.y, 0), z: num(pos.z, 1), tilt: num(pos.tilt, 0) };
+      /* Owner drops mark dragged:true. Dropping that flag made getWidgetLayout
+         treat a real layout as never-dragged and fall back to the default spawn. */
+      if (pos.dragged === true) entry.dragged = true;
+      out[id] = entry;
     });
     return out;
   }
@@ -65,7 +69,17 @@
     var saved = cache[id];
     if (saved && Object.keys(saved).length) {
       var base = p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : {};
-      Object.keys(saved).forEach(function (wid) { base[wid] = saved[wid]; });
+      Object.keys(saved).forEach(function (wid) {
+        var next = saved[wid];
+        var prev = base[wid];
+        /* Keep a local dragged mark when an older DB row predated that flag. */
+        if (prev && prev.dragged === true && next && next.dragged !== true) {
+          next = {
+            x: next.x, y: next.y, z: next.z, tilt: next.tilt, dragged: true
+          };
+        }
+        base[wid] = next;
+      });
       p.widgetLayout = base;
     }
     return p;

@@ -374,4 +374,73 @@ assert.ok(/function commitSocialDraft\(root, id, value\) \{\s*if \(!isTowerOwner
 assert.ok(/a\.target = "_blank";\s*a\.rel = "noopener noreferrer";/.test(tower), "opens outside Cognation");
 })();
 
+
+
+/* ---- Social save keeps session + layout (Alexa: save must not sign out / reset) ---- */
+(function () {
+  var assert = require("assert");
+  var fs = require("fs");
+  var path = require("path");
+  var tower = fs.readFileSync(path.join(__dirname, "tower.js"), "utf8");
+  var social = fs.readFileSync(path.join(__dirname, "supabase-social.js"), "utf8");
+  var layoutSync = fs.readFileSync(path.join(__dirname, "tower-layout-sync.js"), "utf8");
+  var commune = fs.readFileSync(path.join(__dirname, "commune-swipe.js"), "utf8");
+  var dating = fs.readFileSync(path.join(__dirname, "seedops-dating-hydrate.js"), "utf8");
+
+  /* Cause: refreshFriends used to store handles as friendIds and save with geometry:true. */
+  assert.ok(
+    /p\.handle \|\| p\.id/.test(social) === false ||
+      /Friend ids must be profile UUIDs[\s\S]*?\.map\(function \(p\) \{\s*return String\(\(p && p\.id\) \|\| ""\);/.test(social),
+    "refreshFriends stores profile UUIDs, not handles"
+  );
+  assert.ok(
+    /tower\.friendIds = ids\.slice\(\);\s*\/\* Friend roster only[\s\S]*?store\.save\(tower\);/.test(social) ||
+      /tower\.friendIds = ids\.slice\(\);\s*store\.save\(tower\);/.test(social),
+    "friend hydrate saves without geometry:true"
+  );
+  assert.ok(!/tower\.friendIds = ids\.slice\(\);\s*store\.save\(tower,\s*\{\s*geometry:\s*true\s*\}\)/.test(social), "friend hydrate must not POST layout");
+
+  /* dragged survives DB clean/apply so reload keeps arranged positions. */
+  assert.ok(/if \(pos\.dragged === true\) entry\.dragged = true;/.test(layoutSync), "layout sync clean keeps dragged");
+  assert.ok(/prev\.dragged === true && next && next\.dragged !== true/.test(layoutSync), "layout apply preserves local dragged");
+
+  /* Profile/social save never overwrites saved layout. */
+  assert.ok(/writeScrapbookLayout\(data, \{ keepLayout: !opts\.geometry \}\)/.test(tower), "non-geometry save keeps scrapbook layout");
+  assert.ok(/opts\.keepLayout/.test(tower), "writeScrapbookLayout supports keepLayout");
+
+  /* Save profile re-paints in place — no location.reload that re-boots auth. */
+  assert.ok(/setProfileStatus\("Profile saved\."/.test(tower), "save status without refreshing…");
+  assert.ok(!/Profile saved — refreshing…/.test(tower), "old reload toast gone");
+  var saveAt = tower.indexOf('profileForm.addEventListener("submit"');
+  assert.ok(saveAt > 0, "Save profile submit handler present");
+  var saveSubmit = tower.slice(saveAt, saveAt + 9000);
+  assert.ok(!/window\.location\.reload\(\)/.test(saveSubmit), "Save profile does not location.reload");
+  assert.ok(/renderProfileChrome\(root\)/.test(saveSubmit) && /applyWidgetLayout\(root/.test(saveSubmit), "Save profile re-paints Tower in place");
+
+  /* Social / profile save path never calls updateUser (dating metadata). */
+  assert.ok(!/updateUser/.test(tower.slice(tower.indexOf("function commitSocialDraft"), tower.indexOf("function commitSocialDraft") + 800)), "commitSocialDraft never updateUser");
+  assert.ok(!/updateUser/.test(saveSubmit), "Save profile never updateUser");
+  assert.ok(/Do not PUT \/auth\/v1\/user from hydrate/.test(dating), "hydrate boot does not PUT auth user");
+
+  /* Handles must not be queried as profile UUIDs. */
+  assert.ok(/Handles \(seed-ana-0005\) are not profile ids/.test(commune) || /!UUID_RE\.test\(s\)\) return;/.test(commune), "warmProfileSeedStatuses skips non-UUIDs");
+
+  /* Behavioral: arrange → save social → "reload" keeps positions + session. */
+  var vm = require("vm");
+  var syncApi = require("./tower-layout-sync.js");
+  var layout = {
+    avatar: { x: 10, y: 12, z: 2, tilt: 0, dragged: true },
+    calendar: { x: 55, y: 40, z: 3, tilt: 0 },
+  };
+  var cleaned = syncApi._clean(layout);
+  assert.strictEqual(cleaned.avatar.dragged, true, "clean keeps dragged on arranged widget");
+  assert.ok(!cleaned.calendar.dragged, "clean omits dragged when unset");
+  var profile = { _profileId: "11111111-1111-4111-8111-111111111111", widgetLayout: { avatar: { x: 10, y: 12, z: 2, tilt: 0, dragged: true } } };
+  syncApi._cache[profile._profileId] = cleaned;
+  syncApi.apply(profile);
+  assert.strictEqual(profile.widgetLayout.avatar.dragged, true, "apply after 'reload' keeps dragged");
+  assert.strictEqual(profile.widgetLayout.avatar.x, 10, "apply after 'reload' keeps x");
+  assert.strictEqual(profile.widgetLayout.calendar.x, 55, "apply brings companion spots");
+})();
+
 console.log("still-here.test.js: OK");

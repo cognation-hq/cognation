@@ -12292,6 +12292,56 @@ a.circle-fall-portrait {
 .commune-room-line {
   margin: 0;
 }
+/* Chat room ⋯ Block/Report (step 2c) — dark shell, reuse news-report pills. */
+.commune-room-line:has(.commune-room-more) {
+  position: relative;
+  padding-right: 22px;
+}
+.commune-room-more {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cgn-text-muted, rgba(185, 191, 224, 0.75));
+  line-height: 1;
+  cursor: pointer;
+}
+.commune-room-line .commune-room-report-menu {
+  flex-direction: column;
+  align-items: stretch;
+  position: absolute;
+  top: 22px;
+  right: 0;
+  z-index: 5;
+  min-width: 7rem;
+  padding: 0.25rem;
+  background: rgba(16, 19, 48, 0.97);
+  border: 1px solid var(--cgn-border, rgba(255,255,255,.2));
+  border-radius: 0.5rem;
+}
+.commune-room-line .news-report-option {
+  border: 1px solid rgba(185, 191, 224, 0.35);
+  background: rgba(16, 19, 48, 0.85);
+  color: var(--cgn-text, #f7f9ff);
+  border-radius: 999px;
+  width: 100%;
+  text-align: left;
+  padding: 0.18rem 0.45rem;
+  font-size: 0.68rem;
+}
+.commune-room-line .news-report-option:not(:disabled):hover,
+.commune-room-line .news-report-option:not(:disabled):focus-visible {
+  background: rgba(185, 191, 224, 0.18);
+  outline: none;
+}
+.commune-room-line .news-report-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .commune-room textarea {
   width: 100%;
   box-sizing: border-box;

@@ -85,12 +85,12 @@
       reactions[r.face].push(String(r.profile_id));
     });
     return {
-      id: row.id, storyId: row[cfg.parentCol], authorName: author.display_name || "Member",
+      id: row.id, storyId: row[cfg.parentCol], authorName: author.display_name || "Member", authorUserId: author.user_id ? String(author.user_id) : "",
       accountKind: author.account_kind || "real", body: row.body, createdAt: row.created_at, reactions: reactions,
     };
   }
   function pullStory(storyId) {
-    var q = "select=id," + cfg.parentCol + ",body,created_at,author:profiles!author_profile_id(display_name,account_kind)" +
+    var q = "select=id," + cfg.parentCol + ",body,created_at,author:profiles!author_profile_id(display_name,account_kind,user_id)" +
       (cfg.reactionsTable ? ",reactions:" + cfg.reactionsTable + "(face,profile_id)" : "") + "&" + cfg.parentCol + "=eq." +
       encodeURIComponent(storyId) + "&order=created_at.desc&limit=" + MAX;
     return window.CognationSupabase.rest(cfg.table, { query: q }).then(function (rows) {
@@ -287,8 +287,11 @@
       var option = c.reportedByMe
         ? '<button type="button" class="news-report-option" disabled data-news-comment-reported>Reported</button>'
         : '<button type="button" class="news-report-option" data-news-comment-report data-comment-id="' + esc(c.id) + '">Report</button>';
+      var blockBtn = c.authorUserId
+        ? '<button type="button" class="news-report-option" data-news-comment-block data-author-user-id="' + esc(c.authorUserId) + '">Block</button>'
+        : "";
       return '<button type="button" class="news-comment-more" data-news-comment-more aria-haspopup="true" aria-expanded="false" aria-label="More for this comment">⋯</button>' +
-        '<div class="news-report-menu" data-news-comment-menu hidden>' + option + "</div>";
+        '<div class="news-report-menu" data-news-comment-menu hidden>' + option + blockBtn + "</div>";
     }
     host.innerHTML =
       '<ul class="news-comment-list">' +
@@ -417,7 +420,19 @@
           }
           return;
         }
-        var reportBtn = ev.target && ev.target.closest("[data-news-comment-report]");
+        var blockBtn = ev.target && ev.target.closest("[data-news-comment-block]");
+      if (blockBtn) {
+        ev.preventDefault();
+        var uid = blockBtn.getAttribute("data-author-user-id");
+        if (uid && window.CognationBlock) {
+          blockBtn.disabled = true;
+          window.CognationBlock.blockUser(uid).then(function () {
+            blockBtn.textContent = "Blocked";
+          }, function () { blockBtn.disabled = false; });
+        }
+        return;
+      }
+      var reportBtn = ev.target && ev.target.closest("[data-news-comment-report]");
         if (reportBtn && host.contains(reportBtn)) {
           ev.preventDefault();
           if (reportBtn.disabled) return;

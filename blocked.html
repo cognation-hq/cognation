@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Blocked — Cognation</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    .blocked-wrap { max-width: 28rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+    .blocked-item { display: flex; align-items: center; gap: .75rem; padding: .7rem 0;
+      border-bottom: 1px solid var(--cgn-border, rgba(255,255,255,.15)); }
+    .blocked-item:last-child { border-bottom: 0; }
+    .blocked-meta { flex: 1; min-width: 0; }
+    .blocked-name { font-weight: 600; }
+    .blocked-handle { font-size: .85rem; color: var(--cgn-text-muted, #b9bfe0); }
+    .blocked-empty { color: var(--cgn-text-muted, #b9bfe0); }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="/"><span data-brand>COGNATION</span></a>
+    </div>
+  </header>
+  <main id="main" class="blocked-wrap">
+    <h1>Blocked</h1>
+    <p class="blocked-empty">People you block can't see your Tower, message you, or friend you. They are not notified.</p>
+    <p data-blocked-status role="status" aria-live="polite">Loading…</p>
+    <div data-blocked-list></div>
+    <p style="margin-top:1.5rem"><a href="/">Back</a></p>
+  </main>
+  <script src="/js/cognation-config.js"></script>
+  <script src="/runtime-config"></script>
+  <script src="/js/supabase-client.js"></script>
+  <script src="/js/block.js"></script>
+  <script>
+    (function () {
+      var statusEl = document.querySelector("[data-blocked-status]");
+      var listEl = document.querySelector("[data-blocked-list]");
+      function esc(s) {
+        return String(s == null ? "" : s).replace(/[&<>"']/g, function (ch) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch];
+        });
+      }
+      function render(rows) {
+        listEl.innerHTML = "";
+        if (!rows.length) {
+          statusEl.textContent = "No one blocked.";
+          return;
+        }
+        statusEl.textContent = rows.length + " blocked.";
+        rows.forEach(function (row) {
+          var item = document.createElement("div");
+          item.className = "blocked-item";
+          item.innerHTML =
+            '<div class="blocked-meta"><div class="blocked-name">' + esc(row.display_name) +
+            '</div><div class="blocked-handle">@' + esc(row.handle) + "</div></div>" +
+            '<button type="button" class="btn" data-unblock>Unblock</button>';
+          item.querySelector("[data-unblock]").addEventListener("click", function () {
+            window.CognationBlock.unblockUser(row.user_id).then(function () {
+              item.remove();
+              if (!listEl.children.length) statusEl.textContent = "No one blocked.";
+            }, function (err) {
+              statusEl.textContent = (err && err.message) || "Could not unblock.";
+            });
+          });
+          listEl.appendChild(item);
+        });
+      }
+      if (!window.CognationBlock) {
+        statusEl.textContent = "Sign in is not configured.";
+        return;
+      }
+      window.CognationBlock.listMyBlocks().then(render, function () {
+        statusEl.textContent = "Sign in to manage blocked people.";
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -25,9 +25,9 @@ vm.runInContext(code + "\nthis.PROFILE_STACK_GAP = PROFILE_STACK_GAP; this.packS
 
 /* Spec order. */
 assert.deepStrictEqual(JSON.parse(JSON.stringify(ctx.SPAWN_ROWS.personal)),
-  [["avatar"], ["identity"], ["slogan"], ["music"], ["social", "badges"], ["friends", "calendar"], ["polaroid", "html"], ["instax"]]);
+  [["avatar"], ["identity"], ["slogan"], ["music"], ["friends", "social"], ["badges", "calendar"], ["polaroid", "html"], ["instax"]]);
 assert.deepStrictEqual(JSON.parse(JSON.stringify(ctx.SPAWN_ROWS.professional)),
-  [["avatar"], ["identity"], ["slogan"], ["youtube"], ["social", "badges"], ["calendar", "html"]]);
+  [["avatar"], ["identity"], ["slogan"], ["youtube"], ["social", "badges"], ["followers", "calendar"], ["html"]]);
 assert.ok(!/going-live/.test(JSON.stringify(ctx.SPAWN_ROWS)), "Going live is not a public default");
 assert.ok(JSON.stringify(ctx.SPAWN_ROWS.professional).indexOf("music") === -1, "no music on Professional");
 
@@ -58,8 +58,15 @@ function assertNoOverlap(list, gap) {
   var r = rects(d, sz);
   assertNoOverlap(r, 24);
   assert.strictEqual(d.avatar.x, 24);
-  assert.strictEqual(d.social.y, d.badges.y, kind + ": Links | Badges share a row");
-  assert.strictEqual(d.badges.x, 24 + (1120 - 48 - 24) / 2 + 24, "right column");
+  if (kind === "professional") {
+    assert.strictEqual(d.social.y, d.badges.y, kind + ": Links | Badges share a row");
+    assert.strictEqual(d.followers.y, d.calendar.y, kind + ": Followers | Calendar share a row");
+    assert.strictEqual(d.badges.x, 24 + (1120 - 48 - 24) / 2 + 24, "right column");
+  } else {
+    assert.strictEqual(d.friends.y, d.social.y, kind + ": Top Friends | Links share a row");
+    assert.strictEqual(d.badges.y, d.calendar.y, kind + ": Badges | Calendar share a row");
+    assert.strictEqual(d.social.x, 24 + (1120 - 48 - 24) / 2 + 24, "Links right column");
+  }
   /* Phone (390): one column, 16px sides, DOM order top to bottom. */
   var p = ctx.packSpawn(rows, sz, [], 390, true);
   var prevBottom = -1;
@@ -112,4 +119,13 @@ assert.ok(/applyPublicWidgetsInner\(root, p\);\s*\/\*[^*]*\*\/\s*spawnUnplacedWi
 assert.ok(/freezeSpawnedWidgets\(root, layout\);\s*sticker\.classList\.remove\("is-spawned"\);\s*layout\[id\] = \{\s*x: dropX,\s*y: dropY,/.test(tower), "drop saves free x/y and freezes others");
 assert.ok(tower.indexOf("JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT))") === -1, "no factory copy written on save");
 assert.ok(/\.is-spawned \{\s*max-width: var\(--spawn-max-w/.test(css), "spawn column width CSS");
+/* CSS grid autospawn (LOOK lock): no absolute for defaults; followers on Pro. */
+assert.ok(tower.indexOf("is-default-grid") !== -1, "CSS grid class for pure autospawn");
+assert.ok(/is-default-grid/.test(css) && /grid-template-columns/.test(css), "default-grid CSS present");
+assert.ok(JSON.stringify(ctx.SPAWN_ROWS.professional).indexOf("followers") !== -1, "followers in Pro order");
+assert.ok(JSON.stringify(ctx.SPAWN_ROWS.professional).indexOf("music") === -1, "no music on Pro");
+assert.ok(JSON.stringify(ctx.SPAWN_ROWS.professional).indexOf("friends") === -1, "no Top Friends on Pro");
+assert.ok(JSON.stringify(ctx.SPAWN_ROWS.professional).indexOf("polaroid") === -1, "no polaroid on Pro");
+assert.ok(/data-tower-widget="followers"/.test(fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8")), "followers sticker in HTML");
 console.log("tower-default-spawn.test.js: ok");
+

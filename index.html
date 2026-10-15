@@ -1081,11 +1081,30 @@
                       Off until you turn it on. Dating cards stay hidden, and they only appear for someone local.
                     </p>
                   </div>
+                  <div class="commune-algo-manager" data-commune-algo-manager>
+                    <p class="commune-algo-manager-label">Algorithm Manager</p>
+                    <div class="commune-dating-toggle-row commune-algo-toggle-row">
+                      <label class="commune-dating-toggle" for="commune-see-friend-shares">
+                        <input
+                          type="checkbox"
+                          id="commune-see-friend-shares"
+                          name="seeFriendShares"
+                          data-commune-see-friend-shares
+                          checked
+                        >
+                        <span class="commune-dating-toggle-ui" aria-hidden="true"></span>
+                        <span class="commune-dating-toggle-text">Friends' shares</span>
+                      </label>
+                      <p class="form-hint commune-dating-toggle-hint" id="commune-friend-shares-hint" data-commune-friend-shares-hint>
+                        On: friends' shares can appear. Sharer name shows on the card; interest graph stays private. Off-interest shares stay rare (at most 1 in 6).
+                      </p>
+                    </div>
+                  </div>
                   <div class="commune-private-notices" data-commune-notices hidden></div>
                 </header>
 
                 <p class="commune-swipe-hint" id="commune-swipe-hint">
-                  Swipe left to pass · swipe right to keep · cards stay mixed so no one focus takes over
+                  Swipe right to share with friends and confirm an interest · swipe left to pass (repeat fades a topic) · cards stay mixed
                 </p>
 
                 <div class="commune-swipe-stage">

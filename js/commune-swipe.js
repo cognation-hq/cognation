@@ -11,6 +11,10 @@
  * auction / podcast / field / pop-culture), rotated 1:1, each card with a visible type mark
  * and a "why you see this" line. Professional never shows dating or friends-you-may-know.
  * No Instagram copycat patterns.
+ * Swipe learning (step 1): right = share to friends + confirm interest tag;
+ * left = retag / fade topic after repeats; seed swipes never share; real users
+ * never see seed shares; Friends' shares switch in Algorithm Manager; off-interest
+ * friend shares at most 1 in 6; deck ends "You're caught up."
  */
 (function () {
   "use strict";
@@ -19,12 +23,16 @@
   var LIKES_KEY = "cognation.commune.swipe.likes.v1";
   var FOLLOWS_KEY = "cognation.commune.follows.v1";
   var SEE_DATING_KEY = "cognation.commune.seeDating.v1";
+  var SEE_FRIEND_SHARES_KEY = "cognation.commune.seeFriendShares.v1";
+  var LEARN_KEY = "cognation.commune.swipe-learn.v1";
   var MEMBER_PROFILE_KEY = "cognation.member.profile.v1";
   var RATINGS_KEY = "cognation.commune.dating.ratings.v1";
   var DATING_RIGHT_KEY = "cognation.commune.dating.rights.v1";
   var INBOUND_KEY = "cognation.commune.dating.inbound.v1";
   var NOTICES_KEY = "cognation.commune.notices.v1";
   var SHARES_KEY = "cognation.commune.friend-shares.v1";
+  var FADE_LEFT_THRESHOLD = 3;
+  var OFF_INTEREST_FRIEND_RATIO = 6;
   var ROOMS_KEY = "cognation.commune.site-rooms.v1";
   var ROOM_CHAT_KEY = "cognation.commune.room-chat.v1";
   var REQUESTS_KEY = "cognation.friend.requests.v1";
@@ -282,6 +290,32 @@
         for (n = 0; n < CONTENT_SUBTYPES.length; n++) {
           var sub = CONTENT_SUBTYPES[(start + n) % CONTENT_SUBTYPES.length];
           var list = (lanes && lanes[sub]) || [];
+          if (sub === TYPE.FRIEND && list.length) {
+            /* Prefer in-interest friend shares; off-interest at most 1 in every 6 cards. */
+            var prefer = [];
+            var off = [];
+            list.forEach(function (c) {
+              if (c && c.offInterest) off.push(c);
+              else prefer.push(c);
+            });
+            var pickList = prefer.length ? prefer : off;
+            var cardF = takeFromList(sub, pickList, null);
+            if (!cardF && prefer.length && off.length) cardF = takeFromList(sub + ":off", off, null);
+            if (!cardF) continue;
+            if (cardF.offInterest) {
+              var nextLen = out.length + 1;
+              var offCount = 0;
+              out.forEach(function (c) {
+                if (c && c.type === TYPE.FRIEND && c.offInterest) offCount += 1;
+              });
+              if ((offCount + 1) * OFF_INTEREST_FRIEND_RATIO > nextLen) {
+                /* Skip this off-interest slot; try another content subtype. */
+                continue;
+              }
+            }
+            cursors._contentRot = (CONTENT_SUBTYPES.indexOf(sub) + 1) % CONTENT_SUBTYPES.length;
+            return cardF;
+          }
           var card = takeFromList(sub, list, null);
           if (!card) continue;
           cursors._contentRot = (CONTENT_SUBTYPES.indexOf(sub) + 1) % CONTENT_SUBTYPES.length;
@@ -459,6 +493,123 @@
   function datingAllowed() {
     var age = getMemberAge();
     return !!(getSeeDating() && age != null && age > 18);
+  }
+
+  /* Algorithm Manager — Friends' shares (default on). */
+  function getSeeFriendShares() {
+    try {
+      var raw = localStorage.getItem(SEE_FRIEND_SHARES_KEY);
+      if (raw === null || raw === undefined || raw === "") return true;
+      return raw === "1" || raw === "true";
+    } catch (eSee) {
+      return true;
+    }
+  }
+  function setSeeFriendShares(on) {
+    var next = !!on;
+    var prev = getSeeFriendShares();
+    try { localStorage.setItem(SEE_FRIEND_SHARES_KEY, next ? "1" : "0"); } catch (eSet) {}
+    if (prev === next) return;
+    emit("cognation:see-friend-shares-changed", { seeFriendShares: next });
+  }
+
+  function learnDoc() {
+    var doc = readJson(localStorage, LEARN_KEY, null);
+    if (!doc || typeof doc !== "object" || Array.isArray(doc)) {
+      doc = { confirmed: {}, left: {} };
+    }
+    if (!doc.confirmed || typeof doc.confirmed !== "object") doc.confirmed = {};
+    if (!doc.left || typeof doc.left !== "object") doc.left = {};
+    return doc;
+  }
+  function writeLearnDoc(doc) {
+    writeJson(localStorage, LEARN_KEY, {
+      confirmed: doc.confirmed || {},
+      left: doc.left || {},
+    });
+  }
+  function cardInterestTags(card) {
+    var tags = terms(card && card.interests);
+    if (!tags.length) tags = terms(((card && card.title) || "") + " " + ((card && card.body) || ""));
+    return tags.slice(0, 8);
+  }
+  function confirmInterestTags(card) {
+    var tags = cardInterestTags(card);
+    if (!tags.length) return tags;
+    var doc = learnDoc();
+    tags.forEach(function (tag) {
+      doc.confirmed[tag] = (doc.confirmed[tag] || 0) + 1;
+      if (doc.left[tag]) doc.left[tag] = Math.max(0, (doc.left[tag] || 0) - 1);
+    });
+    writeLearnDoc(doc);
+    return tags;
+  }
+  function noteLeftInterestTags(card) {
+    var tags = cardInterestTags(card);
+    if (!tags.length) return tags;
+    var doc = learnDoc();
+    tags.forEach(function (tag) {
+      doc.left[tag] = (doc.left[tag] || 0) + 1;
+    });
+    writeLearnDoc(doc);
+    return tags;
+  }
+  function isTopicFaded(tag) {
+    tag = norm(tag);
+    if (!tag) return false;
+    var doc = learnDoc();
+    var left = doc.left[tag] || 0;
+    var conf = doc.confirmed[tag] || 0;
+    return left >= FADE_LEFT_THRESHOLD && left > conf;
+  }
+  function cardTopicFaded(card) {
+    var tags = cardInterestTags(card);
+    if (!tags.length) return false;
+    var faded = 0;
+    tags.forEach(function (t) { if (isTopicFaded(t)) faded += 1; });
+    return faded > 0 && faded >= tags.length;
+  }
+
+  function viewerIsSeedOrOps() {
+    try {
+      var auth = window.CognationAuth && typeof window.CognationAuth.getSession === "function"
+        ? window.CognationAuth.getSession()
+        : null;
+      if (auth && (auth.accountKind === "seed" || auth.accountKind === "ops" || auth.isSeed)) return true;
+    } catch (eAuth) {}
+    var personal = viewerPersonal();
+    if (personal) {
+      if (personal.accountKind === "seed" || personal.accountKind === "ops" || personal.isSeed) return true;
+      if (/^seed-/i.test(String(personal.handle || "")) || /^seed-/i.test(String(personal.seedFleetId || personal.seed_fleet_id || ""))) return true;
+    }
+    return false;
+  }
+
+  function profileLooksSeed(rec) {
+    if (!rec) return false;
+    if (rec.accountKind === "seed" || rec.account_kind === "seed" || rec.isSeed) return true;
+    if (rec.accountKind === "ops" || rec.account_kind === "ops") return true;
+    if (/^seed-/i.test(String(rec.handle || ""))) return true;
+    if (rec.seedFleetId || rec.seed_fleet_id) return true;
+    return false;
+  }
+
+  function viewerDisplayName() {
+    var personal = viewerPersonal();
+    if (personal && String(personal.displayName || "").trim()) return String(personal.displayName).trim().slice(0, 80);
+    var member = getMemberProfile();
+    if (member && String(member.displayName || member.name || "").trim()) {
+      return String(member.displayName || member.name).trim().slice(0, 80);
+    }
+    try {
+      var auth = window.CognationAuth && typeof window.CognationAuth.getSession === "function"
+        ? window.CognationAuth.getSession()
+        : null;
+      if (auth && String(auth.profileDisplayName || "").trim()) {
+        return String(auth.profileDisplayName).trim().slice(0, 80);
+      }
+    } catch (eName) {}
+    return "A friend";
   }
 
   function eachProfile(fn) {
@@ -938,7 +1089,20 @@
     return out;
   }
 
+  function shareAuthorBlocked(share) {
+    if (!share) return false;
+    var blockedUsers = state.blockedShareUserIds || {};
+    var blockedProfiles = state.blockedShareProfileIds || {};
+    if (share.swiperId && blockedProfiles[String(share.swiperId)]) return true;
+    if (share.swiperUserId && blockedUsers[String(share.swiperUserId)]) return true;
+    var rec = profileById(share.swiperId);
+    if (rec && rec.user_id && blockedUsers[String(rec.user_id)]) return true;
+    if (rec && rec.userId && blockedUsers[String(rec.userId)]) return true;
+    return false;
+  }
+
   function friendShareCards() {
+    if (!getSeeFriendShares()) return [];
     var shares = readJson(localStorage, SHARES_KEY, []);
     if (!Array.isArray(shares)) return [];
     var friends = {};
@@ -948,18 +1112,30 @@
     shares.forEach(function (share) {
       if (!share || !share.swiperId || !friends[String(share.swiperId)]) return;
       if (viewerIds().indexOf(String(share.swiperId)) >= 0) return;
+      /* Real users never see seed shares. */
+      if (share.swiperIsSeed || share.fromSeed) return;
+      var sharer = profileById(share.swiperId);
+      if (profileLooksSeed(sharer)) return;
+      if (shareAuthorBlocked(share)) return;
       var tags = terms(share.interests);
-      if (!tags.length || !overlap(interests, tags)) return;
+      if (!tags.length) tags = terms((share.title || "") + " " + (share.body || ""));
+      if (!tags.length) return;
+      if (cardTopicFaded({ interests: tags, title: share.title, body: share.body })) return;
+      var inInterest = !!(interests.length && overlap(interests, tags));
+      var sharerName = String(share.sharerName || share.fromName || (sharer && sharer.displayName) || "A friend").slice(0, 80);
       out.push({
         id: "friend-" + (share.id || share.adId || share.title),
         type: TYPE.FRIEND,
-        title: share.title || "A friend kept this",
+        title: share.title || "A friend shared this",
         body: share.body || "",
         videoUrl: share.videoUrl || "",
-        fromName: share.fromName || "A friend",
+        fromName: sharerName,
         handle: share.handle || "",
-        profileId: share.profileId || "",
+        profileId: share.swiperId || share.profileId || "",
         interests: tags,
+        offInterest: !inInterest,
+        /* Friends see sharer name; interest graph stays anonymous (no tag dump). */
+        why: "Shared by " + sharerName,
       });
     });
     return out;
@@ -982,7 +1158,11 @@
     lanes[TYPE.KNOW] = peopleYouMayKnow();
     lanes[TYPE.CONTENT] = towerLiveContentCards();
     Object.keys(lanes).forEach(function (type) {
-      lanes[type] = omitPassed((lanes[type] || []).filter(ageSafeFeaturedCard));
+      lanes[type] = omitPassed((lanes[type] || []).filter(ageSafeFeaturedCard).filter(function (card) {
+        /* Repeated lefts fade a topic out of the deck (friend shares handled separately). */
+        if (type === TYPE.FRIEND) return true;
+        return !cardTopicFaded(card);
+      }));
     });
     var dating = omitPassed(datingPool().filter(ageSafeFeaturedCard));
     return { lanes: lanes, dating: dating };
@@ -1157,6 +1337,8 @@
     roomBlockedUserIds: {},
     roomReportedMsgIds: {},
     roomHiddenMsgIds: {},
+    blockedShareUserIds: {},
+    blockedShareProfileIds: {},
   };
 
   function typeLabel(t) {
@@ -1202,6 +1384,40 @@
       else if (!getSeeDating()) hint.textContent = "Off until you turn it on. Dating cards stay hidden, and they only appear for someone local.";
       else hint.textContent = "Dating is on. Local dating cards share the featured mix one-to-one with Classroom, ads, chat rooms, and content.";
     }
+    syncFriendSharesVisibility();
+  }
+
+  function syncFriendSharesVisibility() {
+    if (!state.shell) return;
+    var on = getSeeFriendShares();
+    if (on) state.shell.setAttribute("data-friend-shares-visible", "true");
+    else state.shell.removeAttribute("data-friend-shares-visible");
+    var toggle = state.shell.querySelector("[data-commune-see-friend-shares]");
+    if (toggle && toggle.type === "checkbox") {
+      toggle.checked = on;
+      toggle.setAttribute("aria-checked", on ? "true" : "false");
+    }
+    var hint = state.shell.querySelector("[data-commune-friend-shares-hint]");
+    if (hint) {
+      hint.textContent = on
+        ? "On: friends' shares can appear. Sharer name shows on the card; interest graph stays private. Off-interest shares stay rare (at most 1 in 6)."
+        : "Off: friends' shares stay out of your ECHO deck. Turn on anytime in Algorithm Manager.";
+    }
+  }
+
+  function refreshBlockedShares() {
+    state.blockedShareUserIds = state.blockedShareUserIds || {};
+    state.blockedShareProfileIds = state.blockedShareProfileIds || {};
+    if (!window.CognationBlock || typeof window.CognationBlock.listMyBlocks !== "function") return;
+    try {
+      window.CognationBlock.listMyBlocks().then(function (rows) {
+        var map = {};
+        (Array.isArray(rows) ? rows : []).forEach(function (row) {
+          if (row && row.user_id) map[String(row.user_id)] = true;
+        });
+        state.blockedShareUserIds = map;
+      }, function () {});
+    } catch (eBlk) {}
   }
 
   function setStatus(msg) {
@@ -2087,7 +2303,7 @@
     if (!card) {
       var roomsOpen = ensureSiteRooms().length;
       var empty =
-        '<p class="commune-swipe-empty">No more ECHO cards right now.</p>' +
+        '<p class="commune-swipe-empty">You\'re caught up.</p>' +
         (roomsOpen
           ? ''
           : '<p class="commune-swipe-empty commune-swipe-empty--rooms">No chat rooms match your age and interests yet. Update age or interests in your profile, then come back.</p>');
@@ -2120,6 +2336,8 @@
   }
 
   function recordShare(card) {
+    /* Seed swipes are excluded — real users never see seed shares. */
+    if (viewerIsSeedOrOps()) return;
     var interests = terms(card.interests);
     if (!interests.length) interests = terms((card.title || "") + " " + (card.body || ""));
     if (!interests.length) return;
@@ -2132,10 +2350,12 @@
       body: card.body,
       videoUrl: card.videoUrl || "",
       fromName: card.fromName || "",
+      sharerName: viewerDisplayName(),
       handle: card.handle || "",
       profileId: card.profileId || "",
       interests: interests,
       swiperId: currentProfileId(),
+      swiperIsSeed: false,
       at: Date.now(),
     });
     writeJson(localStorage, SHARES_KEY, shares.slice(-200));
@@ -2296,7 +2516,15 @@
     var pathway = pathwayForCard(card);
     if (dir === "left") {
       dismiss(card);
-      setStatus("Passed.");
+      var leftTags = noteLeftInterestTags(card);
+      var faded = leftTags.filter(isTopicFaded);
+      if (faded.length) {
+        setStatus("Passed — fading \"" + faded[0] + "\" after repeated lefts.");
+      } else if (leftTags.length) {
+        setStatus("Passed — less of \"" + leftTags[0] + "\" for now.");
+      } else {
+        setStatus("Passed.");
+      }
       friction("abandon", pathway, "swipe_left");
       return;
     }
@@ -2328,8 +2556,13 @@
       return;
     }
     if (card.type === TYPE.AD) {
+      var adTags = confirmInterestTags(card);
       recordShare(card);
-      setStatus("Shared with friends who share this interest.");
+      setStatus(
+        viewerIsSeedOrOps()
+          ? "Kept."
+          : ("Shared with friends" + (adTags.length ? " · confirmed \"" + adTags[0] + "\"" : "") + ".")
+      );
       friction("complete", "ad");
       return;
     }
@@ -2343,8 +2576,11 @@
         if (!isFollowing(card.profileId)) toggleFollow(card.profileId);
         setStatus("Following this professional page.");
       } else {
-        if (!card.demo) recordShare(card);
-        setStatus("Kept.");
+        if (!card.demo) {
+          confirmInterestTags(card);
+          recordShare(card);
+        }
+        setStatus(card.demo ? "Kept." : "Shared with friends · interest confirmed.");
       }
       friction("complete", pathway);
       return;
@@ -2357,8 +2593,17 @@
     }
     if (card.type === TYPE.FRIEND || card.type === TYPE.EVENT || card.type === TYPE.FACT || card.type === TYPE.WELLNESS || card.type === TYPE.CHAT || card.type === TYPE.CONTENT) {
       like(card);
-      if (card.type !== TYPE.CHAT) recordShare(card);
-      setStatus("Kept.");
+      if (card.type !== TYPE.CHAT) {
+        confirmInterestTags(card);
+        recordShare(card);
+        setStatus(
+          viewerIsSeedOrOps() || card.type === TYPE.FRIEND
+            ? "Kept · interest confirmed."
+            : "Shared with friends · interest confirmed."
+        );
+      } else {
+        setStatus("Kept.");
+      }
       friction("complete", pathway);
       return;
     }
@@ -2486,6 +2731,18 @@
       }
       rebuildDeck();
       setStatus("Dating cards hidden.");
+    });
+  }
+
+  function wireFriendSharesToggle(shell) {
+    var toggle = shell.querySelector("[data-commune-see-friend-shares]");
+    if (!toggle) return;
+    toggle.addEventListener("change", function () {
+      var on = !!toggle.checked;
+      setSeeFriendShares(on);
+      syncFriendSharesVisibility();
+      rebuildDeck();
+      setStatus(on ? "Friends' shares can appear in ECHO." : "Friends' shares hidden.");
     });
   }
 
@@ -2620,6 +2877,8 @@
       else if (ev.key === "ArrowRight") { ev.preventDefault(); swipe("right"); }
     });
     wireDatingToggle(shell);
+    wireFriendSharesToggle(shell);
+    refreshBlockedShares();
     wireModeSwitch(shell);
   }
 
@@ -2659,6 +2918,20 @@
     getSeeDating: getSeeDating,
     setSeeDating: setSeeDating,
     datingAllowed: datingAllowed,
+    getSeeFriendShares: getSeeFriendShares,
+    setSeeFriendShares: setSeeFriendShares,
+    confirmInterestTags: confirmInterestTags,
+    noteLeftInterestTags: noteLeftInterestTags,
+    isTopicFaded: isTopicFaded,
+    cardTopicFaded: cardTopicFaded,
+    cardInterestTags: cardInterestTags,
+    friendShareCards: friendShareCards,
+    recordShare: recordShare,
+    viewerIsSeedOrOps: viewerIsSeedOrOps,
+    FADE_LEFT_THRESHOLD: FADE_LEFT_THRESHOLD,
+    OFF_INTEREST_FRIEND_RATIO: OFF_INTEREST_FRIEND_RATIO,
+    SEE_FRIEND_SHARES_KEY: SEE_FRIEND_SHARES_KEY,
+    LEARN_KEY: LEARN_KEY,
     seedDemoFollows: function () { return getFollows(); },
     siteRoomCatalog: function () { return SITE_ROOMS.map(roomCard); },
     visibleSiteRooms: ensureSiteRooms,
@@ -2685,6 +2958,8 @@
     formatMatchEventLine: formatMatchEventLine,
     FOLLOWS_KEY: FOLLOWS_KEY,
     SEE_DATING_KEY: SEE_DATING_KEY,
+    SEE_FRIEND_SHARES_KEY: SEE_FRIEND_SHARES_KEY,
+    LEARN_KEY: LEARN_KEY,
     MEMBER_PROFILE_KEY: MEMBER_PROFILE_KEY,
   };
 

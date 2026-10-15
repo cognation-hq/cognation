@@ -61,7 +61,7 @@ assert.ok(/function bindProYoutubeUrl[\s\S]*?isTowerOwner\(cur\) \|\| !profileIs
 
 /* Layout: own saved spot; existing Professional pages keep Music's old spot (no migration). */
 assert.ok(/youtube: \{ x: 2, y: 28, z: 6, tilt: 0 \}/.test(tower), "default YouTube spot");
-assert.ok(/if \(id === "youtube" && !layout\.youtube && layout\.music\) pos = layout\.music;/.test(tower), "inherits saved Music spot");
+assert.ok(/if \(id === "youtube" && !layout\.youtube && isPlacedPos\(layout, "music"\)\) pos = layout\.music;/.test(tower), "inherits saved Music spot");
 
 /* Calendar stays on both pages; going-live stays out of public widgets. */
 assert.ok(/if \(id === "calendar"\) on = true;/.test(tower), "calendar stays");

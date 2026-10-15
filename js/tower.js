@@ -86,6 +86,184 @@
     polaroid: { x: 40, y: 6, z: 6, tilt: 0 },
     instax: { x: 62, y: 4, z: 7, tilt: 0 },
   };
+  /* Default spawn spots (Designer spec, tower-default-layout). Saved layouts keep
+     the free x/y % format; these rows only decide where an unplaced widget first
+     appears. Rows are DOM/phone order; a row of two is left | right. */
+  var SPAWN_GAP = 24;
+  var SPAWN_ROWS = {
+    personal: [["avatar"], ["identity"], ["slogan"], ["music"], ["social", "badges"], ["friends", "calendar"], ["polaroid", "html"], ["instax"]],
+    professional: [["avatar"], ["identity"], ["slogan"], ["youtube"], ["social", "badges"], ["calendar", "html"]],
+  };
+  /* Factory seeds that were never a user's choice. An entry equal to one of these
+     is treated as unplaced, so old overlapping defaults get a real spawn spot. */
+  var FACTORY_SEED_LAYOUTS = [
+    { avatar: [2, 3], identity: [2, 26], slogan: [22, 16], social: [2, 22], music: [2, 28], youtube: [2, 28], badges: [2, 38], friends: [2, 52], html: [22, 3], calendar: [55, 28], polaroid: [40, 6], instax: [62, 4] },
+    { avatar: [4, 4], identity: [4, 26], slogan: [28, 18], social: [4, 26], music: [4, 34], badges: [4, 44], friends: [4, 56], html: [28, 4] },
+    { identity: [4, 18] },
+  ];
+  var spawnCache = {};
+
+  function isFactorySeedPos(id, pos) {
+    if (!pos || typeof pos !== "object") return true;
+    for (var i = 0; i < FACTORY_SEED_LAYOUTS.length; i++) {
+      var f = FACTORY_SEED_LAYOUTS[i][id];
+      if (f && pos.x === f[0] && pos.y === f[1]) return true;
+    }
+    return false;
+  }
+
+  /* A widget the owner actually placed (dragged or frozen). */
+  function isPlacedPos(layout, id) {
+    return !!(layout && layout[id] && !isFactorySeedPos(id, layout[id]));
+  }
+
+  function spawnRowsFor(p) {
+    return p && (p._profileKind === "professional" || p.kind === "professional") ? SPAWN_ROWS.professional : SPAWN_ROWS.personal;
+  }
+
+  function rectsOverlap(a, b, gap) {
+    return a.x < b.x + b.w + gap && b.x < a.x + a.w + gap && a.y < b.y + b.h + gap && b.y < a.y + a.h + gap;
+  }
+
+  /* Pure packer (px). items: [{ row, id, w, h }] in spawn order; occupied: placed rects.
+     Returns { id: { x, y } } plus bottom. Never touches occupied rects. */
+  function packSpawn(rows, sizes, occupied, stageW, phone) {
+    var pad = phone ? 16 : 24;
+    var gap = SPAWN_GAP;
+    var colW = phone ? stageW - pad * 2 : (stageW - pad * 2 - gap) / 2;
+    var taken = occupied.slice();
+    var out = {};
+    var cursor = pad;
+    function freeY(x, y, w, h) {
+      var moved = true;
+      while (moved) {
+        moved = false;
+        for (var i = 0; i < taken.length; i++) {
+          if (rectsOverlap({ x: x, y: y, w: w, h: h }, taken[i], gap - 0.5)) {
+            y = taken[i].y + taken[i].h + gap;
+            moved = true;
+          }
+        }
+      }
+      return y;
+    }
+    rows.forEach(function (row) {
+      var ids = row.filter(function (id) { return !!sizes[id]; });
+      if (!ids.length) return;
+      if (phone || row.length === 1) {
+        ids.forEach(function (id) {
+          var sz = sizes[id];
+          var y = freeY(pad, cursor, Math.min(sz.w, phone ? colW : stageW - pad * 2), sz.h);
+          out[id] = { x: pad, y: y };
+          taken.push({ x: pad, y: y, w: sz.w, h: sz.h });
+          cursor = y + sz.h + gap;
+        });
+        return;
+      }
+      /* Two small widgets share a row: left column, right column. */
+      var slots = row.map(function (id, i) { return { id: id, x: pad + i * (colW + gap) }; }).filter(function (sl) { return !!sizes[sl.id]; });
+      var y = cursor;
+      var settled = false;
+      while (!settled) {
+        settled = true;
+        slots.forEach(function (sl) {
+          var sz = sizes[sl.id];
+          var ny = freeY(sl.x, y, Math.min(sz.w, colW), sz.h);
+          if (ny !== y) { y = ny; settled = false; }
+        });
+      }
+      var bottom = y;
+      slots.forEach(function (sl) {
+        var sz = sizes[sl.id];
+        out[sl.id] = { x: sl.x, y: y };
+        taken.push({ x: sl.x, y: y, w: Math.min(sz.w, colW), h: sz.h });
+        bottom = Math.max(bottom, y + sz.h);
+      });
+      cursor = bottom + gap;
+    });
+    var maxBottom = 0;
+    taken.forEach(function (r) { maxBottom = Math.max(maxBottom, r.y + r.h); });
+    out.__bottom = maxBottom + pad;
+    out.__colW = colW;
+    return out;
+  }
+
+  /* Place every visible, unplaced widget in its spawn spot (no overlap, 24px gap).
+     Owner-placed widgets never move. Nothing is saved here. */
+  function spawnUnplacedWidgets(root, p) {
+    var stage = root && root.querySelector("[data-tower-scrapbook]");
+    if (!stage || !stage.classList.contains("is-sticker-stage")) return;
+    var stageW = stage.clientWidth || 0;
+    if (!stageW) return;
+    var phone = stageW < 768 || (window.innerWidth && window.innerWidth < 768);
+    var layout = getWidgetLayout(p) || {};
+    var rows = spawnRowsFor(p);
+    var spawnIds = {};
+    rows.forEach(function (r) { r.forEach(function (id) { spawnIds[id] = true; }); });
+    var sizes = {};
+    var occupied = [];
+    var colW = phone ? stageW - 32 : (stageW - 48 - SPAWN_GAP) / 2;
+    stage.querySelectorAll("[data-tower-widget]").forEach(function (el) {
+      if (el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
+      var id = el.getAttribute("data-tower-widget");
+      if (spawnIds[id] && !isPlacedPos(layout, id) && !el.classList.contains("is-dragging")) {
+        var full = rows.some(function (r) { return r.length === 1 && r[0] === id; });
+        el.classList.add("is-spawned");
+        el.style.setProperty("--spawn-max-w", Math.floor(full && !phone ? stageW - 48 : colW) + "px");
+        sizes[id] = { w: el.offsetWidth || 0, h: el.offsetHeight || 0 };
+        return;
+      }
+      el.classList.remove("is-spawned");
+      occupied.push({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
+    });
+    var placed = packSpawn(rows, sizes, occupied, stageW, phone);
+    var stageH = Math.max(stage.clientHeight || 0, placed.__bottom);
+    if (placed.__bottom > (stage.clientHeight || 0)) stage.style.minHeight = Math.ceil(placed.__bottom) + "px";
+    spawnCache = {};
+    Object.keys(placed).forEach(function (id) {
+      if (id.indexOf("__") === 0) return;
+      var el = stage.querySelector('[data-tower-widget="' + id + '"]');
+      if (!el) return;
+      var x = Math.round((placed[id].x / stageW) * 1000) / 10;
+      var y = Math.round((placed[id].y / stageH) * 1000) / 10;
+      spawnCache[id] = { x: x, y: y, z: 2, tilt: 0 };
+      el.style.setProperty("--sticker-x", x + "%");
+      el.style.setProperty("--sticker-y", y + "%");
+      el.style.setProperty("--sticker-z", "2");
+      el.style.setProperty("--sticker-tilt", "0deg");
+      el.setAttribute("data-sticker-x", String(x));
+      el.setAttribute("data-sticker-y", String(y));
+      el.setAttribute("data-sticker-z", "2");
+    });
+  }
+
+  /* Saved spot if the owner placed it, else the current spawn spot, else the old default. */
+  function widgetPos(p, id) {
+    var layout = getWidgetLayout(p);
+    if (isPlacedPos(layout, id)) return layout[id];
+    return spawnCache[id] || DEFAULT_WIDGET_LAYOUT[id];
+  }
+
+  /* Before saving any layout, pin every on-screen spawned widget where it is now,
+     so moving one widget never makes the others jump. */
+  function freezeSpawnedWidgets(root, layout) {
+    var stage = root && root.querySelector ? root.querySelector("[data-tower-scrapbook]") : null;
+    if (!stage) return layout;
+    stage.querySelectorAll("[data-tower-widget].is-spawned").forEach(function (el) {
+      var id = el.getAttribute("data-tower-widget");
+      if (!id || el.hidden || el.classList.contains("is-widget-off")) return;
+      if (isPlacedPos(layout, id)) return;
+      layout[id] = {
+        x: parseFloat(el.getAttribute("data-sticker-x") || "0"),
+        y: parseFloat(el.getAttribute("data-sticker-y") || "0"),
+        z: parseInt(el.getAttribute("data-sticker-z") || "2", 10),
+        tilt: 0,
+      };
+      el.classList.remove("is-spawned");
+    });
+    return layout;
+  }
+
   /* Old scrapbook leans. A Rotate click adds 5° and that angle is kept. */
   var FACTORY_WIDGET_TILT = {
     avatar: -2,
@@ -2538,8 +2716,7 @@
 
   /** Default badge pin dock — offset from badges sticker so pins do not stack on friend pins. */
   function defaultBadgePinPos(p, index) {
-    var layout = getWidgetLayout(p) || DEFAULT_WIDGET_LAYOUT;
-    var badges = (layout && layout.badges) || DEFAULT_WIDGET_LAYOUT.badges;
+    var badges = widgetPos(p, "badges") || DEFAULT_WIDGET_LAYOUT.badges;
     var baseX = typeof badges.x === "number" ? badges.x : DEFAULT_WIDGET_LAYOUT.badges.x;
     var baseY = typeof badges.y === "number" ? badges.y : DEFAULT_WIDGET_LAYOUT.badges.y;
     var col = index % 4;
@@ -3923,8 +4100,7 @@
   }
 
   function defaultFriendPinPos(p, index) {
-    var layout = getWidgetLayout(p) || DEFAULT_WIDGET_LAYOUT;
-    var friends = (layout && layout.friends) || DEFAULT_WIDGET_LAYOUT.friends;
+    var friends = widgetPos(p, "friends") || DEFAULT_WIDGET_LAYOUT.friends;
     var baseX = typeof friends.x === "number" ? friends.x : DEFAULT_WIDGET_LAYOUT.friends.x;
     var baseY = typeof friends.y === "number" ? friends.y : DEFAULT_WIDGET_LAYOUT.friends.y;
     var col = index % 4;
@@ -4801,6 +4977,25 @@
   }
 
   function applyPublicWidgets(root, p) {
+    applyPublicWidgetsInner(root, p);
+    /* Visibility changed: give newly shown, unplaced widgets their spawn spot. */
+    spawnUnplacedWidgets(root, p);
+    bindSpawnResize(root);
+  }
+
+  function bindSpawnResize(root) {
+    if (!root || root.__cognationSpawnResize || typeof window.addEventListener !== "function") return;
+    root.__cognationSpawnResize = true;
+    var timer = null;
+    window.addEventListener("resize", function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        try { spawnUnplacedWidgets(root, TowerProfileStore.get()); } catch (e) {}
+      }, 150);
+    });
+  }
+
+  function applyPublicWidgetsInner(root, p) {
     if (p) pruneEmptyPublicWidgetsInProfile(p);
     var widgets = normalizePublicWidgets(p && p.publicWidgets);
     var sloganText = p && typeof p.slogan === "string" ? p.slogan.trim() : "";
@@ -5018,8 +5213,8 @@
     }
     var wid = el.getAttribute("data-tower-widget");
     if (!wid || wid === "feed" || wid === "messages") return;
-    var layout = getWidgetLayout(p) || JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT));
-    var prev = layout[wid] || DEFAULT_WIDGET_LAYOUT[wid] || {};
+    var layout = freezeSpawnedWidgets(el.closest ? el.closest("[data-tower-app]") || document : document, getWidgetLayout(p) || {});
+    var prev = layout[wid] || {};
     layout[wid] = {
       x: typeof prev.x === "number" ? prev.x : parseFloat(el.getAttribute("data-sticker-x") || "0"),
       y: typeof prev.y === "number" ? prev.y : parseFloat(el.getAttribute("data-sticker-y") || "0"),
@@ -6864,7 +7059,7 @@
     if (!found) {
       list.push({ id: spec.id, glyph: spec.glyph, size: 64 });
       if (!p.widgetLayout || typeof p.widgetLayout !== "object") {
-        p.widgetLayout = JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT));
+        p.widgetLayout = {};
       }
       p.widgetLayout[spec.id] = defaultEmojiPos(list.length - 1);
       p.emojiStickers = list;
@@ -7007,7 +7202,7 @@
       if (!el || el.classList.contains("is-dragging")) return;
       var pos = layout[id] || DEFAULT_WIDGET_LAYOUT[id];
       /* YouTube split from Music: a Professional page that already placed Music keeps that spot. */
-      if (id === "youtube" && !layout.youtube && layout.music) pos = layout.music;
+      if (id === "youtube" && !layout.youtube && isPlacedPos(layout, "music")) pos = layout.music;
       var fallback = DEFAULT_WIDGET_LAYOUT[id] || { x: 8, y: 8, z: zBase, tilt: 0 };
       var x = layoutCoord(pos && pos.x, fallback.x);
       var y = layoutCoord(pos && pos.y, fallback.y);
@@ -7040,6 +7235,7 @@
       extraEl.setAttribute("data-sticker-y", String(ey));
       extraEl.setAttribute("data-sticker-z", String(ez));
     });
+    spawnUnplacedWidgets(root, p);
   }
 
   function collageCellCount(layoutId) {
@@ -7547,7 +7743,7 @@
           pEmojiUndo.emojiStickers = listEmoji;
           if (entry.layout) {
             if (!pEmojiUndo.widgetLayout || typeof pEmojiUndo.widgetLayout !== "object") {
-              pEmojiUndo.widgetLayout = JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT));
+              pEmojiUndo.widgetLayout = {};
             }
             pEmojiUndo.widgetLayout[entry.id] = entry.layout;
           }
@@ -7627,7 +7823,7 @@
         if (!isTowerOwner(TowerProfileStore.get())) return;
         var p = TowerProfileStore.get();
         if (!isTowerOwner(p)) return;
-        p.widgetLayout = JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT));
+        p.widgetLayout = {};
         if (p.widgetLayout && p.widgetLayout.feed) delete p.widgetLayout.feed;
         if (p.widgetLayout && p.widgetLayout.messages) delete p.widgetLayout.messages;
         p.publicWidgets = JSON.parse(JSON.stringify(DEFAULT_PUBLIC_WIDGETS));
@@ -7841,7 +8037,7 @@
         var dropZ = parseInt(sticker.getAttribute("data-sticker-z") || "1", 10);
         var dropTilt = parseFloat(String(sticker.style.getPropertyValue("--sticker-tilt") || "0").replace("deg", "")) || 0;
         var p = TowerProfileStore.get();
-        var layout = getWidgetLayout(p) || JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT));
+        var layout = getWidgetLayout(p) || {};
         var id = sticker.getAttribute("data-tower-widget");
         if (!id) {
           sticker.classList.remove("is-dragging");
@@ -7863,7 +8059,9 @@
           });
           TowerProfileStore.save(p, { geometry: true });
         } else {
-          var prev = layout[id] || DEFAULT_WIDGET_LAYOUT[id] || { tilt: dropTilt };
+          var prev = layout[id] || { tilt: dropTilt };
+          freezeSpawnedWidgets(root, layout);
+          sticker.classList.remove("is-spawned");
           layout[id] = {
             x: dropX,
             y: dropY,
@@ -9096,7 +9294,7 @@
           p.backgroundCollage = readCollageFromForm(root);
         }
         /* keep widgetLayout as last dragged */
-        if (!p.widgetLayout) p.widgetLayout = JSON.parse(JSON.stringify(DEFAULT_WIDGET_LAYOUT));
+        if (!p.widgetLayout) p.widgetLayout = {};
         if (root.querySelector("[data-tower-public-widget]")) {
           p.publicWidgets = readPublicWidgetsFromForm(root);
         }

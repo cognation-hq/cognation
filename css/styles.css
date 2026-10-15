@@ -12780,3 +12780,10 @@ a.site-switch-side:focus-visible {
 .login-age-block { text-align: center; padding: 1.5rem 0.5rem; }
 .login-age-block[hidden] { display: none; }
 .login-age-block p { font-size: 1.1rem; margin: 0; }
+
+/* Default spawn spots (tower-default-layout spec): an unplaced widget is held
+   to its grid column so two side-by-side defaults never overlap. Owner-placed
+   widgets are unaffected. */
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker.is-spawned {
+  max-width: var(--spawn-max-w, min(22rem, 92%));
+}

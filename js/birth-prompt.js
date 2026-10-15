@@ -10,6 +10,7 @@
   var SHOWN_KEY = "cognation.birthPrompt.shown.v1";
   var panel = null;
   var busy = false;
+  var UNKNOWN = { unknown: true };
 
   function session() {
     try {
@@ -141,14 +142,20 @@
   function hasBirthRow() {
     var sb = window.CognationSupabase;
     var id = uid();
-    if (!sb || !id || typeof sb.rest !== "function") return Promise.resolve(null);
+    /* Resolves to the row, null when there is truly no row, or UNKNOWN when the
+       lookup could not run or failed. Only a real "no row" opens the ask. The
+       table name and query go separately: rest() URL-encodes the table name. */
+    if (!sb || !id || typeof sb.rest !== "function") return Promise.resolve(UNKNOWN);
     return sb
-      .rest("user_birth?select=birth_year,birth_month&user_id=eq." + encodeURIComponent(id) + "&limit=1")
+      .rest("user_birth", {
+        query: "select=birth_year,birth_month&user_id=eq." + encodeURIComponent(id) + "&limit=1",
+      })
       .then(function (rows) {
-        return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+        if (!Array.isArray(rows)) return UNKNOWN;
+        return rows.length > 0 ? rows[0] : null;
       })
       .catch(function () {
-        return null;
+        return UNKNOWN;
       });
   }
 
@@ -198,6 +205,7 @@
     var login = document.querySelector(".login-gate:not(.birth-prompt-gate)");
     if (login && !login.hidden) return;
     hasBirthRow().then(function (row) {
+      if (row === UNKNOWN) return; /* lookup failed: never block the page on a guess */
       if (row) {
         markShown(id);
         return;

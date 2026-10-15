@@ -1160,7 +1160,7 @@
       case TYPE.KNOW: return "People you may know";
       case TYPE.DATING: return "Dating";
       case TYPE.CONTENT: return "Content";
-      default: return "Commune";
+      default: return "Echo";
     }
   }
 

@@ -9692,14 +9692,14 @@
       page.setAttribute("data-circle-page", "");
       var title = document.createElement("h3");
       title.className = "circle-page-title";
-      title.textContent = "CIRCLE";
+      title.textContent = "PULSE";
       page.appendChild(title);
       page.appendChild(layer);
     }
     if (!page.querySelector(".circle-page-title")) {
       var circleTitle = document.createElement("h3");
       circleTitle.className = "circle-page-title";
-      circleTitle.textContent = "CIRCLE";
+      circleTitle.textContent = "PULSE";
       page.insertBefore(circleTitle, page.firstChild);
     }
     var topbar = document.querySelector(".app-topbar");

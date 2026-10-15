@@ -297,7 +297,7 @@
   </section>
 
   <main id="main">
-    <!-- Tab order (L→R): TOWER · SIGNAL · COMMUNE · CIRCLE (V2 areas stay hidden) -->
+    <!-- Tab order (L→R): TOWER · SIGNAL · ECHO · PULSE (V2 areas stay hidden) -->
     <section class="section tabs-section" aria-label="COGNATION">
       <div class="container">
         <div class="tabs tabs--chrome" data-tabs>
@@ -305,8 +305,8 @@
             <div role="tablist" aria-label="COGNATION topics" class="tablist">
               <button type="button" role="tab" id="tab-tower" aria-controls="panel-tower" aria-selected="true" tabindex="0">TOWER</button>
               <button type="button" role="tab" id="tab-signal" aria-controls="panel-signal" aria-selected="false" tabindex="-1">SIGNAL</button>
-              <button type="button" role="tab" id="tab-commune" aria-controls="panel-commune" aria-selected="false" tabindex="-1">COMMUNE</button>
-              <button type="button" class="app-topbar-shortcut" data-tower-anchor="circle">CIRCLE</button>
+              <button type="button" role="tab" id="tab-commune" aria-controls="panel-commune" aria-selected="false" tabindex="-1">ECHO</button>
+              <button type="button" class="app-topbar-shortcut" data-tower-anchor="circle">PULSE</button>
               <button type="button" role="tab" id="tab-pages" aria-controls="panel-pages" aria-selected="false" tabindex="-1" hidden>PAGES</button>
             </div>
             <div class="app-topbar-actions">
@@ -1038,14 +1038,14 @@
                 class="commune-swipe-shell"
                 data-commune-shell
                 role="region"
-                aria-label="COMMUNE swipe feed"
+                aria-label="ECHO swipe feed"
                 tabindex="0"
               >
                 <header class="commune-swipe-header">
-                  <h3 class="commune-swipe-title">COMMUNE</h3>
+                  <h3 class="commune-swipe-title">ECHO</h3>
                   <p class="commune-swipe-dek">A paced deck of everyday cards. One card is one thing.</p>
                   <!-- Personal | Professional deck switch — same pipe chrome as SIGNAL News | Feed -->
-                  <div class="commune-mode-switch signal-subtabs site-switch" data-commune-mode-switch role="tablist" aria-label="COMMUNE deck">
+                  <div class="commune-mode-switch signal-subtabs site-switch" data-commune-mode-switch role="tablist" aria-label="ECHO deck">
                     <button type="button" class="commune-mode-btn signal-subtab site-switch-side is-selected is-active" role="tab" id="commune-mode-personal" data-commune-mode-btn="personal" aria-selected="true" tabindex="0">Personal</button>
                     <span class="signal-subtab-sep site-switch-sep" aria-hidden="true">|</span>
                     <button type="button" class="commune-mode-btn signal-subtab site-switch-side" role="tab" id="commune-mode-professional" data-commune-mode-btn="professional" aria-selected="false" tabindex="-1">Professional</button>

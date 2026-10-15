@@ -34,6 +34,7 @@ function loadSwipe(localStorage, sessionStorage) {
     addEventListener: function () {},
     dispatchEvent: function () {},
   };
+  /* Exercises dating-on behavior (post kill-switch flip). */ windowStub.CognationDatingFlag = { enabled: function () { return true; } };
   var context = vm.createContext({
     window: windowStub,
     document: documentStub,

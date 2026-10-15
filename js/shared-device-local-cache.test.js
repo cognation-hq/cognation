@@ -50,6 +50,7 @@ function helperFor(session, local) {
   var ls = store(local);
   var win = { localStorage: ls, CognationAuth: { getSession: function () { return session; } } };
   win.window = win;
+  win.CognationDatingFlag = { enabled: function () { return true; } }; /* dating-on path (post kill-switch flip) */
   vm.runInNewContext(read("js/age-floor-keywords.js"), { window: win, JSON: JSON, String: String, parseInt: parseInt, isNaN: isNaN });
   return win.CognationAgeFloor;
 }
@@ -123,6 +124,7 @@ function pageLoad(server, session, local, script) {
     rebuild: function () {},
   };
   win.window = win;
+  win.CognationDatingFlag = { enabled: function () { return true; } }; /* dating-on path (post kill-switch flip) */
   var ctx = {
     window: win, document: doc, localStorage: ls, sessionStorage: store(), console: console,
     setTimeout: function (fn, ms) { return setTimeout(fn, (ms || 0) / SCALE); }, clearTimeout: clearTimeout,

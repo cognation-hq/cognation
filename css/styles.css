@@ -13260,3 +13260,5 @@ a.site-switch-side:focus-visible {
 [data-commune-index][hidden] {
   display: none !important;
 }
+/* P0 dating kill switch: entry stays hidden while js/dating-flag.js is off. */
+[data-dating-entry][hidden] { display: none !important; }

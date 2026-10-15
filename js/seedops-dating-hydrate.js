@@ -29,6 +29,10 @@
     return 13 + ((nnn - 1) % 14);
   }
   /* Most seeds aged 18–26 date on (nnn % 5 !== 0); 13–17 off. */
+  function datingSwitchOn() {
+    var f = window.CognationDatingFlag;
+    return !!(f && typeof f.enabled === "function" && f.enabled());
+  }
   function seedDatingOn(fleetId, age) {
     var m = /^seed-(\d{4})$/.exec(String(fleetId || ""));
     if (!m) return false;
@@ -303,7 +307,8 @@
     /* seeDating before setMemberProfile — member-profile-updated rebuilds the deck,
        and dating cards must be eligible on that first rebuild (blank Card 1 race). */
     var see = prefs.seeDating;
-    if (see == null && opts.seedDefaults) see = true; /* Alexa walk: no console paste */
+    if (see == null && opts.seedDefaults) see = true;
+    if (!datingSwitchOn()) see = false; /* P0 kill switch */ /* Alexa walk: no console paste */
     /* Another user's leftover See dating flag: back to the default. */
     if (see == null && foreign) see = false;
     var owner = sessionOwnerId();
@@ -341,7 +346,7 @@
     if (mappedAge != null) rec.age = mappedAge;
     else if (!rec.age) rec.age = 22 + (Math.abs(Number(index) || 0) % 14); /* stay in 13–26 */
     var ageNum = parseInt(rec.age, 10);
-    var datingOn = seedDatingOn(fleet, ageNum);
+    var datingOn = datingSwitchOn() && seedDatingOn(fleet, ageNum);
     if (viewerFleet && fleet && fleet === viewerFleet) {
       rec.datingEnabled = false;
       rec.datingContent = false;

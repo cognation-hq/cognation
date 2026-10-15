@@ -1350,7 +1350,8 @@
         html += '<p class="commune-card-meta">Book on the calendar, or follow this professional page.</p>';
       }
       if (card.type === TYPE.CHAT) {
-        html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room</button>';
+        html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room (local demo)</button>';
+        html += '<p class="commune-card-meta">Local demo on this device — not a live group yet. Messages stay in this browser.</p>';
       }
       if (card.type === TYPE.CLASSROOM) {
         html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
@@ -1490,6 +1491,7 @@
     }
     closeClassroom();
     paintRoom(room);
+    setStatus("Local demo room — only you are here. Live group chat comes later.");
     friction("begin", "chat", "chatroom:" + roomId);
     if (scroll && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
     return true;
@@ -1601,7 +1603,13 @@
       card = currentCard();
     }
     if (!card) {
-      state.deck.innerHTML = '<p class="commune-swipe-empty">Nothing public to show yet.</p>';
+      var roomsOpen = ensureSiteRooms().length;
+      var empty =
+        '<p class="commune-swipe-empty">No more ECHO cards right now.</p>' +
+        (roomsOpen
+          ? ''
+          : '<p class="commune-swipe-empty commune-swipe-empty--rooms">No chat rooms match your age and interests yet. Update age or interests in your profile, then come back.</p>');
+      state.deck.innerHTML = empty;
       syncActionLabels();
       return;
     }

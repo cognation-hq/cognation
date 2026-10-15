@@ -12965,3 +12965,31 @@ a.site-switch-side:focus-visible {
 #panel-tower .tower-friend-pin.is-spawned .tower-friend-pin-name {
   white-space: nowrap;
 }
+
+/* Admin-only seed preview (js/seed-preview.js) */
+.seed-preview-open {
+  position: fixed; left: 1rem; bottom: 1rem; z-index: 900;
+  padding: .45rem .9rem; border-radius: 999px; border: 1px solid var(--cgn-border, rgba(255,255,255,.2));
+  background: rgba(16,19,48,.92); color: var(--cgn-text, #f7f9ff); font-size: .8rem; cursor: pointer;
+}
+.seed-preview {
+  position: fixed; inset: 0; z-index: 1100; overflow-y: auto;
+  background: #08091a; color: var(--cgn-text, #f7f9ff);
+}
+.seed-preview-banner {
+  position: sticky; top: 0; display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; justify-content: center;
+  padding: .7rem 1rem; background: #ffd6a0; color: #2a1600; font-weight: 600; font-size: .9rem;
+}
+.seed-preview-exit {
+  border: 1px solid #2a1600 !important; background: #2a1600 !important; color: #ffd6a0 !important; border-radius: 999px; padding: .25rem .8rem; cursor: pointer; font-weight: 700;
+}
+.seed-preview-body { max-width: 44rem; margin: 0 auto; padding: 1rem; }
+.seed-preview-echo { list-style: none; padding: 0; display: grid; gap: .6rem; }
+.seed-preview-echo li { padding: .7rem .9rem; border: 1px solid var(--cgn-border, rgba(255,255,255,.15)); border-radius: .8rem; background: rgba(16,19,48,.8); }
+.seed-preview-meta { font-size: .8rem; color: var(--cgn-text-muted, #b9bfe0); margin-bottom: .25rem; }
+.seed-preview-rating { margin-left: .4rem; padding: 0 .4rem; border-radius: .4rem; border: 1px solid currentColor; font-size: .7rem; }
+.seed-preview-empty { color: var(--cgn-text-muted, #b9bfe0); }
+.seed-preview-pulse { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+.seed-preview h2, .seed-preview h3, .seed-preview li div { color: var(--cgn-text, #f7f9ff) !important; }
+.seed-preview .seed-preview-meta, .seed-preview .seed-preview-meta strong { color: var(--cgn-text-muted, #b9bfe0) !important; }
+.seed-preview .seed-preview-banner { color: #2a1600 !important; }

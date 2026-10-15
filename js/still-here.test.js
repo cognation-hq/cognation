@@ -374,4 +374,36 @@ assert.ok(/function commitSocialDraft\(root, id, value\) \{\s*if \(!isTowerOwner
 assert.ok(/a\.target = "_blank";\s*a\.rel = "noopener noreferrer";/.test(tower), "opens outside Cognation");
 })();
 
+
+/* Calendar: readable event cards, no demo Friends schedule panel, visitor Book */
+(function () {
+  var card = css.match(/\.tower-cal-event \{[^}]*\}/)[0];
+  var bg = card.match(/background:\s*rgba\((\d+),\s*(\d+),\s*(\d+)/);
+  var fg = card.match(/color:\s*#([0-9a-f]{6})/i);
+  assert.ok(bg && fg, "calendar event card sets background and text color");
+  function lum(r, g, b) {
+    return [r, g, b].map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); })
+      .reduce(function (a, v, i) { return a + v * [0.2126, 0.7152, 0.0722][i]; }, 0);
+  }
+  var h = fg[1];
+  var lf = lum(parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16));
+  var lb = lum(+bg[1], +bg[2], +bg[3]);
+  var ratio = (Math.max(lf, lb) + 0.05) / (Math.min(lf, lb) + 0.05);
+  assert.ok(ratio >= 4.5, "calendar event card text contrasts with its card (" + ratio.toFixed(1) + ":1)");
+  assert.ok(!/\.tower-cal-event-(time|who|notes)[^{]*\{[^}]*#8a6575/.test(css), "no pink-grey text on calendar cards");
+  assert.ok(!/Friends schedule|tower-cal-friend-dropdown|tower-cal-friend-form|Request \/ add|Request a hangout/.test(html + tower + css), "Friends schedule panel gone");
+  assert.ok(!/\(demo\)/.test(tower.slice(tower.indexOf("function renderSchedulerPanel"), tower.indexOf("function renderPrivateCalendar"))), "no demo copy in scheduler");
+  assert.ok(html.indexOf('data-tower-widget="calendar"') > 0, "calendar widget kept");
+  var vm = require("vm");
+  var ctx = { escapeHtml: function (x) { return String(x); }, formatEventTime: function (x) { return x; },
+    eventsForDate: function () { return []; },
+    suggestHangoutTimes: function () { return [{ time: "09:00", label: "Morning" }]; } };
+  vm.createContext(ctx);
+  vm.runInContext(tower.slice(tower.indexOf("  function renderSchedulerPanel("), tower.indexOf("  /* Visitor books an open time")), ctx);
+  assert.ok(!/data-tower-cal-book=/.test(ctx.renderSchedulerPanel([], "2026-10-20", { visitor: true, picked: "" })), "no Book before a time is picked");
+  assert.ok(/data-tower-cal-book="09:00"[^>]*>Book</.test(ctx.renderSchedulerPanel([], "2026-10-20", { visitor: true, picked: "09:00" })), "Book shows once a time is selected");
+  assert.ok(/sb\.rpc\("request_hangout"/.test(tower), "Book saves on the server");
+  assert.ok(/create or replace function public\.request_hangout/.test(src("supabase/migrations/20261016_hangout_requests.sql")), "request_hangout migration");
+})();
+
 console.log("still-here.test.js: OK");

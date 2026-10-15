@@ -6214,7 +6214,8 @@
     return open.slice(0, 3);
   }
 
-  function renderSchedulerPanel(events, iso) {
+  function renderSchedulerPanel(events, iso, opts) {
+    opts = opts || {};
     var slots = suggestHangoutTimes(events, iso);
     var dayEvents = eventsForDate(events, iso);
     var busyNote = dayEvents.some(function (e) { return e && e.busy; })
@@ -6231,15 +6232,39 @@
       '<div class="tower-cal-scheduler-actions">' +
       slots.map(function (slot) {
         return (
-          '<button type="button" class="btn btn-secondary tower-cal-suggest" data-tower-cal-suggest="' +
+          '<button type="button" class="btn btn-secondary tower-cal-suggest' +
+          (opts.picked === slot.time ? " is-picked" : "") +
+          '" data-tower-cal-suggest="' +
           escapeHtml(slot.time) +
           '">' +
           escapeHtml(slot.label) + " · " + escapeHtml(formatEventTime(slot.time)) +
           "</button>"
         );
       }).join("") +
+      (opts.visitor && opts.picked
+        ? '<button type="button" class="btn btn-primary tower-cal-book" data-tower-cal-book="' +
+          escapeHtml(opts.picked) +
+          '">Book</button>'
+        : "") +
+      '<p class="commune-status" data-tower-cal-book-status' +
+      (opts.bookStatus ? "" : " hidden") +
+      ' role="status" aria-live="polite">' +
+      escapeHtml(opts.bookStatus || "") +
+      "</p>" +
       "</div></div>"
     );
+  }
+
+  /* Visitor books an open time: one hangout request to the Tower owner, saved on the server. */
+  function requestHangoutOnServer(profileId, iso, time) {
+    var sb = window.CognationSupabase;
+    if (!sb || typeof sb.rpc !== "function" || !signedInUserId()) {
+      return Promise.reject(new Error("Sign in to book a time."));
+    }
+    if (!/^[0-9a-f-]{36}$/i.test(String(profileId || ""))) {
+      return Promise.reject(new Error("This calendar can't take bookings yet."));
+    }
+    return sb.rpc("request_hangout", { p_profile_id: profileId, p_date: iso, p_time: time });
   }
 
   function renderPrivateCalendar(root) {
@@ -6349,8 +6374,12 @@
         })
       : busyBlocksOnly(shared);
     var selected = view.selected;
-    var schedulerHtml = owner && view.schedulerOpen
-      ? renderSchedulerPanel(shared, selected)
+    var schedulerHtml = view.schedulerOpen
+      ? renderSchedulerPanel(owner ? shared : events, selected, {
+          visitor: !owner,
+          picked: owner ? "" : view.pickedTime || "",
+          bookStatus: owner ? "" : view.bookStatus || "",
+        })
       : "";
     var calRoot = root.querySelector('[data-tower-widget="calendar"]');
     if (calRoot) {
@@ -6374,8 +6403,6 @@
       renderDayEventList(events, selected, { ownerControls: owner, busyOnly: !owner }) +
       "</div>" +
       schedulerHtml;
-    var dateInput = root.querySelector("[data-tower-cal-friend-date]");
-    if (dateInput && !dateInput.value) dateInput.value = selected;
   }
 
   function refreshTowerCalendars(root) {
@@ -6478,8 +6505,8 @@
         view2.month0 = parseInt(parts[1], 10) - 1;
         if (key2 === "public") {
           view2.schedulerOpen = true;
-          var friendDate = root.querySelector("[data-tower-cal-friend-date]");
-          if (friendDate) friendDate.value = iso;
+          view2.pickedTime = "";
+          view2.bookStatus = "";
         } else {
           var privHost = root.querySelector("[data-tower-cal-private]");
           if (privHost && !privHost.getAttribute("data-editing-id")) {
@@ -6563,6 +6590,14 @@
         var viewS = getCalendarViewState(root, "public");
         var slotIso = viewS.selected;
         if (!/^\d{2}:\d{2}$/.test(slotTime) || !/^\d{4}-\d{2}-\d{2}$/.test(slotIso)) return;
+        if (!isTowerOwner(TowerProfileStore.get())) {
+          viewS.schedulerOpen = true;
+          viewS.pickedTime = slotTime;
+          viewS.bookStatus = "";
+          ev.preventDefault();
+          refreshTowerCalendars(root);
+          return;
+        }
         saveCalendarToProfile(function (p) {
           var taken = (p.calendarEvents || []).some(function (e) {
             return e && e.date === slotIso && String(e.time || "").slice(0, 5) === slotTime;
@@ -6581,6 +6616,31 @@
         viewS.schedulerOpen = true;
         ev.preventDefault();
         refreshTowerCalendars(root);
+        return;
+      }
+
+      var bookBtn = t.closest("[data-tower-cal-book]");
+      if (bookBtn) {
+        ev.preventDefault();
+        var viewB = getCalendarViewState(root, "public");
+        var bookTime = bookBtn.getAttribute("data-tower-cal-book") || "";
+        var bookIso = viewB.selected;
+        if (!/^\d{2}:\d{2}$/.test(bookTime) || !/^\d{4}-\d{2}-\d{2}$/.test(bookIso)) return;
+        var bookProfile = TowerProfileStore.get();
+        bookBtn.disabled = true;
+        requestHangoutOnServer(bookProfile && bookProfile._profileId, bookIso, bookTime).then(
+          function () {
+            viewB.pickedTime = "";
+            viewB.bookStatus = "Request sent.";
+            refreshTowerCalendars(root);
+          },
+          function (err) {
+            viewB.bookStatus = (err && err.message && /Sign in|can't take/.test(err.message))
+              ? err.message
+              : "Couldn't send the request. Try again.";
+            refreshTowerCalendars(root);
+          }
+        );
         return;
       }
 
@@ -6603,7 +6663,7 @@
       var pubCal = t.closest('[data-tower-widget="calendar"]');
       if (!pubCal || !pubCal.contains(t)) return;
       if (pubCal.__cognationDraggedAt && Date.now() - pubCal.__cognationDraggedAt < 500) return;
-      if (t.closest("[data-tower-cal-friend-dropdown], a, button, input, textarea, select, label, summary")) return;
+      if (t.closest("a, button, input, textarea, select, label, summary")) return;
       var viewG = getCalendarViewState(root, "public");
       viewG.schedulerOpen = true;
       refreshTowerCalendars(root);
@@ -6688,56 +6748,6 @@
         return;
       }
 
-      if (form.matches("[data-tower-cal-friend-form]")) {
-        ev.preventDefault();
-        var nameIn = form.querySelector("[data-tower-cal-friend-name]");
-        var titleIn = form.querySelector("[data-tower-cal-friend-title]");
-        var dateIn = form.querySelector("[data-tower-cal-friend-date]");
-        var timeIn = form.querySelector("[data-tower-cal-friend-time]");
-        var notesIn = form.querySelector("[data-tower-cal-friend-notes]");
-        var fStatus = form.querySelector("[data-tower-cal-friend-status]");
-        function setFStatus(msg, isError) {
-          if (!fStatus) return;
-          if (!msg) {
-            fStatus.hidden = true;
-            fStatus.textContent = "";
-            return;
-          }
-          fStatus.hidden = false;
-          fStatus.textContent = msg;
-          fStatus.classList.toggle("is-error", !!isError);
-        }
-        var requesterName = nameIn ? nameIn.value.trim().slice(0, 80) : "";
-        var fTitle = titleIn ? titleIn.value.trim().slice(0, 120) : "";
-        var fDate = dateIn ? dateIn.value : "";
-        var fTime = timeIn ? timeIn.value : "";
-        var fNotes = notesIn ? notesIn.value.trim().slice(0, 200) : "";
-        if (!requesterName || !fTitle || !/^\d{4}-\d{2}-\d{2}$/.test(fDate)) {
-          setFStatus("Name, event title, and date are required.", true);
-          return;
-        }
-        saveCalendarToProfile(function (p) {
-          p.calendarEvents.push({
-            id: newCalendarEventId(),
-            title: fTitle,
-            date: fDate,
-            time: fTime,
-            notes: fNotes,
-            status: "pending",
-            source: "friend",
-            requesterName: requesterName,
-          });
-        });
-        var view4 = getCalendarViewState(root, "public");
-        view4.selected = fDate;
-        var dp2 = fDate.split("-");
-        view4.year = parseInt(dp2[0], 10);
-        view4.month0 = parseInt(dp2[1], 10) - 1;
-        if (titleIn) titleIn.value = "";
-        if (notesIn) notesIn.value = "";
-        setFStatus("Request added to the owner calendar as pending (demo).", false);
-        refreshTowerCalendars(root);
-      }
     });
 
     refreshTowerCalendars(root);

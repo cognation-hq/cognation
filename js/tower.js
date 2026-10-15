@@ -10513,6 +10513,141 @@
       glowAt(p.x, p.y, 34 * depth, circleGlowColor(turn), 0.06 * flicker);
     }
     ring.appendChild(canvas);
+    paintCircleBolt(ring);
+  }
+
+  /* PULSE lightning bolt restored from 9d88e68 (last bolt look, Oct 1).
+     ead52bb swapped it for a 0.06-alpha blurred canvas glow that reads as
+     nothing on the #61 indigo background, so the bolt looked missing. */
+  function circleBoltSegments(radius, wobble, seed, baseWidth) {
+    var steps = 144;
+    var chunk = 6;
+    var segs = [];
+    var start;
+    for (start = 0; start < steps; start += chunk) {
+      var cmds = [];
+      var depthSum = 0;
+      var count = 0;
+      var end = Math.min(steps, start + chunk);
+      var i;
+      for (i = start; i <= end; i++) {
+        var n = Math.sin(i * 0.73 + seed) * 0.58 + Math.sin(i * 1.91 + seed * 1.4) * 0.42;
+        if (i === 0 || i === steps) n = 0;
+        var p = circleProjectRadius((i / steps) * 360, radius + n * wobble);
+        cmds.push((i === start ? "M" : "L") + p.x.toFixed(1) + " " + p.y.toFixed(1));
+        depthSum += p.s / CIRCLE_SCALE;
+        count++;
+      }
+      segs.push({ d: cmds.join(" "), width: Math.max(0.7, baseWidth * (depthSum / count)) });
+    }
+    return segs;
+  }
+
+  function circleBranchPath(angleDeg, radius, length, seed) {
+    var cmds = [];
+    var steps = 6;
+    var i;
+    for (i = 0; i <= steps; i++) {
+      var along = (i / steps) * length;
+      var side = Math.sin(i * 2.1 + seed) * 16;
+      if (i === 0) side = 0;
+      var p = circleProjectRadius(angleDeg + side * 0.18, radius + along);
+      cmds.push((i ? "L" : "M") + p.x.toFixed(1) + " " + p.y.toFixed(1));
+    }
+    return cmds.join(" ");
+  }
+
+  function paintCircleBolt(ring) {
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "circle-lightning circle-bolt");
+    svg.setAttribute("data-circle-bolt", "");
+    svg.setAttribute("viewBox", "-520 -260 1040 520");
+    svg.setAttribute("aria-hidden", "true");
+    var ns = "http://www.w3.org/2000/svg";
+    var defs = document.createElementNS(ns, "defs");
+    function glowFilter(id, wide, tight, keepCore) {
+      var filter = document.createElementNS(ns, "filter");
+      filter.setAttribute("id", id);
+      filter.setAttribute("x", "-80%");
+      filter.setAttribute("y", "-80%");
+      filter.setAttribute("width", "260%");
+      filter.setAttribute("height", "260%");
+      filter.setAttribute("color-interpolation-filters", "sRGB");
+      var blurWide = document.createElementNS(ns, "feGaussianBlur");
+      blurWide.setAttribute("in", "SourceGraphic");
+      blurWide.setAttribute("stdDeviation", String(wide));
+      blurWide.setAttribute("result", "wide");
+      var blurTight = document.createElementNS(ns, "feGaussianBlur");
+      blurTight.setAttribute("in", "SourceGraphic");
+      blurTight.setAttribute("stdDeviation", String(tight));
+      blurTight.setAttribute("result", "tight");
+      var blend = document.createElementNS(ns, "feBlend");
+      blend.setAttribute("in", "wide");
+      blend.setAttribute("in2", "tight");
+      blend.setAttribute("mode", "screen");
+      blend.setAttribute("result", "glow");
+      filter.appendChild(blurWide);
+      filter.appendChild(blurTight);
+      filter.appendChild(blend);
+      if (keepCore) {
+        var merge = document.createElementNS(ns, "feMerge");
+        var glowNode = document.createElementNS(ns, "feMergeNode");
+        glowNode.setAttribute("in", "glow");
+        var coreNode = document.createElementNS(ns, "feMergeNode");
+        coreNode.setAttribute("in", "SourceGraphic");
+        merge.appendChild(glowNode);
+        merge.appendChild(coreNode);
+        filter.appendChild(merge);
+      }
+      return filter;
+    }
+    defs.appendChild(glowFilter("pulse-bolt-glow", 18, 7, false));
+    defs.appendChild(glowFilter("pulse-bolt-core", 3.2, 1.1, false));
+    svg.appendChild(defs);
+    function addBolt(parent, d, color, width, opacity) {
+      var path = document.createElementNS(ns, "path");
+      path.setAttribute("d", d);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", color);
+      path.setAttribute("stroke-width", width.toFixed(2));
+      path.setAttribute("stroke-linejoin", "round");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("opacity", String(opacity));
+      parent.appendChild(path);
+    }
+    var halo = document.createElementNS(ns, "g");
+    halo.setAttribute("filter", "url(#pulse-bolt-glow)");
+    var core = document.createElementNS(ns, "g");
+    core.setAttribute("filter", "url(#pulse-bolt-core)");
+    var colors = [
+      { color: "#b44bff", opacity: 0.9 },
+      { color: "#3ecbff", opacity: 0.85 },
+      { color: "#ff4ad8", opacity: 0.8 }
+    ];
+    circleBoltSegments(CIRCLE_RING_R, 18, 1.2, 8).forEach(function (seg, index) {
+      var shift = Math.sin(index * 0.65) * 0.5 + 0.5;
+      var shift2 = Math.cos(index * 0.4) * 0.5 + 0.5;
+      var weights = [0.35 + 0.65 * shift, 0.3 + 0.55 * (1 - shift), 0.3 + 0.6 * shift2];
+      colors.forEach(function (ink, inkIndex) {
+        addBolt(halo, seg.d, ink.color, seg.width * 1.2, 0.28 + 0.5 * weights[inkIndex]);
+      });
+      addBolt(core, seg.d, "#e9f7ff", Math.max(0.9, seg.width * 0.16), 0.7);
+    });
+    var forks = [22, 64, 98, 146, 188, 228, 274, 332];
+    forks.forEach(function (angle, index) {
+      var outward = index % 2 === 0;
+      var t = angle * Math.PI / 180;
+      var depth = CIRCLE_PERSPECTIVE / (CIRCLE_PERSPECTIVE - Math.sin(t) * CIRCLE_RING_R * Math.sin(CIRCLE_TILT));
+      var d = circleBranchPath(angle, CIRCLE_RING_R, outward ? 28 + (index % 3) * 6 : -22, index + 2);
+      var width = 4.2 * depth;
+      colors.forEach(function (ink) {
+        addBolt(halo, d, ink.color, width, 0.75);
+      });
+      addBolt(core, d, "#f4fbff", Math.max(0.8, width * 0.2), 0.8);
+    });
+    svg.appendChild(halo);
+    svg.appendChild(core);
+    ring.appendChild(svg);
   }
 
   var CIRCLE_REFRESH_MS = 15 * 60 * 1000;
@@ -10975,6 +11110,24 @@
     var circlePage = document.querySelector("[data-circle-page]") || layer;
     if (window.CognationCircleRelations && typeof window.CognationCircleRelations.mount === "function") {
       window.CognationCircleRelations.mount(circlePage);
+    }
+    /* PULSE falling friends restored (removed by #49 early return). Every
+       server friend's Tower circle falls BEHIND the halo ring; tap opens Tower. */
+    if (window.CognationPulseFall && typeof window.CognationPulseFall.mount === "function") {
+      window.CognationPulseFall.mount(layer, {
+        paint: function (el, friend, i) {
+          paintFriendPicture(el, { id: friend.handle || friend.userId, name: friend.name }, i);
+        },
+        open: function (handle) {
+          if (!handle) return;
+          if (window.CognationTowerOpenProfile) {
+            try { window.CognationTowerOpenProfile(handle); } catch (eOpen) {}
+          } else {
+            try { location.hash = "tower-profile-" + handle; } catch (eHash) {}
+          }
+          try { stopCircleFall(); } catch (eStop) {}
+        }
+      });
     }
     return;
 

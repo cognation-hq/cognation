@@ -12,7 +12,7 @@
 --   public.chat_room_messages    — messages in a room
 --
 -- RULES
---   - 13+: join / read / write require cognation_user_age >= 13 (null age => 13 per birth rules).
+--   - 13+: join / read / write require cognation_user_age IS NOT NULL AND >= 13. Null age fails closed (no birth year/month yet → not 13+; matches G/PG-only until age set).
 --   - Rating: room + message rows carry G|PG|PG-13|R|MA|NR; reads use cognation_viewer_can_see.
 --   - Blocks: messages from anyone related via user_blocks are hidden; you cannot join a room
 --     whose creator you are blocked with (when created_by is set).
@@ -91,7 +91,8 @@ drop policy if exists "chat rooms readable to 13+ when rating allows" on public.
 create policy "chat rooms readable to 13+ when rating allows"
 on public.chat_rooms for select to authenticated
 using (
-  coalesce(public.cognation_user_age(auth.uid()), 13) >= 13
+  public.cognation_user_age(auth.uid()) is not null
+  and public.cognation_user_age(auth.uid()) >= 13
   and public.cognation_viewer_can_see(rating)
 );
 
@@ -133,8 +134,8 @@ declare
   age int;
 begin
   if auth.uid() is null then raise exception 'Sign in first'; end if;
-  age := coalesce(public.cognation_user_age(auth.uid()), 13);
-  if age < 13 then raise exception 'under_13'; end if;
+  age := public.cognation_user_age(auth.uid());
+  if age is null or age < 13 then raise exception 'under_13'; end if;
 
   select * into room from public.chat_rooms where id = p_room_id;
   if room.id is null then raise exception 'room_not_found'; end if;
@@ -195,8 +196,8 @@ declare
   profile_id uuid;
 begin
   if auth.uid() is null then raise exception 'Sign in first'; end if;
-  age := coalesce(public.cognation_user_age(auth.uid()), 13);
-  if age < 13 then raise exception 'under_13'; end if;
+  age := public.cognation_user_age(auth.uid());
+  if age is null or age < 13 then raise exception 'under_13'; end if;
 
   cleaned := trim(both from coalesce(p_body, ''));
   if char_length(cleaned) < 1 or char_length(cleaned) > 500 then

@@ -25,6 +25,12 @@
    * @param {string} [opts.note]
    * @param {number} [opts.attachmentIndex]  required for illegal_image; never send the image itself
    */
+  function canIReport() {
+    var c = client();
+    if (!c) return Promise.resolve(false);
+    return c.rpc("can_i_report", {}).then(function (yes) { return yes === true; }, function () { return false; });
+  }
+
   function reportTowerPost(opts) {
     opts = opts || {};
     var c = client();
@@ -60,7 +66,7 @@
     return c.rpc("mark_report_as_test", { report_id: reportId });
   }
 
-  var api = { REASONS: REASONS, reportTowerPost: reportTowerPost, markAsTest: markAsTest };
+  var api = { REASONS: REASONS, reportTowerPost: reportTowerPost, markAsTest: markAsTest, canIReport: canIReport };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.CognationContentReport = api;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -12993,3 +12993,13 @@ a.site-switch-side:focus-visible {
 .seed-preview h2, .seed-preview h3, .seed-preview li div { color: var(--cgn-text, #f7f9ff) !important; }
 .seed-preview .seed-preview-meta, .seed-preview .seed-preview-meta strong { color: var(--cgn-text-muted, #b9bfe0) !important; }
 .seed-preview .seed-preview-banner { color: #2a1600 !important; }
+
+/* Investigator: Confirm illegal is a danger action (Designer LOOK nit). */
+.inv-btn-danger {
+  border: 1px solid #e85d5d !important;
+  background: rgba(232, 93, 93, 0.18) !important;
+  color: #ffc9c9 !important;
+}
+.inv-btn-danger:hover, .inv-btn-danger:focus-visible {
+  background: rgba(232, 93, 93, 0.35) !important;
+}

@@ -82,6 +82,8 @@ function sessionFor(id) {
     },
   }));
   var api = loadSwipe(local, memoryStorage());
+  api.noteViewerSeedStatus(false); /* server: real */
+  api.noteProfileSeedStatus("bea", false);
   api.settleSwipe({
     id: "fact-1", type: "fact", title: "AI note", body: "About tech and AI.", interests: ["tech", "ai"],
   }, "right");
@@ -102,6 +104,7 @@ function sessionFor(id) {
   var api = loadSwipe(local, memoryStorage(), {
     CognationAuth: { getSession: function () { return { accountKind: "seed", isSeed: true, activeProfileId: "seed-ada", profileDisplayName: "SeedAda" }; } },
   });
+  api.noteViewerSeedStatus(true); /* server: seed */
   api.settleSwipe({ id: "fact-2", type: "fact", title: "X", body: "tech", interests: ["tech"] }, "right");
   var raw = local.getItem("cognation.commune.friend-shares.v1");
   var shares = raw ? JSON.parse(raw) : [];
@@ -136,6 +139,9 @@ function sessionFor(id) {
     { id: "s2", adId: "a2", title: "Baking", body: "cake", interests: ["baking"], swiperId: "bea", sharerName: "Bea", swiperIsSeed: false },
   ]));
   var api = loadSwipe(local, memoryStorage());
+  api.noteViewerSeedStatus(false);
+  api.noteProfileSeedStatus("bea", false);
+  api.noteProfileSeedStatus("ada", false);
   var friends = api.friendShareCards();
   assert.ok(friends.some(function (c) { return !c.offInterest; }), "in-interest friend share flows");
   assert.ok(friends.some(function (c) { return c.offInterest; }), "off-interest friend share available");
@@ -170,7 +176,64 @@ function sessionFor(id) {
     { id: "sx", adId: "ax", title: "Seed share", body: "tech", interests: ["tech"], swiperId: "seed1", sharerName: "Seed", swiperIsSeed: true },
   ]));
   var api = loadSwipe(local, memoryStorage());
+  api.noteViewerSeedStatus(false);
+  api.noteProfileSeedStatus("seed1", true); /* server account_kind */
   assert.strictEqual(api.friendShareCards().length, 0, "real users never see seed shares");
 })();
+
+/* Live seed-0001/Ada: no client seed fields — still must not write a share (fail closed / server). */
+(function () {
+  var local = memoryStorage();
+  local.setItem("cognation.session.v2", sessionFor("prof-seed-0001"));
+  local.setItem("cognation.profiles.v1", JSON.stringify({
+    profiles: {
+      /* No accountKind, isSeed, seedFleetId, or seed- handle — the live gap. */
+      "prof-seed-0001": { id: "prof-seed-0001", kind: "personal", displayName: "Ada", friendIds: [] },
+    },
+  }));
+  var api = loadSwipe(local, memoryStorage(), {
+    CognationAuth: {
+      getSession: function () {
+        return { username: "seed-0001", activeProfileId: "prof-seed-0001", profileDisplayName: "Ada", source: "supabase", supabaseUserId: "u-seed-0001" };
+      },
+    },
+  });
+  assert.strictEqual(api.viewerIsSeedOrOps(), true, "unknown viewer seed status fails closed");
+  api.settleSwipe({ id: "fact-bare", type: "fact", title: "X", body: "tech", interests: ["tech"] }, "right");
+  var raw = local.getItem("cognation.commune.friend-shares.v1");
+  var shares = raw ? JSON.parse(raw) : [];
+  assert.strictEqual(shares.length, 0, "bare seed profile writes no friend share");
+  /* Server says seed explicitly */
+  api.noteViewerSeedStatus(true);
+  api.settleSwipe({ id: "fact-bare-2", type: "fact", title: "Y", body: "tech", interests: ["tech"] }, "right");
+  raw = local.getItem("cognation.commune.friend-shares.v1");
+  shares = raw ? JSON.parse(raw) : [];
+  assert.strictEqual(shares.length, 0, "server seed still writes no friend share");
+})();
+
+/* Receiver: sharer profile lacks client seed fields — still hidden (fail closed). */
+(function () {
+  var local = memoryStorage();
+  local.setItem("cognation.session.v2", sessionFor("ada"));
+  local.setItem("cognation.profiles.v1", JSON.stringify({
+    profiles: {
+      ada: { id: "ada", kind: "personal", displayName: "Ada", accountKind: "real", friendIds: ["bare-seed"], interests: ["tech"] },
+      "bare-seed": { id: "bare-seed", kind: "personal", displayName: "Ada", friendIds: ["ada"] },
+    },
+  }));
+  local.setItem("cognation.commune.friend-shares.v1", JSON.stringify([
+    { id: "sx2", adId: "ax2", title: "Bare seed share", body: "tech", interests: ["tech"], swiperId: "bare-seed", sharerName: "Ada", swiperIsSeed: false },
+  ]));
+  var api = loadSwipe(local, memoryStorage());
+  api.noteViewerSeedStatus(false);
+  assert.strictEqual(api.friendShareCards().length, 0, "unknown sharer kind fails closed (hidden)");
+  api.noteProfileSeedStatus("bare-seed", false);
+  assert.ok(api.friendShareCards().length >= 1, "once server says real, share can show");
+})();
+
+assert.ok(/cognation_am_i_seed/.test(src), "uses cognation_am_i_seed RPC");
+assert.ok(fs.existsSync(path.join(root, "supabase/migrations/20261016_cognation_am_i_seed.sql")), "SQL migration present");
+var sql = fs.readFileSync(path.join(root, "supabase/migrations/20261016_cognation_am_i_seed.sql"), "utf8");
+assert.ok(/NOT auto-run/i.test(sql) && /grant execute on function public\.cognation_am_i_seed/.test(sql));
 
 console.log("echo-swipe-learn tests passed");

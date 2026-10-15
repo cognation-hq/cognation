@@ -74,8 +74,14 @@
     try {
       var store0 = localStore();
       var own = store0 ? JSON.parse(store0.getItem("cognation.member.profile.v1") || "null") : null;
-      if (!memberProfileOwned(own)) return 0;
       var swipe = root.CognationCommuneSwipe;
+      /* Server birth age (user_birth, read by seedops-dating-hydrate) is not
+         device state, so it counts even when this browser has no saved profile. */
+      if (swipe && typeof swipe.getDatingBirthAge === "function" && sessionUserId()) {
+        var b = swipe.getDatingBirthAge();
+        if (b != null && !isNaN(b) && b > 0) return b;
+      }
+      if (!memberProfileOwned(own)) return 0;
       if (swipe && swipe.getMemberAge) {
         var n = swipe.getMemberAge();
         if (n != null && !isNaN(n)) return n;

@@ -13,7 +13,7 @@ var css = fs.readFileSync(path.join(root, "css/styles.css"), "utf8");
 var html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 
 var fn = tower.slice(tower.indexOf("function initProfileEditDropdown"), tower.indexOf("function initFramePicker"));
-assert.ok(/function mountPanelAsSheet\(\) \{\s*if \(panel\.parentNode !== root\) root\.appendChild\(panel\);\s*panel\.classList\.add\("is-sheet"\);/.test(fn), "open moves the editor out of the widget");
+assert.ok(/function mountPanelAsSheet\(\) \{\s*showScrim\(true\);\s*if \(panel\.parentNode !== root\) root\.appendChild\(panel\);\s*panel\.classList\.add\("is-sheet"\);/.test(fn), "open moves the editor out of the widget");
 assert.ok(/if \(open\) \{\s*mountPanelAsSheet\(\);\s*panel\.hidden = false;/.test(fn), "mounted before showing");
 assert.ok(/panel\.hidden = true;\s*returnPanelHome\(\);/.test(fn), "returned to the widget on close");
 assert.ok(/data-tower-profile-edit-close/.test(fn) && /data-tower-profile-edit-close/.test(html), "sheet has a close button");

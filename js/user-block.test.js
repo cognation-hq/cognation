@@ -26,5 +26,6 @@ assert.ok(!/@[a-z0-9.-]+\.[a-z]{2,}/i.test(blockJs + page.replace(/@sam|@jordan/
 assert.ok(typeof require("./block.js").blockUser === "function");
 var styles = fs.readFileSync(path.join(root, "css/styles.css"), "utf8");
 assert.ok(/\.news-comment-item \.news-report-option/.test(styles), "dark shell Report/Block pills");
+assert.ok(/padding: 0\.18rem 0\.45rem/.test(styles) && /font-size: 0\.68rem/.test(styles), "smaller pills");
 assert.ok(/inv-btn-danger/.test(styles), "keep Confirm-illegal danger styles");
 console.log("user-block.test.js: ok");

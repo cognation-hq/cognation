@@ -327,6 +327,16 @@
       });
   }
 
+  /* Poster appeals their post's rating once (server enforces one per post). */
+  function appealPostRating(postId, note) {
+    if (!active() || !identity()) return Promise.reject(new Error("Sign in to appeal."));
+    return client()
+      .rpc("appeal_my_post_rating", { post_id: postId, note: String(note || "").slice(0, 280) || null })
+      .then(function (ok) {
+        return { ok: ok === true, alreadyAppealed: ok === false };
+      });
+  }
+
   function feedPost(postId) {
     var i;
     for (i = 0; i < state.feed.length; i++) {
@@ -723,6 +733,7 @@
     refreshFeed: refreshFeed,
     refreshFriends: refreshFriends,
     refreshNotifications: refreshNotifications,
+    appealPostRating: appealPostRating,
     createTowerPost: createTowerPost,
     togglePostReaction: togglePostReaction,
     updateCurrentProfile: updateCurrentProfile,

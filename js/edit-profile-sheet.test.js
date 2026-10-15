@@ -41,3 +41,4 @@ assert.ok(/scrim\.addEventListener\("click", function \(\) \{\s*setOpen\(false\)
 var labelHide = tower.slice(tower.indexOf("function renderSocialLinks"), tower.indexOf("function renderSocialLinks") + 1200);
 assert.ok(/formInput\.hidden = true;\s*if \(label\) label\.hidden = true;/.test(labelHide), "per-page networks hide label + input together");
 console.log("edit-profile-sheet.test.js: ok");
+assert.ok(/\.is-sheet \.tower-social-actions \{\s*grid-column: 1 \/ -1;\s*justify-self: stretch;\s*width: 100% !important;\s*justify-content: flex-start !important;/.test(css), "phone: Save profile aligns with the sheet\'s left padding");

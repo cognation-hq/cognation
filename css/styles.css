@@ -12928,3 +12928,16 @@ a.site-switch-side:focus-visible {
 #panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-frame-chip .tower-frame-chip-name {
   color: var(--cgn-text, #f7f9ff) !important;
 }
+
+/* Phone sheet: Save profile lines up with the sheet's left padding (the actions row
+   shrank to fit and flex-end pushed the nowrap button past its left edge). */
+@media (max-width: 767px) {
+  #panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown.is-sheet .tower-social-actions {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    width: 100% !important;
+    justify-content: flex-start !important;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+  }
+}

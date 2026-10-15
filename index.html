@@ -50,6 +50,9 @@
       </p>
 
       <div id="login-credentials-step" data-login-credentials-step data-login-mode="signin">
+      <div class="login-age-block" data-login-age-block hidden role="status" aria-live="polite">
+        <p>Cognation is for ages 13 and up.</p>
+      </div>
       <form id="login-form" class="login-form" action="#" method="post" novalidate data-login-form>
         <div class="form-group">
           <label for="login-username">Email address</label>
@@ -79,20 +82,15 @@
         <!-- Signup-only fields (shown when data-login-mode="signup") -->
         <div class="login-signup-fields" data-login-signup-fields hidden>
           <div class="form-group">
-            <label for="age">Age</label>
+            <label for="birthdate">Birthdate</label>
             <input
-              type="number"
-              id="age"
-              name="age"
-              min="13"
-              max="120"
-              inputmode="numeric"
-              autocomplete="bday-year"
+              type="date"
+              id="birthdate"
+              name="birthdate"
+              autocomplete="off"
               required
-              aria-describedby="age-hint"
               aria-invalid="false"
             >
-            <span class="form-hint" id="age-hint">Must be 13 or older.</span>
           </div>
           <div class="form-group">
             <label for="country">Country</label>
@@ -210,6 +208,10 @@
             >
             <span class="form-hint" id="email-hint">We will never share your email in this demo.</span>
           </div>
+          <p class="login-legal-links" data-login-legal-links>
+            By signing up you agree to the <a href="/terms" target="_blank" rel="noopener">Terms of Service</a>
+            and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.
+          </p>
         </div>
 
         <!-- Sign-in country (kept for existing login.js country persist) -->
@@ -1314,6 +1316,7 @@
   <script src="js/seedops-ops-trigger.js" defer></script>
   <script src="js/demo-mode.js" defer></script>
   <script src="js/login.js" defer></script>
+  <script src="js/signup-age-gate.js" defer></script>
   <script src="js/login-signup-shell.js" defer></script>
   <script src="js/screen-break.js" defer></script>
   <script src="js/supabase-social.js" defer></script>

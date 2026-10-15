@@ -52,6 +52,8 @@
       /* Owner drops mark dragged:true. Dropping that flag made getWidgetLayout
          treat a real layout as never-dragged and fall back to the default spawn. */
       if (pos.dragged === true) entry.dragged = true;
+      /* Stage-pixel y (stage height varies between loads; % drifted). */
+      if (typeof pos.yPx === "number" && isFinite(pos.yPx)) entry.yPx = Math.round(Math.max(0, Math.min(20000, pos.yPx)));
       out[id] = entry;
     });
     if (layout._public && typeof layout._public === "object") {
@@ -119,6 +121,7 @@
           next = {
             x: next.x, y: next.y, z: next.z, tilt: next.tilt, dragged: true
           };
+          if (typeof saved[wid].yPx === "number") next.yPx = saved[wid].yPx;
         }
         base[wid] = next;
       });

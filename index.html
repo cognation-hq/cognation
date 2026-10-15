@@ -636,10 +636,6 @@
                       </div><div class="tower-sticker tower-sticker--music" data-tower-widget="music" data-sticker-label="Music"><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Music sticker" tabindex="-1" hidden>⋮⋮</button><div class="tower-music" data-tower-music data-music-skin="classic" hidden>
                         <audio data-tower-audio preload="metadata" playsinline></audio>
 
-                        <div class="tower-pro-youtube" data-tower-pro-youtube hidden>
-                          <div class="tower-pro-youtube-screen" data-tower-pro-youtube-frame></div>
-                        </div>
-
                         <div class="tower-music-skin tower-music-skin--classic" data-music-face="classic">
                           <div class="tower-ipod" data-tower-ipod>
                             <div class="tower-ipod-screen">
@@ -682,6 +678,19 @@
                           </div>
                         </div>
 
+                      </div>
+
+                      <!-- Professional page: YouTube is its own widget (split from Music). Personal keeps Music. -->
+                      <div class="tower-sticker tower-sticker--youtube" data-tower-widget="youtube" data-sticker-label="YouTube" hidden><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move YouTube sticker" tabindex="-1" hidden>⋮⋮</button>
+                        <div class="tower-pro-youtube" data-tower-pro-youtube hidden>
+                          <div class="tower-pro-youtube-screen" data-tower-pro-youtube-frame></div>
+                        </div>
+                        <div class="tower-music-owner tower-pro-youtube-owner" data-tower-pro-youtube-owner>
+                          <label class="tower-music-url-label">
+                            <span class="visually-hidden">YouTube link</span>
+                            <input type="url" inputmode="url" maxlength="500" placeholder="Paste a YouTube link" data-tower-pro-youtube-url autocomplete="off">
+                          </label>
+                        </div>
                       </div>
 
                       <div class="tower-sticker tower-sticker--badges" data-tower-widget="badges" data-sticker-label="Badges"><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Badges sticker" tabindex="-1" hidden>⋮⋮</button><div class="tower-badge-shelf" data-tower-badge-shelf aria-label="Badges">

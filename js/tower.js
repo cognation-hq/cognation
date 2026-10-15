@@ -494,6 +494,24 @@
      owner drag (or freeze/save) pin every grid widget at its rendered spot as
      free x/y %, then drop the grid classes. Without this a drag cannot move the
      widget and the freeze saves every widget at 0,0 (3rd drag break). */
+  /* Widget y is saved in stage pixels (yPx) as well as %. The stage height
+     changes between loads (min-height grows with spawned widgets), so a % of a
+     different height drifted the widget down on every reload. x is a % of the
+     stage width, which does not change, so x stays a %. */
+  function stickerYFromLayout(pos, stageH) {
+    var h = stageH > 0 ? stageH : 0;
+    if (pos && typeof pos.yPx === "number" && isFinite(pos.yPx) && h) {
+      return { css: Math.round(pos.yPx) + "px", pct: Math.round((pos.yPx / h) * 1000) / 10 };
+    }
+    var y = pos && typeof pos.y === "number" ? pos.y : parseFloat(pos && pos.y);
+    if (isNaN(y)) y = 0;
+    return { css: y + "%", pct: y };
+  }
+
+  function stickerYPxFromDrop(pct, stageH) {
+    return stageH > 0 ? Math.round((pct / 100) * stageH) : null;
+  }
+
   function liftDefaultGrid(stage) {
     if (!stage || !stage.classList || !stage.classList.contains("is-default-grid")) return false;
     if (isPhoneStage(stage)) return false;
@@ -542,6 +560,7 @@
         z: parseInt(el.getAttribute("data-sticker-z") || "2", 10),
         tilt: 0,
       };
+      if (typeof el.offsetTop === "number" && (stage.clientHeight || 0) > 0) layout[id].yPx = Math.round(el.offsetTop);
       el.classList.remove("is-spawned");
     });
     return layout;
@@ -1119,6 +1138,7 @@
           z: layoutCoord(pos.z, layoutCoord(cur.z, 1)),
           tilt: layoutCoord(pos.tilt, layoutCoord(cur.tilt, 0)),
         };
+        if (typeof pos.yPx === "number" && isFinite(pos.yPx)) base[id].yPx = pos.yPx;
       });
       p.widgetLayout = base;
     }
@@ -6462,6 +6482,9 @@
 
   /* Off until the owner can see requests (owner inbox PR). */
   var HANGOUT_BOOKING_LIVE = false;
+  /* "Suggested hangouts" are fixed times (HANGOUT_SLOTS), not real saved data:
+     hidden until owners publish real open times on the server. */
+  var HANGOUT_SUGGESTIONS_LIVE = false;
 
   /* Visitor books an open time: one hangout request to the Tower owner, saved on the server. */
   function requestHangoutOnServer(profileId, iso, time) {
@@ -6589,6 +6612,8 @@
           bookStatus: owner ? "" : view.bookStatus || "",
         })
       : "";
+    /* No-fake rule: the slots are fixed clock times, not saved Supabase data. */
+    if (!HANGOUT_SUGGESTIONS_LIVE) schedulerHtml = "";
     var calRoot = root.querySelector('[data-tower-widget="calendar"]');
     if (calRoot) {
       calRoot.hidden = false;
@@ -7816,11 +7841,12 @@
       if (id === "youtube" && !layout.youtube && isPlacedPos(layout, "music")) pos = layout.music;
       var fallback = DEFAULT_WIDGET_LAYOUT[id] || { x: 8, y: 8, z: zBase, tilt: 0 };
       var x = layoutCoord(pos && pos.x, fallback.x);
-      var y = layoutCoord(pos && pos.y, fallback.y);
+      var yAt = stickerYFromLayout(pos && typeof pos === "object" ? pos : { y: fallback.y }, stage.clientHeight || 0);
+      var y = yAt.pct;
       var z = layoutCoord(pos && pos.z, fallback.z || zBase);
       var tilt = layoutCoord(pos && pos.tilt, 0);
       el.style.setProperty("--sticker-x", x + "%");
-      el.style.setProperty("--sticker-y", y + "%");
+      el.style.setProperty("--sticker-y", yAt.css);
       el.style.setProperty("--sticker-z", String(z));
       el.style.setProperty("--sticker-tilt", tilt + "deg");
       el.setAttribute("data-sticker-x", String(x));
@@ -8695,11 +8721,14 @@
             /* Owner drag: free placement, never treated as an auto-spawn pile. */
             dragged: true,
           };
+          var dropYPx = stickerYPxFromDrop(dropY, stage.clientHeight || rect.height || 0);
+          if (dropYPx != null) layout[id].yPx = dropYPx;
           p.widgetLayout = layout;
           TowerProfileStore.save(p, { geometry: true });
         }
         sticker.style.setProperty("--sticker-x", dropX + "%");
-        sticker.style.setProperty("--sticker-y", dropY + "%");
+        var dropYAt = id !== "quote" && layout[id] ? stickerYFromLayout(layout[id], stage.clientHeight || 0) : { css: dropY + "%" };
+        sticker.style.setProperty("--sticker-y", dropYAt.css);
         sticker.style.setProperty("--sticker-z", String(dropZ));
         sticker.setAttribute("data-sticker-x", String(dropX));
         sticker.setAttribute("data-sticker-y", String(dropY));

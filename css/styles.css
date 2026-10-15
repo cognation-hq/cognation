@@ -13502,3 +13502,9 @@ svg.circle-bolt {
 .tower-layout--scrapbook [data-tower-widget="social"]:not([data-tower-social-chip]) {
   display: none !important;
 }
+
+/* Owner move handle (1.6rem at 0.35rem) sat on top of a social chip's link, so
+   clicking the link hit the handle and nothing opened. Make room for it. */
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-layout--scrapbook .tower-sticker--social-chip {
+  padding-left: 2.2rem;
+}

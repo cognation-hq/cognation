@@ -9500,8 +9500,8 @@ body { padding-top: 0 !important; }
   margin: 0;
   padding: 20px;
   box-sizing: border-box;
-  /* SIGNAL Feed empty: dark glass, readable light text (AA). No black border. */
-  background: rgba(16, 19, 48, 0.42);
+  /* SIGNAL Feed empty: SOLID dark panel, readable light text (AA). No black border. */
+  background: #101330; /* SOLID (opaque) dark panel, no glass over pink */
   border: 1px solid rgba(209, 241, 255, 0.28);
   border-radius: 1.15rem;
   color: var(--cgn-text, #f7f9ff);
@@ -9510,7 +9510,7 @@ body { padding-top: 0 !important; }
   text-shadow: none;
 }
 #panel-signal .signal-feed-host .tower-feed[data-tower-feed] .commune-empty {
-  background: rgba(16, 19, 48, 0.42);
+  background: #101330; /* SOLID (opaque) */
   border: 1px solid rgba(209, 241, 255, 0.28);
   border-radius: 1.15rem;
   color: var(--cgn-text, #f7f9ff);

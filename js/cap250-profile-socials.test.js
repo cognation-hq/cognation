@@ -38,7 +38,7 @@ assert.ok(/\[data-tower-side-toggle\]\s*\{\s*display:\s*none/.test(css), "pill f
 assert.ok(/data-tower-followers-mutual/.test(html), "mutual followers line hook");
 assert.ok(/tower-followers-find[\s\S]*hidden/.test(html) || /input\.hidden = true/.test(tower), "Search followers removed/hidden");
 assert.ok(/formatMutualFollowersLine/.test(tower), "mutual followers formatter present");
-assert.ok(/Seeds NEVER appear in a real person's mutual line/.test(tower), "seed exclusion documented in mutual line");
+assert.ok(/seeds never on real PULSE|Seeds NEVER appear in a real person.s mutual line|Seed sandbox: seed mutuals only/i.test(tower), "seed exclusion documented in mutual line");
 assert.ok(/followerEdges/.test(tower), "follow edges carry face");
 assert.ok(/normalizeFollowerFace/.test(tower), "follower face normalizer");
 

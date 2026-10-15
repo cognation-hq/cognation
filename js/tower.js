@@ -4652,6 +4652,20 @@
   }
 
   function viewerIsSeedOrOps() {
+    /* Prefer ECHO server-truth cache (cognation_am_i_seed). Fail closed for
+       PULSE mutual-share lines: unknown → treat as real-side hide of seeds
+       via !viewerSeed for seed names, and seed viewers only see seed mutuals. */
+    try {
+      var swipe = window.CognationCommuneSwipe;
+      if (swipe && typeof swipe.viewerIsSeedOrOps === "function") {
+        /* When status is explicitly false, viewer is real. When true/unknown
+           from swipe helper, treat as seedish for mutual gating. */
+        if (swipe.noteViewerSeedStatus && swipe.refreshViewerSeedStatus) {
+          /* read cache only — noteViewerSeedStatus(null) would clear it */
+        }
+        return !!swipe.viewerIsSeedOrOps();
+      }
+    } catch (eSwipe) {}
     var personal = viewerPersonalRecord();
     if (personal && (recordIsSeed(personal) || recordIsOps(personal))) return true;
     try {
@@ -4686,12 +4700,19 @@
           rec = window.CognationAccounts.getProfileById(fid);
         }
       } catch (eRec) {}
-      /* Seeds NEVER appear in a real person's mutual line. */
-      if (!viewerSeed && rec && (recordIsSeed(rec) || recordIsOps(rec))) return;
-      if (!viewerSeed) {
-        var demo = DEMO_FRIENDS.filter(function (entry) { return entry.id === fid; })[0];
-        if (demo && (demo.isSeed || demo.accountKind === "seed")) return;
+      /* Seed sandbox: seed mutuals only for seed viewers; seeds never on real PULSE. */
+      var recSeed = !!(rec && (recordIsSeed(rec) || recordIsOps(rec)));
+      if (!recSeed) {
+        var demo0 = DEMO_FRIENDS.filter(function (entry) { return entry.id === fid; })[0];
+        if (demo0 && (demo0.isSeed || demo0.accountKind === "seed" || demo0.accountKind === "ops")) recSeed = true;
       }
+      try {
+        var swipeGate = window.CognationCommuneSwipe;
+        if (swipeGate && typeof swipeGate.profileLooksSeed === "function" && rec) {
+          recSeed = !!swipeGate.profileLooksSeed(rec);
+        }
+      } catch (eGate) {}
+      if (viewerSeed !== recSeed) return;
       var label = followerDisplayName(fid);
       if (!label || seen[label]) return;
       seen[label] = true;

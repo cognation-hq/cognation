@@ -395,6 +395,11 @@ function testRightSwipeStillKeeps() {
   }));
   var api = loadSwipe(local, memoryStorage());
   if (api.noteViewerSeedStatus) api.noteViewerSeedStatus(false);
+  if (api.noteProfileSeedStatus) {
+    api.noteProfileSeedStatus("ada", false);
+    api.noteProfileSeedStatus("friend", false);
+    api.noteProfileSeedStatus("sam", false);
+  }
   assert.strictEqual(deckHas(api.sampleDeck(18), "ad-pro-0"), true);
   assert.strictEqual(deckHas(api.sampleDeck(18), "know-sam"), true);
 
@@ -417,6 +422,11 @@ function testRightSwipeStillKeeps() {
   api.settleSwipe({ id: "ad-pro-0", type: "ad", title: "Evening class" }, "left");
   api.settleSwipe({ id: "know-sam", type: "know", profileId: "sam" }, "left");
   var after = loadSwipe(local, memoryStorage());
+  if (after.noteViewerSeedStatus) after.noteViewerSeedStatus(false);
+  if (after.noteProfileSeedStatus) {
+    after.noteProfileSeedStatus("friend", false);
+    after.noteProfileSeedStatus("sam", false);
+  }
   assert.strictEqual(deckHas(after.sampleDeck(18), "ad-pro-0"), false);
   assert.strictEqual(deckHas(after.sampleDeck(18), "know-sam"), false);
 
@@ -425,6 +435,12 @@ function testRightSwipeStillKeeps() {
   local.setItem("cognation.profiles.v1", JSON.stringify(profiles));
   local.setItem("cognation.session.v2", sessionFor("bea"));
   var bea = loadSwipe(local, memoryStorage());
+  if (bea.noteViewerSeedStatus) bea.noteViewerSeedStatus(false);
+  if (bea.noteProfileSeedStatus) {
+    bea.noteProfileSeedStatus("bea", false);
+    bea.noteProfileSeedStatus("friend", false);
+    bea.noteProfileSeedStatus("sam", false);
+  }
   assert.strictEqual(deckHas(bea.sampleDeck(18), "ad-pro-0"), true);
   assert.strictEqual(deckHas(bea.sampleDeck(18), "know-sam"), true);
 }

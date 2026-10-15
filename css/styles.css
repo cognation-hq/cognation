@@ -13089,3 +13089,22 @@ a.site-switch-side:focus-visible {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+
+/* Algorithm Manager — Friends' shares switch (ECHO swipe learning). */
+.commune-algo-manager {
+  margin-top: 0.65rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(185, 191, 224, 0.18);
+}
+.commune-algo-manager-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cgn-text-muted, rgba(185, 191, 224, 0.8));
+}
+.commune-algo-toggle-row {
+  margin-top: 0;
+}

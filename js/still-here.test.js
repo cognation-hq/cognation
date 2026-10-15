@@ -240,4 +240,80 @@ assert.ok(/!signInConfigured && window\.CognationAccounts/.test(tower), "demo pr
 
 })();
 
+/* ---- Tower: no overlaps, auto-pile repair, drag overlap kept, MP3 Personal only ---- */
+(function () {
+var assert = require("assert");
+var fs = require("fs");
+var path = require("path");
+var vm = require("vm");
+var tower = fs.readFileSync(path.join(__dirname, "tower.js"), "utf8");
+function grab(a, b) {
+  var i = tower.indexOf(a), j = tower.indexOf(b, i);
+  assert.ok(i !== -1 && j > i, "found " + a);
+  return tower.slice(i, j);
+}
+var ctx = vm.createContext({ Number: Number, Object: Object, Math: Math, String: String, parseFloat: parseFloat, parseInt: parseInt, isNaN: isNaN });
+vm.runInContext([
+  grab("  var SPAWN_GAP = 24;", "  /* Phone (<768px)"),
+  "  var PROFILE_STACK = { avatar: true, identity: true, slogan: true }; var PROFILE_STACK_GAP = 4;",
+  grab("  function isFactorySeedPos(", "  /* Drag out of the default CSS grid"),
+  grab("  /* Broken pile-up", "  function profileHasSocialLinks("),
+  "this.SPAWN_ROWS = SPAWN_ROWS; this.packSpawn = packSpawn; this.getWidgetLayout = getWidgetLayout; this.isProTower = isProTower;",
+].join("\n"), ctx);
+
+/* Default spawn never overlaps, Personal and Pro, desktop and phone. */
+var SIZES = { avatar: [220, 220], identity: [400, 90], slogan: [400, 70], music: [300, 380], youtube: [560, 340],
+  friends: [440, 200], social: [300, 120], badges: [300, 160], calendar: [300, 260], followers: [300, 240],
+  polaroid: [280, 320], html: [420, 200], instax: [220, 280] };
+function noOverlap(face, stageW, phone) {
+  var rows = ctx.SPAWN_ROWS[face], sizes = {};
+  rows.forEach(function (r) { r.forEach(function (id) { sizes[id] = { w: SIZES[id][0], h: SIZES[id][1] }; }); });
+  var out = ctx.packSpawn(rows, sizes, [], stageW, phone);
+  var colW = out.__colW, rects = [];
+  rows.forEach(function (r) { r.forEach(function (id) {
+    var w = r.length > 1 || phone ? Math.min(sizes[id].w, colW) : sizes[id].w;
+    rects.push({ id: id, x: out[id].x, y: out[id].y, w: w, h: sizes[id].h });
+  }); });
+  for (var i = 0; i < rects.length; i++) for (var j = i + 1; j < rects.length; j++) {
+    var a = rects[i], b = rects[j];
+    var hit = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    assert.ok(!hit, face + (phone ? " phone" : " desktop") + " default: " + a.id + " overlaps " + b.id);
+  }
+}
+noOverlap("personal", 1000, false); noOverlap("professional", 1000, false);
+noOverlap("personal", 375, true); noOverlap("professional", 375, true);
+
+var pro = { _profileKind: "professional" }, personal = { _profileKind: "personal" };
+function withLayout(base, layout) { var o = {}; Object.keys(base).forEach(function (k) { o[k] = base[k]; }); o.widgetLayout = layout; return o; }
+
+/* Auto-spawn pile (never dragged, several on one spot) is repaired -> default grid. */
+assert.strictEqual(ctx.getWidgetLayout(withLayout(personal, { music: { x: 30, y: 40 }, friends: { x: 30, y: 40 }, calendar: { x: 60, y: 10 } })), null, "Personal auto pile repaired");
+assert.strictEqual(ctx.getWidgetLayout(withLayout(pro, { youtube: { x: 12, y: 30 }, followers: { x: 12, y: 30 }, html: { x: 60, y: 70 } })), null, "Pro auto pile repaired");
+assert.strictEqual(ctx.getWidgetLayout(withLayout(personal, { avatar: { x: 0, y: 0 }, identity: { x: 0, y: 0 } })), null, "0,0 pile repaired");
+/* One dragged + one never-dragged on the same spot: still an auto pile. */
+assert.strictEqual(ctx.getWidgetLayout(withLayout(personal, { music: { x: 30, y: 40, dragged: true }, friends: { x: 30, y: 40 } })), null, "half-dragged pile repaired");
+
+/* Overlap the owner made by dragging is free placement: kept. */
+var dragged = { music: { x: 30, y: 40, dragged: true }, friends: { x: 30, y: 40, dragged: true }, calendar: { x: 60, y: 10 } };
+assert.strictEqual(ctx.getWidgetLayout(withLayout(personal, dragged)), dragged, "drag-made overlap kept (Personal)");
+var proDrag = { youtube: { x: 20, y: 20, dragged: true }, calendar: { x: 22, y: 24, dragged: true } };
+assert.strictEqual(ctx.getWidgetLayout(withLayout(pro, proDrag)), proDrag, "drag-made overlap kept (Pro)");
+var spread = { avatar: { x: 2, y: 3 }, identity: { x: 30, y: 3 }, calendar: { x: 60, y: 40 } };
+assert.strictEqual(ctx.getWidgetLayout(withLayout(personal, spread)), spread, "normal layout kept");
+
+/* MP3 is Personal only (Alexa, Oct 7); YouTube stays on Pro. */
+assert.ok(ctx.SPAWN_ROWS.professional.every(function (r) { return r.indexOf("music") < 0; }), "Pro spawn has no music");
+assert.ok(ctx.SPAWN_ROWS.professional.some(function (r) { return r.indexOf("youtube") >= 0; }), "Pro spawn keeps YouTube");
+assert.ok(ctx.SPAWN_ROWS.personal.some(function (r) { return r.indexOf("music") >= 0; }), "Personal still has music");
+assert.ok(ctx.isProTower({ kind: "professional", _profileKind: "personal" }), "Pro by kind counts even if _profileKind says personal");
+assert.ok(!ctx.isProTower(personal), "Personal is not Pro");
+/* Old saved Pro layout with music on top of YouTube: music never counts, layout kept. */
+var oldPro = { music: { x: 12, y: 30 }, youtube: { x: 12, y: 30, dragged: true }, calendar: { x: 60, y: 10 } };
+assert.strictEqual(ctx.getWidgetLayout(withLayout(pro, oldPro)), oldPro, "old Pro music spot ignored");
+assert.ok(/var personalMusic = !isProTower\(p\);/.test(tower), "public widget music gate uses the shared Pro check");
+assert.ok(/var personal = !isProTower\(p\);/.test(tower), "music player init uses the shared Pro check");
+assert.ok(/if \(id === "music" && isProTower\(p\)\) \{\s*el\.hidden = true;/.test(tower), "old saved Pro layouts never show the MP3");
+assert.ok(/dragged: true,/.test(tower), "owner drop marks the widget as dragged");
+})();
+
 console.log("still-here.test.js: OK");

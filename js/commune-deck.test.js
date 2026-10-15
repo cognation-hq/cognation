@@ -214,6 +214,7 @@ function testSiteRooms() {
   ];
 
   api.setMemberProfile({ age: 16, interests: interests });
+  api.setDatingBirthAge(16); /* dating age now comes from user_birth only */
   api.setSeeDating(true);
   var school = titles(api.visibleSiteRooms());
   assert.ok(school.indexOf("Highschool") !== -1);
@@ -224,12 +225,14 @@ function testSiteRooms() {
   assert.strictEqual(school.indexOf("18–21"), -1);
 
   api.setMemberProfile({ age: 19, interests: [] });
+  api.setDatingBirthAge(19); /* dating age now comes from user_birth only */
   api.setSeeDating(false);
   assert.deepStrictEqual(titles(api.visibleSiteRooms()), ["18–21"]);
   api.setSeeDating(true);
   assert.deepStrictEqual(titles(api.visibleSiteRooms()), ["18–21", "Speed dating"]);
 
   api.setMemberProfile({ age: 21, interests: interests });
+  api.setDatingBirthAge(21); /* dating age now comes from user_birth only */
   api.setSeeDating(true);
   var adult = titles(api.visibleSiteRooms());
   assert.ok(adult.indexOf("18–21") !== -1);
@@ -240,10 +243,12 @@ function testSiteRooms() {
   assert.strictEqual(adult.length, 15);
 
   api.setMemberProfile({ age: 30, interests: ["insurance"] });
+  api.setDatingBirthAge(30); /* dating age now comes from user_birth only */
   api.setSeeDating(false);
   assert.deepStrictEqual(titles(api.visibleSiteRooms()), ["21+", "Insurance"]);
 
   api.setMemberProfile({ age: 40, interests: [] });
+  api.setDatingBirthAge(40); /* dating age now comes from user_birth only */
   assert.deepStrictEqual(titles(api.visibleSiteRooms()), ["21+"]);
 
   var lanes = {
@@ -462,10 +467,12 @@ function testClassroomSurface() {
   });
 
   api.setMemberProfile({ age: 16, interests: ["insurance"] });
+  api.setDatingBirthAge(16); /* dating age now comes from user_birth only */
   assert.strictEqual(api.classroomAllowed(), false);
   assert.strictEqual(api.visibleClassroomSessions().length, 0);
 
   api.setMemberProfile({ age: 18, interests: ["insurance"] });
+  api.setDatingBirthAge(18); /* dating age now comes from user_birth only */
   assert.strictEqual(api.classroomAllowed(), true);
   assert.strictEqual(api.visibleClassroomSessions().length, 3);
 
@@ -511,6 +518,7 @@ testRightSwipeStillKeeps();
 function testClassroomAgeGateToast() {
   var api = loadSwipe(memoryStorage(), memoryStorage());
   api.setMemberProfile({ age: 16, interests: ["insurance"] });
+  api.setDatingBirthAge(16); /* dating age now comes from user_birth only */
   assert.strictEqual(api.classroomAllowed(), false);
   assert.strictEqual(api.openClassroom("class-insurance", false), false);
 
@@ -519,6 +527,7 @@ function testClassroomAgeGateToast() {
   assert.strictEqual(api.openClassroom("class-insurance", false), false);
 
   api.setMemberProfile({ age: 28, interests: ["insurance"] });
+  api.setDatingBirthAge(28); /* dating age now comes from user_birth only */
   assert.strictEqual(api.classroomAllowed(), true);
 
   var src = fs.readFileSync(path.join(root, "js/commune-swipe.js"), "utf8");

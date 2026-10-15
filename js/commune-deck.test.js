@@ -521,20 +521,24 @@ function testClassroomAgeGateToast() {
 }
 
 function testChatroomReplyReleasesSwipe() {
-  /* Source guard: after a room reply, release roomId lock so deck swipe works again. */
+  /* Demo path: after a local-demo reply, release roomId so deck swipe works again.
+     Live path (step 2b): stay in the room and refresh the log — do not release. */
   var src = fs.readFileSync(path.join(root, "js/commune-swipe.js"), "utf8");
   assert.ok(src.indexOf("function releaseRoomSurface") !== -1, "releaseRoomSurface helper");
   assert.ok(src.indexOf("function clearPointer") !== -1, "clearPointer helper");
   var submitIdx = src.indexOf('form.addEventListener("submit"');
   assert.ok(submitIdx !== -1, "room compose submit handler");
-  var submitChunk = src.slice(submitIdx, submitIdx + 900);
-  assert.ok(submitChunk.indexOf("releaseRoomSurface()") !== -1, "submit releases room surface");
-  assert.ok(submitChunk.indexOf("friction(\"complete\", \"chat\")") !== -1, "submit still completes chat friction");
+  var submitChunk = src.slice(submitIdx, submitIdx + 2200);
+  assert.ok(submitChunk.indexOf("state.liveRoom") !== -1, "submit branches on liveRoom");
+  assert.ok(submitChunk.indexOf("postLiveMessage") !== -1, "live submit uses RPC");
+  assert.ok(submitChunk.indexOf("releaseRoomSurface()") !== -1, "demo submit releases room surface");
+  assert.ok(submitChunk.indexOf('friction("complete", "chat")') !== -1, "submit still completes chat friction");
   assert.ok(
     submitChunk.indexOf("if (room) paintRoom(room);") === -1,
-    "submit must not leave the room open via paintRoom (that kept state.roomId and blocked swipe)"
+    "submit must not leave the demo room open via paintRoom (that kept state.roomId and blocked swipe)"
   );
-  assert.ok(src.indexOf("Sent. Swipe when you are ready.") !== -1, "status after send");
+  assert.ok(src.indexOf("Sent. Swipe when you are ready.") !== -1, "demo status after send");
+  assert.ok(src.indexOf("Sent to the live room.") !== -1, "live status after send");
   assert.ok(src.indexOf("if (state.busy || state.roomId || state.classroomId) return;") !== -1, "swipe still guards open room");
 }
 

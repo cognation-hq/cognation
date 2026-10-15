@@ -12849,3 +12849,82 @@ a.site-switch-side:focus-visible {
   cursor: pointer;
   box-shadow: none !important;
 }
+
+/* Edit profile (Designer look check on #92): dark panel, muted labels,
+   one-line Save buttons, hidden rows fully hidden. */
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown {
+  background: rgba(16, 19, 48, 0.97) !important;
+  color: var(--cgn-text, #f7f9ff) !important;
+  border: 1px solid var(--cgn-border, rgba(209, 241, 255, 0.28)) !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown :is(p, label, span, button, input, .form-hint) {
+  color: var(--cgn-text, #f7f9ff) !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown :is(.tower-social-fields label, .tower-social-fields-label, .tower-frame-fields-label) {
+  color: var(--cgn-text-muted, rgba(232, 240, 255, 0.66)) !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown input {
+  background: rgba(5, 8, 28, 0.55) !important;
+  border: 1px solid var(--cgn-border, rgba(209, 241, 255, 0.28)) !important;
+  color: var(--cgn-text, #f7f9ff) !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown input::placeholder {
+  color: var(--cgn-text-soft, rgba(232, 240, 255, 0.48)) !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown input:focus {
+  border-color: var(--cgn-accent, #b7f6ff) !important;
+  outline: none;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-social-fields :is(label, input)[hidden] {
+  display: none !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown :is(.tower-frame-chip, [data-tower-frame-chips] .tower-frame-chip) {
+  background: rgba(5, 8, 28, 0.55) !important;
+  border-color: var(--cgn-border, rgba(209, 241, 255, 0.28)) !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown :is(.tower-frame-chip.is-selected, .tower-frame-chip[aria-pressed="true"]) {
+  background: rgba(183, 246, 255, 0.18) !important;
+  border-color: var(--cgn-accent, #b7f6ff) !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown :is(.btn, .tower-social-actions .btn-primary) {
+  white-space: nowrap;
+  width: auto;
+  background: transparent !important;
+  color: var(--cgn-text, #f7f9ff) !important;
+  border: 1px solid var(--cgn-border, rgba(209, 241, 255, 0.28)) !important;
+  border-radius: 999px !important;
+  padding: 0.22rem 0.75rem !important;
+  font-size: 0.75rem !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-profile-edit-sheet-head {
+  background: rgba(16, 19, 48, 0.99);
+  border-bottom-color: var(--cgn-border, rgba(209, 241, 255, 0.28));
+}
+.tower-profile-edit-scrim {
+  display: none;
+}
+@media (max-width: 767px) {
+  .tower-profile-edit-scrim:not([hidden]) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(3, 4, 14, 0.6);
+    z-index: 999;
+  }
+  #panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown.is-sheet {
+    max-height: 85vh !important;
+    max-height: 85dvh !important;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-top: 0 !important;
+  }
+  #panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown.is-sheet .tower-profile-edit-sheet-head {
+    top: 0;
+    margin: 0 -1rem 0.5rem;
+    padding: 0.7rem 1rem;
+  }
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown [data-tower-frame-chips] .tower-frame-chip > .tower-frame-chip-name,
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-frame-chip .tower-frame-chip-name {
+  color: var(--cgn-text, #f7f9ff) !important;
+}

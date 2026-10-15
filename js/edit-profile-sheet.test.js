@@ -27,4 +27,17 @@ var editOpen = css.match(/\.tower-sticker--avatar\.is-edit-open \{([^}]*)\}/g) |
 editOpen.forEach(function (rule) {
   assert.ok(!/width|height|padding|scale/.test(rule), "is-edit-open does not resize the widget: " + rule);
 });
+/* Designer look check: dark panel, muted labels, hidden social rows fully hidden,
+   one-line Save buttons, phone scrim + 85% sheet with pinned header. */
+assert.ok(/\.tower-profile-edit-dropdown\.tower-profile-edit-dropdown \{\s*background: rgba\(16, 19, 48, 0\.97\) !important;/.test(css), "dark panel");
+assert.ok(/\.tower-social-fields label, \.tower-social-fields-label, \.tower-frame-fields-label\) \{\s*color: var\(--cgn-text-muted/.test(css), "muted labels");
+assert.ok(/\.tower-social-fields :is\(label, input\)\[hidden\] \{\s*display: none !important;/.test(css), "label hides with its input (no orphan LinkedIn/Linktree labels)");
+assert.ok(/:is\(\.btn, \.tower-social-actions \.btn-primary\) \{\s*white-space: nowrap;/.test(css), "Save buttons stay on one line");
+assert.ok(/\.tower-profile-edit-scrim:not\(\[hidden\]\) \{\s*display: block;\s*position: fixed;\s*inset: 0;/.test(css), "phone scrim");
+assert.ok(/\.is-sheet \{\s*max-height: 85vh !important;/.test(css), "sheet capped at 85vh");
+assert.ok(/\.is-sheet \.tower-profile-edit-sheet-head \{\s*top: 0;/.test(css) && /position: sticky;/.test(css), "header pinned");
+assert.ok(/function mountPanelAsSheet\(\) \{\s*showScrim\(true\);/.test(fn) && /function returnPanelHome\(\) \{\s*showScrim\(false\);/.test(fn), "scrim follows open/close");
+assert.ok(/scrim\.addEventListener\("click", function \(\) \{\s*setOpen\(false\);/.test(fn), "tap scrim closes");
+var labelHide = tower.slice(tower.indexOf("function renderSocialLinks"), tower.indexOf("function renderSocialLinks") + 1200);
+assert.ok(/formInput\.hidden = true;\s*if \(label\) label\.hidden = true;/.test(labelHide), "per-page networks hide label + input together");
 console.log("edit-profile-sheet.test.js: ok");

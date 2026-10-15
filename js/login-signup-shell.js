@@ -1,7 +1,8 @@
 /**
  * CGN-007 — Login/signup shell behavior.
  * Mode: [data-login-mode]="signin|signup" on [data-login-credentials-step]
- * Signup fields: age, country, state, phone, email
+ * Signup fields: birthdate, country, state, phone, email
+ * 13+ gate: js/signup-age-gate.js (birthdate itself is never stored or sent)
  * Persists member profile for COMMUNE age / dating gates.
  */
 (function () {
@@ -26,6 +27,63 @@
   var statusEl = document.getElementById("login-status");
   var demoHint = form.querySelector("[data-login-demo-hint]");
   var passwordInput = form.querySelector("#login-password");
+  var ageBlockEl = document.querySelector("[data-login-age-block]");
+  var submitActions = form.querySelector(".login-form-actions");
+  var legalLinks = form.querySelector("[data-login-legal-links]");
+
+  function gate() {
+    return window.CognationAgeGate || null;
+  }
+
+  function localStore() {
+    try {
+      return window.localStorage;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function signupHeld() {
+    var g = gate();
+    return !!(g && g.isHeld(localStore(), document));
+  }
+
+  /* Plain block screen. Signup inputs and the submit button are hidden; the
+     mode toggle stays so existing members can still sign in. */
+  function applyAgeBlock(isSignup) {
+    var blocked = !!isSignup && signupHeld();
+    if (blocked) step.setAttribute("data-login-age-blocked", "");
+    else step.removeAttribute("data-login-age-blocked");
+    if (ageBlockEl) ageBlockEl.hidden = !blocked;
+    if (submitActions) submitActions.hidden = blocked;
+    form.querySelectorAll(".login-form > .form-group").forEach(function (el) {
+      if (el === signinCountry) return;
+      el.hidden = blocked;
+    });
+    if (blocked) {
+      if (signupFields) signupFields.hidden = true;
+      if (descEl) descEl.textContent = "";
+    }
+    return blocked;
+  }
+
+  /* Wipe everything typed into the form (in memory and in the DOM). */
+  function clearSignupInputs() {
+    form.querySelectorAll("input, select").forEach(function (el) {
+      if (el.type === "checkbox" || el.type === "radio") el.checked = false;
+      else if (el.tagName === "SELECT") el.selectedIndex = 0;
+      else el.value = "";
+      el.setAttribute("aria-invalid", "false");
+    });
+  }
+
+  function blockSignup() {
+    var g = gate();
+    if (g) g.setHold(localStore(), document);
+    clearSignupInputs();
+    setStatus("");
+    applyAgeBlock(true);
+  }
 
   function setStatus(msg, isError) {
     if (!statusEl) return;
@@ -130,7 +188,9 @@
         : 'Welcome to <span data-brand>COGNATION</span>. Sign in with your account to continue.';
     }
     if (demoHint) demoHint.hidden = true;
+    if (legalLinks) legalLinks.hidden = !isSignup;
     if (!opts.keepStatus) setStatus("");
+    applyAgeBlock(isSignup);
   }
 
   function markInvalid(el, bad) {
@@ -140,7 +200,7 @@
 
   function validateSignup() {
     var ok = true;
-    var age = form.querySelector("#age");
+    var birth = form.querySelector("#birthdate");
     var phone = form.querySelector("#phone");
     var email = form.querySelector("#email");
     var user = form.querySelector("#login-username");
@@ -164,10 +224,9 @@
     req(pass, function (el) {
       return el && el.value.length > 0;
     });
-    req(age, function (el) {
-      if (!el || el.value === "") return false;
-      var n = Number(el.value);
-      return n >= 13 && n <= 120;
+    req(birth, function (el) {
+      var g = gate();
+      return !!(el && el.value && g && g.ageFromBirthdate(el.value) !== null);
     });
     req(country, function (el) {
       return el && el.value;
@@ -191,7 +250,8 @@
   }
 
   function collectSignupProfile() {
-    var ageEl = form.querySelector("#age");
+    var birthEl = form.querySelector("#birthdate");
+    var g = gate();
     var phoneEl = form.querySelector("#phone");
     var emailEl = form.querySelector("#email");
     var country =
@@ -204,7 +264,8 @@
       state = stateText ? stateText.value.trim() : "";
     }
     return {
-      age: ageEl ? parseInt(ageEl.value, 10) : null,
+      /* Whole-year age only (existing Commune age gates read it); the birthdate itself is not kept. */
+      age: birthEl && g ? g.ageFromBirthdate(birthEl.value) : null,
       country: country,
       state: state,
       phone: phoneEl ? phoneEl.value.trim() : "",
@@ -236,6 +297,17 @@
       if (mode === "signup") {
         e.preventDefault();
         e.stopImmediatePropagation();
+        if (signupHeld()) {
+          blockSignup();
+          return;
+        }
+        var birthInput = form.querySelector("#birthdate");
+        var g = gate();
+        /* Under the minimum: stop here. Nothing typed leaves the device or is stored. */
+        if (birthInput && g && g.isUnderMin(birthInput.value)) {
+          blockSignup();
+          return;
+        }
         if (!validateSignup()) {
           setStatus("Use a 3–40 character username (letters, numbers, _ or -), then fix any highlighted fields.", true);
           return;
@@ -254,7 +326,23 @@
           window.CognationSupabase.configured()
         ) {
           setStatus("Creating your Cognation account…", false);
-          window.CognationSupabase
+          g.checkEmailBlocked(profile.email).then(function (emailBlocked) {
+            if (emailBlocked) {
+              password = "";
+              profile = null;
+              blockSignup();
+              return null;
+            }
+            return createAccount();
+          });
+          return;
+        }
+        setStatus("Account sign-up is not configured. Please try again later.", true);
+        return;
+      }
+
+      function createAccount() {
+          return window.CognationSupabase
             .signUp({
               email: profile.email,
               password: password,
@@ -280,10 +368,6 @@
                 true
               );
             });
-          return;
-        }
-        setStatus("Account sign-up is not configured. Please try again later.", true);
-        return;
       }
 
       /* Sign-in: also capture country + keep any existing age */
@@ -292,11 +376,6 @@
       );
       var patch = {};
       if (countryInput && countryInput.value) patch.country = countryInput.value;
-      /* If age field somehow visible/filled, keep it */
-      var ageEl = form.querySelector("#age");
-      if (ageEl && ageEl.value && !ageEl.disabled) {
-        patch.age = parseInt(ageEl.value, 10);
-      }
       if (Object.keys(patch).length) writeProfile(patch);
     },
     true
@@ -305,10 +384,8 @@
   /* Hydrate from existing profile */
   (function hydrate() {
     var p = readProfile();
-    var ageEl = form.querySelector("#age");
     var phoneEl = form.querySelector("#phone");
     var emailEl = form.querySelector("#email");
-    if (ageEl && p.age != null) ageEl.value = p.age;
     if (phoneEl && p.phone) phoneEl.value = p.phone;
     if (emailEl && p.email) emailEl.value = p.email;
     if (signupCountrySelect && p.country) signupCountrySelect.value = p.country;

@@ -21,13 +21,14 @@ function grab(startMarker, endMarker) {
 }
 var code = grab("  var SPAWN_GAP = 24;", "  /* Place every visible, unplaced widget");
 var ctx = vm.createContext({});
-vm.runInContext(code + "\nthis.PROFILE_STACK_GAP = PROFILE_STACK_GAP; this.packSpawn = packSpawn; this.SPAWN_ROWS = SPAWN_ROWS; this.isFactorySeedPos = isFactorySeedPos; this.rectsOverlap = rectsOverlap;", ctx);
+vm.runInContext(code + "\nthis.PROFILE_STACK_GAP = PROFILE_STACK_GAP; this.packSpawn = packSpawn; this.SPAWN_ROWS = SPAWN_ROWS; this.expandSpawnRows = expandSpawnRows; this.isFactorySeedPos = isFactorySeedPos; this.rectsOverlap = rectsOverlap;", ctx);
 
 /* Spec order. */
 assert.deepStrictEqual(JSON.parse(JSON.stringify(ctx.SPAWN_ROWS.personal)),
-  [["avatar"], ["identity"], ["slogan"], ["music"], ["friends", "social"], ["badges", "calendar"], ["polaroid", "html"], ["instax"]]);
+  [["avatar"], ["identity"], ["slogan"], ["music"], ["friends"], ["__socials__"], ["badges", "calendar"], ["polaroid", "html"], ["instax"]]);
 assert.deepStrictEqual(JSON.parse(JSON.stringify(ctx.SPAWN_ROWS.professional)),
-  [["avatar"], ["identity"], ["slogan"], ["youtube"], ["social", "badges"], ["followers", "calendar"], ["html"]]);
+  [["avatar"], ["identity"], ["slogan"], ["youtube"], ["__socials__"], ["badges"], ["followers", "calendar"], ["html"]]);
+assert.ok(JSON.stringify(ctx.SPAWN_ROWS).indexOf('"social"') === -1, "no grouped social slot in SPAWN_ROWS");
 assert.ok(!/going-live/.test(JSON.stringify(ctx.SPAWN_ROWS)), "Going live is not a public default");
 assert.ok(JSON.stringify(ctx.SPAWN_ROWS.professional).indexOf("music") === -1, "no music on Professional");
 
@@ -49,8 +50,39 @@ function assertNoOverlap(list, gap) {
   }
 }
 
+/* Sample opted-in chips so pack tests exercise __socials__ expansion (pairs of two). */
+function sampleProfile(kind) {
+  return {
+    _profileKind: kind,
+    socialLinks: {
+      instagram: "https://instagram.com/a",
+      tiktok: "https://tiktok.com/@a",
+      venmo: "@a",
+      x: "https://x.com/a",
+    },
+    publicWidgets: {},
+  };
+}
+/* expandSpawnRows needs social helpers; stub via opted-in ids by patching through a thin expand. */
+function expandForTest(kind) {
+  var base = ctx.SPAWN_ROWS[kind];
+  var chips = kind === "professional"
+    ? ["social-instagram", "social-tiktok", "social-x"]
+    : ["social-instagram", "social-tiktok", "social-venmo", "social-x"];
+  var out = [];
+  base.forEach(function (row) {
+    if (row.length === 1 && row[0] === "__socials__") {
+      var i;
+      for (i = 0; i < chips.length; i += 2) out.push(chips.slice(i, i + 2));
+      return;
+    }
+    out.push(row.slice());
+  });
+  return out;
+}
+
 ["personal", "professional"].forEach(function (kind) {
-  var rows = ctx.SPAWN_ROWS[kind];
+  var rows = expandForTest(kind);
   var ids = [].concat.apply([], rows);
   /* Website (1120 wide): left | right rows, 24px side padding, 24px gap, no overlap. */
   var sz = sizes(ids);
@@ -59,13 +91,14 @@ function assertNoOverlap(list, gap) {
   assertNoOverlap(r, 24);
   assert.strictEqual(d.avatar.x, 24);
   if (kind === "professional") {
-    assert.strictEqual(d.social.y, d.badges.y, kind + ": Links | Badges share a row");
+    assert.strictEqual(d["social-instagram"].y, d["social-tiktok"].y, kind + ": first social pair shares a row");
     assert.strictEqual(d.followers.y, d.calendar.y, kind + ": Followers | Calendar share a row");
-    assert.strictEqual(d.badges.x, 24 + (1120 - 48 - 24) / 2 + 24, "right column");
+    assert.strictEqual(d.badges.x, 24, kind + ": Badges full-width left after socials");
   } else {
-    assert.strictEqual(d.friends.y, d.social.y, kind + ": Top Friends | Links share a row");
+    assert.ok(d.friends && !d.social, kind + ": friends alone; no grouped social");
+    assert.strictEqual(d["social-instagram"].y, d["social-tiktok"].y, kind + ": first social pair shares a row");
     assert.strictEqual(d.badges.y, d.calendar.y, kind + ": Badges | Calendar share a row");
-    assert.strictEqual(d.social.x, 24 + (1120 - 48 - 24) / 2 + 24, "Links right column");
+    assert.strictEqual(d["social-tiktok"].x, 24 + (1120 - 48 - 24) / 2 + 24, "second chip right column");
   }
   /* Phone (390): one column, 16px sides, DOM order top to bottom. */
   var p = ctx.packSpawn(rows, sz, [], 390, true);
@@ -80,7 +113,7 @@ function assertNoOverlap(list, gap) {
 
 /* Profile card: avatar, name and slogan sit together (tight gap), then the 24px gap. */
 ["personal", "professional"].forEach(function (kind) {
-  var rows2 = ctx.SPAWN_ROWS[kind];
+  var rows2 = expandForTest(kind);
   var ids2 = [].concat.apply([], rows2);
   [false, true].forEach(function (phone) {
     var sz3 = sizes(ids2);

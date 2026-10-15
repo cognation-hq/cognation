@@ -36,9 +36,15 @@
       try {
         var tab = tabs[index];
         var name = String((tab && tab.id) || "").replace(/^tab-/, "");
-        /* Tower tab while on a friend deep-link: return to the signed-in own Tower. */
+        /* Own Tower only when nobody else's profile is open. Friend tap /
+           People → Open set #tower-profile-… then activate this tab; calling
+           OpenOwn there cleared the hash and bounced everyone to their own Tower. */
         if (name === "tower" && typeof window.CognationTowerOpenOwn === "function") {
-          try { window.CognationTowerOpenOwn(); } catch (eOwn) {}
+          var hash = String(location.hash || "").replace(/^#/, "");
+          var viewingOther = hash.indexOf("tower-profile-") === 0;
+          if (!viewingOther) {
+            try { window.CognationTowerOpenOwn(); } catch (eOwn) {}
+          }
         }
         document.dispatchEvent(new CustomEvent("cognation:tab-change", { detail: { tab: name } }));
       } catch (e) {}

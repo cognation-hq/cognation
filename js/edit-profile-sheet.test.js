@@ -38,7 +38,9 @@ assert.ok(/\.is-sheet \{\s*max-height: 85vh !important;/.test(css), "sheet cappe
 assert.ok(/\.is-sheet \.tower-profile-edit-sheet-head \{\s*top: 0;/.test(css) && /position: sticky;/.test(css), "header pinned");
 assert.ok(/function mountPanelAsSheet\(\) \{\s*showScrim\(true\);/.test(fn) && /function returnPanelHome\(\) \{\s*showScrim\(false\);/.test(fn), "scrim follows open/close");
 assert.ok(/scrim\.addEventListener\("click", function \(\) \{\s*setOpen\(false\);/.test(fn), "tap scrim closes");
-var labelHide = tower.slice(tower.indexOf("function renderSocialLinks"), tower.indexOf("function renderSocialLinks") + 1200);
+var syncStart = tower.indexOf("function syncEditSocialFields");
+assert.ok(syncStart > 0, "syncEditSocialFields present");
+var labelHide = tower.slice(syncStart, syncStart + 1800);
 assert.ok(/formInput\.hidden = true;\s*if \(label\) label\.hidden = true;/.test(labelHide), "per-page networks hide label + input together");
 console.log("edit-profile-sheet.test.js: ok");
 assert.ok(/\.is-sheet \.tower-social-actions \{\s*grid-column: 1 \/ -1;\s*justify-self: stretch;\s*width: 100% !important;\s*justify-content: flex-start !important;/.test(css), "phone: Save profile aligns with the sheet\'s left padding");

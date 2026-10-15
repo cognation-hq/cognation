@@ -24,8 +24,12 @@ assert.ok(
   "Edit Profile has a visible Save profile submit button"
 );
 assert.ok(
-  /data-tower-social-links/.test(html) && /tower-sticker--social/.test(html),
-  "scrapbook keeps the social circle sticker shell"
+  /tower-sticker--social-chip/.test(tower) && /data-tower-social-chip/.test(tower),
+  "social links spawn as per-network chip widgets"
+);
+assert.ok(
+  /\.tower-sticker--social-chip/.test(css),
+  "chip sticker CSS present"
 );
 assert.ok(
   /\.tower-social-btn--youtube/.test(css) && /\.tower-social-btn--instagram/.test(css),

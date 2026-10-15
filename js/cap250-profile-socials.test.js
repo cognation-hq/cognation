@@ -30,13 +30,13 @@ assert.ok(/createElement\("img"\)/.test(tower) && /net\.logo/.test(tower), "logo
 assert.ok(/\.tower-social-btn\.is-logo/.test(css), "circular logo CSS present");
 assert.ok(/border-radius:\s*999px/.test(css), "logo buttons are circular");
 
-assert.ok(/data-tower-side-toggle[^>]*hidden|toggle\.hidden = true/.test(html + tower), "Connections|Public pill hidden");
+assert.ok(/toggle\.hidden = !owner;/.test(tower), "Private|Public switch restored, owner only");
 assert.ok(/data-tower-side-jump="public"/.test(html), "quiet jump to Public profile");
 assert.ok(/data-tower-side-jump="private"/.test(html), "quiet jump to Connections");
-assert.ok(/\[data-tower-side-toggle\]\s*\{\s*display:\s*none/.test(css), "pill forced off in CSS");
+assert.ok(!/\[data-tower-side-toggle\]\s*\{\s*display:\s*none/.test(css), "switch no longer forced off in CSS");
 
 assert.ok(/data-tower-followers-mutual/.test(html), "mutual followers line hook");
-assert.ok(/tower-followers-find[\s\S]*hidden/.test(html) || /input\.hidden = true/.test(tower), "Search followers removed/hidden");
+assert.ok(/input\.hidden = !searchOwner;/.test(tower), "Search followers restored, owner only");
 assert.ok(/formatMutualFollowersLine/.test(tower), "mutual followers formatter present");
 assert.ok(/seeds never on real PULSE|Seeds NEVER appear in a real person.s mutual line|Seed sandbox: seed mutuals only/i.test(tower), "seed exclusion documented in mutual line");
 assert.ok(/followerEdges/.test(tower), "follow edges carry face");

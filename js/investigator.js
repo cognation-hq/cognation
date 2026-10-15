@@ -51,8 +51,15 @@
       '<button type="button" class="btn btn-primary" data-inv-act="set_rating">Set rating</button>' +
       '<button type="button" class="btn" data-inv-act="restore">Restore</button>' +
       '<button type="button" class="btn" data-inv-act="dismiss">Dismiss</button>' +
+      (item.kind === "report"
+        ? '<button type="button" class="btn" data-inv-act="dismiss_groundless">Dismiss as groundless</button>'
+        : "") +
       (item.reason === "illegal_image"
-        ? '<button type="button" class="btn" data-inv-act="confirm_illegal">Confirm illegal (freeze)</button>'
+        ? '<button type="button" class="btn inv-btn-danger" data-inv-act="confirm_illegal">Confirm illegal (freeze)</button>'
+        : "") +
+      (item.reporter_user_id
+        ? '<span class="inv-meta">Filer <code data-inv-filer></code> · groundless(30d): ' +
+          esc(item.reporter_groundless_30d == null ? "—" : item.reporter_groundless_30d) + "</span>"
         : "") +
       "</div>";
     el.querySelectorAll("[data-inv-act]").forEach(function (btn) {
@@ -99,7 +106,10 @@
         }
         setStatus(list.length + " open item" + (list.length === 1 ? "" : "s") + ".");
         list.forEach(function (item) {
-          listEl.appendChild(renderItem(item));
+          var node = renderItem(item);
+          var filerEl = node.querySelector("[data-inv-filer]");
+          if (filerEl && item.reporter_user_id) filerEl.textContent = String(item.reporter_user_id);
+          listEl.appendChild(node);
         });
       });
   }

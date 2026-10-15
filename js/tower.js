@@ -1647,8 +1647,31 @@
     return floor && typeof floor.viewerIsUnder13 === "function" ? floor.viewerIsUnder13() : true;
   }
 
+  /* Auto-rate (js/auto-rate.js): the server rating wins; local/demo posts are
+     rated here. Posters never choose it. Fail closed if the rater is missing. */
+  function postRating(post) {
+    if (post && post.rating) return post.rating;
+    var ar = window.CognationAutoRate;
+    if (!ar || !post) return "NR";
+    return ar.rate(post.body || post.title || "", post.attachments || []).rating;
+  }
+  function ratingViewer() {
+    var age = null;
+    try {
+      var p = JSON.parse(localStorage.getItem("cognation.member.profile.v1") || "{}");
+      if (typeof p.age === "number" && isFinite(p.age)) age = p.age;
+    } catch (e) {}
+    /* Unknown age: treat as 13 (when in doubt, younger). MA opt-in lives server-side only. */
+    return { age: age == null ? 13 : age, matureOptIn: false };
+  }
+  function ratingVisible(post) {
+    var ar = window.CognationAutoRate;
+    return !!(ar && ar.canSee(postRating(post), ratingViewer()));
+  }
+
   function towerPostVisibleToViewer(post) {
-    return !viewerUnder13() || newsPostAppropriate(post);
+    if (post && post._remote) return (!viewerUnder13() || newsPostAppropriate(post)); /* server already gated by rating */
+    return ratingVisible(post) && (!viewerUnder13() || newsPostAppropriate(post));
   }
 
   function newsProfessionalPosts() {
@@ -1755,7 +1778,12 @@
         return copy;
       });
       var professional = newsProfessionalPosts();
-      return personal.concat(professional).filter(newsPostAppropriate).sort(function (a, b) {
+      return personal.concat(professional).map(function (post) {
+        post.rating = postRating(post); /* rating carries unchanged into SIGNAL and ECHO */
+        return post;
+      }).filter(function (post) {
+        return newsPostAppropriate(post) && (post._remote || ratingVisible(post));
+      }).sort(function (a, b) {
         var delta = newsReactionScore(b) - newsReactionScore(a);
         if (delta) return delta;
         return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
@@ -1833,6 +1861,10 @@
         body: body.slice(0, 2000),
         createdAt: new Date().toISOString(),
         attachments: (fields && fields.attachments) || [],
+        /* Rated once at post time; any rating in `fields` is ignored. */
+        rating: window.CognationAutoRate
+          ? window.CognationAutoRate.rate(body, (fields && fields.attachments) || []).rating
+          : "NR",
         likes: 0,
         handle: (window.CognationTowerProfileStore
           ? normalizeHandle(window.CognationTowerProfileStore.get().handle || "")

@@ -31,10 +31,10 @@ assert.ok(/escapeHtml\(mid\)/.test(src) && /escapeHtml\(uid\)/.test(src), "escap
 assert.ok(/seedBadgeForAuthor/.test(src), "Demo badge still on seed authors");
 assert.ok(/kind: "chat_room_message"/.test(src) || /kind: 'chat_room_message'/.test(src));
 
-/* Local-demo path unchanged (no liveRoom → no ⋯). */
+/* No local demo room (standing rule); ⋯ only in a live room. */
 assert.ok(/if \(!state\.liveRoom\) return ""/.test(src), "⋯ only in live room");
-assert.ok(/Enter room \(local demo\)/.test(src));
-assert.ok(/Local demo room — only you are here/.test(src));
+assert.ok(!/Enter room \(local demo\)|Local demo room — only you are here|opening local demo/.test(src), "no local demo copy");
+assert.ok(/function liveRoomUnavailable\(/.test(src) && !/function openDemoRoom\(/.test(src), "no demo fallback room");
 
 /* Own messages: no menu when author === me. */
 assert.ok(/uid === me/.test(src), "skip ⋯ on own messages");
@@ -73,3 +73,4 @@ assert.ok(!/Cap 250/.test(src));
 assert.ok(!/Cap 250/.test(reportsSql));
 
 console.log("chat-rooms-2c tests passed");
+assert.ok(!/function roomLog\(/.test(src) && !/Chatroom · local demo/.test(src), "no local room log or demo kicker");

@@ -25,3 +25,16 @@ assert.ok(/room_full/.test(sql), "cap enforced on join");
 assert.ok(/NOT auto-run/.test(sql), "Alexa must run SQL");
 assert.ok(/20261015_chat_rooms\.sql/.test("20261015_chat_rooms.sql"));
 console.log("chat-rooms-sql tests passed");
+
+/* 42P17 fix: membership via SECURITY DEFINER helper, no self-referencing policy. */
+(function () {
+  var fs2 = require("fs"), p2 = require("path"), a2 = require("assert");
+  var fix = fs2.readFileSync(p2.join(__dirname, "..", "supabase/migrations/20261016_chat_room_members_rls_fix.sql"), "utf8");
+  a2.ok(/create or replace function public\.is_chat_room_member\(p_room_id uuid\)[\s\S]*security definer[\s\S]*set search_path = public/.test(fix), "definer helper");
+  a2.ok(/m\.user_id = auth\.uid\(\)/.test(fix), "helper only checks the caller");
+  a2.ok(/revoke all on function public\.is_chat_room_member\(uuid\) from public, anon/.test(fix), "no anon execute");
+  var membersPolicy = fix.slice(fix.indexOf('create policy "chat room members readable'), fix.indexOf('drop policy if exists "chat room messages'));
+  a2.ok(/using \(public\.is_chat_room_member\(room_id\)\)/.test(membersPolicy) && !/from public\.chat_room_members/.test(membersPolicy), "members policy no longer queries itself");
+  a2.ok(/hidden_at is null/.test(fix) && /block_users_related/.test(fix) && /cognation_viewer_can_see\(rating\)/.test(fix), "messages policy keeps every rule");
+  console.log("chat-rooms-sql 42P17 fix tests passed");
+})();

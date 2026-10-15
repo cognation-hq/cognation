@@ -34,7 +34,6 @@
   var FADE_LEFT_THRESHOLD = 3;
   var OFF_INTEREST_FRIEND_RATIO = 6;
   var ROOMS_KEY = "cognation.commune.site-rooms.v1";
-  var ROOM_CHAT_KEY = "cognation.commune.room-chat.v1";
   var REQUESTS_KEY = "cognation.friend.requests.v1";
   var FRIEND_CAP = 6000;
 
@@ -1853,8 +1852,9 @@
           html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room</button>';
           html += '<p class="commune-card-meta">Live group chat — up to 12 people. Keep it kind.</p>';
         } else {
-          html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room (local demo)</button>';
-          html += '<p class="commune-card-meta">Local demo on this device — not a live group yet. Messages stay in this browser.</p>';
+          /* No local demo room (standing rule): live rooms only. */
+          html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room</button>';
+          html += '<p class="commune-card-meta">Live group chat — sign in to join (up to 12 people).</p>';
         }
       }
       if (card.type === TYPE.CLASSROOM) {
@@ -2027,6 +2027,9 @@
       ["room_not_found", "That room is not available right now."],
       ["bad_body", "Message must be 1–500 characters."],
       ["Sign in first", "Sign in to join the live room."],
+      /* chat_room_members RLS self-recursion until 20261016_chat_room_members_rls_fix.sql runs. */
+      ["42P17", "Live rooms are being fixed. Try again soon."],
+      ["infinite recursion", "Live rooms are being fixed. Try again soon."],
     ];
     var i;
     for (i = 0; i < codes.length; i++) {
@@ -2373,19 +2376,6 @@
     });
   }
 
-  function roomLog(roomId) {
-    var doc = readJson(localStorage, ROOM_CHAT_KEY, {});
-    if (!doc[roomId]) {
-      doc[roomId] = [{
-        id: "host-" + roomId,
-        senderName: "Cognation",
-        body: "Cognation hosts this room. Keep it kind.",
-        at: new Date().toISOString(),
-      }];
-      writeJson(localStorage, ROOM_CHAT_KEY, doc);
-    }
-    return doc;
-  }
   function paintRoom(room, opts) {
     opts = opts || {};
     var panel = state.shell.querySelector("[data-commune-room]");
@@ -2396,43 +2386,24 @@
     var kicker = panel.querySelector(".commune-card-kicker");
     if (title) title.textContent = room.title || "Room";
     if (topic) topic.textContent = room.body || room.topic || "";
-    if (kicker) {
-      kicker.textContent = opts.live
-        ? "Chatroom · live · hosted by Cognation"
-        : "Chatroom · local demo · hosted by Cognation";
-    }
-    if (log) {
-      if (opts.live) {
-        paintLiveLog(opts.messages || state.liveMessages || []);
-      } else {
-        log.innerHTML = "";
-        var doc = roomLog(room.id);
-        (doc[room.id] || []).forEach(function (msg) {
-          var p = document.createElement("p");
-          p.className = "commune-room-line";
-          p.textContent = (msg.senderName || "Cognation") + ": " + (msg.body || "");
-          log.appendChild(p);
-        });
-      }
-    }
+    /* Live rooms only (no local demo room). */
+    if (kicker) kicker.textContent = "Chatroom · live · hosted by Cognation";
+    if (log) paintLiveLog(opts.messages || state.liveMessages || []);
     showRoom(true);
     state.roomId = room.id;
     state.liveRoom = !!opts.live;
     state.roomSqlId = opts.live ? String(room.sqlId || opts.sqlId || "") : "";
     if (opts.live && opts.messages) state.liveMessages = opts.messages;
   }
-  function openDemoRoom(room, scroll) {
-    closeClassroom();
-    paintRoom(room, { live: false });
-    setStatus("Local demo room — only you are here. Live group chat comes later.");
-    friction("begin", "chat", "chatroom:" + room.id);
-    if (scroll && state.shell && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
-    return true;
+  /* No local demo fallback: if the live room can't open, say so and stay on the deck. */
+  function liveRoomUnavailable(message) {
+    setStatus(message || "Live rooms aren't available right now. Try again soon.");
+    return false;
   }
 
   function openLiveRoom(room, scroll) {
     var sqlId = String(room.sqlId || "");
-    if (!sqlId) return Promise.resolve(openDemoRoom(room, scroll));
+    if (!sqlId) return Promise.resolve(liveRoomUnavailable("This room isn't live yet."));
     setStatus("Joining live room…");
     closeClassroom();
     return joinLiveRoom(sqlId).then(function () {
@@ -2445,8 +2416,7 @@
       });
     }).catch(function (err) {
       if (isChatSchemaMissing(err) || state.chatSchema === "missing") {
-        setStatus("Live rooms aren't ready yet — opening local demo.");
-        return openDemoRoom(room, scroll);
+        return liveRoomUnavailable("Live rooms aren't ready yet. Try again soon.");
       }
       var mapped = mapChatRoomError(err);
       setStatus(mapped.message);
@@ -2479,7 +2449,7 @@
       openLiveRoom(room, scroll);
       return true;
     }
-    return openDemoRoom(room, scroll);
+    return liveRoomUnavailable(supabaseLiveSession() ? "Live rooms aren't ready yet. Try again soon." : "Sign in to join live rooms.");
   }
   function clearPointer() {
     var el = state.pointer && state.pointer.el;
@@ -3217,19 +3187,9 @@
           });
           return;
         }
-        var doc = roomLog(state.roomId);
-        doc[state.roomId].push({
-          id: "m" + Date.now().toString(36),
-          senderName: "You",
-          body: body,
-          at: new Date().toISOString(),
-        });
-        writeJson(localStorage, ROOM_CHAT_KEY, doc);
-        if (input) input.value = "";
-        friction("complete", "chat");
-        /* Demo path: return to the deck after send so the card stays swipeable. */
+        /* No local-only messages: only a live room can send. Release the room so the deck swipes. */
         releaseRoomSurface();
-        setStatus("Sent. Swipe when you are ready.");
+        setStatus("This room isn't live — message not sent.");
       });
     }
     var deck = shell.querySelector("[data-commune-deck]");

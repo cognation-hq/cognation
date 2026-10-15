@@ -837,6 +837,13 @@
      the spawn layout. The last drop on this profile wins over both. */
   function mergeScrapbookLayout(p) {
     if (!p) return p;
+    mergeLocalScrapbookLayout(p);
+    /* DB layout (tower_widget_layouts) wins when a row exists. */
+    if (window.CognationTowerLayoutSync) window.CognationTowerLayoutSync.apply(p);
+    return p;
+  }
+
+  function mergeLocalScrapbookLayout(p) {
     var saved = readSavedScrapbook(p);
     if (!saved || typeof saved !== "object") return p;
     if (saved.widgetLayout && typeof saved.widgetLayout === "object") {
@@ -1426,6 +1433,7 @@
       this._saving = true;
       try {
       writeScrapbookLayout(data);
+      if (window.CognationTowerLayoutSync) window.CognationTowerLayoutSync.save(data);
       var id = data._profileId || resolveActiveProfileId();
       /* A drop only changes x/y. Never PATCH the profile: that reload paints
          the remote row, which has no sticker coordinates, and the widget

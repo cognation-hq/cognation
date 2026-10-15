@@ -34,9 +34,11 @@ assert.ok(/\.circle-ring\s*\{[^}]*z-index:\s*2/.test(css), "halo in front");
 assert.ok(/\.pulse-fall-stack\s*\{[^}]*z-index:\s*1/.test(css), "friends behind");
 
 /* Tower widgets */
-["avatar", "identity", "slogan", "social", "music", "youtube", "badges", "friends", "calendar", "followers", "polaroid", "html", "instax"].forEach(function (w) {
+["avatar", "identity", "slogan", "music", "youtube", "badges", "friends", "calendar", "followers", "polaroid", "html", "instax"].forEach(function (w) {
   assert.ok(html.indexOf('data-tower-widget="' + w + '"') > 0, "Tower widget " + w);
 });
+assert.ok(html.indexOf('data-tower-widget="social"') < 0, "no grouped LINKS/social sticker in HTML");
+assert.ok(/socialWidgetId|data-tower-social-chip|__socials__/.test(tower), "per-network social widgets");
 
 /* News comments + Report, Feed comments */
 var news = src("js/news-comments.js");
@@ -205,8 +207,8 @@ function ownerDrag(t, env, id, dxPct, dyPct, p) {
 }
 
 var PAGES = {
-  personal: ["avatar", "identity", "slogan", "music", "friends", "social", "badges", "calendar", "polaroid", "html", "instax"],
-  professional: ["avatar", "identity", "slogan", "youtube", "social", "badges", "followers", "calendar", "html"],
+  personal: ["avatar", "identity", "slogan", "music", "friends", "social-instagram", "badges", "calendar", "polaroid", "html", "instax"],
+  professional: ["avatar", "identity", "slogan", "youtube", "social-instagram", "badges", "followers", "calendar", "html"],
 };
 Object.keys(PAGES).forEach(function (kind) {
   var t = load();
@@ -274,10 +276,23 @@ vm.runInContext([
 
 /* Default spawn never overlaps, Personal and Pro, desktop and phone. */
 var SIZES = { avatar: [220, 220], identity: [400, 90], slogan: [400, 70], music: [300, 380], youtube: [560, 340],
-  friends: [440, 200], social: [300, 120], badges: [300, 160], calendar: [300, 260], followers: [300, 240],
+  friends: [440, 200], "social-instagram": [160, 48], "social-tiktok": [160, 48], badges: [300, 160], calendar: [300, 260], followers: [300, 240],
   polaroid: [280, 320], html: [420, 200], instax: [220, 280] };
+function expandRows(face) {
+  var chips = face === "professional" ? ["social-instagram", "social-tiktok"] : ["social-instagram", "social-tiktok"];
+  var out = [];
+  ctx.SPAWN_ROWS[face].forEach(function (row) {
+    if (row.length === 1 && row[0] === "__socials__") {
+      var i;
+      for (i = 0; i < chips.length; i += 2) out.push(chips.slice(i, i + 2));
+      return;
+    }
+    out.push(row.slice());
+  });
+  return out;
+}
 function noOverlap(face, stageW, phone) {
-  var rows = ctx.SPAWN_ROWS[face], sizes = {};
+  var rows = expandRows(face), sizes = {};
   rows.forEach(function (r) { r.forEach(function (id) { sizes[id] = { w: SIZES[id][0], h: SIZES[id][1] }; }); });
   var out = ctx.packSpawn(rows, sizes, [], stageW, phone);
   var colW = out.__colW, rects = [];
@@ -412,6 +427,167 @@ assert.ok(/a\.target = "_blank";\s*a\.rel = "noopener noreferrer";/.test(tower),
   assert.ok(/var schedulerHtml = view\.schedulerOpen\s*\? renderSchedulerPanel\(owner \? shared : events, selected, \{\s*visitor: !owner,\s*picked: owner \? "" :/.test(tower), "owner gets full scheduler, never Book");
   assert.ok(!/data-tower-cal-book=/.test(ctx.renderSchedulerPanel([], "2026-10-20", { visitor: false, picked: "09:00" })), "owner never sees Book");
   assert.ok(/create or replace function public\.request_hangout/.test(src("supabase/migrations/20261016_hangout_requests.sql")), "request_hangout migration");
+})();
+
+
+/* ---- #131 live fails + LOOK v3.2/v3.3 density (tabs, handle, Pro server, strip) ---- */
+(function () {
+  var assert = require("assert");
+  var fs = require("fs");
+  var path = require("path");
+  var tabs = fs.readFileSync(path.join(__dirname, "tabs.js"), "utf8");
+  var tower = fs.readFileSync(path.join(__dirname, "tower.js"), "utf8");
+  var css = fs.readFileSync(path.join(__dirname, "..", "css", "styles.css"), "utf8");
+  var layoutSync = fs.readFileSync(path.join(__dirname, "tower-layout-sync.js"), "utf8");
+  var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+
+  /* Friend tap-through / visitor Tower: do not OpenOwn while a profile hash is open. */
+  assert.ok(/viewingOther = hash\.indexOf\("tower-profile-"\) === 0/.test(tabs), "tabs skip OpenOwn when viewing a profile");
+  assert.ok(/if \(!viewingOther\)/.test(tabs) && /CognationTowerOpenOwn/.test(tabs), "OpenOwn only when no profile viewed");
+
+  /* Drag handle visible for owner on Public. */
+  assert.ok(/display: flex !important/.test(css) && /\.tower-sticker-handle/.test(css), "handle shown for owner");
+  assert.ok(!/\.tower-sticker-handle,\s*\[data-tower-app\]\[data-tower-is-owner="true"\]\[data-tower-side="public"\] \.tower-sticker-handle,\s*\[data-tower-app\]\[data-tower-is-owner="true"\]\[data-tower-side="public"\] \.tower-sticker-handle\[hidden\] \{\s*display: none !important/.test(css), "old hide-all-handles rule gone");
+  assert.ok(/h\.hidden = !show;/.test(tower), "syncOwnerStickerHandles unhides for owner");
+
+  /* Pro YouTube + Venmo/Pay/Buy ads persist on server (layout._public), not local only. */
+  assert.ok(/function savePublic\(/.test(layoutSync) && /_public/.test(layoutSync), "layout sync savePublic");
+  assert.ok(/CognationTowerLayoutSync\.savePublic/.test(tower), "Tower calls savePublic on social/YouTube save");
+  assert.ok(/Empty local must not wipe server _public links/.test(tower), "empty localStorage does not clear server socials");
+
+  /* v3.2/v3.3 density: profile strip ~72–88px, YouTube band ~96–112px, quote under handle. */
+  assert.ok(/data-tower-profile-strip/.test(tower) && /ensureProfileStrip/.test(tower), "profile strip wrapper");
+  assert.ok(/max-height:\s*88px/.test(css) && /min-height:\s*72px/.test(css), "profile strip height band");
+  assert.ok(/max-height:\s*112px/.test(css) && /max-height:\s*96px/.test(css), "YouTube thumb band");
+  assert.ok(/tower-profile-strip-quote/.test(css) && /content: none !important/.test(css), "quote under handle, no divider");
+  assert.ok(/__socials__/.test(tower) && /socialWidgetId/.test(tower), "SPAWN_ROWS expands per-link social chips");
+  assert.ok(!/\["friends", "social"\]/.test(tower) && !/\["social", "badges"\]/.test(tower), "grouped social spawn slots removed");
+
+  /* Behavioral: server public round-trip. */
+  var sync = require("./tower-layout-sync.js");
+  var pub = sync._cleanPublic({
+    musicUrl: "https://youtube.com/watch?v=abcdefghijk",
+    socialLinks: { venmo: "@lex", services: "https://pay.example/x", ads: "https://ads.example/y", instagram: "https://instagram.com/lex" },
+  });
+  assert.strictEqual(pub.musicUrl.indexOf("youtube.com") > 0, true, "YouTube URL kept");
+  assert.ok(pub.socialLinks.venmo && pub.socialLinks.services && pub.socialLinks.ads && pub.socialLinks.instagram, "Venmo/Pay/Buy ads/IG in _public");
+  var profile = { _profileId: "22222222-2222-4222-8222-222222222222", socialLinks: {}, musicUrl: "" };
+  sync._cache[profile._profileId] = { _public: pub, avatar: { x: 2, y: 3, z: 1, tilt: 0, dragged: true } };
+  sync._publicCache[profile._profileId] = pub;
+  sync.apply(profile);
+  assert.ok(profile.musicUrl.indexOf("youtube") > 0, "fresh apply loads YouTube from server");
+  assert.strictEqual(profile.socialLinks.venmo, "@lex", "fresh apply loads Venmo from server");
+  assert.ok(profile.widgetLayout.avatar.dragged === true, "dragged preserved through apply");
+})();
+
+
+
+/* ---- v3.3 split links: each social is its own widget ---- */
+(function () {
+  var assert = require("assert");
+  var fs = require("fs");
+  var path = require("path");
+  var vm = require("vm");
+  var tower = fs.readFileSync(path.join(__dirname, "tower.js"), "utf8");
+  var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  var css = fs.readFileSync(path.join(__dirname, "..", "css", "styles.css"), "utf8");
+
+  assert.ok(html.indexOf('data-tower-widget="social"') < 0, "HTML has no grouped social box");
+  assert.ok(/data-tower-social-chip/.test(tower), "chips carry data-tower-social-chip");
+  assert.ok(/data-tower-social-remove/.test(tower), "each chip has its own remove");
+  assert.ok(/tower-sticker--social-chip/.test(css), "chip CSS present");
+  assert.ok(/migrateGroupedSocialLayout/.test(tower), "old grouped layout.social maps to first chip");
+
+  var start = tower.indexOf("function optedInSocialNetIds");
+  var end = tower.indexOf("function expandSpawnRows");
+  assert.ok(start > 0 && end > start, "optedInSocialNetIds present");
+  var ctx = vm.createContext({
+    socialLinkDefs: function () {
+      return [
+        { id: "instagram", label: "Instagram" },
+        { id: "tiktok", label: "TikTok" },
+        { id: "venmo", label: "Venmo" },
+        { id: "x", label: "X" },
+      ];
+    },
+    socialNetAllowedForKind: function () { return true; },
+    socialHref: function (id, raw) { return raw ? "https://example/" + id : ""; },
+    socialWidgetId: function (id) { return "social-" + id; },
+  });
+  vm.runInContext(tower.slice(start, end) + "\nthis.optedIn = optedInSocialNetIds;", ctx);
+  var ids = ctx.optedIn({
+    socialLinks: { instagram: "https://instagram.com/a", tiktok: "", venmo: "@v", x: "https://x.com/a" },
+    publicWidgets: { "social-x": false },
+    _profileKind: "personal",
+  });
+  assert.deepStrictEqual(Array.prototype.slice.call(ids), ["instagram", "venmo"], "unset tiktok omitted; hidden x omitted; IG+Venmo remain");
+})();
+
+/* ---- Social save keeps session + layout (Alexa: save must not sign out / reset) ---- */
+(function () {
+  var assert = require("assert");
+  var fs = require("fs");
+  var path = require("path");
+  var tower = fs.readFileSync(path.join(__dirname, "tower.js"), "utf8");
+  var social = fs.readFileSync(path.join(__dirname, "supabase-social.js"), "utf8");
+  var layoutSync = fs.readFileSync(path.join(__dirname, "tower-layout-sync.js"), "utf8");
+  var commune = fs.readFileSync(path.join(__dirname, "commune-swipe.js"), "utf8");
+  var dating = fs.readFileSync(path.join(__dirname, "seedops-dating-hydrate.js"), "utf8");
+
+  /* Cause: refreshFriends used to store handles as friendIds and save with geometry:true. */
+  assert.ok(
+    /p\.handle \|\| p\.id/.test(social) === false ||
+      /Friend ids must be profile UUIDs[\s\S]*?\.map\(function \(p\) \{\s*return String\(\(p && p\.id\) \|\| ""\);/.test(social),
+    "refreshFriends stores profile UUIDs, not handles"
+  );
+  assert.ok(
+    /tower\.friendIds = ids\.slice\(\);\s*\/\* Friend roster only[\s\S]*?store\.save\(tower\);/.test(social) ||
+      /tower\.friendIds = ids\.slice\(\);\s*store\.save\(tower\);/.test(social),
+    "friend hydrate saves without geometry:true"
+  );
+  assert.ok(!/tower\.friendIds = ids\.slice\(\);\s*store\.save\(tower,\s*\{\s*geometry:\s*true\s*\}\)/.test(social), "friend hydrate must not POST layout");
+
+  /* dragged survives DB clean/apply so reload keeps arranged positions. */
+  assert.ok(/if \(pos\.dragged === true\) entry\.dragged = true;/.test(layoutSync), "layout sync clean keeps dragged");
+  assert.ok(/prev\.dragged === true && next && next\.dragged !== true/.test(layoutSync), "layout apply preserves local dragged");
+
+  /* Profile/social save never overwrites saved layout. */
+  assert.ok(/writeScrapbookLayout\(data, \{ keepLayout: !opts\.geometry \}\)/.test(tower), "non-geometry save keeps scrapbook layout");
+  assert.ok(/opts\.keepLayout/.test(tower), "writeScrapbookLayout supports keepLayout");
+
+  /* Save profile re-paints in place — no location.reload that re-boots auth. */
+  assert.ok(/setProfileStatus\("Profile saved\."/.test(tower), "save status without refreshing…");
+  assert.ok(!/Profile saved — refreshing…/.test(tower), "old reload toast gone");
+  var saveAt = tower.indexOf('profileForm.addEventListener("submit"');
+  assert.ok(saveAt > 0, "Save profile submit handler present");
+  var saveSubmit = tower.slice(saveAt, saveAt + 9000);
+  assert.ok(!/window\.location\.reload\(\)/.test(saveSubmit), "Save profile does not location.reload");
+  assert.ok(/renderProfileChrome\(root\)/.test(saveSubmit) && /applyWidgetLayout\(root/.test(saveSubmit), "Save profile re-paints Tower in place");
+
+  /* Social / profile save path never calls updateUser (dating metadata). */
+  assert.ok(!/updateUser/.test(tower.slice(tower.indexOf("function commitSocialDraft"), tower.indexOf("function commitSocialDraft") + 800)), "commitSocialDraft never updateUser");
+  assert.ok(!/updateUser/.test(saveSubmit), "Save profile never updateUser");
+  assert.ok(/Do not PUT \/auth\/v1\/user from hydrate/.test(dating), "hydrate boot does not PUT auth user");
+
+  /* Handles must not be queried as profile UUIDs. */
+  assert.ok(/Handles \(seed-ana-0005\) are not profile ids/.test(commune) || /!UUID_RE\.test\(s\)\) return;/.test(commune), "warmProfileSeedStatuses skips non-UUIDs");
+
+  /* Behavioral: arrange → save social → "reload" keeps positions + session. */
+  var vm = require("vm");
+  var syncApi = require("./tower-layout-sync.js");
+  var layout = {
+    avatar: { x: 10, y: 12, z: 2, tilt: 0, dragged: true },
+    calendar: { x: 55, y: 40, z: 3, tilt: 0 },
+  };
+  var cleaned = syncApi._clean(layout);
+  assert.strictEqual(cleaned.avatar.dragged, true, "clean keeps dragged on arranged widget");
+  assert.ok(!cleaned.calendar.dragged, "clean omits dragged when unset");
+  var profile = { _profileId: "11111111-1111-4111-8111-111111111111", widgetLayout: { avatar: { x: 10, y: 12, z: 2, tilt: 0, dragged: true } } };
+  syncApi._cache[profile._profileId] = cleaned;
+  syncApi.apply(profile);
+  assert.strictEqual(profile.widgetLayout.avatar.dragged, true, "apply after 'reload' keeps dragged");
+  assert.strictEqual(profile.widgetLayout.avatar.x, 10, "apply after 'reload' keeps x");
+  assert.strictEqual(profile.widgetLayout.calendar.x, 55, "apply brings companion spots");
 })();
 
 console.log("still-here.test.js: OK");

@@ -108,9 +108,10 @@
     var c = sb();
     var s = window.CognationAuth && window.CognationAuth.getSession && window.CognationAuth.getSession();
     if (!c || !s || s.source !== "supabase") return;
+    /* Missing RPC (404 PGRST202) is noise — never treat as auth failure. */
     c.rpc("am_i_cognation_admin", {}).then(function (yes) {
       if (yes === true) addEntry();
-    }, function () {});
+    }, function () { /* 404 / 401: stay quiet */ });
   }
 
   window.CognationSeedPreview = { open: open, close: close, FLEET_ID: FLEET_ID };

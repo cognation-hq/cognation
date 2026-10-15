@@ -11380,6 +11380,80 @@
     }
   }
 
+  /* PULSE ring balls: friend photo circles on the halo ring in mirrored pairs.
+     Math lives in js/pulse-ring.js; tap opens THAT friend's Tower. */
+  function paintPulseBalls(layer, friends) {
+    var ringApi = window.CognationPulseRing;
+    if (!layer || !ringApi) return;
+    var old = layer.querySelector("[data-pulse-balls]");
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    var slots = ringApi.assignSpots(friends);
+    var ring = layer.querySelector("[data-circle-ring]");
+    if (ring) {
+      if (slots.length) ring.setAttribute("data-pulse-has-balls", "1");
+      else ring.removeAttribute("data-pulse-has-balls");
+    }
+    if (!slots.length) return;
+    var host = document.createElement("div");
+    host.className = "pulse-balls";
+    host.setAttribute("data-pulse-balls", String(slots.length));
+    slots.forEach(function (slot, i) {
+      var friend = slot.friend;
+      var ball = document.createElement("a");
+      ball.className = "pulse-ball";
+      ball.setAttribute("data-pulse-ball", friend.userId || "");
+      ball.setAttribute("data-pulse-start", String(slot.start));
+      ball.setAttribute("data-pulse-pair", String(slot.pair));
+      var openKey = friend.handle || friend.profileId || "";
+      ball.setAttribute("data-friend-handle", openKey);
+      ball.href = openKey ? "#tower-profile-" + openKey : "#";
+      ball.setAttribute("aria-label", "Open " + (friend.name || "friend") + " Tower");
+      var face = document.createElement("span");
+      face.className = "pulse-ball-photo";
+      face.setAttribute("aria-hidden", "true");
+      paintFriendPicture(face, { id: friend.handle || friend.userId, name: friend.name }, i);
+      var photo = window.CognationProfilePhoto;
+      if (friend.photoUrl && photo && typeof photo.applyPhoto === "function") photo.applyPhoto(face, friend.photoUrl);
+      var name = document.createElement("span");
+      name.className = "pulse-ball-name";
+      name.textContent = String(friend.name || "").trim();
+      ball.appendChild(face);
+      ball.appendChild(name);
+      ball.addEventListener("click", function (ev) {
+        if (ev && ev.preventDefault) ev.preventDefault();
+        if (!openKey) return;
+        if (window.CognationTowerOpenProfile) {
+          try { window.CognationTowerOpenProfile(openKey); } catch (eOpen) {}
+        }
+        try { stopCircleFall(); } catch (eStop) {}
+      });
+      host.appendChild(ball);
+    });
+    layer.appendChild(host);
+    if (circleFallState) circleFallState.ballsStarted = performance.now();
+    placePulseBalls();
+  }
+
+  function placePulseBalls() {
+    var ringApi = window.CognationPulseRing;
+    if (!ringApi || !circleFallState) return;
+    var balls = document.querySelectorAll("[data-pulse-balls] [data-pulse-ball]");
+    if (!balls.length) return;
+    var reduced = ringApi.prefersReducedMotion(window);
+    var t = performance.now() - (circleFallState.ballsStarted || circleFallState.ringStarted || 0);
+    for (var i = 0; i < balls.length; i++) {
+      var start = parseInt(balls[i].getAttribute("data-pulse-start"), 10) || 0;
+      var b = ringApi.ballAt(start, t, reduced);
+      var pos = circleProject(b.angle);
+      balls[i].style.transform =
+        "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + (pos.y - b.lift).toFixed(1) + "px) scale(" + pos.s.toFixed(3) + ")";
+      balls[i].style.zIndex = String(Math.round(pos.s * 100));
+      balls[i].style.opacity = String(b.opacity.toFixed(3));
+      balls[i].classList.toggle("is-named", !!b.showName);
+      balls[i].classList.toggle("is-front", !!b.front);
+    }
+  }
+
   function fillCircleSpots(people) {
     var layer = document.querySelector("[data-circle-fall]");
     if (!layer) return;
@@ -11510,6 +11584,7 @@
       var st = circleFallState;
       if (!st || !st.shellOnly) return;
       placeCircleSpots();
+      placePulseBalls();
       st.raf = requestAnimationFrame(frameShell);
     }
     circleFallState.raf = requestAnimationFrame(frameShell);
@@ -11520,7 +11595,7 @@
     /* PULSE falling friends restored (removed by #49 early return). Every
        server friend's Tower circle falls BEHIND the halo ring; tap opens Tower. */
     if (window.CognationPulseFall && typeof window.CognationPulseFall.mount === "function") {
-      window.CognationPulseFall.mount(layer, {
+      var pulseMount = window.CognationPulseFall.mount(layer, {
         paint: function (el, friend, i) {
           paintFriendPicture(el, { id: friend.handle || friend.userId, name: friend.name }, i);
         },
@@ -11534,6 +11609,12 @@
           try { stopCircleFall(); } catch (eStop) {}
         }
       });
+      /* Same server friends ride the halo ring as mirrored-pair balls. */
+      if (pulseMount && typeof pulseMount.then === "function") {
+        pulseMount.then(function (friends) {
+          if (circleFallState && layer.parentNode) paintPulseBalls(layer, friends || []);
+        }, function () {});
+      }
     }
     return;
 
@@ -11743,6 +11824,13 @@
     var hash = "tower-profile-" + handle;
     if (String(location.hash || "") !== "#" + hash) {
       try { location.hash = hash; } catch (e) {}
+    }
+    /* Show the Tower tab now. The hash is already the friend's, so tabs.js
+       skips OpenOwn and the friend's Tower stays open (PULSE tap, re-tap of the
+       same friend with no hashchange, People → Open). */
+    var towerTab = document.getElementById("tab-tower");
+    if (towerTab && towerTab.getAttribute("aria-selected") !== "true" && typeof towerTab.click === "function") {
+      try { towerTab.click(); } catch (eTab) {}
     }
     document.querySelectorAll("[data-tower-app]").forEach(function (root) {
       applyTowerSide(root, "public");

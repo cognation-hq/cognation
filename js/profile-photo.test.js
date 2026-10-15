@@ -53,14 +53,23 @@ photo.saveOwnPhoto(client, me, "https://cdn.example.com/me.jpg").then(function (
       return Promise.resolve(profiles.map(function (p) { var c = Object.assign({}, p); if (!sqlRun) delete c.photo_url; return c; }));
     } };
   }
+  /* Off by default (no 42703 400 before the SQL runs); on once Alexa runs it. */
+  assert.strictEqual(pulse.photoColumnLive, false, "photo_url read off by default");
+  pulse.setPhotoColumnLive(true);
   return pulse.loadFriends(server(true), me).then(function (list) {
     assert.strictEqual(list[0].photoUrl, "https://cdn.example.com/ada.jpg");
     assert.strictEqual(list[1].photoUrl, "");
-    assert.ok(/photo_url/.test(selects[0]), "asks for photo_url");
+    assert.ok(/photo_url/.test(selects[0]), "asks for photo_url when switched on");
     return pulse.loadFriends(server(false), me);
   }).then(function (list) {
-    assert.strictEqual(list.length, 2, "PULSE still loads before the SQL runs");
+    assert.strictEqual(list.length, 2, "PULSE still loads if the SQL is missing (fallback)");
     assert.strictEqual(list[0].photoUrl, "");
+    pulse.setPhotoColumnLive(false);
+    selects.length = 0;
+    return pulse.loadFriends(server(false), me);
+  }).then(function (list) {
+    assert.strictEqual(list.length, 2, "PULSE loads with the column off");
+    assert.ok(selects.length && selects.every(function (q) { return !/photo_url/.test(q); }), "no photo_url asked while off");
     return list;
   });
 }).then(function () {

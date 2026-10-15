@@ -13502,3 +13502,66 @@ svg.circle-bolt {
 .tower-layout--scrapbook [data-tower-widget="social"]:not([data-tower-social-chip]) {
   display: none !important;
 }
+
+/* PULSE ring balls (Alexa 2026-10-15): friend photo circles on the halo ring in
+   mirrored pairs. In front of the halo (z3) so taps reach them; the container
+   ignores taps, each ball takes them. Name shows under the photo at the front. */
+.pulse-balls {
+  position: absolute;
+  left: 50%;
+  top: 48%;
+  width: 0;
+  height: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+a.pulse-ball {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  text-decoration: none;
+  pointer-events: auto;
+  will-change: transform, opacity;
+}
+.pulse-ball-photo {
+  width: 4.4rem;
+  height: 4.4rem;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 18px rgba(8, 12, 32, 0.28), 0 0 22px rgba(197, 166, 255, 0.32);
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #f7fbff;
+  font-weight: 700;
+  font-size: 1.3rem;
+}
+.pulse-ball-name {
+  max-width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #f7fbff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-shadow: 0 2px 10px rgba(6, 10, 30, 0.75);
+  visibility: hidden;
+}
+a.pulse-ball.is-named .pulse-ball-name {
+  visibility: visible;
+}
+/* Balls replace the five empty halo spots while friends are on the ring. */
+.circle-ring[data-pulse-has-balls] .circle-spot.is-empty {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  a.pulse-ball { transition: none; animation: none; }
+  a.pulse-ball .pulse-ball-name { visibility: visible; }
+}

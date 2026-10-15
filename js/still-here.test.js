@@ -590,4 +590,38 @@ assert.ok(/a\.target = "_blank";\s*a\.rel = "noopener noreferrer";/.test(tower),
   assert.strictEqual(profile.widgetLayout.calendar.x, 55, "apply brings companion spots");
 })();
 
+
+/* ---- PULSE ring balls + friend tap-through + no 42703 (PULSE restore) ---- */
+(function () {
+  var assert = require("assert");
+  var fs = require("fs");
+  var path = require("path");
+  var tower = fs.readFileSync(path.join(__dirname, "tower.js"), "utf8");
+  var tabs = fs.readFileSync(path.join(__dirname, "tabs.js"), "utf8");
+  var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  var css = fs.readFileSync(path.join(__dirname, "..", "css", "styles.css"), "utf8");
+  var fallSrc = fs.readFileSync(path.join(__dirname, "pulse-falling-friends.js"), "utf8");
+  /* Locks kept: halo, bolt, falling friends up to 6,000, friend list underneath. */
+  assert.ok(/function paintCircleBolt\(/.test(tower) && /paintCircleBolt\(ring\)/.test(tower), "bolt kept");
+  assert.ok(/CIRCLE_SPOTS\s*=\s*\[/.test(tower) && /\.circle-ring\s*\{/.test(css), "halo kept");
+  assert.ok(/var PULSE_FALL_CAP = 6000;/.test(fallSrc), "6,000 falling friends cap kept");
+  assert.ok(/CognationCircleRelations\.mount\(circlePage\)/.test(tower), "friend list under the pictures kept");
+  /* Ring balls loaded and painted from the same server friends. */
+  assert.ok(html.indexOf('src="js/pulse-ring.js"') > 0 && html.indexOf('src="js/pulse-ring.js"') < html.indexOf('src="js/tower.js"'), "pulse-ring.js loads before tower.js");
+  assert.ok(/pulseMount\.then\(function \(friends\)[\s\S]{0,120}paintPulseBalls\(layer, friends/.test(tower), "balls from server friends");
+  assert.ok(!/localStorage/.test(fs.readFileSync(path.join(__dirname, "pulse-ring.js"), "utf8")), "no local stubs in ring");
+  /* Tap-through: tabs skip OpenOwn on a profile hash; OpenProfile shows Tower itself. */
+  assert.ok(/if \(!viewingOther\)/.test(tabs), "tabs never OpenOwn over a friend hash");
+  assert.ok(/CognationTowerOpenProfile = function[\s\S]{0,900}towerTab\.click\(\)/.test(tower), "OpenProfile shows the Tower tab");
+  /* No photo_url in the profiles read until its SQL runs (live 400 42703). */
+  var pf = require("./pulse-falling-friends.js");
+  var queries = [];
+  var client = { rest: function (t, o) { queries.push(t + "?" + o.query); return Promise.resolve([]); } };
+  return pf.loadFriends(client, "11111111-1111-4111-8111-111111111111").then(function () {
+    var prof = queries.filter(function (q) { return q.indexOf("profiles?") === 0; });
+    assert.ok(prof.length >= 1, "profiles read happens");
+    prof.forEach(function (q) { assert.ok(!/photo_url/.test(q), "no photo_url column requested"); });
+  });
+})();
+
 console.log("still-here.test.js: OK");

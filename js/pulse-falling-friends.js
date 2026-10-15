@@ -30,10 +30,12 @@
       : [];
     var handles = {};
     var photos = {};
+    var pids = {};
     (profiles || []).forEach(function (p) {
       if (!p || !p.user_id) return;
       var uid = String(p.user_id);
       if (p.handle && (!handles[uid] || p.kind === "personal")) handles[uid] = String(p.handle);
+      if (safeId(p.id) && (!pids[uid] || p.kind === "personal")) pids[uid] = String(p.id);
       if (p.photo_url && (!photos[uid] || p.kind === "personal")) photos[uid] = String(p.photo_url);
     });
     var out = [];
@@ -48,6 +50,7 @@
         userId: friend.userId,
         name: friend.name,
         handle: handles[friend.userId] || "",
+        profileId: pids[friend.userId] || "",
         badge: friend.badge || "",
         photoUrl: photos[friend.userId] || "",
       });
@@ -72,10 +75,16 @@
   }
 
   var BASE_COLS = "id,user_id,kind,handle,display_name,account_kind";
+  /* profiles.photo_url only exists after Alexa runs
+     supabase/migrations/20261016_profiles_photo_url.sql. Asking for it before
+     then was the live GET /rest/v1/profiles 400 (42703 undefined column) on
+     every PULSE open. Off until that SQL is confirmed run; letter circles meanwhile. */
+  var PHOTO_COLUMN_LIVE = false;
 
   function fetchProfiles(client, userIds, withPhoto) {
     var chunks = [];
     for (var i = 0; i < userIds.length; i += 100) chunks.push(userIds.slice(i, i + 100));
+    if (withPhoto === undefined) withPhoto = PHOTO_COLUMN_LIVE;
     var cols = withPhoto === false ? BASE_COLS : BASE_COLS + ",photo_url";
     return Promise.all(chunks.map(function (ids) {
       return client.rest("profiles", {
@@ -175,7 +184,8 @@
       el.className = "circle-fall-portrait pulse-fall-circle";
       el.setAttribute("data-circle-fall-portrait", friend.userId);
       el.setAttribute("data-friend-handle", friend.handle || "");
-      el.href = friend.handle ? "#tower-profile-" + friend.handle : "#";
+      var openKey = friend.handle || friend.profileId || "";
+      el.href = openKey ? "#tower-profile-" + openKey : "#";
       el.setAttribute("aria-label", "Open " + friend.name + " Tower");
       el.style.width = L.size + "px";
       el.style.height = L.size + "px";
@@ -194,7 +204,7 @@
       if (friend.photoUrl && photo && typeof photo.applyPhoto === "function") photo.applyPhoto(el, friend.photoUrl);
       el.addEventListener("click", function (ev) {
         if (ev && ev.preventDefault) ev.preventDefault();
-        if (typeof opts.open === "function") opts.open(friend.handle, friend);
+        if (typeof opts.open === "function") opts.open(openKey, friend);
       });
       inner.appendChild(el);
     });
@@ -214,6 +224,9 @@
 
   var api = {
     cap: PULSE_FALL_CAP,
+    get photoColumnLive() { return PHOTO_COLUMN_LIVE; },
+    /* Flip on once 20261016_profiles_photo_url.sql is confirmed run. */
+    setPhotoColumnLive: function (on) { PHOTO_COLUMN_LIVE = !!on; },
     friendsFromRows: friendsFromRows,
     loadFriends: loadFriends,
     layout: layout,

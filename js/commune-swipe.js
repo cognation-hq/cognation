@@ -570,28 +570,120 @@
     return faded > 0 && faded >= tags.length;
   }
 
-  function viewerIsSeedOrOps() {
-    try {
-      var auth = window.CognationAuth && typeof window.CognationAuth.getSession === "function"
-        ? window.CognationAuth.getSession()
-        : null;
-      if (auth && (auth.accountKind === "seed" || auth.accountKind === "ops" || auth.isSeed)) return true;
-    } catch (eAuth) {}
-    var personal = viewerPersonal();
-    if (personal) {
-      if (personal.accountKind === "seed" || personal.accountKind === "ops" || personal.isSeed) return true;
-      if (/^seed-/i.test(String(personal.handle || "")) || /^seed-/i.test(String(personal.seedFleetId || personal.seed_fleet_id || ""))) return true;
+  /* Server truth for seed/real (ECHO friend shares). Client accountKind/isSeed/
+     seedFleetId/handle are NOT trusted — live seeds often lack them. Cache is
+     filled from cognation_am_i_seed() and profiles.account_kind. Fail closed:
+     unknown → treat as seed (do not write a share; hide share cards). */
+  var viewerSeedStatus = null; /* null unknown | true seed/ops | false real */
+  var profileSeedById = {}; /* profileId → true|false */
+
+  function noteViewerSeedStatus(isSeed) {
+    if (isSeed === true) viewerSeedStatus = true;
+    else if (isSeed === false) viewerSeedStatus = false;
+    else viewerSeedStatus = null;
+    return viewerSeedStatus;
+  }
+
+  function noteProfileSeedStatus(profileId, isSeed) {
+    var id = String(profileId || "");
+    if (!id) return;
+    if (isSeed === true) profileSeedById[id] = true;
+    else if (isSeed === false) profileSeedById[id] = false;
+    else delete profileSeedById[id];
+  }
+
+  function accountKindMeansSeed(kind) {
+    var k = String(kind || "").toLowerCase();
+    if (k === "seed" || k === "ops") return true;
+    if (k === "real") return false;
+    return null;
+  }
+
+  function refreshViewerSeedStatus() {
+    var sb = window.CognationSupabase;
+    if (!sb || typeof sb.configured !== "function" || !sb.configured() || typeof sb.rpc !== "function") {
+      return Promise.resolve(viewerSeedStatus);
     }
-    return false;
+    return sb
+      .rpc("cognation_am_i_seed", {})
+      .then(function (row) {
+        /* PostgREST may return bare boolean or [boolean]. */
+        var v = row;
+        if (Array.isArray(row)) v = row[0];
+        if (v && typeof v === "object" && "cognation_am_i_seed" in v) v = v.cognation_am_i_seed;
+        if (v === true || v === false) {
+          viewerSeedStatus = v;
+          return viewerSeedStatus;
+        }
+        viewerSeedStatus = null;
+        return viewerSeedStatus;
+      })
+      .catch(function () {
+        viewerSeedStatus = null;
+        return viewerSeedStatus;
+      });
+  }
+
+  function warmProfileSeedStatuses(ids) {
+    var list = [];
+    (ids || []).forEach(function (id) {
+      var s = String(id || "");
+      if (s && list.indexOf(s) < 0 && profileSeedById[s] == null) list.push(s);
+    });
+    if (!list.length) return Promise.resolve();
+    var sb = window.CognationSupabase;
+    if (!sb || typeof sb.configured !== "function" || !sb.configured() || typeof sb.rest !== "function") {
+      return Promise.resolve();
+    }
+    var q =
+      "select=id,account_kind&id=in.(" +
+      list
+        .map(function (id) {
+          return '"' + String(id).replace(/"/g, "") + '"';
+        })
+        .join(",") +
+      ")";
+    return sb
+      .rest("profiles", { query: q })
+      .then(function (rows) {
+        (Array.isArray(rows) ? rows : []).forEach(function (row) {
+          if (!row || !row.id) return;
+          var flag = accountKindMeansSeed(row.account_kind);
+          if (flag === true || flag === false) profileSeedById[String(row.id)] = flag;
+        });
+      })
+      .catch(function () {});
+  }
+
+  function viewerIsSeedOrOps() {
+    /* Fail closed: unknown counts as seed so we never write a share. */
+    if (viewerSeedStatus === false) return false;
+    if (viewerSeedStatus === true) return true;
+    return true;
   }
 
   function profileLooksSeed(rec) {
-    if (!rec) return false;
-    if (rec.accountKind === "seed" || rec.account_kind === "seed" || rec.isSeed) return true;
-    if (rec.accountKind === "ops" || rec.account_kind === "ops") return true;
-    if (/^seed-/i.test(String(rec.handle || ""))) return true;
-    if (rec.seedFleetId || rec.seed_fleet_id) return true;
-    return false;
+    /* Fail closed: missing/unknown → treat as seed (real users never see it). */
+    if (!rec) return true;
+    var id = String(rec.id || "");
+    if (id && profileSeedById[id] === true) return true;
+    if (id && profileSeedById[id] === false) return false;
+    var fromKind = accountKindMeansSeed(rec.account_kind || rec.accountKind);
+    if (fromKind === true) {
+      if (id) profileSeedById[id] = true;
+      return true;
+    }
+    if (fromKind === false) {
+      if (id) profileSeedById[id] = false;
+      return false;
+    }
+    return true;
+  }
+
+  function refreshSeedGates() {
+    return refreshViewerSeedStatus().then(function () {
+      return warmProfileSeedStatuses(friendIds());
+    });
   }
 
   function viewerDisplayName() {
@@ -1107,6 +1199,12 @@
     if (!Array.isArray(shares)) return [];
     var friends = {};
     friendIds().forEach(function (id) { friends[String(id)] = true; });
+    /* Warm server account_kind for friends + share authors we have not classified. */
+    var need = friendIds().slice();
+    shares.forEach(function (share) {
+      if (share && share.swiperId) need.push(String(share.swiperId));
+    });
+    warmProfileSeedStatuses(need);
     var interests = viewerInterests();
     var out = [];
     shares.forEach(function (share) {
@@ -2891,11 +2989,14 @@
     state.statusEl = shell.querySelector("[data-commune-swipe-status]");
     bindInteractions(shell);
     rebuildDeck();
-    document.addEventListener("cognation:session-started", rebuildDeck);
+    document.addEventListener("cognation:session-started", function () {
+      refreshSeedGates().then(function () { rebuildDeck(); });
+    });
     document.addEventListener("cognation:member-profile-updated", function () {
       syncDatingVisibility();
       rebuildDeck();
     });
+    refreshSeedGates();
   }
 
   window.CognationCommuneSwipe = {
@@ -2928,6 +3029,11 @@
     friendShareCards: friendShareCards,
     recordShare: recordShare,
     viewerIsSeedOrOps: viewerIsSeedOrOps,
+    profileLooksSeed: profileLooksSeed,
+    noteViewerSeedStatus: noteViewerSeedStatus,
+    noteProfileSeedStatus: noteProfileSeedStatus,
+    refreshViewerSeedStatus: refreshViewerSeedStatus,
+    refreshSeedGates: refreshSeedGates,
     FADE_LEFT_THRESHOLD: FADE_LEFT_THRESHOLD,
     OFF_INTEREST_FRIEND_RATIO: OFF_INTEREST_FRIEND_RATIO,
     SEE_FRIEND_SHARES_KEY: SEE_FRIEND_SHARES_KEY,

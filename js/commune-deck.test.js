@@ -394,6 +394,7 @@ function testRightSwipeStillKeeps() {
     },
   }));
   var api = loadSwipe(local, memoryStorage());
+  if (api.noteViewerSeedStatus) api.noteViewerSeedStatus(false);
   assert.strictEqual(deckHas(api.sampleDeck(18), "ad-pro-0"), true);
   assert.strictEqual(deckHas(api.sampleDeck(18), "know-sam"), true);
 

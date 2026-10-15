@@ -597,6 +597,7 @@
           emitLog({ action: "persist", ok: true, payload: payload });
           return { ok: true, payload: payload };
         }, function (err) {
+          /* 401/400 here must never clear CognationAuth / CognationSupabase session. */
           if (persistAttempts[json] < PERSIST_MAX_ATTEMPTS && !retryTimer) {
             retryJson = json;
             retryTimer = setTimeout(function () {
@@ -605,7 +606,11 @@
               persistPrefs();
             }, PERSIST_RETRY_MS * persistAttempts[json]);
           }
-          throw err;
+          return {
+            ok: false,
+            error: (err && err.message) || "persist_failed",
+            status: err && err.status,
+          };
         });
       }).catch(function (err) {
         emitLog({
@@ -733,11 +738,9 @@
         writeJson(sessionStorage, BOOT_FLAG, out);
         emitLog({ action: "hydrate", ok: out.ok, result: out });
         hydrating = false;
-        /* Seed defaults should stick server-side so the next device skips
-           localStorage. persistPrefs() only writes when they differ from the server. */
-        if (seedish) {
-          persistPrefs(); /* waits for login state + profile row; skips Sage */
-        }
+        /* Do not PUT /auth/v1/user from hydrate/boot. That write on every
+           sign-in was the main suspect for breaking real sessions. Prefs
+           persist only from explicit member-profile / see-dating changes. */
         return out;
       })
       .catch(function (err) {

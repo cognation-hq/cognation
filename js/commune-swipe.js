@@ -694,9 +694,12 @@
   }
 
   function warmProfileSeedStatuses(ids) {
+    var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     var list = [];
     (ids || []).forEach(function (id) {
       var s = String(id || "");
+      /* Handles (seed-ana-0005) are not profile ids — id=eq.<handle> is 400 22P02. */
+      if (!UUID_RE.test(s)) return;
       if (s && list.indexOf(s) < 0 && profileSeedById[s] == null) list.push(s);
     });
     if (!list.length) return Promise.resolve();

@@ -37,6 +37,13 @@
     return age;
   }
 
+  /* Year + month only, and only for 13+; under 13 returns null so nothing is sent. */
+  function yearMonth(value, now) {
+    var b = parseBirthdate(value);
+    if (!b || isUnderMin(value, now) || ageFromBirthdate(value, now) === null) return null;
+    return { year: b.y, month: b.m };
+  }
+
   function isUnderMin(value, now) {
     var age = ageFromBirthdate(value, now);
     return age !== null && age < MIN_AGE;
@@ -106,6 +113,7 @@
     parseBirthdate: parseBirthdate,
     ageFromBirthdate: ageFromBirthdate,
     isUnderMin: isUnderMin,
+    yearMonth: yearMonth,
     isHeld: isHeld,
     setHold: setHold,
     checkEmailBlocked: checkEmailBlocked,

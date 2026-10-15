@@ -264,8 +264,10 @@
       state = stateText ? stateText.value.trim() : "";
     }
     return {
-      /* Whole-year age only (existing Commune age gates read it); the birthdate itself is not kept. */
+      /* Whole-year age (existing Commune age gates read it). Only year + month go
+         to the server (owner-only); the full birthdate is never kept or sent. */
       age: birthEl && g ? g.ageFromBirthdate(birthEl.value) : null,
+      birthYearMonth: birthEl && g && g.yearMonth ? g.yearMonth(birthEl.value) : null,
       country: country,
       state: state,
       phone: phoneEl ? phoneEl.value.trim() : "",
@@ -349,8 +351,11 @@
               username: profile.username,
               handle: handle,
               displayName: profile.username,
+              birthYear: profile.birthYearMonth ? profile.birthYearMonth.year : undefined,
+              birthMonth: profile.birthYearMonth ? profile.birthYearMonth.month : undefined,
             })
             .then(function (result) {
+              delete profile.birthYearMonth; /* not kept on the device either */
               writeProfile(profile);
               if (result && result.session && window.CognationAuth) {
                 return window.CognationAuth.login(profile.email, password);

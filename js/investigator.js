@@ -1,8 +1,11 @@
 /**
  * Private Investigator review page. Access is decided only by
- * am_i_cognation_investigator() (server allowlist). No emails or user ids
- * are printed. Until the SQL runs / the viewer is allowlisted, the page stays
- * closed (fail closed).
+ * am_i_cognation_investigator() (server allowlist). No mailbox addresses or
+ * user ids are printed. Fail closed until allowlisted.
+ *
+ * After Confirm illegal: pattern-check other posts/attachments (metadata only).
+ * Illegal trend/duplicates → auto-generate incident report (username + findings),
+ * freeze account and hide from public. Never delete account/content.
  */
 (function () {
   "use strict";
@@ -21,6 +24,92 @@
   }
   function setStatus(msg) {
     if (statusEl) statusEl.textContent = msg || "";
+  }
+
+  function renderPatternPanel(postId, triggerEl) {
+    var panel = document.createElement("article");
+    panel.className = "inv-item inv-pattern";
+    panel.innerHTML =
+      '<div class="inv-meta"><span class="inv-tag">pattern check</span> Trends or duplicates? (illegal only)</div>' +
+      '<div data-inv-pattern-body class="inv-body">Loading…</div>' +
+      '<div class="inv-actions">' +
+      '<input type="text" data-inv-findings maxlength="2000" placeholder="What was found (required)" aria-label="Findings">' +
+      '<button type="button" class="btn inv-btn-danger" data-inv-incident disabled>Generate incident report + freeze/hide</button>' +
+      '<button type="button" class="btn" data-inv-pattern-close>No trend — done</button>' +
+      "</div>";
+    if (triggerEl && triggerEl.parentNode) triggerEl.parentNode.replaceChild(panel, triggerEl);
+    else listEl.appendChild(panel);
+
+    var bodyEl = panel.querySelector("[data-inv-pattern-body]");
+    var findingsEl = panel.querySelector("[data-inv-findings]");
+    var actBtn = panel.querySelector("[data-inv-incident]");
+
+    panel.querySelector("[data-inv-pattern-close]").addEventListener("click", function () {
+      panel.remove();
+      if (!listEl.querySelector(".inv-item")) setStatus("Queue is empty.");
+      else setStatus("Saved. Pattern check closed.");
+    });
+
+    actBtn.addEventListener("click", function () {
+      var findings = String((findingsEl && findingsEl.value) || "").trim();
+      if (!findings) {
+        setStatus("Describe what was found to generate the incident report.");
+        return;
+      }
+      actBtn.disabled = true;
+      sb()
+        .rpc("investigator_incident_takedown", {
+          post_id: postId,
+          findings: findings.slice(0, 2000),
+        })
+        .then(function (res) {
+          var handle = res && res.handle ? String(res.handle) : "";
+          panel.remove();
+          setStatus(
+            "Incident report generated for @" + handle +
+              ". Account frozen and hidden from public (content kept for evidence)."
+          );
+        }, function (err) {
+          actBtn.disabled = false;
+          setStatus((err && err.message) || "Could not generate incident report.");
+        });
+    });
+
+    sb()
+      .rpc("investigator_pattern_check", { post_id: postId })
+      .then(function (data) {
+        var posts = (data && data.posts) || [];
+        var handle = data && data.handle ? String(data.handle) : "";
+        var lines = posts.map(function (p) {
+          var atts = Array.isArray(p.attachments) ? p.attachments : [];
+          var attLine = atts.length
+            ? atts.map(function (a) {
+                return (a.kind || "file") + ":" + (a.name || "?");
+              }).join(", ")
+            : "no attachments";
+          return (
+            (p.is_trigger_post ? "★ " : "· ") +
+            esc(p.body_preview || "(empty)") +
+            "\n  " + esc(p.rating || "") +
+            (p.hidden ? " · hidden" : "") +
+            " · " + esc(attLine)
+          );
+        });
+        bodyEl.innerHTML =
+          "<strong>@" + esc(handle) + "</strong> — " + posts.length +
+          " post" + (posts.length === 1 ? "" : "s") +
+          " (names/kinds only; no image bytes)<pre class=\"inv-pattern-pre\">" +
+          (lines.length ? lines.join("\n\n") : "No other posts.") +
+          "</pre>";
+        actBtn.disabled = false;
+        setStatus(
+          "Pattern check ready for @" + handle +
+            ". Only if you see a trend or duplicates: generate incident report + freeze/hide."
+        );
+      }, function (err) {
+        bodyEl.textContent = (err && err.message) || "Could not load pattern check.";
+        setStatus("Pattern check failed.");
+      });
   }
 
   function renderItem(item) {
@@ -51,15 +140,8 @@
       '<button type="button" class="btn btn-primary" data-inv-act="set_rating">Set rating</button>' +
       '<button type="button" class="btn" data-inv-act="restore">Restore</button>' +
       '<button type="button" class="btn" data-inv-act="dismiss">Dismiss</button>' +
-      (item.kind === "report"
-        ? '<button type="button" class="btn" data-inv-act="dismiss_groundless">Dismiss as groundless</button>'
-        : "") +
       (item.reason === "illegal_image"
         ? '<button type="button" class="btn inv-btn-danger" data-inv-act="confirm_illegal">Confirm illegal (freeze)</button>'
-        : "") +
-      (item.reporter_user_id
-        ? '<span class="inv-meta">Filer <code data-inv-filer></code> · groundless(30d): ' +
-          esc(item.reporter_groundless_30d == null ? "—" : item.reporter_groundless_30d) + "</span>"
         : "") +
       "</div>";
     el.querySelectorAll("[data-inv-act]").forEach(function (btn) {
@@ -81,6 +163,11 @@
             reason: String(reason).trim().slice(0, 200),
           })
           .then(function () {
+            if (act === "confirm_illegal" && item.post_id) {
+              setStatus("Confirmed illegal. Running pattern check…");
+              renderPatternPanel(item.post_id, el);
+              return;
+            }
             el.remove();
             setStatus("Saved.");
             if (!listEl.querySelector(".inv-item")) setStatus("Queue is empty.");
@@ -106,10 +193,7 @@
         }
         setStatus(list.length + " open item" + (list.length === 1 ? "" : "s") + ".");
         list.forEach(function (item) {
-          var node = renderItem(item);
-          var filerEl = node.querySelector("[data-inv-filer]");
-          if (filerEl && item.reporter_user_id) filerEl.textContent = String(item.reporter_user_id);
-          listEl.appendChild(node);
+          listEl.appendChild(renderItem(item));
         });
       });
   }
@@ -130,7 +214,6 @@
         return loadQueue();
       },
       function () {
-        /* Fail closed until the SQL is run / the function exists. */
         setStatus("This page is only for Cognation Investigators.");
       }
     );

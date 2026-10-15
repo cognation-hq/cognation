@@ -18,6 +18,9 @@
     .inv-denied, .inv-empty { color: var(--cgn-text-muted, #b9bfe0); }
     .inv-tag { display: inline-block; border: 1px solid currentColor; border-radius: .4rem;
       padding: 0 .4rem; font-size: .7rem; margin-right: .35rem; }
+    .inv-pattern-pre { white-space: pre-wrap; font: inherit; font-size: .8rem;
+      margin: .5rem 0 0; color: var(--cgn-text-muted, #b9bfe0); }
+    .inv-pattern .inv-actions input[type="text"] { flex: 1 1 16rem; }
   </style>
 </head>
 <body>
@@ -30,7 +33,7 @@
   </header>
   <main id="main" class="inv-wrap">
     <h1>Review queue</h1>
-    <p class="inv-meta">Reports, low-confidence ratings, and appeals. Seed-to-seed tests stay out of this list.</p>
+    <p class="inv-meta">Reports, low-confidence ratings, and appeals. After Confirm illegal, pattern-check for trends; incident report freezes/hides (never deletes). Seed-to-seed tests stay out of this list.</p>
     <p data-inv-status role="status" aria-live="polite">Checking access…</p>
     <div data-inv-list hidden></div>
   </main>

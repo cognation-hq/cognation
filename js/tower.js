@@ -384,6 +384,40 @@
     return spawnCache[id] || DEFAULT_WIDGET_LAYOUT[id];
   }
 
+  /* Drag out of the default CSS grid (#117). The grid has no x/y, so before any
+     owner drag (or freeze/save) pin every grid widget at its rendered spot as
+     free x/y %, then drop the grid classes. Without this a drag cannot move the
+     widget and the freeze saves every widget at 0,0 (3rd drag break). */
+  function liftDefaultGrid(stage) {
+    if (!stage || !stage.classList || !stage.classList.contains("is-default-grid")) return false;
+    if (isPhoneStage(stage)) return false;
+    var sr = stage.getBoundingClientRect();
+    var w = sr.width || stage.clientWidth || 1;
+    var h = sr.height || stage.clientHeight || 1;
+    var spots = [];
+    stage.querySelectorAll("[data-tower-widget]").forEach(function (el) {
+      if (el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
+      var r = el.getBoundingClientRect();
+      spots.push({ el: el, x: Math.round(((r.left - sr.left) / w) * 1000) / 10, y: Math.round(((r.top - sr.top) / h) * 1000) / 10, w: r.width });
+    });
+    stage.style.minHeight = Math.ceil(h) + "px";
+    stage.classList.remove("is-default-grid", "is-desktop-grid");
+    spots.forEach(function (sp) {
+      var el = sp.el;
+      el.classList.remove("is-spawn-full", "is-spawn-half");
+      if (sp.w) el.style.setProperty("--spawn-max-w", Math.ceil(sp.w) + "px");
+      el.style.setProperty("--sticker-x", sp.x + "%");
+      el.style.setProperty("--sticker-y", sp.y + "%");
+      el.style.setProperty("--sticker-z", el.getAttribute("data-sticker-z") || "2");
+      el.style.setProperty("--sticker-tilt", "0deg");
+      el.setAttribute("data-sticker-x", String(sp.x));
+      el.setAttribute("data-sticker-y", String(sp.y));
+      if (!el.getAttribute("data-sticker-z")) el.setAttribute("data-sticker-z", "2");
+      spawnCache[el.getAttribute("data-tower-widget")] = { x: sp.x, y: sp.y, z: 2, tilt: 0 };
+    });
+    return true;
+  }
+
   /* Before saving any layout, pin every on-screen spawned widget where it is now,
      so moving one widget never makes the others jump. */
   function freezeSpawnedWidgets(root, layout) {
@@ -391,6 +425,7 @@
     if (!stage) return layout;
     /* Phone positions are a stacked view, never the website layout. */
     if (isPhoneStage(stage)) return layout;
+    liftDefaultGrid(stage);
     stage.querySelectorAll("[data-tower-widget].is-spawned").forEach(function (el) {
       var id = el.getAttribute("data-tower-widget");
       if (!id || el.hidden || el.classList.contains("is-widget-off")) return;
@@ -786,7 +821,11 @@
         return prefer.id;
       }
     }
-    if (window.CognationAccounts && window.CognationAccounts.DEMO_ALEXA) {
+    /* Demo founder id only in local preview (sign-in not configured). On a real
+       site it leaked prof-alexa-personal into seed sessions. */
+    var supa = window.CognationSupabase;
+    var signInConfigured = !!(supa && typeof supa.configured === "function" && supa.configured());
+    if (!signInConfigured && window.CognationAccounts && window.CognationAccounts.DEMO_ALEXA) {
       return window.CognationAccounts.DEMO_ALEXA.personalId;
     }
     return null;
@@ -1544,7 +1583,9 @@
       this._saving = true;
       try {
       writeScrapbookLayout(data);
-      if (window.CognationTowerLayoutSync) window.CognationTowerLayoutSync.save(data);
+      /* Account layout row is written only on a real geometry edit (drag end,
+         rotate, resize). Opening the Tower must never POST a layout. */
+      if (opts.geometry && window.CognationTowerLayoutSync) window.CognationTowerLayoutSync.save(data);
       var id = data._profileId || resolveActiveProfileId();
       /* A drop only changes x/y. Never PATCH the profile: that reload paints
          the remote row, which has no sticker coordinates, and the widget
@@ -5168,9 +5209,23 @@
     });
   }
 
+  /* Broken pile-up (the #117 drag bug saved every other widget at 0,0): two or
+     more widgets at the top-left corner is never a real owner layout. */
+  function isPileupLayout(layout) {
+    if (!layout || typeof layout !== "object") return false;
+    var n = 0;
+    Object.keys(layout).forEach(function (id) {
+      var pos = layout[id];
+      if (pos && typeof pos === "object" && (Number(pos.x) || 0) <= 0.5 && (Number(pos.y) || 0) <= 0.5) n += 1;
+    });
+    return n >= 2;
+  }
+
   function getWidgetLayout(p) {
     var layout = (p && p.widgetLayout) || null;
     if (!layout || typeof layout !== "object") return null;
+    /* Safe reset: a pile-up falls back to the default grid (not saved until a real drag). */
+    if (isPileupLayout(layout)) return null;
     return layout;
   }
 
@@ -8237,6 +8292,11 @@
         if (!dragStarted) {
           if (Math.abs(dxPx) < 5 && Math.abs(dyPx) < 5) return;
           dragStarted = true;
+          if (liftDefaultGrid(stage)) {
+            rect = stage.getBoundingClientRect();
+            startX = parseFloat(sticker.getAttribute("data-sticker-x") || "0");
+            startY = parseFloat(sticker.getAttribute("data-sticker-y") || "0");
+          }
           stickerZCounter += 1;
           sticker.style.setProperty("--sticker-z", String(stickerZCounter));
           sticker.classList.add("is-dragging");

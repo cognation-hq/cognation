@@ -44,9 +44,9 @@ var TABS = '.app-topbar .tablist [role="tab"], .app-topbar-shortcut';
 var HOVER = '.app-topbar .tablist [role="tab"]:hover, .app-topbar .tablist [role="tab"]:focus-visible, .app-topbar-shortcut:hover, .app-topbar-shortcut:focus-visible';
 var ACTIVE = '.app-topbar .tablist [role="tab"][aria-selected="true"], body.is-circle-open .app-topbar-shortcut[data-tower-anchor="circle"]';
 
-/* Top row is still TOWER · SIGNAL · COMMUNE · CIRCLE. */
-assert.ok(/id="tab-tower"[^>]*>TOWER</.test(html) && /id="tab-signal"[^>]*>SIGNAL</.test(html) && /id="tab-commune"[^>]*>COMMUNE</.test(html), "top-row tabs");
-assert.ok(/class="app-topbar-shortcut" data-tower-anchor="circle">CIRCLE</.test(html), "CIRCLE shortcut");
+/* Top row is still TOWER · SIGNAL · ECHO · PULSE. */
+assert.ok(/id="tab-tower"[^>]*>TOWER</.test(html) && /id="tab-signal"[^>]*>SIGNAL</.test(html) && /id="tab-commune"[^>]*>ECHO</.test(html), "top-row tabs");
+assert.ok(/class="app-topbar-shortcut" data-tower-anchor="circle">PULSE</.test(html), "PULSE shortcut");
 
 /* Inactive top-row labels: #1c1630 at 70% on the text color (not element opacity), no fill,
    2px underline slot, no text-shadow (Designer 2026-10-07). */

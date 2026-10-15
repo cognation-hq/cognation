@@ -233,7 +233,15 @@
       handle: handle,
       body: row.body || "",
       createdAt: row.created_at,
-      attachments: Array.isArray(row.attachments) ? row.attachments : [],
+      attachments: (function () {
+        var atts = Array.isArray(row.attachments) ? row.attachments.slice() : [];
+        var hide = Array.isArray(row.hidden_attachment_indexes) ? row.hidden_attachment_indexes : [];
+        if (!hide.length) return atts;
+        /* Illegal-image reports hide that image for everyone; no bytes, no description. */
+        return atts.map(function (a, i) {
+          return hide.indexOf(i) >= 0 ? { kind: "removed", label: "Removed" } : a;
+        });
+      })(),
       likes: hearts,
       reactions: reactions,
       visibility: row.visibility || "friends",
@@ -254,7 +262,7 @@
   }
 
   var FEED_COLUMNS =
-    "id,author_profile_id,body,visibility,attachments,created_at,rating,author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,bio,seed_fleet_id),reactions:tower_post_reactions(face,profile_id)";
+    "id,author_profile_id,body,visibility,attachments,created_at,rating,hidden_attachment_indexes,author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,bio,seed_fleet_id),reactions:tower_post_reactions(face,profile_id)";
   var FEED_TAIL = "&order=created_at.desc&limit=100";
 
   /* The rating column is missing until 20261015_tower_auto_rate.sql runs. */
@@ -271,12 +279,17 @@
       .then(function (rows) {
         return { rows: rows, unrated: false };
       }, function (err) {
-        if (!isMissingRatingColumn(err)) throw err;
+        var missingRating = isMissingRatingColumn(err);
+        var missingHide = /hidden_attachment_indexes/i.test(String((err && err.message) || err || ""));
+        if (!missingRating && !missingHide) throw err;
+        var q = FEED_COLUMNS;
+        if (missingRating) q = q.replace(",rating,", ",").replace(",hidden_attachment_indexes,", ",");
+        else if (missingHide) q = q.replace(",hidden_attachment_indexes,", ",");
         /* Fail closed: without server ratings, show only the viewer's own posts. */
         return client()
-          .rest("tower_posts", { query: "select=" + FEED_COLUMNS.replace(",rating,", ",") + FEED_TAIL })
+          .rest("tower_posts", { query: "select=" + q + FEED_TAIL })
           .then(function (rows) {
-            return { rows: rows, unrated: true };
+            return { rows: rows, unrated: missingRating };
           });
       })
       .then(function (res) {

@@ -50,6 +50,7 @@ function load(viewer, opts) {
   var helper = opts.helper || "full";
   if (helper !== "none") vm.runInContext(read("js/age-floor-keywords.js"), ctx);
   if (helper === "no-keyword") delete win.CognationAgeFloor.isAdultKeyword;
+  vm.runInContext(read("js/auto-rate.js"), ctx, { filename: "js/auto-rate.js" }); /* loads before tower.js in index.html */
   vm.runInContext(read("js/tower.js"), ctx, { filename: "js/tower.js" });
   vm.runInContext(read("js/commune.js"), ctx, { filename: "js/commune.js" });
   return {

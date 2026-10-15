@@ -237,6 +237,8 @@
       likes: hearts,
       reactions: reactions,
       visibility: row.visibility || "friends",
+      /* Server auto-rate (tower_posts.rating); read-only for everyone but Investigator. */
+      rating: row.rating || "PG-13",
     };
   }
 
@@ -251,17 +253,39 @@
     emit("cognation:remote-feed-loaded", { count: posts.length });
   }
 
+  var FEED_COLUMNS =
+    "id,author_profile_id,body,visibility,attachments,created_at,rating,author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,bio,seed_fleet_id),reactions:tower_post_reactions(face,profile_id)";
+  var FEED_TAIL = "&order=created_at.desc&limit=100";
+
+  /* The rating column is missing until 20261015_tower_auto_rate.sql runs. */
+  function isMissingRatingColumn(err) {
+    var text = String((err && (err.message || err.details || err.hint || err.code)) || err || "");
+    return /rating/i.test(text) && /(column|42703|PGRST204|does not exist|schema cache)/i.test(text);
+  }
+
   function refreshFeed() {
     if (!active()) return Promise.resolve([]);
+    var me = identity();
     return client()
-      .rest("tower_posts", {
-        query:
-          "select=id,author_profile_id,body,visibility,attachments,created_at,author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,bio,seed_fleet_id),reactions:tower_post_reactions(face,profile_id)&order=created_at.desc&limit=100",
-      })
+      .rest("tower_posts", { query: "select=" + FEED_COLUMNS + FEED_TAIL })
       .then(function (rows) {
-        var posts = (Array.isArray(rows) ? rows : [])
+        return { rows: rows, unrated: false };
+      }, function (err) {
+        if (!isMissingRatingColumn(err)) throw err;
+        /* Fail closed: without server ratings, show only the viewer's own posts. */
+        return client()
+          .rest("tower_posts", { query: "select=" + FEED_COLUMNS.replace(",rating,", ",") + FEED_TAIL })
+          .then(function (rows) {
+            return { rows: rows, unrated: true };
+          });
+      })
+      .then(function (res) {
+        var posts = (Array.isArray(res.rows) ? res.rows : [])
           .filter(function (row) {
-            return !isSageRow(row && (row.author || row.profiles));
+            if (isSageRow(row && (row.author || row.profiles))) return false;
+            if (!res.unrated) return true;
+            var author = row && (row.author || row.profiles);
+            return !!(author && me && author.user_id && author.user_id === me.supabaseUserId);
           })
           .map(mapPost);
         replaceTowerFeed(posts);

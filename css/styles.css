@@ -12831,17 +12831,111 @@ a.site-switch-side:focus-visible {
 .login-age-block[hidden] { display: none; }
 .login-age-block p { font-size: 1.1rem; margin: 0; }
 
-/* Default spawn spots (tower-default-layout spec): an unplaced widget is held
-   to its grid column so two side-by-side defaults never overlap. Owner-placed
-   widgets are unaffected. */
+/* Default spawn spots (tower-default-layout LOOK lock): CSS grid when nothing
+   is owner-dragged. Absolute free x/y only after a user drag. Gap 24px. */
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker.is-spawned {
   max-width: var(--spawn-max-w, min(22rem, 92%));
 }
 
-/* Phone: fixed single column (spec order). No tilt, no drag affordance. */
+/* Pure autospawn: CSS grid, no absolute, no overlap. */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  max-width: 1120px;
+  margin-inline: auto;
+  padding: 24px;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker.is-spawned {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  z-index: 1;
+  background: rgba(16, 19, 48, 0.42);
+  border: 1px solid rgba(209, 241, 255, 0.28);
+  border-radius: 1.15rem;
+  padding: 20px;
+  min-height: 150px;
+  box-shadow: none;
+  box-sizing: border-box;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker.is-spawned.is-spawn-full {
+  grid-column: 1 / -1;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker.is-spawned.is-spawn-half {
+  grid-column: auto;
+}
+/* Profile stack (avatar / identity / slogan): no min-height, tight card look */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--avatar.is-spawned,
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--identity.is-spawned,
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--slogan.is-spawned {
+  min-height: 0;
+  padding: 12px 20px;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--followers.is-spawned {
+  background: rgba(16, 19, 48, 0.42);
+  border: 1px solid rgba(209, 241, 255, 0.28);
+  border-radius: 1.15rem;
+  padding: 20px;
+  min-height: 150px;
+}
+/* Going live is an owner action, not a grid widget in the public default. */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--going-live {
+  display: none !important;
+}
+/* Friend pins in grid mode: flow as a row under Top Friends (no absolute). */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-friend-pin.is-spawned,
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-friend-pin.is-grid-friend-pin {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+  grid-column: 1 / -1;
+  display: inline-flex;
+  width: auto;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-friend-pin:not(.is-spawned):not(.is-grid-friend-pin) {
+  /* Owner-moved pins keep absolute if somehow present; hide defaults without mark */
+}
+
+/* Phone / app <768: 1 column, padding 16px sides, 24px top/bottom. */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid.is-phone-stack,
+.tower-layout--scrapbook.is-sticker-stage.is-phone-stack.is-default-grid {
+  grid-template-columns: 1fr;
+  padding: 24px 16px;
+  max-width: none;
+}
 .tower-layout--scrapbook.is-sticker-stage.is-phone-stack .tower-sticker {
   transform: none !important;
   cursor: default;
+}
+@media (max-width: 767px) {
+  .tower-layout--scrapbook.is-sticker-stage.is-default-grid {
+    grid-template-columns: 1fr;
+    padding: 24px 16px;
+  }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tower-layout--scrapbook.is-sticker-stage.is-default-grid {
+    grid-template-columns: 1fr 1fr;
+    padding: 24px;
+  }
+}
+@media (min-width: 1024px) {
+  .tower-layout--scrapbook.is-sticker-stage.is-default-grid {
+    max-width: 1120px;
+    padding: 24px;
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 /* Edit profile opens as a panel / sheet, not inside the avatar widget, so the

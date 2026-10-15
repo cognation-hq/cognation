@@ -85,19 +85,23 @@
     "going-live": { x: 60, y: 74, z: 18, tilt: 0 },
     polaroid: { x: 40, y: 6, z: 6, tilt: 0 },
     instax: { x: 62, y: 4, z: 7, tilt: 0 },
+    followers: { x: 2, y: 52, z: 4, tilt: 0 },
   };
   /* Default spawn spots (Designer spec, tower-default-layout). Saved layouts keep
      the free x/y % format; these rows only decide where an unplaced widget first
      appears. Rows are DOM/phone order; a row of two is left | right. */
   var SPAWN_GAP = 24;
   var SPAWN_ROWS = {
-    personal: [["avatar"], ["identity"], ["slogan"], ["music"], ["social", "badges"], ["friends", "calendar"], ["polaroid", "html"], ["instax"]],
-    professional: [["avatar"], ["identity"], ["slogan"], ["youtube"], ["social", "badges"], ["calendar", "html"]],
+    /* Designer LOOK: Profile, MP3, Top Friends|Links, Badges|Calendar, Polaroid|HTML, Instax left. */
+    personal: [["avatar"], ["identity"], ["slogan"], ["music"], ["friends", "social"], ["badges", "calendar"], ["polaroid", "html"], ["instax"]],
+    /* Designer LOOK: Profile, YouTube, Links|Badges, Followers|Calendar, Custom HTML left.
+       No music / Top Friends / Polaroid / Instax on Pro. */
+    professional: [["avatar"], ["identity"], ["slogan"], ["youtube"], ["social", "badges"], ["followers", "calendar"], ["html"]],
   };
   /* Factory seeds that were never a user's choice. An entry equal to one of these
      is treated as unplaced, so old overlapping defaults get a real spawn spot. */
   var FACTORY_SEED_LAYOUTS = [
-    { avatar: [2, 3], identity: [2, 26], slogan: [22, 16], social: [2, 22], music: [2, 28], youtube: [2, 28], badges: [2, 38], friends: [2, 52], html: [22, 3], calendar: [55, 28], polaroid: [40, 6], instax: [62, 4] },
+    { avatar: [2, 3], identity: [2, 26], slogan: [22, 16], social: [2, 22], music: [2, 28], youtube: [2, 28], badges: [2, 38], friends: [2, 52], followers: [2, 52], html: [22, 3], calendar: [55, 28], polaroid: [40, 6], instax: [62, 4] },
     { avatar: [4, 4], identity: [4, 26], slogan: [28, 18], social: [4, 26], music: [4, 34], badges: [4, 44], friends: [4, 56], html: [28, 4] },
     { identity: [4, 18] },
   ];
@@ -229,12 +233,74 @@
     }
     var spawnIds = {};
     rows.forEach(function (r) { r.forEach(function (id) { spawnIds[id] = true; }); });
+    /* Any owner-dragged (non-factory) spawn-row widget? If none — CSS grid, no absolute. */
+    var anyPlaced = false;
+    if (!phone) {
+      Object.keys(spawnIds).forEach(function (id) {
+        if (isPlacedPos(layout, id)) anyPlaced = true;
+      });
+    }
+    var useGrid = phone || !anyPlaced;
+    stage.classList.toggle("is-default-grid", useGrid);
+    stage.classList.toggle("is-desktop-grid", useGrid && !phone);
+
+    if (useGrid) {
+      var ordered = [];
+      var gridCache = {};
+      rows.forEach(function (row) {
+        row.forEach(function (id) {
+          var el = stage.querySelector('[data-tower-widget="' + id + '"]');
+          if (!el || el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
+          if (el.classList.contains("is-dragging")) return;
+          el.classList.add("is-spawned");
+          el.classList.toggle("is-spawn-full", row.length === 1);
+          el.classList.toggle("is-spawn-half", row.length > 1);
+          el.style.removeProperty("--sticker-x");
+          el.style.removeProperty("--sticker-y");
+          el.style.removeProperty("--sticker-z");
+          el.style.removeProperty("--sticker-tilt");
+          el.style.removeProperty("--spawn-max-w");
+          el.removeAttribute("data-sticker-x");
+          el.removeAttribute("data-sticker-y");
+          el.removeAttribute("data-sticker-z");
+          ordered.push(el);
+          gridCache[id] = { x: 0, y: 0, z: 2, tilt: 0 };
+        });
+      });
+      ordered.forEach(function (el) { stage.appendChild(el); });
+      /* Friend pins: in default grid they sit inside the Top Friends card flow via CSS;
+         clear absolute spawn marks so they do not float over the grid. */
+      stage.querySelectorAll("[data-tower-friend-pin].is-spawned").forEach(function (pin) {
+        pin.classList.remove("is-spawned");
+        pin.style.removeProperty("--friend-pin-w");
+      });
+      if (!(p && (p._profileKind === "professional" || p.kind === "professional"))) {
+        var pinLayoutG = (p && p.friendPinLayout) || {};
+        var pinIdsG = [];
+        try { pinIdsG = resolveTopFriendIds(p); } catch (eG) { pinIdsG = []; }
+        pinIdsG.forEach(function (fid, index) {
+          var pin = stage.querySelector('[data-tower-friend-pin="' + fid + '"]');
+          if (!pin || pin.hidden || pin.classList.contains("is-dragging")) return;
+          if (!phone && !isDefaultFriendPinPos(p, index, pinLayoutG[fid])) return;
+          pin.classList.add("is-spawned");
+          pin.classList.add("is-grid-friend-pin");
+          pin.style.removeProperty("--sticker-x");
+          pin.style.removeProperty("--sticker-y");
+        });
+      }
+      spawnCache = gridCache;
+      stage.style.minHeight = "";
+      return;
+    }
+
+    /* Mixed: owner placed some widgets — pack unplaced around them (absolute %). */
     var sizes = {};
     var occupied = [];
     var colW = phone ? stageW - 32 : (stageW - 48 - SPAWN_GAP) / 2;
     stage.querySelectorAll("[data-tower-widget]").forEach(function (el) {
       if (el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
       var id = el.getAttribute("data-tower-widget");
+      el.classList.remove("is-spawn-full", "is-spawn-half", "is-grid-friend-pin");
       if (spawnIds[id] && !isPlacedPos(layout, id) && !el.classList.contains("is-dragging")) {
         var full = rows.some(function (r) { return r.length === 1 && r[0] === id; });
         el.classList.add("is-spawned");
@@ -4732,9 +4798,15 @@
   function renderProfessionalFollowers(root) {
     var box = root.querySelector("[data-tower-followers]");
     if (!box) return;
+    var sticker = box.closest('[data-tower-widget="followers"]') || root.querySelector('[data-tower-widget="followers"]');
     var p = TowerProfileStore.get();
     var pro = !!(p && p._profileKind === "professional" && root.getAttribute("data-tower-side") === "public");
     box.hidden = !pro;
+    if (sticker) {
+      sticker.hidden = !pro;
+      sticker.classList.toggle("is-widget-off", !pro);
+      if (pro) sticker.removeAttribute("hidden");
+    }
     if (!pro) return;
     var edges = ensureFollowerEdges(p);
     var note = box.querySelector("[data-tower-followers-note]");

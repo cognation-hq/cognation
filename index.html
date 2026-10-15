@@ -515,13 +515,6 @@
                             aria-label="Add this person as a friend"
                           >Add friend</button>
                         </div>
-                        <div class="tower-followers" data-tower-followers hidden>
-                          <p class="tower-followers-note" data-tower-followers-note>No followers yet.</p>
-                          <p class="tower-followers-mutual" data-tower-followers-mutual hidden></p>
-                          <label class="visually-hidden" for="tower-followers-find" hidden>Search followers</label>
-                          <input id="tower-followers-find" class="tower-followers-find" type="search" data-tower-followers-find placeholder="Search followers" autocomplete="off" hidden>
-                          <ul class="tower-followers-results" data-tower-followers-results role="list"></ul>
-                        </div>
                         <button type="button" class="tower-go-live-btn" data-go-live aria-label="Go live">Go live</button>
                       </div>
                       </div>
@@ -743,6 +736,16 @@
                         <div class="tower-going-live" data-tower-going-live>
                           <h4 class="tower-going-live-kicker">Going live</h4>
                           <div data-tower-going-live-body></div>
+                        </div>
+                      </div>
+                      <div class="tower-sticker tower-sticker--followers" data-tower-widget="followers" data-sticker-label="Followers" hidden><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Followers sticker" tabindex="-1" hidden>⋮⋮</button>
+                        <div class="tower-followers" data-tower-followers>
+                          <p class="tower-widget-title">Followers</p>
+                          <p class="tower-followers-note" data-tower-followers-note>No followers yet.</p>
+                          <p class="tower-followers-mutual" data-tower-followers-mutual hidden></p>
+                          <label class="visually-hidden" for="tower-followers-find" hidden>Search followers</label>
+                          <input id="tower-followers-find" class="tower-followers-find" type="search" data-tower-followers-find placeholder="Search followers" autocomplete="off" hidden>
+                          <ul class="tower-followers-results" data-tower-followers-results role="list"></ul>
                         </div>
                       </div>
                       <div class="tower-sticker tower-sticker--calendar" data-tower-widget="calendar" data-sticker-label="Calendar" data-tower-calendar-personal>

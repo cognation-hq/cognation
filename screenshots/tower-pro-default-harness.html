@@ -1,0 +1,141 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(circle at 30% 10%,#2a2160,#0b0d24 70%);color:#e8eeff;font-family:system-ui,sans-serif;min-height:100vh}
+.bar{height:56px;background:#1c1630;display:flex;align-items:center;gap:28px;padding:0 24px;font-size:13px;letter-spacing:.14em;color:#b9c2e6}
+.bar b{color:#b7f6ff}
+.tower-widget-title{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:#9aa3c7;margin:0 0 16px}
+.mut{color:#9aa3c7;font-size:14px}
+.tower-layout--scrapbook.is-sticker-stage{position:relative;width:100%}
+.tower-sticker{position:relative}
+/* Default spawn spots (tower-default-layout LOOK lock): CSS grid when nothing
+   is owner-dragged. Absolute free x/y only after a user drag. Gap 24px. */
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker.is-spawned {
+  max-width: var(--spawn-max-w, min(22rem, 92%));
+}
+
+/* Pure autospawn: CSS grid, no absolute, no overlap. */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  max-width: 1120px;
+  margin-inline: auto;
+  padding: 24px;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker.is-spawned {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  z-index: 1;
+  background: rgba(16, 19, 48, 0.42);
+  border: 1px solid rgba(209, 241, 255, 0.28);
+  border-radius: 1.15rem;
+  padding: 20px;
+  min-height: 150px;
+  box-shadow: none;
+  box-sizing: border-box;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker.is-spawned.is-spawn-full {
+  grid-column: 1 / -1;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker.is-spawned.is-spawn-half {
+  grid-column: auto;
+}
+/* Profile stack (avatar / identity / slogan): no min-height, tight card look */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--avatar.is-spawned,
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--identity.is-spawned,
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--slogan.is-spawned {
+  min-height: 0;
+  padding: 12px 20px;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--followers.is-spawned {
+  background: rgba(16, 19, 48, 0.42);
+  border: 1px solid rgba(209, 241, 255, 0.28);
+  border-radius: 1.15rem;
+  padding: 20px;
+  min-height: 150px;
+}
+/* Going live is an owner action, not a grid widget in the public default. */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--going-live {
+  display: none !important;
+}
+/* Friend pins in grid mode: flow as a row under Top Friends (no absolute). */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-friend-pin.is-spawned,
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-friend-pin.is-grid-friend-pin {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+  grid-column: 1 / -1;
+  display: inline-flex;
+  width: auto;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-friend-pin:not(.is-spawned):not(.is-grid-friend-pin) {
+  /* Owner-moved pins keep absolute if somehow present; hide defaults without mark */
+}
+
+/* Phone / app <768: 1 column, padding 16px sides, 24px top/bottom. */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid.is-phone-stack,
+.tower-layout--scrapbook.is-sticker-stage.is-phone-stack.is-default-grid {
+  grid-template-columns: 1fr;
+  padding: 24px 16px;
+  max-width: none;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-phone-stack .tower-sticker {
+  transform: none !important;
+  cursor: default;
+}
+@media (max-width: 767px) {
+  .tower-layout--scrapbook.is-sticker-stage.is-default-grid {
+    grid-template-columns: 1fr;
+    padding: 24px 16px;
+  }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .tower-layout--scrapbook.is-sticker-stage.is-default-grid {
+    grid-template-columns: 1fr 1fr;
+    padding: 24px;
+  }
+}
+@media (min-width: 1024px) {
+  .tower-layout--scrapbook.is-sticker-stage.is-default-grid {
+    max-width: 1120px;
+    padding: 24px;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+
+</style></head><body>
+<div class="bar"><b>TOWER</b><span>Professional · default spawn (LOOK)</span></div>
+<div class="tower-layout--scrapbook is-sticker-stage is-default-grid" id="stage">
+  <div class="tower-sticker tower-sticker--avatar is-spawned is-spawn-full" style="display:flex;gap:20px;align-items:center">
+    <div style="width:96px;height:96px;border-radius:50%;background:linear-gradient(135deg,#d8b7ff,#b7f6ff);flex-shrink:0"></div>
+    <div><h1 style="margin:0;font-size:28px;color:#f7f9ff">Alexa J Thomas</h1><div class="mut">@alexa-pro · Founder, Cognation</div></div>
+  </div>
+  <div class="tower-sticker tower-sticker--youtube is-spawned is-spawn-full">
+    <p class="tower-widget-title">YouTube</p>
+    <div style="aspect-ratio:16/9;background:rgba(5,8,28,.55);border-radius:.45rem;display:grid;place-items:center;color:#9aa3c7">YouTube player</div>
+  </div>
+  <div class="tower-sticker tower-sticker--social is-spawned is-spawn-half"><p class="tower-widget-title">Links</p><div class="mut">Instagram · TikTok · YouTube · Website</div></div>
+  <div class="tower-sticker tower-sticker--badges is-spawned is-spawn-half"><p class="tower-widget-title">Badges</p><div class="mut">Beta tester · Mindful · Reader</div></div>
+  <div class="tower-sticker tower-sticker--followers is-spawned is-spawn-half"><p class="tower-widget-title">Followers</p><div class="mut">No followers yet.</div></div>
+  <div class="tower-sticker tower-sticker--calendar is-spawned is-spawn-half"><p class="tower-widget-title">Calendar</p><div class="mut">Busy blocks</div></div>
+  <div class="tower-sticker tower-sticker--html is-spawned is-spawn-half"><p class="tower-widget-title">Custom HTML</p><div class="mut">Empty slot</div></div>
+</div>
+<script>
+if(new URLSearchParams(location.search).get('phone')==='1')
+  document.getElementById('stage').classList.add('is-phone-stack');
+</script>
+</body></html>

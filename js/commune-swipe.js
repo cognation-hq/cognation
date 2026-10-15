@@ -1726,6 +1726,24 @@
     return null;
   }
 
+  function topUpDeck() {
+    /* Keep 1:1 pacing via sampleDeck/paceDeck. Never re-add passed cards. */
+    var guard = 0;
+    while (state.cards.length - state.index < 4 && guard < 6) {
+      guard += 1;
+      var more = omitPassed(sampleDeck(8));
+      var added = 0;
+      more.forEach(function (card) {
+        var stable = stableCardId(card.id);
+        var dup = state.cards.some(function (c) { return stableCardId(c.id) === stable; });
+        if (dup) return;
+        state.cards.push(card);
+        added += 1;
+      });
+      if (!added) break;
+    }
+  }
+
   function finishSwipe() {
     var passed = passedSet();
     var dropAt = state.index;
@@ -1741,15 +1759,18 @@
       kept.push(card);
     });
     state.cards = kept;
+    /* Next eligible card takes the same slot. Clamp so we never sit past the end
+       (that left a blank deck after swipe-left on the last queued card). */
     state.index = Math.max(0, dropAt - removedBefore);
+    if (state.index > state.cards.length) state.index = state.cards.length;
     state.seen += 1;
-    if (state.cards.length < 4) {
-      var more = omitPassed(sampleDeck(8));
-      more.forEach(function (card) {
-        var stable = stableCardId(card.id);
-        var dup = state.cards.some(function (c) { return stableCardId(c.id) === stable; });
-        if (!dup) state.cards.push(card);
-      });
+    topUpDeck();
+    if (state.index >= state.cards.length) {
+      var fresh = omitPassed(sampleDeck(12));
+      if (fresh.length) {
+        state.cards = fresh;
+        state.index = 0;
+      }
     }
     state.busy = false;
     paintDeck();

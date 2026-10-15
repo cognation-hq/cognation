@@ -12787,3 +12787,9 @@ a.site-switch-side:focus-visible {
 .tower-layout--scrapbook.is-sticker-stage .tower-sticker.is-spawned {
   max-width: var(--spawn-max-w, min(22rem, 92%));
 }
+
+/* Phone: fixed single column (spec order). No tilt, no drag affordance. */
+.tower-layout--scrapbook.is-sticker-stage.is-phone-stack .tower-sticker {
+  transform: none !important;
+  cursor: default;
+}

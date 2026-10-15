@@ -102,6 +102,17 @@
     { identity: [4, 18] },
   ];
   var spawnCache = {};
+  /* Avatar, name and slogan read as one profile card: a tight gap between them. */
+  var PROFILE_STACK = { avatar: true, identity: true, slogan: true };
+  var PROFILE_STACK_GAP = 4;
+  var PHONE_MAX = 767;
+
+  /* Phone (<768px): saved x/y is ignored; every visible widget stacks in spec order. */
+  function isPhoneStage(stage) {
+    var w = (stage && stage.clientWidth) || 0;
+    var vw = (typeof window !== "undefined" && window.innerWidth) || 0;
+    return (vw > 0 && vw <= PHONE_MAX) || (w > 0 && w <= PHONE_MAX);
+  }
 
   function isFactorySeedPos(id, pos) {
     if (!pos || typeof pos !== "object") return true;
@@ -134,13 +145,15 @@
     var taken = occupied.slice();
     var out = {};
     var cursor = pad;
-    function freeY(x, y, w, h) {
+    var lastStackBottom = null;
+    function freeY(x, y, w, h, stackMember) {
       var moved = true;
       while (moved) {
         moved = false;
         for (var i = 0; i < taken.length; i++) {
-          if (rectsOverlap({ x: x, y: y, w: w, h: h }, taken[i], gap - 0.5)) {
-            y = taken[i].y + taken[i].h + gap;
+          var g = stackMember && taken[i].stack ? PROFILE_STACK_GAP : gap;
+          if (rectsOverlap({ x: x, y: y, w: w, h: h }, taken[i], g - 0.5)) {
+            y = taken[i].y + taken[i].h + g;
             moved = true;
           }
         }
@@ -153,9 +166,12 @@
       if (phone || row.length === 1) {
         ids.forEach(function (id) {
           var sz = sizes[id];
-          var y = freeY(pad, cursor, Math.min(sz.w, phone ? colW : stageW - pad * 2), sz.h);
+          var inStack = !!PROFILE_STACK[id];
+          if (inStack && lastStackBottom !== null) cursor = lastStackBottom + PROFILE_STACK_GAP;
+          var y = freeY(pad, cursor, Math.min(sz.w, phone ? colW : stageW - pad * 2), sz.h, inStack);
           out[id] = { x: pad, y: y };
-          taken.push({ x: pad, y: y, w: sz.w, h: sz.h });
+          taken.push({ x: pad, y: y, w: sz.w, h: sz.h, stack: inStack });
+          if (inStack) lastStackBottom = y + sz.h;
           cursor = y + sz.h + gap;
         });
         return;
@@ -195,9 +211,22 @@
     if (!stage || !stage.classList.contains("is-sticker-stage")) return;
     var stageW = stage.clientWidth || 0;
     if (!stageW) return;
-    var phone = stageW < 768 || (window.innerWidth && window.innerWidth < 768);
-    var layout = getWidgetLayout(p) || {};
-    var rows = spawnRowsFor(p);
+    var phone = isPhoneStage(stage);
+    stage.classList.toggle("is-phone-stack", phone);
+    /* Phone ignores saved x/y entirely (it is the website's layout). */
+    var layout = phone ? {} : getWidgetLayout(p) || {};
+    var rows = spawnRowsFor(p).slice();
+    if (phone) {
+      /* Widgets outside the spec order (emoji, quotes, extra prints) follow in DOM order. */
+      var listed = {};
+      rows.forEach(function (r) { r.forEach(function (id) { listed[id] = true; }); });
+      stage.querySelectorAll("[data-tower-widget]").forEach(function (el) {
+        var wid = el.getAttribute("data-tower-widget");
+        if (el.parentNode !== stage || !wid || listed[wid] || wid === "feed" || wid === "messages" || wid === "going-live") return;
+        listed[wid] = true;
+        rows.push([wid]);
+      });
+    }
     var spawnIds = {};
     rows.forEach(function (r) { r.forEach(function (id) { spawnIds[id] = true; }); });
     var sizes = {};
@@ -249,6 +278,8 @@
   function freezeSpawnedWidgets(root, layout) {
     var stage = root && root.querySelector ? root.querySelector("[data-tower-scrapbook]") : null;
     if (!stage) return layout;
+    /* Phone positions are a stacked view, never the website layout. */
+    if (isPhoneStage(stage)) return layout;
     stage.querySelectorAll("[data-tower-widget].is-spawned").forEach(function (el) {
       var id = el.getAttribute("data-tower-widget");
       if (!id || el.hidden || el.classList.contains("is-widget-off")) return;
@@ -5180,6 +5211,8 @@
   }
 
   function persistSelectedTilt(root, el, tilt) {
+    var tiltStage = root && root.querySelector ? root.querySelector("[data-tower-scrapbook]") : null;
+    if (tiltStage && isPhoneStage(tiltStage)) return;
     var p = TowerProfileStore.get();
     tilt = normalizeTiltDegrees(tilt);
     applyTiltToElement(el, tilt);
@@ -7855,6 +7888,8 @@
 
     function onPointerDown(ev) {
       if (!ownerOnPublic()) return;
+      /* Phone shows a fixed single column; dragging there must not rewrite the website layout. */
+      if (isPhoneStage(stage)) return;
 
       var friendPin = ev.target.closest("[data-tower-friend-pin]");
       if (friendPin && stage.contains(friendPin)) {

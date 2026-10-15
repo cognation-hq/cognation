@@ -1,7 +1,8 @@
 /**
  * Tower default spawn spots (Designer spec tower-default-layout, LOOK-YES).
  * Free x/y saved format is unchanged; only unplaced widgets get a spawn spot.
- * No overlap, 24px gap, two-column rows on website, one column (16px sides) on phone.
+ * No overlap, 24px gap (avatar/name/slogan tight as one card), two-column rows on website.
+ * Phone (<768px): saved x/y ignored, one column (16px sides), no drag or save.
  * Run: node js/tower-default-spawn.test.js
  */
 "use strict";
@@ -20,7 +21,7 @@ function grab(startMarker, endMarker) {
 }
 var code = grab("  var SPAWN_GAP = 24;", "  /* Place every visible, unplaced widget");
 var ctx = vm.createContext({});
-vm.runInContext(code + "\nthis.packSpawn = packSpawn; this.SPAWN_ROWS = SPAWN_ROWS; this.isFactorySeedPos = isFactorySeedPos; this.rectsOverlap = rectsOverlap;", ctx);
+vm.runInContext(code + "\nthis.PROFILE_STACK_GAP = PROFILE_STACK_GAP; this.packSpawn = packSpawn; this.SPAWN_ROWS = SPAWN_ROWS; this.isFactorySeedPos = isFactorySeedPos; this.rectsOverlap = rectsOverlap;", ctx);
 
 /* Spec order. */
 assert.deepStrictEqual(JSON.parse(JSON.stringify(ctx.SPAWN_ROWS.personal)),
@@ -42,7 +43,9 @@ function rects(placed, sz) {
 }
 function assertNoOverlap(list, gap) {
   for (var i = 0; i < list.length; i++) for (var j = i + 1; j < list.length; j++) {
-    assert.ok(!ctx.rectsOverlap(list[i], list[j], gap - 0.5), list[i].id + " overlaps " + list[j].id);
+    var stack = { avatar: 1, identity: 1, slogan: 1 };
+    var g = stack[list[i].id] && stack[list[j].id] ? ctx.PROFILE_STACK_GAP : gap;
+    assert.ok(!ctx.rectsOverlap(list[i], list[j], g - 0.5), list[i].id + " overlaps " + list[j].id);
   }
 }
 
@@ -62,10 +65,32 @@ function assertNoOverlap(list, gap) {
   var prevBottom = -1;
   ids.forEach(function (id) {
     assert.strictEqual(p[id].x, 16, kind + " phone x " + id);
-    assert.ok(p[id].y >= prevBottom + 24 || prevBottom < 0, kind + " phone order + gap " + id);
+    var minGap = (id === "identity" || id === "slogan") ? ctx.PROFILE_STACK_GAP : 24;
+    assert.ok(p[id].y >= prevBottom + minGap || prevBottom < 0, kind + " phone order + gap " + id);
     prevBottom = p[id].y + sz[id].h;
   });
 });
+
+/* Profile card: avatar, name and slogan sit together (tight gap), then the 24px gap. */
+["personal", "professional"].forEach(function (kind) {
+  var rows2 = ctx.SPAWN_ROWS[kind];
+  var ids2 = [].concat.apply([], rows2);
+  [false, true].forEach(function (phone) {
+    var sz3 = sizes(ids2);
+    var o = ctx.packSpawn(rows2, sz3, [], phone ? 390 : 1120, phone);
+    assert.strictEqual(o.identity.y, o.avatar.y + sz3.avatar.h + ctx.PROFILE_STACK_GAP, kind + " name under avatar");
+    assert.strictEqual(o.slogan.y, o.identity.y + sz3.identity.h + ctx.PROFILE_STACK_GAP, kind + " slogan under name");
+    var next = kind === "personal" ? "music" : "youtube";
+    assert.strictEqual(o[next].y, o.slogan.y + sz3.slogan.h + 24, kind + " 24px after the card");
+  });
+});
+
+/* Phone: saved x/y ignored, every visible widget stacked; no drag, no save from phone. */
+assert.ok(/var layout = phone \? \{\} : getWidgetLayout\(p\) \|\| \{\};/.test(tower), "phone ignores saved x/y");
+assert.ok(/if \(phone\) \{[\s\S]*?rows\.push\(\[wid\]\);/.test(tower), "phone stacks widgets outside spec order too");
+assert.ok(/function onPointerDown\(ev\) \{\s*if \(!ownerOnPublic\(\)\) return;\s*\/\*[^*]*\*\/\s*if \(isPhoneStage\(stage\)\) return;/.test(tower), "no drag on phone");
+assert.ok(/function freezeSpawnedWidgets[\s\S]*?if \(isPhoneStage\(stage\)\) return layout;/.test(tower), "phone never freezes into the website layout");
+assert.ok(/function persistSelectedTilt[\s\S]{0,200}isPhoneStage\(tiltStage\)\) return;/.test(tower), "no tilt save on phone");
 
 /* Existing (owner-placed) widgets never move; new ones take the next open spot around them. */
 var rows = ctx.SPAWN_ROWS.professional;

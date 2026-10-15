@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Cognation Investigator</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    .inv-wrap { max-width: 52rem; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+    .inv-item { border: 1px solid var(--cgn-border, rgba(255,255,255,.18)); border-radius: .8rem;
+      padding: .9rem 1rem; margin: .7rem 0; background: rgba(16,19,48,.9); }
+    .inv-meta { font-size: .8rem; color: var(--cgn-text-muted, #b9bfe0); margin-bottom: .4rem; }
+    .inv-body { white-space: pre-wrap; margin: .4rem 0 .7rem; }
+    .inv-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+    .inv-actions input[type="text"] { flex: 1 1 12rem; min-width: 10rem; }
+    .inv-denied, .inv-empty { color: var(--cgn-text-muted, #b9bfe0); }
+    .inv-tag { display: inline-block; border: 1px solid currentColor; border-radius: .4rem;
+      padding: 0 .4rem; font-size: .7rem; margin-right: .35rem; }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="/"><span data-brand>COGNATION</span></a>
+      <span style="margin-left:auto;font-size:.85rem;opacity:.8">Investigator</span>
+    </div>
+  </header>
+  <main id="main" class="inv-wrap">
+    <h1>Review queue</h1>
+    <p class="inv-meta">Reports, low-confidence ratings, and appeals. Seed-to-seed tests stay out of this list.</p>
+    <p data-inv-status role="status" aria-live="polite">Checking access…</p>
+    <div data-inv-list hidden></div>
+  </main>
+  <script src="/js/cognation-config.js"></script>
+  <script src="/runtime-config"></script>
+  <script src="/js/supabase-client.js"></script>
+  <script src="/js/investigator.js"></script>
+</body>
+</html>

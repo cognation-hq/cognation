@@ -188,6 +188,21 @@
         JSON.stringify(fileDoc)
       );
     } catch (e3) {}
+    /* Tower posts: also file a server report when signed in (Investigator SQL).
+       Seeds flag-only; humans hide-on-report — enforced server-side. */
+    try {
+      if (
+        window.CognationContentReport &&
+        item.postId &&
+        (item.reason === "harmful" || item.reason === "untruthful")
+      ) {
+        window.CognationContentReport.reportTowerPost({
+          postId: item.postId,
+          reason: item.reason,
+          note: (item.postMeta && item.postMeta.reporterNote) || ("User report: " + item.reason),
+        }).catch(function () {});
+      }
+    } catch (eServer) {}
     return {
       ok: true,
       report: item,

@@ -58,7 +58,7 @@ var tower = fs.readFileSync(path.join(root, "js/tower.js"), "utf8");
 assert.ok(/post\.rating = postRating\(post\); \/\* rating carries unchanged into SIGNAL and ECHO \*\//.test(tower));
 assert.ok(/rating: window\.CognationAutoRate\s*\? window\.CognationAutoRate\.rate\(body,/.test(tower), "local posts rated at post time");
 var social = fs.readFileSync(path.join(root, "js/supabase-social.js"), "utf8");
-assert.ok(/created_at,rating,author:/.test(social) && /rating: row\.rating \|\| "PG-13"/.test(social));
+assert.ok(/created_at,rating(,hidden_attachment_indexes)?,author:/.test(social) && /rating: row\.rating \|\| "PG-13"/.test(social));
 assert.ok(!/rating:/.test(social.slice(social.indexOf("function createTowerPost"), social.indexOf("function feedPost"))), "poster never sends a rating");
 var html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 assert.ok(html.indexOf("js/auto-rate.js") > 0 && html.indexOf("js/auto-rate.js") < html.indexOf("js/tower.js"), "rater loads before tower");

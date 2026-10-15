@@ -186,12 +186,12 @@
       el.style.animationDelay = s.delay + "ms";
       if (typeof opts.paint === "function") {
         try { opts.paint(el, friend, i); } catch (eP) {}
-      } else {
-        el.textContent = String(friend.name || "?").trim().charAt(0).toUpperCase();
       }
-      /* Server photo wins; no photo or a bad URL keeps the letter circle. */
-      var photo = root && root.CognationProfilePhoto;
-      if (friend.photoUrl && photo && typeof photo.applyPhoto === "function") photo.applyPhoto(el, friend.photoUrl);
+      /* Always a letter circle first (live #137 check: falling circles were
+         blank). A local browser-only avatar from the painter is dropped. */
+      paintLetter(el, friend);
+      /* Server photo only for a non-empty https URL that actually loads. */
+      paintPhotoWhenLoaded(el, friend.photoUrl);
       el.addEventListener("click", function (ev) {
         if (ev && ev.preventDefault) ev.preventDefault();
         if (typeof opts.open === "function") opts.open(friend.handle, friend);
@@ -200,6 +200,31 @@
     });
     layer.insertBefore(stack, layer.firstChild);
     return stack;
+  }
+
+  function letterFor(friend) {
+    var ch = String((friend && friend.name) || "").trim().charAt(0).toUpperCase();
+    return ch || "?";
+  }
+
+  function paintLetter(el, friend) {
+    el.textContent = letterFor(friend);
+    if (el.style) el.style.backgroundImage = "";
+    if (el.removeAttribute) el.removeAttribute("data-pulse-photo");
+  }
+
+  function paintPhotoWhenLoaded(el, url) {
+    var photo = root && root.CognationProfilePhoto;
+    if (!photo || typeof photo.applyPhoto !== "function" || typeof photo.clean !== "function") return false;
+    var clean = photo.clean(url);
+    if (!clean) return false;
+    var Img = root && root.Image;
+    if (typeof Img !== "function") return false;
+    var probe = new Img();
+    probe.onload = function () { photo.applyPhoto(el, clean); };
+    probe.onerror = function () {}; /* broken URL keeps the letter */
+    probe.src = clean;
+    return true;
   }
 
   function mount(layer, opts) {
@@ -219,6 +244,8 @@
     layout: layout,
     slot: slot,
     render: render,
+    letterFor: letterFor,
+    paintPhotoWhenLoaded: paintPhotoWhenLoaded,
     mount: mount,
   };
   if (root) root.CognationPulseFall = api;

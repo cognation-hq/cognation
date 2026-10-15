@@ -8423,9 +8423,61 @@
       });
     }
 
+    /* The editor opens as a panel (website) or bottom sheet (phone) outside the
+       avatar widget, so the widget keeps its size and spot and never covers
+       its neighbours. It moves back into the widget when closed. */
+    var panelHome = panel.parentNode;
+    var panelNext = panel.nextSibling;
+    /* Phone: a dim scrim behind the sheet; tapping it closes the editor. */
+    var scrim = null;
+    function showScrim(on) {
+      if (on && !scrim) {
+        scrim = document.createElement("div");
+        scrim.className = "tower-profile-edit-scrim";
+        scrim.setAttribute("data-tower-profile-edit-scrim", "");
+        scrim.setAttribute("aria-hidden", "true");
+        scrim.addEventListener("click", function () {
+          setOpen(false);
+        });
+      }
+      if (!scrim) return;
+      if (on) {
+        if (scrim.parentNode !== root) root.appendChild(scrim);
+        scrim.hidden = false;
+      } else {
+        scrim.hidden = true;
+      }
+    }
+    function mountPanelAsSheet() {
+      showScrim(true);
+      if (panel.parentNode !== root) root.appendChild(panel);
+      panel.classList.add("is-sheet");
+      panel.setAttribute("role", "dialog");
+      panel.setAttribute("aria-label", "Edit profile");
+    }
+    function returnPanelHome() {
+      showScrim(false);
+      panel.classList.remove("is-sheet");
+      panel.removeAttribute("role");
+      panel.removeAttribute("aria-label");
+      if (panelHome && panel.parentNode !== panelHome) {
+        if (panelNext && panelNext.parentNode === panelHome) panelHome.insertBefore(panel, panelNext);
+        else panelHome.appendChild(panel);
+      }
+    }
+    var closeBtn = panel.querySelector("[data-tower-profile-edit-close]");
+    if (closeBtn) {
+      closeBtn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        setOpen(false);
+        btn.focus();
+      });
+    }
+
     function setOpen(open) {
       if (!open && pickingAvatarFile) return;
       if (open) {
+        mountPanelAsSheet();
         panel.hidden = false;
         wrap.classList.add("is-open");
         btn.setAttribute("aria-expanded", "true");
@@ -8435,6 +8487,7 @@
         /* Closing without Save still commits typed social URLs so circle buttons stick. */
         try { flushSocialFieldsFromForm(root); } catch (eFlush) {}
         panel.hidden = true;
+        returnPanelHome();
         wrap.classList.remove("is-open");
         btn.setAttribute("aria-expanded", "false");
         var avatarStickerClose = wrap.closest('[data-tower-widget="avatar"]');

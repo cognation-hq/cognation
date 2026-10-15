@@ -12793,3 +12793,151 @@ a.site-switch-side:focus-visible {
   transform: none !important;
   cursor: default;
 }
+
+/* Edit profile opens as a panel / sheet, not inside the avatar widget, so the
+   widget keeps its size and position and covers nothing. */
+#panel-tower .tower-profile-edit-dropdown.is-sheet {
+  position: fixed !important;
+  top: 4.5rem;
+  right: 1rem;
+  left: auto;
+  bottom: auto;
+  transform: none !important;
+  width: min(22rem, calc(100vw - 2rem)) !important;
+  max-height: calc(100vh - 6rem) !important;
+  overflow: auto;
+  z-index: 1000;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+}
+@media (max-width: 767px) {
+  #panel-tower .tower-profile-edit-dropdown.is-sheet {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100% !important;
+    max-height: 78vh !important;
+    border-radius: 1rem 1rem 0 0;
+    padding: 0.6rem 1rem 1rem !important;
+  }
+}
+.tower-profile-edit-sheet-head {
+  display: none;
+}
+#panel-tower .tower-profile-edit-dropdown.is-sheet .tower-profile-edit-sheet-head {
+  position: sticky;
+  top: -0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -0.4rem -0.5rem 0.4rem;
+  padding: 0.45rem 0.5rem;
+  background: #fff;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  z-index: 1;
+}
+#panel-tower .tower-profile-edit-sheet-title {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+#panel-tower .tower-profile-edit-close {
+  background: transparent !important;
+  border: 0 !important;
+  font-size: 1.3rem;
+  line-height: 1;
+  padding: 0.1rem 0.4rem !important;
+  cursor: pointer;
+  box-shadow: none !important;
+}
+
+/* Edit profile (Designer look check on #92): dark panel, muted labels,
+   one-line Save buttons, hidden rows fully hidden. */
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown {
+  background: rgba(16, 19, 48, 0.97) !important;
+  color: var(--cgn-text, #f7f9ff) !important;
+  border: 1px solid var(--cgn-border, rgba(209, 241, 255, 0.28)) !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown :is(p, label, span, button, input, .form-hint) {
+  color: var(--cgn-text, #f7f9ff) !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown :is(.tower-social-fields label, .tower-social-fields-label, .tower-frame-fields-label) {
+  color: var(--cgn-text-muted, rgba(232, 240, 255, 0.66)) !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown input {
+  background: rgba(5, 8, 28, 0.55) !important;
+  border: 1px solid var(--cgn-border, rgba(209, 241, 255, 0.28)) !important;
+  color: var(--cgn-text, #f7f9ff) !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown input::placeholder {
+  color: var(--cgn-text-soft, rgba(232, 240, 255, 0.48)) !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown input:focus {
+  border-color: var(--cgn-accent, #b7f6ff) !important;
+  outline: none;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-social-fields :is(label, input)[hidden] {
+  display: none !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown :is(.tower-frame-chip, [data-tower-frame-chips] .tower-frame-chip) {
+  background: rgba(5, 8, 28, 0.55) !important;
+  border-color: var(--cgn-border, rgba(209, 241, 255, 0.28)) !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown :is(.tower-frame-chip.is-selected, .tower-frame-chip[aria-pressed="true"]) {
+  background: rgba(183, 246, 255, 0.18) !important;
+  border-color: var(--cgn-accent, #b7f6ff) !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown :is(.btn, .tower-social-actions .btn-primary) {
+  white-space: nowrap;
+  width: auto;
+  background: transparent !important;
+  color: var(--cgn-text, #f7f9ff) !important;
+  border: 1px solid var(--cgn-border, rgba(209, 241, 255, 0.28)) !important;
+  border-radius: 999px !important;
+  padding: 0.22rem 0.75rem !important;
+  font-size: 0.75rem !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-profile-edit-sheet-head {
+  background: rgba(16, 19, 48, 0.99);
+  border-bottom-color: var(--cgn-border, rgba(209, 241, 255, 0.28));
+}
+.tower-profile-edit-scrim {
+  display: none;
+}
+@media (max-width: 767px) {
+  .tower-profile-edit-scrim:not([hidden]) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(3, 4, 14, 0.6);
+    z-index: 999;
+  }
+  #panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown.is-sheet {
+    max-height: 85vh !important;
+    max-height: 85dvh !important;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-top: 0 !important;
+  }
+  #panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown.is-sheet .tower-profile-edit-sheet-head {
+    top: 0;
+    margin: 0 -1rem 0.5rem;
+    padding: 0.7rem 1rem;
+  }
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown [data-tower-frame-chips] .tower-frame-chip > .tower-frame-chip-name,
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-frame-chip .tower-frame-chip-name {
+  color: var(--cgn-text, #f7f9ff) !important;
+}
+
+/* Phone sheet: Save profile lines up with the sheet's left padding (the actions row
+   shrank to fit and flex-end pushed the nowrap button past its left edge). */
+@media (max-width: 767px) {
+  #panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown.is-sheet .tower-social-actions {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    width: 100% !important;
+    justify-content: flex-start !important;
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+  }
+}

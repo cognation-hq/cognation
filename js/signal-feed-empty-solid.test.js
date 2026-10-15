@@ -50,3 +50,18 @@ var rootText = (css.match(/--cgn-text:\s*(#[0-9a-f]{3,6})/i) || [])[1];
   });
 });
 console.log("signal-feed-empty-solid: all assertions passed");
+
+// Outer SIGNAL host frame in the empty state: solid dark, scoped, readable.
+(function () {
+  var sel = "#panel-signal .signal-feed-host:has(.tower-feed[data-tower-feed] .commune-empty)";
+  var body = rule(sel);
+  var bg = prop(body, "background"), fg = prop(body, "color");
+  assert.ok(hex(bg), "host background must be opaque hex, got " + bg);
+  assert.ok(lum(hex(bg)) < 0.05, "host must be dark, got " + bg);
+  assert.strictEqual(prop(body, "--tower-private-bg"), bg);
+  var r = ratio(hex(fg), hex(bg));
+  assert.ok(r >= 4.5, "host text " + fg + " on " + bg + " = " + r.toFixed(2));
+  console.log("ok host " + fg + " on " + bg + " = " + r.toFixed(2) + ":1");
+  // Other cards untouched: base .signal-feed-host still pale.
+  assert.strictEqual(prop(rule("\n.signal-feed-host"), "--tower-private-bg"), "#fff5f9");
+})();

@@ -9516,6 +9516,13 @@ body { padding-top: 0 !important; }
   color: var(--cgn-text, #f7f9ff);
   padding: 20px;
 }
+/* SIGNAL Feed EMPTY only: outer host frame goes solid dark too (no pale #fff5f9 box). */
+#panel-signal .signal-feed-host:has(.tower-feed[data-tower-feed] .commune-empty) {
+  --tower-private-bg: #0b0d24;
+  --tower-private-text: #f7f9ff;
+  background: #0b0d24;
+  color: #f7f9ff;
+}
 .tower-friends-browse,
 .tower-friends-browse-note,
 .tower-friends-browse-item,

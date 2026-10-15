@@ -42,3 +42,5 @@ var labelHide = tower.slice(tower.indexOf("function renderSocialLinks"), tower.i
 assert.ok(/formInput\.hidden = true;\s*if \(label\) label\.hidden = true;/.test(labelHide), "per-page networks hide label + input together");
 console.log("edit-profile-sheet.test.js: ok");
 assert.ok(/\.is-sheet \.tower-social-actions \{\s*grid-column: 1 \/ -1;\s*justify-self: stretch;\s*width: 100% !important;\s*justify-content: flex-start !important;/.test(css), "phone: Save profile aligns with the sheet\'s left padding");
+assert.ok(/right: var\(--tower-edit-right, 16px\);\s*max-width: calc\(100vw - 32px\) !important;\s*width: min\(22rem, calc\(100vw - 16px - var\(--tower-edit-right, 16px\)\)\) !important;/.test(css), "desktop panel stays inside the page edge");
+assert.ok(/Math\.max\(16, Math\.round\(vw - Math\.min\(edge, vw\) \+ 16\)\)/.test(tower) && /alignPanelToPage\(\);/.test(fn), "panel aligned to page right edge on open/resize");

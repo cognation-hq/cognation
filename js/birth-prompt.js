@@ -1,0 +1,229 @@
+/**
+ * One-time birth year + month ask at sign-in for real accounts with no
+ * user_birth row. Dark Cognation shell (same panel family as login-gate).
+ * Year and month only — never the day. No lecturing copy for under-13 attempts.
+ * Seeds are skipped (fleet backfill owns their ages).
+ */
+(function () {
+  "use strict";
+
+  var SHOWN_KEY = "cognation.birthPrompt.shown.v1";
+  var panel = null;
+  var busy = false;
+
+  function session() {
+    try {
+      var auth = window.CognationAuth;
+      return auth && typeof auth.getSession === "function" ? auth.getSession() : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function isSeedSession(s) {
+    if (!s) return false;
+    var kind = String(s.accountKind || s.account_kind || "").toLowerCase();
+    if (kind === "seed" || kind === "ops") return true;
+    if (s.isSeed) return true;
+    var fleet = String(s.seedFleetId || s.seed_fleet_id || "");
+    if (/^seed-/.test(fleet) || /^ops-/.test(fleet)) return true;
+    var uname = String(s.username || "");
+    return /^seed-/.test(uname) || /^ops-/.test(uname);
+  }
+
+  function uid() {
+    var s = session();
+    if (s && s.supabaseUserId) return String(s.supabaseUserId);
+    try {
+      var sb = window.CognationSupabase;
+      var live = sb && typeof sb.getSession === "function" ? sb.getSession() : null;
+      if (live && live.user && live.user.id) return String(live.user.id);
+    } catch (e) {}
+    return "";
+  }
+
+  function alreadyShownFor(userId) {
+    try {
+      var raw = sessionStorage.getItem(SHOWN_KEY);
+      var doc = raw ? JSON.parse(raw) : {};
+      return !!(doc && doc[userId]);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function markShown(userId) {
+    try {
+      var raw = sessionStorage.getItem(SHOWN_KEY);
+      var doc = raw ? JSON.parse(raw) : {};
+      doc[userId] = Date.now();
+      sessionStorage.setItem(SHOWN_KEY, JSON.stringify(doc));
+    } catch (e) {}
+  }
+
+  function ensurePanel() {
+    if (panel && panel.isConnected) return panel;
+    panel = document.getElementById("birth-prompt-gate");
+    if (panel) return panel;
+    panel = document.createElement("div");
+    panel.id = "birth-prompt-gate";
+    panel.className = "login-gate birth-prompt-gate";
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-modal", "true");
+    panel.setAttribute("aria-labelledby", "birth-prompt-title");
+    panel.hidden = true;
+    panel.innerHTML =
+      '<div class="login-gate-backdrop" data-birth-prompt-backdrop tabindex="-1" aria-hidden="true"></div>' +
+      '<div class="login-gate-panel birth-prompt-panel">' +
+      '<p class="login-gate-eyebrow">Profile</p>' +
+      '<h2 id="birth-prompt-title">Add your birth year and month</h2>' +
+      '<p class="login-gate-desc birth-prompt-why">We use year and month only to keep age-gated spaces accurate. We never store the day.</p>' +
+      '<form class="login-form birth-prompt-form" data-birth-prompt-form action="#" method="post" novalidate>' +
+      '<div class="form-group">' +
+      '<label for="birth-prompt-year">Birth year</label>' +
+      '<input id="birth-prompt-year" name="birthYear" type="number" inputmode="numeric" min="1900" max="2100" required placeholder="YYYY" autocomplete="bday-year">' +
+      "</div>" +
+      '<div class="form-group">' +
+      '<label for="birth-prompt-month">Birth month</label>' +
+      '<select id="birth-prompt-month" name="birthMonth" required autocomplete="bday-month">' +
+      '<option value="">Month</option>' +
+      '<option value="1">January</option><option value="2">February</option>' +
+      '<option value="3">March</option><option value="4">April</option>' +
+      '<option value="5">May</option><option value="6">June</option>' +
+      '<option value="7">July</option><option value="8">August</option>' +
+      '<option value="9">September</option><option value="10">October</option>' +
+      '<option value="11">November</option><option value="12">December</option>' +
+      "</select>" +
+      "</div>" +
+      '<p class="login-status" data-birth-prompt-status hidden role="status" aria-live="polite"></p>' +
+      '<div class="login-form-actions form-actions">' +
+      '<button type="submit" class="btn btn-primary" data-birth-prompt-save>Save</button>' +
+      "</div>" +
+      "</form>" +
+      "</div>";
+    document.body.appendChild(panel);
+    var form = panel.querySelector("[data-birth-prompt-form]");
+    if (form) form.addEventListener("submit", onSubmit);
+    return panel;
+  }
+
+  function setStatus(msg, isError) {
+    var el = panel && panel.querySelector("[data-birth-prompt-status]");
+    if (!el) return;
+    if (!msg) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    el.textContent = msg;
+    el.classList.toggle("is-error", !!isError);
+  }
+
+  function openPanel() {
+    var el = ensurePanel();
+    el.hidden = false;
+    el.setAttribute("aria-hidden", "false");
+    document.body.classList.add("login-gate-open");
+    var year = el.querySelector("#birth-prompt-year");
+    if (year) setTimeout(function () { year.focus(); }, 20);
+  }
+
+  function closePanel() {
+    if (!panel) return;
+    panel.hidden = true;
+    panel.setAttribute("aria-hidden", "true");
+    /* Don't clear login-gate-open if the main login gate is still open. */
+    var login = document.querySelector(".login-gate:not(.birth-prompt-gate)");
+    if (!login || login.hidden) document.body.classList.remove("login-gate-open");
+  }
+
+  function hasBirthRow() {
+    var sb = window.CognationSupabase;
+    var id = uid();
+    if (!sb || !id || typeof sb.rest !== "function") return Promise.resolve(null);
+    return sb
+      .rest("user_birth?select=birth_year,birth_month&user_id=eq." + encodeURIComponent(id) + "&limit=1")
+      .then(function (rows) {
+        return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
+  function onSubmit(ev) {
+    ev.preventDefault();
+    if (busy) return;
+    var yearEl = panel.querySelector("#birth-prompt-year");
+    var monthEl = panel.querySelector("#birth-prompt-month");
+    var y = yearEl ? parseInt(yearEl.value, 10) : NaN;
+    var m = monthEl ? parseInt(monthEl.value, 10) : NaN;
+    if (!y || y < 1900 || y > 2100 || !m || m < 1 || m > 12) {
+      setStatus("Enter a birth year and month.", true);
+      return;
+    }
+    var sb = window.CognationSupabase;
+    if (!sb || typeof sb.rpc !== "function") {
+      setStatus("Could not save right now. Try again in a moment.", true);
+      return;
+    }
+    busy = true;
+    setStatus("Saving…", false);
+    sb
+      .rpc("set_my_birth_month", { y: y, m: m })
+      .then(function (ok) {
+        busy = false;
+        if (ok === false) {
+          /* Server refused (e.g. under 13) — soft redirect, no lecture. */
+          setStatus("We couldn't save that. Cognation is for ages 13 and up.", true);
+          return;
+        }
+        markShown(uid());
+        closePanel();
+      })
+      .catch(function () {
+        busy = false;
+        setStatus("Could not save right now. Try again in a moment.", true);
+      });
+  }
+
+  function maybePrompt() {
+    var s = session();
+    if (!s || s.source === "demo") return;
+    if (isSeedSession(s)) return;
+    var id = uid();
+    if (!id) return;
+    if (alreadyShownFor(id)) return;
+    var login = document.querySelector(".login-gate:not(.birth-prompt-gate)");
+    if (login && !login.hidden) return;
+    hasBirthRow().then(function (row) {
+      if (row) {
+        markShown(id);
+        return;
+      }
+      /* Still signed in? */
+      if (uid() !== id) return;
+      openPanel();
+    });
+  }
+
+  function boot() {
+    document.addEventListener("cognation:session-started", function () {
+      setTimeout(maybePrompt, 400);
+    });
+    document.addEventListener("cognation:auth-changed", function () {
+      setTimeout(maybePrompt, 400);
+    });
+    if (session() && session().source === "supabase") setTimeout(maybePrompt, 600);
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+
+  window.CognationBirthPrompt = {
+    maybePrompt: maybePrompt,
+    open: openPanel,
+    close: closePanel,
+  };
+})();

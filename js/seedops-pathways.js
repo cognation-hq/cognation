@@ -189,7 +189,7 @@
               var prev = (swipe.getMemberProfile && swipe.getMemberProfile()) || {};
               var next = {};
               Object.keys(prev).forEach(function (k) { next[k] = prev[k]; });
-              if (!(parseInt(next.age, 10) >= 18)) next.age = 28;
+              if (!(parseInt(next.age, 10) >= 18)) next.age = 22; /* within seed ages 13–26 */
               swipe.setMemberProfile(next);
             }
             opened = !!swipe.openClassroom(sessionId, false);

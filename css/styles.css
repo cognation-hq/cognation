@@ -13108,3 +13108,29 @@ a.site-switch-side:focus-visible {
 .commune-algo-toggle-row {
   margin-top: 0;
 }
+
+/* Birth year/month one-time ask (same dark login-gate panel family) */
+.birth-prompt-gate .birth-prompt-panel {
+  text-align: left;
+}
+.birth-prompt-why {
+  color: rgba(238, 249, 255, 0.62) !important;
+  font-size: 0.78rem !important;
+  line-height: 1.5 !important;
+  margin-bottom: 1.1rem !important;
+}
+.birth-prompt-form .form-group label {
+  color: rgba(238, 249, 255, 0.88);
+}
+.birth-prompt-form input,
+.birth-prompt-form select {
+  width: 100%;
+  background: rgba(8, 12, 36, 0.55);
+  border: 1px solid rgba(219, 245, 255, 0.35);
+  color: #fff;
+  border-radius: 0.65rem;
+  padding: 0.55rem 0.7rem;
+}
+.birth-prompt-form .login-status.is-error {
+  color: #ffb4c0;
+}

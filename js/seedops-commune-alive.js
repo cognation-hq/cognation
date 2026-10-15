@@ -18,7 +18,7 @@
   var DEMO_CITY = "Demo City";
   var DEMO_STATE = "Demo";
   var DEMO_COUNTRY = "United States";
-  var DEMO_AGE = 28;
+  var DEMO_AGE = 22; /* within seed ages 13–26 */
   var MATERIALIZE_COUNT = 48; /* enough for dating spacing in a paced deck */
   var BOOT_FLAG = "cognation.seedops.communeAlive.v1";
 

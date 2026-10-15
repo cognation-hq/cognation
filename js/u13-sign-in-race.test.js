@@ -1,11 +1,11 @@
 /**
  * Sign-in race (SeedOps): on Sage's sign-in the site sent PUT /auth/v1/user
- * with member_age 28 / see_dating true about 1.5s after submit, and the age
- * readers showed 28 for ~1.85s. isU13TestViewer() is false until the login
+ * with member_age 22 / see_dating true about 1.5s after submit, and the age
+ * readers showed 22 for ~1.85s. isU13TestViewer() is false until the login
  * state and profile row load, and "not loaded" was treated as "not Sage".
  * Here the login state is ready only after a delay and the profile row loads
- * even later. Expect: Sage 0 PUTs and her age never reads 28; a normal seed
- * still gets age 28 with exactly one write.
+ * even later. Expect: Sage 0 PUTs and her age never reads 22; a normal seed
+ * still gets age 22 with exactly one write.
  * Run: node js/u13-sign-in-race.test.js
  */
 "use strict";
@@ -135,7 +135,7 @@ var SAGE_ROW = { id: "p-sage", user_id: "u-sage", account_kind: "seed", seed_fle
 function testSageRowLate() {
   return signIn({ username: "seed-0248", user: clone(SAGE_USER), row: SAGE_ROW, rowDelay: 2500 }).then(function (r) {
     assert.strictEqual(r.puts.length, 0, "Sage: 0 PUT /auth/v1/user (got " + JSON.stringify(r.puts) + ")");
-    assert.ok(r.ages.indexOf(28) === -1, "Sage's age never reads 28: " + JSON.stringify(r.ages.filter(function (a) { return a != null; }).slice(0, 12)));
+    assert.ok(r.ages.indexOf(22) === -1, "Sage's age never reads 22: " + JSON.stringify(r.ages.filter(function (a) { return a != null; }).slice(0, 12)));
     assert.strictEqual(r.win.CognationCommuneSwipe.getMemberAge(), 11, "Sage ends at 11");
     assert.strictEqual(r.win.CognationU13TestViewer.isU13TestViewer(), true, "profile row did load in the end");
   });
@@ -145,7 +145,7 @@ function testSageRowFails() {
   /* Profile row never loads: still no write and no 28 (test_role in metadata). */
   return signIn({ username: "seed-0248", user: clone(SAGE_USER), row: SAGE_ROW, rowDelay: 1500, rowFails: true }).then(function (r) {
     assert.strictEqual(r.puts.length, 0, "Sage with no profile row: 0 PUTs");
-    assert.ok(r.ages.indexOf(28) === -1, "no 28 without the profile row either");
+    assert.ok(r.ages.indexOf(22) === -1, "no 22 without the profile row either");
   });
 }
 
@@ -153,9 +153,9 @@ function testNormalSeedOneWrite() {
   var user = { id: "u-0003", app_metadata: {}, user_metadata: {} };
   var row = { id: "p-seed-0003", user_id: "u-0003", account_kind: "seed", seed_fleet_id: "seed-0003" };
   return signIn({ username: "seed-0003", user: user, row: row, rowDelay: 2500 }).then(function (r) {
-    assert.strictEqual(r.win.CognationCommuneSwipe.getMemberAge(), 28, "normal seed still gets age 28");
+    assert.strictEqual(r.win.CognationCommuneSwipe.getMemberAge(), 22, "normal seed still gets age 22");
     assert.strictEqual(r.puts.length, 1, "normal seed: exactly one write (got " + r.puts.length + ")");
-    assert.strictEqual(r.puts[0].data.member_age, 28);
+    assert.strictEqual(r.puts[0].data.member_age, 22);
     assert.ok(r.puts[0].at >= 2500, "write waits for the profile row (at " + r.puts[0].at + "ms)");
   });
 }

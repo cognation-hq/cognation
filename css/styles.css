@@ -13309,3 +13309,22 @@ body.is-circle-open .circle-relations {
 @media (prefers-reduced-motion: reduce) {
   a.pulse-fall-circle, .circle-ring { animation: none; }
 }
+
+/* PULSE lightning bolt (restored look from 9d88e68): visible above the halo glow, with crackle. */
+svg.circle-bolt {
+  z-index: 1;
+  opacity: 1;
+  animation: pulse-bolt-crackle 2.6s steps(1, end) infinite;
+}
+@keyframes pulse-bolt-crackle {
+  0%, 100% { opacity: 1; }
+  8% { opacity: 0.72; }
+  11% { opacity: 1; }
+  47% { opacity: 0.85; }
+  49% { opacity: 1; }
+  73% { opacity: 0.66; }
+  75% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  svg.circle-bolt { animation: none; }
+}

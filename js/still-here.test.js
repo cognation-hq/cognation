@@ -51,4 +51,54 @@ assert.ok(/Block/.test(src("js/block.js")), "Block");
 /* PULSE tab label */
 assert.ok(/data-tower-anchor="circle">PULSE</.test(html), "PULSE tab");
 
+
+/* Electric lines actually render: run the real draw code against a recording
+   canvas/SVG and require visible output, not just an element. */
+function extractFn(name) {
+  var i = tower.indexOf("function " + name + "(");
+  assert.ok(i >= 0, name + " exists");
+  var j = tower.indexOf("{", i), depth = 0, k;
+  for (k = j; k < tower.length; k++) {
+    if (tower[k] === "{") depth++;
+    else if (tower[k] === "}" && --depth === 0) break;
+  }
+  return tower.slice(i, k + 1);
+}
+function constVal(name) { var m = new RegExp("var " + name + " = ([^;]+);").exec(tower); assert.ok(m, name); return m[1]; }
+var draw = { fills: 0, maxAlpha: 0, paths: [] };
+function node(tag) {
+  return {
+    tag: tag, attrs: {}, children: [],
+    setAttribute: function (k, v) { this.attrs[k] = String(v); },
+    appendChild: function (c) { this.children.push(c); if (c.tag === "path") draw.paths.push(c); return c; },
+    getContext: function () {
+      return {
+        clearRect: function () {}, beginPath: function () {}, arc: function () {},
+        fill: function () { draw.fills++; },
+        createRadialGradient: function () {
+          return { addColorStop: function (o, c) { var a = parseFloat(String(c).split(",")[3]); if (a > draw.maxAlpha) draw.maxAlpha = a; } };
+        },
+      };
+    },
+  };
+}
+var fakeDoc = { createElement: node, createElementNS: function (ns, t) { return node(t); } };
+var code = ["CIRCLE_TILT", "CIRCLE_RING_R", "CIRCLE_PERSPECTIVE", "CIRCLE_SCALE"].map(function (n) { return "var " + n + " = " + constVal(n) + ";"; }).join("\n") +
+  ["circleProjectRadius", "circleGlowColor", "circleBoltSegments", "circleBranchPath", "paintCircleBolt", "paintCircleLightning"].map(extractFn).join("\n") +
+  "\nreturn paintCircleLightning;";
+var paint = new Function("document", code)(fakeDoc);
+var ringNode = node("div");
+paint(ringNode);
+assert.ok(draw.fills > 100, "glow canvas draws");
+assert.ok(ringNode.children.some(function (c) { return c.attrs["data-circle-lightning"] !== undefined; }), "lightning canvas attached");
+var bolt = ringNode.children.filter(function (c) { return c.attrs["data-circle-bolt"] !== undefined; })[0];
+assert.ok(bolt, "lightning bolt SVG attached");
+var strokes = draw.paths.filter(function (pth) { return parseFloat(pth.attrs.opacity) >= 0.5 && parseFloat(pth.attrs["stroke-width"]) > 0.5; });
+assert.ok(strokes.length >= 50, "bolt has visible strokes (" + strokes.length + ")");
+["#b44bff", "#3ecbff", "#ff4ad8", "#e9f7ff"].forEach(function (c) {
+  assert.ok(draw.paths.some(function (pth) { return pth.attrs.stroke === c; }), "old bolt color " + c);
+});
+assert.ok(!/\.circle-lightning\s*\{[^}]*(display:\s*none|opacity:\s*0[;\s]|visibility:\s*hidden)/.test(css), "lightning not hidden by CSS");
+assert.ok(/svg\.circle-bolt\s*\{[^}]*opacity:\s*1/.test(css) && /pulse-bolt-crackle/.test(css), "bolt visible with crackle");
+
 console.log("still-here.test.js: OK");

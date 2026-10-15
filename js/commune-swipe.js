@@ -34,7 +34,6 @@
   var FADE_LEFT_THRESHOLD = 3;
   var OFF_INTEREST_FRIEND_RATIO = 6;
   var ROOMS_KEY = "cognation.commune.site-rooms.v1";
-  var ROOM_CHAT_KEY = "cognation.commune.room-chat.v1";
   var REQUESTS_KEY = "cognation.friend.requests.v1";
   var FRIEND_CAP = 6000;
 
@@ -2377,19 +2376,6 @@
     });
   }
 
-  function roomLog(roomId) {
-    var doc = readJson(localStorage, ROOM_CHAT_KEY, {});
-    if (!doc[roomId]) {
-      doc[roomId] = [{
-        id: "host-" + roomId,
-        senderName: "Cognation",
-        body: "Cognation hosts this room. Keep it kind.",
-        at: new Date().toISOString(),
-      }];
-      writeJson(localStorage, ROOM_CHAT_KEY, doc);
-    }
-    return doc;
-  }
   function paintRoom(room, opts) {
     opts = opts || {};
     var panel = state.shell.querySelector("[data-commune-room]");
@@ -2400,25 +2386,9 @@
     var kicker = panel.querySelector(".commune-card-kicker");
     if (title) title.textContent = room.title || "Room";
     if (topic) topic.textContent = room.body || room.topic || "";
-    if (kicker) {
-      kicker.textContent = opts.live
-        ? "Chatroom · live · hosted by Cognation"
-        : "Chatroom · local demo · hosted by Cognation";
-    }
-    if (log) {
-      if (opts.live) {
-        paintLiveLog(opts.messages || state.liveMessages || []);
-      } else {
-        log.innerHTML = "";
-        var doc = roomLog(room.id);
-        (doc[room.id] || []).forEach(function (msg) {
-          var p = document.createElement("p");
-          p.className = "commune-room-line";
-          p.textContent = (msg.senderName || "Cognation") + ": " + (msg.body || "");
-          log.appendChild(p);
-        });
-      }
-    }
+    /* Live rooms only (no local demo room). */
+    if (kicker) kicker.textContent = "Chatroom · live · hosted by Cognation";
+    if (log) paintLiveLog(opts.messages || state.liveMessages || []);
     showRoom(true);
     state.roomId = room.id;
     state.liveRoom = !!opts.live;

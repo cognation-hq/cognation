@@ -73,3 +73,4 @@ assert.ok(!/Cap 250/.test(src));
 assert.ok(!/Cap 250/.test(reportsSql));
 
 console.log("chat-rooms-2c tests passed");
+assert.ok(!/function roomLog\(/.test(src) && !/Chatroom · local demo/.test(src), "no local room log or demo kicker");

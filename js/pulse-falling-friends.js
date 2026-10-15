@@ -29,10 +29,12 @@
       ? rel.visibleRelations({ viewerId: viewerId, friendships: friendships, follows: [], profiles: profiles })
       : [];
     var handles = {};
+    var photos = {};
     (profiles || []).forEach(function (p) {
-      if (!p || !p.user_id || !p.handle) return;
+      if (!p || !p.user_id) return;
       var uid = String(p.user_id);
-      if (!handles[uid] || p.kind === "personal") handles[uid] = String(p.handle);
+      if (p.handle && (!handles[uid] || p.kind === "personal")) handles[uid] = String(p.handle);
+      if (p.photo_url && (!photos[uid] || p.kind === "personal")) photos[uid] = String(p.photo_url);
     });
     var out = [];
     var seen = {};
@@ -47,6 +49,7 @@
         name: friend.name,
         handle: handles[friend.userId] || "",
         badge: friend.badge || "",
+        photoUrl: photos[friend.userId] || "",
       });
     });
     return out;
@@ -68,14 +71,21 @@
     return page(0);
   }
 
-  function fetchProfiles(client, userIds) {
+  var BASE_COLS = "id,user_id,kind,handle,display_name,account_kind";
+
+  function fetchProfiles(client, userIds, withPhoto) {
     var chunks = [];
     for (var i = 0; i < userIds.length; i += 100) chunks.push(userIds.slice(i, i + 100));
+    var cols = withPhoto === false ? BASE_COLS : BASE_COLS + ",photo_url";
     return Promise.all(chunks.map(function (ids) {
       return client.rest("profiles", {
-        query: "select=id,user_id,kind,handle,display_name,account_kind&user_id=in.(" + ids.join(",") + ")&limit=1000",
+        query: "select=" + cols + "&user_id=in.(" + ids.join(",") + ")&limit=1000",
       }).then(function (r) { return Array.isArray(r) ? r : []; });
-    })).then(function (parts) { return [].concat.apply([], parts); });
+    })).then(function (parts) { return [].concat.apply([], parts); }, function (err) {
+      /* photo_url SQL not run yet: read without it and keep letter circles. */
+      if (withPhoto === false) throw err;
+      return fetchProfiles(client, userIds, false);
+    });
   }
 
   function viewerId() {
@@ -179,6 +189,9 @@
       } else {
         el.textContent = String(friend.name || "?").trim().charAt(0).toUpperCase();
       }
+      /* Server photo wins; no photo or a bad URL keeps the letter circle. */
+      var photo = root && root.CognationProfilePhoto;
+      if (friend.photoUrl && photo && typeof photo.applyPhoto === "function") photo.applyPhoto(el, friend.photoUrl);
       el.addEventListener("click", function (ev) {
         if (ev && ev.preventDefault) ev.preventDefault();
         if (typeof opts.open === "function") opts.open(friend.handle, friend);

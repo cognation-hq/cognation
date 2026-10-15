@@ -1888,6 +1888,11 @@
     if (classroom) classroom.hidden = kind !== "classroom";
     if (deck) deck.hidden = on;
     if (actions) actions.hidden = on;
+    /* Full views hide all deck swipe chrome; Back to deck restores it. */
+    [".commune-swipe-hint", "[data-commune-dots]", "[data-commune-index]"].forEach(function (sel) {
+      var chrome = state.shell && state.shell.querySelector(sel);
+      if (chrome) chrome.hidden = on;
+    });
   }
 
   function showRoom(on) {

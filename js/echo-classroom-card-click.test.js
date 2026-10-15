@@ -63,4 +63,8 @@ assert.ok(/state\.cardView[\s\S]{0,40}closeCardView\(\)/.test(src), "Back to dec
 assert.ok(/Math\.abs\(state\.lastDragDx \|\| 0\) >= 10\) return;/.test(src), "a drag of 10px or more stays a swipe");
 var css = fs.readFileSync(path.join(__dirname, "..", "css/styles.css"), "utf8");
 assert.ok(/\.commune-room\[data-commune-room-view\] \[data-commune-room-input\]/.test(css), "no chat compose in Classroom/Auction view");
+
+/* Designer nit: deck swipe chrome (Pass/Keep, hint, deck) hidden while open, restored on close. */
+assert.ok(/function showSubpanel[\s\S]{0,900}actions\.hidden = on;[\s\S]{0,300}"\.commune-swipe-hint", "\[data-commune-dots\]", "\[data-commune-index\]"[\s\S]{0,150}chrome\.hidden = on;/.test(src), "Pass/Keep, hint, dots and card counter follow the open view");
+assert.ok(/\.commune-swipe-actions\[hidden\],\s*\.commune-swipe-hint\[hidden\],\s*\.commune-swipe-deck\[hidden\],\s*\.commune-swipe-dots\[hidden\],\s*\[data-commune-index\]\[hidden\]\s*\{\s*display: none !important;/.test(css), "[hidden] beats display:grid on swipe chrome");
 console.log("echo-classroom-card-click.test.js: OK");

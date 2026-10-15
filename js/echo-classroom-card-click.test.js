@@ -52,4 +52,15 @@ assert.ok(/card\.type === TYPE\.CLASSROOM\) \{\s*wireClassroomCardClick\(el, car
 assert.ok(/function onPointerDown[\s\S]{0,200}closest\("button, a, input/.test(src), "pointerdown skips buttons, so Open session still fires");
 assert.ok(!/function onPointerDown[\s\S]{0,400}preventDefault/.test(src), "pointerdown never cancels the click");
 assert.ok(/state\.lastDragDx = dx;/.test(src), "drag distance recorded so a swipe is not a tap");
+
+/* Designer LOOK: Classroom and Auction open in the chat-room full view. */
+assert.ok(typeof api.openAuction === "function", "openAuction exported");
+assert.ok(/card\.type === PRO\.AUCTION\) \{\s*wireClassroomCardClick\(el, card, function \(\) \{ openAuction\(card, true\); \}\)/.test(src), "auction cards wired to openAuction");
+assert.ok(/function paintCardView[\s\S]{0,200}querySelector\("\[data-commune-room\]"\)/.test(src), "card view reuses the chat-room panel");
+assert.ok(/function paintClassroom[\s\S]{0,500}paintCardView\("classroom"/.test(src), "classroom paints the chat-room view");
+assert.ok(/function openAuction[\s\S]{0,300}paintCardView\("auction"/.test(src), "auction paints the chat-room view");
+assert.ok(/state\.cardView[\s\S]{0,40}closeCardView\(\)/.test(src), "Back to deck closes the card view");
+assert.ok(/Math\.abs\(state\.lastDragDx \|\| 0\) >= 10\) return;/.test(src), "a drag of 10px or more stays a swipe");
+var css = fs.readFileSync(path.join(__dirname, "..", "css/styles.css"), "utf8");
+assert.ok(/\.commune-room\[data-commune-room-view\] \[data-commune-room-input\]/.test(css), "no chat compose in Classroom/Auction view");
 console.log("echo-classroom-card-click.test.js: OK");

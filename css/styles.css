@@ -13243,3 +13243,10 @@ a.site-switch-side:focus-visible {
 .birth-prompt-form .login-status.is-error {
   color: #ffb4c0;
 }
+
+/* Classroom / Auction open in the chat-room full view; no chat compose there. */
+.commune-room[data-commune-room-view] [data-commune-room-input],
+.commune-room[data-commune-room-view] .commune-room-compose button[type="submit"],
+.commune-room[data-commune-room-view] .commune-room-compose label {
+  display: none !important;
+}

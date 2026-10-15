@@ -12956,3 +12956,12 @@ a.site-switch-side:focus-visible {
     justify-content: flex-start !important;
   }
 }
+
+/* Default layout: Top Friends cards share one width (set from the widest card). */
+#panel-tower .tower-friend-pin.is-spawned {
+  width: var(--friend-pin-w, auto);
+  box-sizing: border-box;
+}
+#panel-tower .tower-friend-pin.is-spawned .tower-friend-pin-name {
+  white-space: nowrap;
+}

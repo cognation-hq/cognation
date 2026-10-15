@@ -256,6 +256,8 @@
         var pin = stage.querySelector('[data-tower-friend-pin="' + fid + '"]');
         if (!pin || pin.hidden || pin.classList.contains("is-dragging")) return;
         if (!phone && !isDefaultFriendPinPos(p, index, pinLayout[fid])) {
+          pin.classList.remove("is-spawned");
+          pin.style.removeProperty("--friend-pin-w");
           occupied.push({ x: pin.offsetLeft, y: pin.offsetTop, w: pin.offsetWidth, h: pin.offsetHeight });
           return;
         }
@@ -263,8 +265,13 @@
       });
     }
     if (autoPins.length) {
-      var pinW = 0, pinH = 0;
-      autoPins.forEach(function (pin) { pinW += pin.offsetWidth || 0; pinH = Math.max(pinH, pin.offsetHeight || 0); });
+      /* Same width for every default card (widest natural width), even 24px gaps. */
+      var cardW = 0, pinH = 0;
+      autoPins.forEach(function (pin) { pin.style.removeProperty("--friend-pin-w"); pin.classList.remove("is-spawned"); });
+      autoPins.forEach(function (pin) { cardW = Math.max(cardW, pin.offsetWidth || 0); });
+      autoPins.forEach(function (pin) { pin.style.setProperty("--friend-pin-w", Math.ceil(cardW) + "px"); pin.classList.add("is-spawned"); });
+      autoPins.forEach(function (pin) { pinH = Math.max(pinH, pin.offsetHeight || 0); });
+      var pinW = autoPins.length * Math.ceil(cardW);
       sizes.__friendpins = { w: pinW + (autoPins.length - 1) * SPAWN_GAP, h: pinH };
       var mi = -1;
       rows.forEach(function (r, i) { if (r.indexOf("music") >= 0) mi = i; });
@@ -277,7 +284,7 @@
     if (autoPins.length && placed.__friendpins) {
       var px = placed.__friendpins.x;
       autoPins.forEach(function (pin, i) {
-        if (i) px += (autoPins[i - 1].offsetWidth || 0) + SPAWN_GAP; /* even 24px gaps */
+        if (i) px += Math.ceil(cardW) + SPAWN_GAP; /* equal cards, even 24px gaps */
         applyFriendPinPosition(pin, {
           x: Math.round((px / stageW) * 10000) / 100,
           y: Math.round((placed.__friendpins.y / stageH) * 10000) / 100,

@@ -631,18 +631,24 @@
       .then(function (profiles) {
         renderFriends(profiles);
         emit("cognation:remote-friends-loaded", { profiles: profiles });
+        /* Friend ids must be profile UUIDs. Handles like seed-ana-0005 used to
+           land here, then id=eq.<handle> returned 400 22P02 and the failed
+           refetch fell back to an empty/default Tower layout after Save. */
+        var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
         var ids = (Array.isArray(profiles) ? profiles : [])
           .map(function (p) {
-            return String((p && (p.handle || p.id)) || "").replace(/^@/, "");
+            return String((p && p.id) || "");
           })
-          .filter(Boolean)
+          .filter(function (id) { return UUID_RE.test(id); })
           .slice(0, 250);
         var store = window.CognationTowerProfileStore;
         if (store && store.get && store.save) {
           try {
             var tower = store.get() || {};
             tower.friendIds = ids.slice();
-            store.save(tower, { geometry: true });
+            /* Friend roster only — never a geometry edit. geometry:true was
+               rewriting tower_widget_layouts on every Save/reload. */
+            store.save(tower);
           } catch (eHydrate) {}
         }
         try {

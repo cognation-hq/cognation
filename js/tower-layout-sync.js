@@ -49,6 +49,8 @@
       var pos = layout[id];
       if (!pos || typeof pos !== "object" || String(id).length > 64) return;
       var entry = { x: num(pos.x, 0), y: num(pos.y, 0), z: num(pos.z, 1), tilt: num(pos.tilt, 0) };
+      /* Owner drops mark dragged:true. Dropping that flag made getWidgetLayout
+         treat a real layout as never-dragged and fall back to the default spawn. */
       if (pos.dragged === true) entry.dragged = true;
       out[id] = entry;
     });
@@ -112,8 +114,11 @@
         if (wid === "_public") return;
         var next = saved[wid];
         var prev = base[wid];
+        /* Keep a local dragged mark when an older DB row predated that flag. */
         if (prev && prev.dragged === true && next && next.dragged !== true) {
-          next = { x: next.x, y: next.y, z: next.z, tilt: next.tilt, dragged: true };
+          next = {
+            x: next.x, y: next.y, z: next.z, tilt: next.tilt, dragged: true
+          };
         }
         base[wid] = next;
       });

@@ -786,6 +786,14 @@
       } catch (e2) {}
       run(true);
     });
+    /* Birth month just saved (real accounts): re-read user_birth so rooms and
+       classrooms open without a reload. */
+    document.addEventListener("cognation:birth-saved", function () {
+      try {
+        sessionStorage.removeItem(BOOT_FLAG);
+      } catch (e3) {}
+      run(true);
+    });
     document.addEventListener("cognation:member-profile-updated", function () {
       schedulePersist();
     });

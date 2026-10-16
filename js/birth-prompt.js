@@ -188,6 +188,9 @@
         }
         markShown(uid());
         closePanel();
+        try {
+          document.dispatchEvent(new CustomEvent("cognation:birth-saved", { detail: { year: y, month: m } }));
+        } catch (eEv) {}
       })
       .catch(function () {
         busy = false;

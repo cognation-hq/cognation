@@ -93,6 +93,7 @@
   var CLASSROOM_SESSIONS = [
     {
       id: "class-insurance",
+      sqlId: "a2000000-0000-4000-8000-000000000001",
       title: "Insurance basics",
       topic: "insurance",
       body: "What coverage is for, how premiums work, and questions worth asking before you buy.",
@@ -100,6 +101,7 @@
     },
     {
       id: "class-voting",
+      sqlId: "a2000000-0000-4000-8000-000000000002",
       title: "Voting & civic basics",
       topic: "voting",
       body: "How elections reach the ballot, registering where you live, and finding nonpartisan guides.",
@@ -107,6 +109,7 @@
     },
     {
       id: "class-business",
+      sqlId: "a2000000-0000-4000-8000-000000000003",
       title: "Starting a small business",
       topic: "business",
       body: "Sole prop vs LLC in plain language, basic bookkeeping, and when to ask a professional.",
@@ -929,6 +932,7 @@
       topic: session.topic,
       host: "Cognation",
       classroom: true,
+      sqlId: session.sqlId || "",
       minAge: session.minAge || 18,
     };
   }
@@ -938,7 +942,8 @@
   }
 
   function visibleClassroomSessions() {
-    if (!classroomAllowed()) return [];
+    /* No birth month yet: keep the card so Join can offer Add birth month. */
+    if (!classroomAllowed() && !liveBirthMissing()) return [];
     return classroomCatalog();
   }
 
@@ -2062,9 +2067,10 @@
     var codes = [
       ["no_birth", "Add your birth year and month in your profile to join chat rooms"],
       ["under_13", "Chat rooms are for members 13 and up."],
+      ["under_18", "Classrooms are for members 18 and up."],
       ["rating_blocked", "This room's rating is not available for your account."],
       ["blocked", "You can't join this room because of a block."],
-      ["room_full", "This room is full (12 people). Try another room or come back later."],
+      ["room_full", "This room is full. Try another room or come back later."],
       ["not_a_member", "Join the room before posting."],
       ["room_not_found", "That room is not available right now."],
       ["bad_body", "Message must be 1–500 characters."],
@@ -2076,6 +2082,11 @@
     var i;
     if (text.indexOf("under_13") !== -1 && liveBirthMissing()) {
       return { code: "no_birth", message: codes[0][1] + "." };
+    }
+    /* Full-room message uses the room's real cap from the server (room_full:<max_members>). */
+    var full = text.match(/room_full:(\d+)/);
+    if (full) {
+      return { code: "room_full", message: "This room is full (" + full[1] + " people). Try another room or come back later." };
     }
     for (i = 0; i < codes.length; i++) {
       if (text.indexOf(codes[i][0]) !== -1) {
@@ -2432,7 +2443,15 @@
     if (title) title.textContent = room.title || "Room";
     if (topic) topic.textContent = room.body || room.topic || "";
     /* Live rooms only (no local demo room). */
-    if (kicker) kicker.textContent = "Chatroom · live · hosted by Cognation";
+    if (kicker) kicker.textContent = opts.classroom ? "Classroom · live · hosted by Cognation" : "Chatroom · live · hosted by Cognation";
+    var members = panel.querySelector("[data-commune-room-members]");
+    if (!members && log && log.parentNode) {
+      members = document.createElement("p");
+      members.className = "commune-card-meta commune-room-members";
+      members.setAttribute("data-commune-room-members", "");
+      log.parentNode.insertBefore(members, log);
+    }
+    if (members) { members.hidden = true; members.textContent = ""; }
     if (log) paintLiveLog(opts.messages || state.liveMessages || []);
     showRoom(true);
     state.roomId = room.id;
@@ -2440,22 +2459,39 @@
     state.roomSqlId = opts.live ? String(room.sqlId || opts.sqlId || "") : "";
     if (opts.live && opts.messages) state.liveMessages = opts.messages;
   }
+  /* Real member count from chat_room_members (members-only RLS). Hidden if unavailable. */
+  function paintRoomMembers(sqlId) {
+    var sb = window.CognationSupabase;
+    var panel = state.shell && state.shell.querySelector("[data-commune-room]");
+    var el = panel && panel.querySelector("[data-commune-room-members]");
+    if (!el || !sb || typeof sb.rest !== "function" || !sqlId) return;
+    sb.rest("chat_room_members", { query: "select=user_id&room_id=eq." + encodeURIComponent(sqlId) }).then(function (rows) {
+      if (state.roomSqlId !== sqlId || !Array.isArray(rows)) return;
+      el.textContent = rows.length === 1 ? "1 member here" : rows.length + " members here";
+      el.hidden = false;
+    }, function () { el.hidden = true; });
+  }
   /* No local demo fallback: if the live room can't open, say so and stay on the deck. */
   function liveRoomUnavailable(message) {
     setStatus(message || "Live rooms aren't available right now. Try again soon.");
     return false;
   }
 
-  function openLiveRoom(room, scroll) {
+  function openLiveRoom(room, scroll, roomOpts) {
+    roomOpts = roomOpts || {};
+    var isClass = !!roomOpts.classroom;
     var sqlId = String(room.sqlId || "");
     if (!sqlId) return Promise.resolve(liveRoomUnavailable("This room isn't live yet."));
-    setStatus("Joining live room…");
+    setStatus(isClass ? "Joining classroom…" : "Joining live room…");
     closeClassroom();
     return joinLiveRoom(sqlId).then(function () {
       return fetchLiveMessages(sqlId).then(function (messages) {
-        paintRoom(room, { live: true, sqlId: sqlId, messages: filterBlockedLiveMessages(messages) });
-        setStatus("You're in " + (room.title || "the room") + " — live group chat (up to 12).");
-        friction("begin", "chat", "chatroom:" + room.id);
+        paintRoom(room, { live: true, sqlId: sqlId, classroom: isClass, messages: filterBlockedLiveMessages(messages) });
+        paintRoomMembers(sqlId);
+        setStatus(isClass
+          ? "You're in the " + (room.title || "classroom") + " classroom — live."
+          : "You're in " + (room.title || "the room") + " — live group chat (up to 12).");
+        friction("begin", isClass ? "classroom" : "chat", (isClass ? "classroom:" : "chatroom:") + room.id);
         if (scroll && state.shell && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
         return true;
       });
@@ -2464,6 +2500,7 @@
         return liveRoomUnavailable("Live rooms aren't ready yet. Try again soon.");
       }
       var mapped = mapChatRoomError(err);
+      if (isClass && mapped.code === "room_not_found") mapped = { code: mapped.code, message: "Classrooms aren't live yet. Try again soon." };
       showJoinError(mapped);
       return false;
     });
@@ -2648,6 +2685,12 @@
     sessions.forEach(function (item) { if (item.id === sessionId) session = item; });
     if (!session && sessions.length) session = sessions[0];
     if (!session) return false;
+    /* Signed in + 18+: a real live classroom (join_chat_room, messages, members). */
+    if (state.shell && liveChatEligible() && session.sqlId) {
+      state.classroomId = "";
+      openLiveRoom(session, scroll, { classroom: true });
+      return true;
+    }
     if (!state.shell) {
       /* Allow pathway smoke before shell bind: surface still exists in DOM. */
       var panel = document.querySelector("[data-classroom], #panel-classroom, [data-commune-classroom]");

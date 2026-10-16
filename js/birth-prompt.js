@@ -181,6 +181,7 @@
       .rpc("set_my_birth_month", { y: y, m: m })
       .then(function (ok) {
         busy = false;
+        setStatus("", false); /* clear "Saving…" the moment the save resolves */
         if (ok === false) {
           /* Server refused (e.g. under 13) — soft redirect, no lecture. */
           setStatus("We couldn't save that. Cognation is for ages 13 and up.", true);

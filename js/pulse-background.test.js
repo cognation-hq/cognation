@@ -26,4 +26,7 @@ assert.ok(/\.pulse-fall-stack \{ z-index: 3; \}/.test(tail), "friend circles abo
 assert.ok(!/yellow|#ff[cd]|#fe[0-9a-f]{4}|255, ?2[0-9]{2}, ?[0-9]{1,2}\)/i.test(tail), "no yellow");
 assert.ok(/layer\.setAttribute\("data-pulse-bg", ""\)/.test(tower), "PULSE layer opts in");
 assert.ok(/PULSE_BG_SQUARES/.test(tower) && /pinCircleSpotsToBackground\(spots\)/.test(tower), "spots sit where the squares were");
+assert.ok(!/\.circle-lightning,\s*\.circle-fall\[data-pulse-bg\] svg\.circle-bolt \{ display: none/.test(tail), "lightning + bolt not hidden");
+assert.ok(/svg\.circle-bolt \{ filter: opacity\(0\.55\); mix-blend-mode: screen; \}/.test(tail), "lightning + bolt toned, not hidden");
+assert.ok(/\.circle-ring::before \{[\s\S]*?rgba\(168, 244, 255, 0\.16\)[\s\S]*?rgba\(197, 166, 255, 0\.2\)/.test(tail), "halo blended over the image");
 console.log("pulse-background.test: ok");

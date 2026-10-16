@@ -13726,7 +13726,11 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   --pulse-bg-k: 0.954;            /* image px -> screen px (ring ~1040px wide) */
   --pulse-bg-w: calc(1190px * var(--pulse-bg-k));
   --pulse-bg-h: calc(600px * var(--pulse-bg-k));
-  background: #1b1545;
+  /* Cap 250 halo kept, blended over the image's page colour. */
+  background:
+    radial-gradient(ellipse at 50% 44%, rgba(168, 244, 255, 0.16), transparent 42%),
+    radial-gradient(ellipse at 52% 52%, rgba(197, 166, 255, 0.2), transparent 58%),
+    #1b1545;
 }
 .circle-fall[data-pulse-bg]::before,
 .circle-fall[data-pulse-bg]::after {
@@ -13764,9 +13768,21 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   50% { transform: translate3d(3px, -2px, 0) rotate(0.2deg) scale(1.012); }
   100% { transform: translate3d(5px, 2px, 0) rotate(0.4deg) scale(0.998); }
 }
-/* the painted lightning would double the strands on top of the image */
+/* Painted lightning + bolt stay on (still-here list), toned down and blended
+   so they sit with the image strands instead of doubling them. */
 .circle-fall[data-pulse-bg] .circle-lightning,
-.circle-fall[data-pulse-bg] svg.circle-bolt { display: none; }
+.circle-fall[data-pulse-bg] svg.circle-bolt { filter: opacity(0.55); mix-blend-mode: screen; }
+/* Halo glow over the image (the image is opaque, so the page halo alone is hidden). */
+.circle-fall[data-pulse-bg] .circle-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(ellipse at 50% 44%, rgba(168, 244, 255, 0.16), transparent 42%),
+    radial-gradient(ellipse at 52% 52%, rgba(197, 166, 255, 0.2), transparent 58%);
+}
 .circle-fall[data-pulse-bg] .circle-ring { z-index: 2; }
 /* real friend circles sit on top of the background and the ring */
 .circle-fall[data-pulse-bg] .pulse-fall-stack { z-index: 3; }

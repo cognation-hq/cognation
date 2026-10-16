@@ -522,7 +522,7 @@
     stage.querySelectorAll("[data-tower-widget]").forEach(function (el) {
       if (el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
       var r = el.getBoundingClientRect();
-      spots.push({ el: el, left: r.left - sr.left, top: r.top - sr.top, w: r.width });
+      spots.push({ el: el, left: r.left - sr.left, top: r.top - sr.top, w: r.width, half: el.classList.contains("is-spawn-half") });
     });
     /* Profile strip (avatar | name/@handle/quote) is one grid row. Freeze its
        members too, in the same top row, so the first drag on a fresh page never
@@ -569,7 +569,12 @@
       sp.x = Math.round((sp.left / w) * 1000) / 10;
       sp.y = Math.round((sp.top / h) * 1000) / 10;
       el.classList.remove("is-spawn-full", "is-spawn-half");
-      if (sp.w && stripMembers.indexOf(el) < 0) el.style.setProperty("--spawn-max-w", Math.ceil(sp.w) + "px");
+      if (sp.w && stripMembers.indexOf(el) < 0) {
+        el.style.setProperty("--spawn-max-w", Math.ceil(sp.w) + "px");
+        /* Half-row widgets keep their column width. Full rows (YouTube, Music)
+           were height-capped by the grid, so they return to their own size. */
+        if (sp.half) setStickerWidth(el, sp.w);
+      }
       el.classList.add("is-spawned");
       el.style.setProperty("--sticker-x", sp.x + "%");
       el.style.setProperty("--sticker-y", sp.y + "%");
@@ -581,6 +586,36 @@
       spawnCache[el.getAttribute("data-tower-widget")] = { x: sp.x, y: sp.y, z: 2, tilt: 0 };
     });
     return true;
+  }
+
+  /* A widget keeps the width it had on the grid once it is frozen or dragged,
+     so a drag never shrinks it to its text width (big empty area on the right). */
+  function setStickerWidth(el, w) {
+    if (!el || !el.style) return;
+    var n = Math.round(parseFloat(w));
+    if (n > 0) {
+      el.style.setProperty("--sticker-w", n + "px");
+      el.setAttribute("data-sticker-w", String(n));
+    } else {
+      el.style.removeProperty("--sticker-w");
+      el.removeAttribute("data-sticker-w");
+    }
+  }
+
+  /* MP3 is Personal only. On Pro the music widget is not just hidden: its layout
+     spot and its show/hide switch are dropped from the profile and never saved. */
+  function stripProMusic(p) {
+    if (!isProTower(p)) return false;
+    var changed = false;
+    if (p.widgetLayout && typeof p.widgetLayout === "object" && p.widgetLayout.music) {
+      delete p.widgetLayout.music;
+      changed = true;
+    }
+    if (p.publicWidgets && typeof p.publicWidgets === "object" && Object.prototype.hasOwnProperty.call(p.publicWidgets, "music")) {
+      delete p.publicWidgets.music;
+      changed = true;
+    }
+    return changed;
   }
 
   /* Before saving any layout, pin every on-screen spawned widget where it is now,
@@ -602,6 +637,8 @@
         tilt: 0,
       };
       if (typeof el.offsetTop === "number" && (stage.clientHeight || 0) > 0) layout[id].yPx = Math.round(el.offsetTop);
+      var frozenW = parseFloat(el.getAttribute("data-sticker-w") || "");
+      if (frozenW > 0) layout[id].wPx = Math.round(frozenW);
       el.classList.remove("is-spawned");
     });
     return layout;
@@ -1220,6 +1257,8 @@
           tilt: layoutCoord(pos.tilt, layoutCoord(cur.tilt, 0)),
         };
         if (typeof pos.yPx === "number" && isFinite(pos.yPx)) base[id].yPx = pos.yPx;
+        if (typeof pos.wPx === "number" && isFinite(pos.wPx) && pos.wPx > 0) base[id].wPx = pos.wPx;
+        if (pos.dragged === true) base[id].dragged = true;
       });
       p.widgetLayout = base;
     }
@@ -1796,6 +1835,7 @@
       if (!isTowerOwner(data)) return false;
       /* The loading placeholder is never saved anywhere. */
       if (data._loading) return false;
+      stripProMusic(data);
       this._saving = true;
       try {
       writeScrapbookLayout(data, { keepLayout: !opts.geometry });
@@ -5651,6 +5691,7 @@
 
   function pruneEmptyPublicWidgetsInProfile(p) {
     if (!p) return p;
+    stripProMusic(p);
     p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
     var sloganText = typeof p.slogan === "string" ? p.slogan.trim() : "";
     var htmlText = typeof p.customHtml === "string" ? p.customHtml.trim() : "";
@@ -7208,6 +7249,8 @@
         btn.disabled = !hasRemote;
         if (!hasRemote && remoteKind === "professional") {
           btn.title = "Add a professional page from Edit profile";
+        } else {
+          btn.removeAttribute("title");
         }
       });
       return;
@@ -7232,6 +7275,7 @@
     /* Show both tabs if owner might add second — keep professional visible when only personal */
     var proBtn = toggle.querySelector('[data-tower-profile-kind="professional"]');
     var perBtn = toggle.querySelector('[data-tower-profile-kind="personal"]');
+    if (proBtn) proBtn.removeAttribute("title");
     if (proBtn && !profiles.some(function (p) { return p.kind === "professional"; })) {
       proBtn.hidden = false;
       proBtn.disabled = true;
@@ -7303,6 +7347,12 @@
       syncAddProfileUi(root);
     });
     document.addEventListener("cognation:session-started", function () {
+      syncProfileKindToggle(root);
+      syncAddProfileUi(root);
+    });
+    /* My profiles arrive after boot: re-check so "Add a professional page" hides
+       as soon as the Pro page is known. */
+    document.addEventListener("cognation:remote-profile-loaded", function () {
       syncProfileKindToggle(root);
       syncAddProfileUi(root);
     });
@@ -7943,6 +7993,7 @@
       el.setAttribute("data-sticker-x", String(x));
       el.setAttribute("data-sticker-y", String(y));
       el.setAttribute("data-sticker-z", String(z));
+      setStickerWidth(el, pos && typeof pos === "object" && isPlacedPos(layout, id) ? pos.wPx : 0);
     });
     stage.querySelectorAll("[data-tower-polaroid-extra]").forEach(function (extraEl) {
       if (extraEl.classList.contains("is-dragging")) return;
@@ -8747,8 +8798,18 @@
         if (e.cancelable) e.preventDefault();
         var dxPct = (dxPx / rect.width) * 100;
         var dyPct = (dyPx / rect.height) * 100;
-        var nx = Math.max(0, Math.min(88, startX + dxPct));
-        var ny = Math.max(0, Math.min(88, startY + dyPct));
+        /* Keep the whole widget inside the card: right edge stops at the card edge. */
+        var inset = rect.width > 0 ? (12 / rect.width) * 100 : 0;
+        var maxX = 88;
+        if (rect.width > 0 && sticker.offsetWidth > 0) {
+          maxX = Math.max(inset, 100 - inset - (sticker.offsetWidth / rect.width) * 100);
+        }
+        var maxY = 88;
+        if (rect.height > 0 && sticker.offsetHeight > 0) {
+          maxY = Math.max(0, 100 - (sticker.offsetHeight / rect.height) * 100);
+        }
+        var nx = Math.max(inset, Math.min(maxX, startX + dxPct));
+        var ny = Math.max(0, Math.min(maxY, startY + dyPct));
         sticker.style.setProperty("--sticker-x", nx + "%");
         sticker.style.setProperty("--sticker-y", ny + "%");
         sticker.setAttribute("data-sticker-x", String(Math.round(nx * 10) / 10));
@@ -8812,6 +8873,8 @@
             /* Owner drag: free placement, never treated as an auto-spawn pile. */
             dragged: true,
           };
+          var dropW = parseFloat(sticker.getAttribute("data-sticker-w") || "") || (prev && prev.wPx) || 0;
+          if (dropW > 0) layout[id].wPx = Math.round(dropW);
           var dropYPx = stickerYPxFromDrop(dropY, stage.clientHeight || rect.height || 0);
           if (dropYPx != null) layout[id].yPx = dropYPx;
           p.widgetLayout = layout;

@@ -12996,6 +12996,54 @@ a.site-switch-side:focus-visible {
   content: none !important;
   display: none !important;
 }
+/* Profile strip v3.4 (PR #143): avatar shown whole (no clipping under GO LIVE /
+   Edit profile), and each member's move handle sits in its own left gutter so it
+   never covers the avatar or the name. */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] {
+  max-height: none;
+  overflow: visible;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned {
+  flex-direction: row;
+  gap: 10px;
+  padding-left: 32px;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--identity.is-spawned {
+  padding-left: 32px;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker.is-spawned > .tower-sticker-handle {
+  left: 2px;
+  top: 50%;
+  right: auto;
+  transform: translateY(-50%);
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned .tower-avatar-stack {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  height: auto;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned .tower-profile-actions {
+  width: auto;
+  margin: 0;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned .tower-go-live-btn {
+  width: auto;
+  height: auto;
+  white-space: nowrap;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned .tower-profile-edit {
+  width: auto;
+  margin: 0;
+}
+/* After a drag a widget keeps the width it had on the grid (wPx). */
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker[data-sticker-w] {
+  width: var(--sticker-w);
+  max-width: 100%;
+  box-sizing: border-box;
+}
 /* Half-height media / followers strips on default grid */
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--youtube.is-spawned {
   max-height: 112px;
@@ -13013,6 +13061,33 @@ a.site-switch-side:focus-visible {
   max-height: 72px;
   transform: none;
 }
+/* PR #143: the 72px strip squeezed the iPod but not its screen, so the black
+   screen and the wheel spilled over the player and onto Calendar. Lay the
+   compact player out as one row (screen | wheel) and clip to the player. */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--music.is-spawned .tower-ipod {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  height: 72px;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 6px 10px;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--music.is-spawned .tower-ipod-screen {
+  flex: 1 1 auto;
+  height: 56px;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--music.is-spawned .tower-ipod-wheel {
+  flex: 0 0 auto;
+  zoom: 0.46;
+  margin: 0;
+}
+
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--followers.is-spawned {
   min-height: 0;
   padding: 8px 12px;

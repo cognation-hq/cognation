@@ -14,7 +14,12 @@
 --
 -- ROLLBACK: re-run the two functions from 20261016_seed_birth_backfill.sql, then
 --   delete from public.chat_rooms where slug like 'class-%';
---   alter table public.chat_rooms drop constraint if exists chat_rooms_max_members_check;
+--   do $$ declare c record; begin
+--     for c in select conname from pg_constraint
+--       where conrelid = 'public.chat_rooms'::regclass and contype = 'c'
+--         and pg_get_constraintdef(oid) ilike '%max_members%'
+--     loop execute format('alter table public.chat_rooms drop constraint %I', c.conname); end loop;
+--   end $$;
 --   alter table public.chat_rooms alter column max_members set not null;
 --   alter table public.chat_rooms add constraint chat_rooms_max_members_check check (max_members between 2 and 20);
 --   alter table public.chat_rooms drop column if exists min_age;
@@ -26,9 +31,22 @@ alter table public.chat_rooms
 /* Member cap: chatrooms keep their small cap (2–20). Classrooms (min_age >= 18)
    have no cap: max_members is null, and join skips the cap check. */
 alter table public.chat_rooms alter column max_members drop not null;
-alter table public.chat_rooms drop constraint if exists chat_rooms_max_members_check;
+/* Drop any existing max_members check by lookup (name-independent, idempotent). */
+do $$
+declare
+  c record;
+begin
+  for c in
+    select conname from pg_constraint
+    where conrelid = 'public.chat_rooms'::regclass
+      and contype = 'c'
+      and pg_get_constraintdef(oid) ilike '%max_members%'
+  loop
+    execute format('alter table public.chat_rooms drop constraint %I', c.conname);
+  end loop;
+end $$;
 alter table public.chat_rooms add constraint chat_rooms_max_members_check
-  check (max_members between 2 and 20 or (max_members is null and min_age >= 18));
+  check ((max_members is not null and max_members between 2 and 20) or (max_members is null and min_age >= 18));
 
 insert into public.chat_rooms (id, slug, title, topic, body, rating, max_members, min_age) values
   ('a2000000-0000-4000-8000-000000000001', 'class-insurance', 'Insurance basics', 'insurance', 'Cognation Classroom — life skills at a human pace.', 'PG-13', null, 18),

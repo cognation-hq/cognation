@@ -24,7 +24,7 @@ const sql = fs.readFileSync(path.join(__dirname, "..", "supabase", "migrations",
 assert.strictEqual((sql.match(/if age < room\.min_age then raise exception 'under_18'/g) || []).length, 2, "server 18+ gate");
 assert.ok(!/up to 20/.test(swipe), "no 'up to 20' text");
 assert.ok(!/full \(12 people\)/.test(swipe) && /room_full:\(\\d\+\)/.test(swipe), "full message uses real cap");
-assert.ok(/max_members is null and min_age >= 18/.test(sql) && /if room\.max_members is not null/.test(sql), "classrooms uncapped");
+assert.ok(/check \(\(max_members is not null and max_members between 2 and 20\) or \(max_members is null and min_age >= 18\)\)/.test(sql) && /pg_get_constraintdef\(oid\) ilike '%max_members%'/.test(sql) && /if room\.max_members is not null/.test(sql), "classrooms uncapped");
 assert.ok(/'PG-13', null, 18\)/.test(sql), "classroom rows have null cap");
 assert.ok(/comment on function public\.join_chat_room\(uuid\) is/.test(sql), "comment kept");
 console.log("join-birth-button ok");

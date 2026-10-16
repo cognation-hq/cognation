@@ -13665,3 +13665,56 @@ svg.circle-bolt {
   margin: 0;
   white-space: nowrap;
 }
+
+/* ---- Live room chat view (chatrooms + classrooms): full height, phone-first ---- */
+body.commune-room-view-open { overflow: hidden; }
+/* Let the fixed overlay escape the card: drop the shell's backdrop-filter (it makes a
+   containing block for position: fixed) and lift the tab section above the site header. */
+body.commune-room-view-open .commune-swipe-shell { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
+.commune-room-head { display: flex; align-items: center; gap: 0.6rem; }
+.commune-room-head-titles { display: flex; flex-direction: column; min-width: 0; }
+.commune-room-head-titles .commune-card-title { margin: 0; }
+.commune-room-head-titles .commune-room-members { margin: 0; color: var(--cgn-text-muted, rgba(185, 191, 224, 0.75)); font-size: 0.78rem; }
+.commune-room-head-back {
+  flex: none; border: 1px solid rgba(220, 246, 255, 0.24); border-radius: 999px;
+  background: rgba(16, 19, 48, 0.6); color: #f7f9ff; padding: 0.35rem 0.75rem; font: inherit; cursor: pointer;
+}
+.commune-room-head-back:focus-visible { outline: 2px solid #d9d2f0; outline-offset: 2px; }
+
+.commune-room-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.15rem 0.45rem; }
+.commune-room-time { white-space: nowrap; color: var(--cgn-text-muted, rgba(185, 191, 224, 0.75)); font-size: 0.72rem; }
+.commune-room-body { display: block; overflow-wrap: anywhere; }
+.commune-room[data-commune-room-overlay] {
+  position: fixed; inset: 0; z-index: 10000;
+  height: 100vh; height: 100dvh; min-height: 0;
+  margin: 0 auto; width: 100%; max-width: 46rem;
+  border-radius: 0; border-width: 0 1px; gap: 0;
+  padding: calc(0.6rem + env(safe-area-inset-top)) 0 0;
+  background: #0e1028;
+  /* Desktop: dim the page around the centered chat column. */
+  box-shadow: 0 0 0 100vmax rgba(5, 6, 20, 0.78);
+  touch-action: pan-y;
+}
+.commune-room[data-commune-room-overlay] > .commune-card-kicker,
+.commune-room[data-commune-room-overlay] > [data-commune-room-topic] { display: none; }
+.commune-room[data-commune-room-overlay] .commune-room-head {
+  padding: 0 1rem 0.6rem; border-bottom: 1px solid rgba(220, 246, 255, 0.14);
+}
+.commune-room[data-commune-room-overlay] .commune-room-log {
+  flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; overscroll-behavior: contain;
+  align-content: end; gap: 0.7rem; padding: 0.8rem 1rem;
+}
+.commune-room[data-commune-room-overlay] .commune-room-compose {
+  flex: none; display: flex; align-items: flex-end; gap: 0.5rem;
+  padding: 0.6rem 1rem calc(0.6rem + env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(220, 246, 255, 0.14); background: #0e1028;
+}
+.commune-room[data-commune-room-overlay] .commune-room-compose textarea { flex: 1; min-height: 2.6rem; max-height: 8rem; resize: none; }
+.commune-room[data-commune-room-overlay] .commune-room-compose .form-actions { margin: 0; flex: none; }
+.commune-room[data-commune-room-overlay]:not([data-commune-room-view]) [data-commune-room-back] { display: none; }
+.commune-room[data-commune-room-overlay][data-commune-room-view] .commune-room-log { align-content: start; }
+[data-commune-opens-profile] { cursor: pointer; }
+@media (prefers-reduced-motion: reduce) {
+  .commune-room[data-commune-room-overlay], .commune-room[data-commune-room-overlay] * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}

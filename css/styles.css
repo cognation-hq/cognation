@@ -13718,3 +13718,66 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 @media (prefers-reduced-motion: reduce) {
   .commune-room[data-commune-room-overlay], .commune-room[data-commune-room-overlay] * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* pulse-background PR: Alexa's PULSE background (refs/alexa-final-2026-10-15.png),
+   used as-is with only the five placeholder squares removed. WebP with a JPEG
+   fallback; phones load the 760px file. Strands drift gently; off for reduced motion. */
+.circle-fall[data-pulse-bg] {
+  --pulse-bg-k: 0.954;            /* image px -> screen px (ring ~1040px wide) */
+  --pulse-bg-w: calc(1190px * var(--pulse-bg-k));
+  --pulse-bg-h: calc(600px * var(--pulse-bg-k));
+  background: #1b1545;
+}
+.circle-fall[data-pulse-bg]::before,
+.circle-fall[data-pulse-bg]::after {
+  content: "";
+  position: absolute;
+  /* ring centre in the image is (605, 262); pin it to the ring centre (50%, 48%) */
+  left: calc(50% - 605px * var(--pulse-bg-k));
+  top: calc(48% - 262px * var(--pulse-bg-k));
+  width: var(--pulse-bg-w);
+  height: var(--pulse-bg-h);
+  background-image: url("../assets/pulse/pulse-bg-1190.jpg");
+  background-image: image-set(url("../assets/pulse/pulse-bg-1190.webp") type("image/webp"), url("../assets/pulse/pulse-bg-1190.jpg") type("image/jpeg"));
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 0;
+}
+.circle-fall[data-pulse-bg]::before {
+  /* soft edge so the image melts into the page colour */
+  -webkit-mask-image: radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+  mask-image: radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+}
+.circle-fall[data-pulse-bg]::after {
+  /* drift layer: the same strands, masked to the ring band, shifted slowly */
+  opacity: 0.42;
+  mix-blend-mode: screen;
+  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 51% 44%, transparent 58%, #000 76%, #000 90%, transparent 100%);
+  mask-image: radial-gradient(ellipse 50% 50% at 51% 44%, transparent 58%, #000 76%, #000 90%, transparent 100%);
+  transform-origin: 51% 44%;
+  will-change: transform;
+  animation: pulse-strand-drift 16s ease-in-out infinite alternate;
+}
+@keyframes pulse-strand-drift {
+  0% { transform: translate3d(-4px, 1px, 0) rotate(-0.35deg) scale(1.004); }
+  50% { transform: translate3d(3px, -2px, 0) rotate(0.2deg) scale(1.012); }
+  100% { transform: translate3d(5px, 2px, 0) rotate(0.4deg) scale(0.998); }
+}
+/* the painted lightning would double the strands on top of the image */
+.circle-fall[data-pulse-bg] .circle-lightning,
+.circle-fall[data-pulse-bg] svg.circle-bolt { display: none; }
+.circle-fall[data-pulse-bg] .circle-ring { z-index: 2; }
+/* real friend circles sit on top of the background and the ring */
+.circle-fall[data-pulse-bg] .pulse-fall-stack { z-index: 3; }
+@media (max-width: 600px) {
+  .circle-fall[data-pulse-bg] { --pulse-bg-k: 0.31; }
+  .circle-fall[data-pulse-bg]::before,
+  .circle-fall[data-pulse-bg]::after {
+    background-image: url("../assets/pulse/pulse-bg-760.jpg");
+    background-image: image-set(url("../assets/pulse/pulse-bg-760.webp") type("image/webp"), url("../assets/pulse/pulse-bg-760.jpg") type("image/jpeg"));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .circle-fall[data-pulse-bg]::after { animation: none; transform: none; }
+}

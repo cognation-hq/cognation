@@ -134,6 +134,11 @@ assert.strictEqual(adult.setMode("professional"), "professional");
 assert.strictEqual(adult.getMode(), "professional");
 assert.strictEqual(stores.session.getItem(adult.MODE_KEY), "professional", "mode stored for the session");
 
+/* Standing rule (r147): placeholder cards are hidden by default — only real pages show. */
+var realOnly = adult.sampleDeck(21);
+assert.ok(realOnly.length > 0 && realOnly.every(function (c) { return !c.demo && c.type === "pro-know"; }), "no Demo · placeholder cards by default");
+/* The hidden placeholder lanes are still built correctly (for when real feeds back them). */
+adult._setShowProPlaceholders(true);
 var proDeck = adult.sampleDeck(21);
 assert.strictEqual(proDeck.length, 21);
 var banned = ["dating", "know", "friend", "ad", "classroom", "chatroom", "fact", "wellness", "event", "content"];
@@ -189,8 +194,7 @@ assert.ok(adult.sampleDeck(20).every(function (c) { return !/^pro-/.test(c.type)
 var empty = loadSwipe(memoryStorage(), memoryStorage());
 empty.setMode("professional");
 var emptyKnow = empty.buildProfessionalLanes()["pro-know"];
-assert.strictEqual(emptyKnow.length, 1);
-assert.strictEqual(emptyKnow[0].demo, true, "placeholder when no professional pages");
+assert.strictEqual(emptyKnow.length, 0, "no placeholder person card when there are no professional pages");
 assert.ok(!empty.buildProfessionalLanes()["pro-auction"].length, "auction hidden when age unknown (18+)");
 
 /* Under-13: G/PG only — no auction, no pro contact cards under 13. */
@@ -200,6 +204,7 @@ kidLocal.setItem("cognation.profiles.v1", stores.local.getItem("cognation.profil
 var kidSession = memoryStorage();
 kidSession.setItem("cognation.commune.mode", "professional");
 var kid = loadSwipe(kidLocal, kidSession);
+kid._setShowProPlaceholders(true);
 assert.strictEqual(kid.getMode(), "professional");
 var kidDeck = kid.sampleDeck(15);
 assert.ok(kidDeck.length > 0, "under-13 still gets a Professional deck");

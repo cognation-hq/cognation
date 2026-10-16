@@ -56,7 +56,7 @@ assert.ok(/state\.lastDragDx = dx;/.test(src), "drag distance recorded so a swip
 /* Designer LOOK: Classroom and Auction open in the chat-room full view. */
 assert.ok(typeof api.openAuction === "function", "openAuction exported");
 assert.ok(/card\.type === PRO\.AUCTION\) \{\s*wireClassroomCardClick\(el, card, function \(\) \{ openAuction\(card, true\); \}\)/.test(src), "auction cards wired to openAuction");
-assert.ok(/function paintCardView[\s\S]{0,200}querySelector\("\[data-commune-room\]"\)/.test(src), "card view reuses the chat-room panel");
+assert.ok(/function paintCardView[\s\S]{0,200}(querySelector\("\[data-commune-room\]"\)|roomEl\(\))/.test(src), "card view reuses the chat-room panel");
 assert.ok(/function paintClassroom[\s\S]{0,500}paintCardView\("classroom"/.test(src), "classroom paints the chat-room view");
 assert.ok(/function openAuction[\s\S]{0,300}paintCardView\("auction"/.test(src), "auction paints the chat-room view");
 assert.ok(/state\.cardView[\s\S]{0,40}closeCardView\(\)/.test(src), "Back to deck closes the card view");

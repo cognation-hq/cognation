@@ -1949,6 +1949,14 @@
     } else if (card.type === PRO.AUCTION) {
       wireClassroomCardClick(el, card, function () { openAuction(card, true); });
     }
+    /* Alexa's rule: an ECHO card opens its own full-screen window or a Tower profile, nothing else. */
+    if (card.type === TYPE.CHAT) {
+      wireClassroomCardClick(el, card, function () { openRoom(card.id, true); });
+    }
+    if ((card.type === TYPE.KNOW || card.type === TYPE.FRIEND || card.type === TYPE.EVENT || card.type === TYPE.CONTENT) && card.handle) {
+      el.setAttribute("data-commune-opens-profile", "");
+      wireClassroomCardClick(el, card, function () { openProfessionalPage(card); });
+    }
     if (card.type === TYPE.AD && card.handle) {
       el.addEventListener("click", function (ev) {
         if (ev.target.closest("button, a, input, video, iframe")) return;
@@ -1980,14 +1988,78 @@
     }
   }
 
+  function roomEl() {
+    if (state.roomPanel && state.roomPanel.isConnected) return state.roomPanel;
+    var found = state.shell && state.shell.querySelector("[data-commune-room]");
+    if (found) state.roomPanel = found;
+    return found || null;
+  }
+
+  /* Full-screen overlay above the deck. While open, body.commune-room-view-open
+     lifts the trap that kept the old panel inside the card (the shell's
+     backdrop-filter and the tab section's low z-index, see styles.css), locks body
+     scroll, keeps focus inside, and Escape closes. On close, focus returns to what
+     opened it. */
+  function setRoomOverlay(panel, on) {
+    if (!panel) return;
+    var isOn = panel.hasAttribute("data-commune-room-overlay");
+    if (on === isOn) return;
+    if (on) {
+      state.roomReturnFocus = document.activeElement;
+      panel.setAttribute("data-commune-room-overlay", "");
+      panel.setAttribute("role", "dialog");
+      panel.setAttribute("aria-modal", "true");
+      var t = panel.querySelector("[data-commune-room-title]");
+      if (t) { if (!t.id) t.id = "commune-room-title"; panel.setAttribute("aria-labelledby", t.id); }
+      document.body.classList.add("commune-room-view-open");
+      document.addEventListener("keydown", onRoomOverlayKey, true);
+      var first = panel.querySelector("[data-commune-room-head-back]");
+      try { if (first) first.focus({ preventScroll: true }); } catch (eF) {}
+    } else {
+      panel.removeAttribute("data-commune-room-overlay");
+      panel.removeAttribute("role");
+      panel.removeAttribute("aria-modal");
+      document.body.classList.remove("commune-room-view-open");
+      document.removeEventListener("keydown", onRoomOverlayKey, true);
+      var back = state.roomReturnFocus;
+      state.roomReturnFocus = null;
+      try { if (back && back.isConnected && back.focus) back.focus({ preventScroll: true }); } catch (eB) {}
+    }
+  }
+  function onRoomOverlayKey(ev) {
+    var panel = roomEl();
+    if (!panel || !panel.hasAttribute("data-commune-room-overlay")) return;
+    if (ev.key === "Escape") {
+      ev.preventDefault();
+      closeRoom();
+      return;
+    }
+    if (ev.key === "Tab") {
+      var items = Array.prototype.filter.call(
+        panel.querySelectorAll("button, [href], textarea, input, select, [tabindex]:not([tabindex='-1'])"),
+        function (el) { return !el.disabled && el.getClientRects().length; }
+      );
+      if (!items.length) return;
+      var firstEl = items[0], lastEl = items[items.length - 1];
+      if (ev.shiftKey && (document.activeElement === firstEl || !panel.contains(document.activeElement))) {
+        ev.preventDefault(); lastEl.focus();
+      } else if (!ev.shiftKey && (document.activeElement === lastEl || !panel.contains(document.activeElement))) {
+        ev.preventDefault(); firstEl.focus();
+      }
+    }
+  }
+
   function showSubpanel(kind) {
     /* kind: "" | "room" | "classroom" — hides deck when either panel is open */
-    var room = state.shell && state.shell.querySelector("[data-commune-room]");
+    var room = roomEl();
     var classroom = state.shell && state.shell.querySelector("[data-classroom], #panel-classroom, [data-commune-classroom]");
     var deck = state.deck;
     var actions = state.shell && state.shell.querySelector(".commune-swipe-actions");
-    var on = !!kind;
+    var on = kind === "classroom";
     if (room) room.hidden = kind !== "room";
+    /* Rooms, classrooms and auctions open as a full-screen overlay above the deck
+       (the deck and its card stay put underneath, so Back returns to the same card). */
+    if (room) setRoomOverlay(room, kind === "room");
     if (classroom) classroom.hidden = kind !== "classroom";
     if (deck) deck.hidden = on;
     if (actions) actions.hidden = on;
@@ -2404,7 +2476,7 @@
   }
 
   function paintLiveLog(messages) {
-    var panel = state.shell && state.shell.querySelector("[data-commune-room]");
+    var panel = roomEl();
     if (!panel) return;
     var log = panel.querySelector("[data-commune-room-log]");
     if (!log) return;
@@ -2426,15 +2498,111 @@
       var badge = seedBadgeForAuthor(msg.author || msg);
       var body = escapeHtml(msg.body || "");
       var more = roomMessageMoreHtml(msg);
+      var when = roomTimeLabel(msg.at);
       p.innerHTML =
-        "<strong>" + name + "</strong>" + (badge ? " " + badge : "") + ": " + body + more;
+        '<span class="commune-room-meta"><strong>' + name + "</strong>" + (badge ? " " + badge : "") +
+        (when ? ' <time class="commune-room-time" datetime="' + escapeHtml(String(msg.at)) + '">' + escapeHtml(when) + "</time>" : "") +
+        '</span><span class="commune-room-body">' + body + "</span>" + more;
       log.appendChild(p);
+    });
+    scrollLogToNewest(log);
+  }
+
+  /* Short local time for a message (today: "9:12 PM", older: "Oct 14, 9:12 PM"). */
+  function roomTimeLabel(at) {
+    if (!at) return "";
+    var d = new Date(at);
+    if (isNaN(d.getTime())) return "";
+    var now = new Date();
+    var t = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    if (d.toDateString() === now.toDateString()) return t;
+    return d.toLocaleDateString([], { month: "short", day: "numeric" }) + ", " + t;
+  }
+  /* Newest at the bottom; jump there (no smooth scroll, so reduced motion is respected). */
+  function scrollLogToNewest(log) {
+    if (!log) return;
+    log.scrollTop = log.scrollHeight;
+    try { window.requestAnimationFrame(function () { log.scrollTop = log.scrollHeight; }); } catch (eRaf) {}
+  }
+
+  /* Live room view header: Back, title, muted member count (built once, in place). */
+  function ensureRoomHeader(panel) {
+    var head = panel.querySelector("[data-commune-room-head]");
+    if (head) return head;
+    head = document.createElement("div");
+    head.className = "commune-room-head";
+    head.setAttribute("data-commune-room-head", "");
+    var back = document.createElement("button");
+    back.type = "button";
+    back.className = "commune-room-head-back";
+    back.setAttribute("data-commune-room-head-back", "");
+    back.setAttribute("aria-label", "Back to deck");
+    back.textContent = "‹ Back";
+    back.addEventListener("click", closeRoom);
+    var titles = document.createElement("div");
+    titles.className = "commune-room-head-titles";
+    var title = panel.querySelector("[data-commune-room-title]");
+    var members = panel.querySelector("[data-commune-room-members]");
+    if (title) titles.appendChild(title);
+    if (members) titles.appendChild(members);
+    head.appendChild(back);
+    head.appendChild(titles);
+    panel.insertBefore(head, panel.firstChild);
+    return head;
+  }
+
+  /* Room chat view: a right swipe (horizontal-dominant) moves on to the next ECHO
+     card. Never while the list scrolls vertically, the input is focused, or typing.
+     Back to deck stays as the button fallback. */
+  var ROOM_SWIPE_MIN_X = 70;
+  var ROOM_SWIPE_RATIO = 1.8;
+  function roomSwipeIsNext(dx, dy, opts) {
+    opts = opts || {};
+    if (opts.inputFocused || opts.typing || opts.scrolledY) return false;
+    if (dx < ROOM_SWIPE_MIN_X) return false;
+    return Math.abs(dx) >= ROOM_SWIPE_RATIO * Math.abs(dy);
+  }
+  function nextCardFromRoom() {
+    closeRoom();
+    finishSwipe();
+    setStatus("");
+  }
+  function wireRoomSwipe(panel) {
+    if (!panel || panel.getAttribute("data-commune-room-swipe") === "1") return;
+    panel.setAttribute("data-commune-room-swipe", "1");
+    var start = null;
+    var typedAt = 0;
+    panel.addEventListener("input", function () { typedAt = Date.now(); });
+    panel.addEventListener("keydown", function () { typedAt = Date.now(); });
+    function inputFocused() {
+      var a = document.activeElement;
+      return !!(a && panel.contains(a) && /^(TEXTAREA|INPUT|SELECT)$/.test(a.tagName));
+    }
+    panel.addEventListener("pointerdown", function (ev) {
+      if (!panel.hasAttribute("data-commune-room-overlay") || panel.hasAttribute("data-commune-room-view")) { start = null; return; }
+      if (ev.pointerType === "mouse" && ev.button !== 0) return;
+      if (ev.target && ev.target.closest && ev.target.closest("textarea, input, select, button, a, [data-commune-room-more]")) { start = null; return; }
+      var log = panel.querySelector("[data-commune-room-log]");
+      start = { x: ev.clientX, y: ev.clientY, scroll: log ? log.scrollTop : 0 };
+    });
+    panel.addEventListener("pointercancel", function () { start = null; });
+    panel.addEventListener("pointerup", function (ev) {
+      if (!start) return;
+      var log = panel.querySelector("[data-commune-room-log]");
+      var s0 = start;
+      start = null;
+      var ok = roomSwipeIsNext(ev.clientX - s0.x, ev.clientY - s0.y, {
+        inputFocused: inputFocused(),
+        typing: Date.now() - typedAt < 1200,
+        scrolledY: !!(log && Math.abs(log.scrollTop - s0.scroll) > 4),
+      });
+      if (ok) nextCardFromRoom();
     });
   }
 
   function paintRoom(room, opts) {
     opts = opts || {};
-    var panel = state.shell.querySelector("[data-commune-room]");
+    var panel = roomEl();
     if (!panel || !room) return;
     var title = panel.querySelector("[data-commune-room-title]");
     var topic = panel.querySelector("[data-commune-room-topic]");
@@ -2452,6 +2620,8 @@
       log.parentNode.insertBefore(members, log);
     }
     if (members) { members.hidden = true; members.textContent = ""; }
+    ensureRoomHeader(panel);
+    wireRoomSwipe(panel);
     if (log) paintLiveLog(opts.messages || state.liveMessages || []);
     showRoom(true);
     state.roomId = room.id;
@@ -2462,7 +2632,7 @@
   /* Real member count from chat_room_members (members-only RLS). Hidden if unavailable. */
   function paintRoomMembers(sqlId) {
     var sb = window.CognationSupabase;
-    var panel = state.shell && state.shell.querySelector("[data-commune-room]");
+    var panel = roomEl();
     var el = panel && panel.querySelector("[data-commune-room-members]");
     if (!el || !sb || typeof sb.rest !== "function" || !sqlId) return;
     sb.rest("chat_room_members", { query: "select=user_id&room_id=eq." + encodeURIComponent(sqlId) }).then(function (rows) {
@@ -2553,7 +2723,7 @@
     showRoom(false);
     clearPointer();
     try {
-      var input = state.shell && state.shell.querySelector("[data-commune-room-input]");
+      var input = roomEl() && roomEl().querySelector("[data-commune-room-input]");
       if (input && typeof input.blur === "function") input.blur();
     } catch (eBlur) {}
     if (wasLive && sqlId) {
@@ -2575,8 +2745,9 @@
   /* Classroom and Auction open in the chat-room full view (same dark shell,
      same Back to deck), not a demo card. Compose is hidden: these are not chats. */
   function paintCardView(kind, item, notesText) {
-    var panel = state.shell && state.shell.querySelector("[data-commune-room]");
+    var panel = roomEl();
     if (!panel || !item) return false;
+    ensureRoomHeader(panel);
     var title = panel.querySelector("[data-commune-room-title]");
     var topic = panel.querySelector("[data-commune-room-topic]");
     var log = panel.querySelector("[data-commune-room-log]");
@@ -2615,7 +2786,7 @@
   }
 
   function closeCardView() {
-    var panel = state.shell && state.shell.querySelector("[data-commune-room]");
+    var panel = roomEl();
     if (panel) panel.removeAttribute("data-commune-room-view");
     state.cardView = "";
     state.auctionId = "";
@@ -3192,8 +3363,8 @@
     var back = shell.querySelector("[data-commune-room-back]");
     if (back) back.addEventListener("click", closeRoom);
     /* Step 2c: Block / Report ⋯ on live room messages. */
-    shell.addEventListener("click", function (ev) {
-      var roomPanel = shell.querySelector("[data-commune-room]");
+    (roomEl() || shell).addEventListener("click", function (ev) {
+      var roomPanel = roomEl();
       if (!roomPanel || roomPanel.hidden) return;
       var moreBtn = ev.target && ev.target.closest("[data-commune-room-more]");
       if (moreBtn && roomPanel.contains(moreBtn)) {
@@ -3259,7 +3430,7 @@
     if (form) {
       form.addEventListener("submit", function (ev) {
         ev.preventDefault();
-        var input = shell.querySelector("[data-commune-room-input]");
+        var input = roomEl() && roomEl().querySelector("[data-commune-room-input]");
         var body = input ? String(input.value || "").trim() : "";
         if (!body || !state.roomId) return;
         body = body.slice(0, 500);
@@ -3350,6 +3521,8 @@
     datingCandidateAgeOk: datingCandidateAgeOk,
     datingAgeOk: datingAgeOk,
     setDatingBirthAge: setDatingBirthAge,
+    roomSwipeIsNext: roomSwipeIsNext,
+    roomTimeLabel: roomTimeLabel,
     getDatingBirthAge: getDatingBirthAge,
     liveBirthMissing: liveBirthMissing,
     datingAllowed: datingAllowed,

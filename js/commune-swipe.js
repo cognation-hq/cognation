@@ -3479,6 +3479,16 @@
     if (classBack) classBack.addEventListener("click", closeClassroom);
     var form = shell.querySelector("[data-commune-room-compose]");
     if (form) {
+      /* Chatroom + classroom overlay: Enter sends, Shift+Enter adds a new line,
+         never during IME composition. The Send button stays. */
+      var composeInput = form.querySelector("[data-commune-room-input]");
+      if (composeInput) composeInput.addEventListener("keydown", function (e) {
+        if (e.isComposing || e.keyCode === 229) return;
+        if (e.key !== "Enter" || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+        e.preventDefault();
+        if (form.requestSubmit) form.requestSubmit();
+        else form.dispatchEvent(new Event("submit", { cancelable: true }));
+      });
       form.addEventListener("submit", function (ev) {
         ev.preventDefault();
         var input = roomEl() && roomEl().querySelector("[data-commune-room-input]");

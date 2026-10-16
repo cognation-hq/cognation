@@ -13872,3 +13872,32 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 [data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker--calendar .tower-cal-public-title {
   padding-left: calc(1.6rem + 14px);
 }
+/* postlive149: the Calendar title is a full-width block, so its padded box still
+   sat under the absolutely placed drag dots (15x17px on live) even though the
+   text was clear. Use margin instead so the box itself starts right of the dots.
+   Same text position as r4. Followers gets the same rule (its padded box overlaps
+   too in narrower layouts). */
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker--followers .tower-widget-title,
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker--calendar .tower-cal-public-title {
+  padding-left: 0;
+  margin-left: calc(1.6rem + 14px);
+}
+
+/* postlive149: the avatar-frame resize handle (.tower-avatar-resize) and the
+   display-name resize handle (.tower-name-resize) are real owner controls, but at
+   rest they read as stray ~18px squares at the avatar corner and next to the name.
+   Keep both controls; show them only while the owner hovers, focuses or selects
+   that sticker. */
+[data-tower-app][data-tower-is-owner="true"] .tower-sticker--avatar .tower-avatar-resize,
+[data-tower-app][data-tower-is-owner="true"] .tower-sticker--identity .tower-name-resize {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+[data-tower-app][data-tower-is-owner="true"] .tower-sticker--avatar:is(:hover, :focus-within, .is-widget-selected) .tower-avatar-resize,
+[data-tower-app][data-tower-is-owner="true"] .tower-sticker--identity:is(:hover, :focus-within, .is-widget-selected) .tower-name-resize {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-tower-app] .tower-avatar-resize,
+  [data-tower-app] .tower-name-resize { transition: none; }
+}

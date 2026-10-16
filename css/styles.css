@@ -13834,3 +13834,8 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 [data-tower-app] .tower-sticker--calendar .tower-cal-scheduler {
   border-top-color: rgba(209, 241, 255, 0.28) !important;
 }
+/* tower-widgets: inner calendar frame was still the old #c45a5a red line. */
+[data-tower-app] .tower-sticker--calendar :is([data-tower-calendar-personal], .tower-personal-calendar) {
+  background: transparent !important;
+  border-color: rgba(209, 241, 255, 0.28) !important;
+}

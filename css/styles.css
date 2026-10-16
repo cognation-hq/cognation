@@ -13827,3 +13827,8 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   mask-image: linear-gradient(to bottom, transparent 0%, #000 16%, #000 86%, transparent 100%), radial-gradient(ellipse 50% 50% at 51% 44%, transparent 58%, #000 76%, #000 90%, transparent 100%);
   mask-composite: intersect;
 }
+/* r3: on phones the painted lightning + bolt scale with the image ring (0.31 / 0.954). */
+@media (max-width: 600px) {
+  .circle-fall[data-pulse-bg] .circle-lightning,
+  .circle-fall[data-pulse-bg] svg.circle-bolt { transform: translate(-50%, -50%) scale(0.325); }
+}

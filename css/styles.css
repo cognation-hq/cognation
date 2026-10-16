@@ -12917,6 +12917,16 @@ a.site-switch-side:focus-visible {
   box-sizing: border-box;
 }
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker.is-spawned {
+  /* Strip members flow inside the strip. Without this they kept the sticker
+     default position:absolute + their --sticker-x/y and floated over YouTube /
+     Music / Followers on every fresh page (SeedOps 2026-10-15 fresh account). */
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  z-index: 1;
   background: transparent;
   border: none;
   border-radius: 0;

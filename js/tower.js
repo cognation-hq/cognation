@@ -522,14 +522,55 @@
     stage.querySelectorAll("[data-tower-widget]").forEach(function (el) {
       if (el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
       var r = el.getBoundingClientRect();
-      spots.push({ el: el, x: Math.round(((r.left - sr.left) / w) * 1000) / 10, y: Math.round(((r.top - sr.top) / h) * 1000) / 10, w: r.width });
+      spots.push({ el: el, left: r.left - sr.left, top: r.top - sr.top, w: r.width });
     });
-    stage.style.minHeight = Math.ceil(h) + "px";
+    /* Profile strip (avatar | name/@handle/quote) is one grid row. Freeze its
+       members too, in the same top row, so the first drag on a fresh page never
+       sends the profile card below the other widgets (spawn lock, LOOK v3). */
+    var strip = typeof stage.querySelector === "function" ? stage.querySelector("[data-tower-profile-strip]") : null;
+    var stripMembers = [];
+    var stripTop = 0;
+    var stripBottom = 0;
+    var stripLeft = 0;
+    if (strip && strip.parentNode === stage) {
+      var str = strip.getBoundingClientRect();
+      stripTop = str.top - sr.top;
+      stripBottom = str.bottom - sr.top;
+      stripLeft = str.left - sr.left;
+      Array.prototype.forEach.call(strip.querySelectorAll(":scope > [data-tower-widget]"), function (el) {
+        if (!el.hidden && !el.classList.contains("is-widget-off")) stripMembers.push(el);
+      });
+      unwrapProfileStrip(stage);
+    }
     stage.classList.remove("is-default-grid", "is-desktop-grid");
+    /* Out of the strip the members take their sticker size; lay them in one row
+       from the strip's left edge and push everything below down by the extra height. */
+    var cursorX = stripLeft;
+    var rowH = 0;
+    stripMembers.forEach(function (el) {
+      el.classList.remove("is-spawn-full", "is-spawn-half");
+      el.style.removeProperty("--spawn-max-w");
+      var mw = el.offsetWidth || 0;
+      var mh = el.offsetHeight || 0;
+      spots.push({ el: el, left: cursorX, top: stripTop, w: mw });
+      cursorX += mw + 12;
+      rowH = Math.max(rowH, mh);
+    });
+    var delta = stripMembers.length ? Math.max(0, stripTop + rowH + SPAWN_GAP - stripBottom) : 0;
+    if (delta) {
+      spots.forEach(function (sp) {
+        if (stripMembers.indexOf(sp.el) < 0 && sp.top >= stripBottom - 1) sp.top += delta;
+      });
+    }
+    h += delta;
+    stage.style.minHeight = Math.ceil(h) + "px";
     spots.forEach(function (sp) {
       var el = sp.el;
+      sp.x = Math.round((sp.left / w) * 1000) / 10;
+      sp.y = Math.round((sp.top / h) * 1000) / 10;
       el.classList.remove("is-spawn-full", "is-spawn-half");
-      if (sp.w) el.style.setProperty("--spawn-max-w", Math.ceil(sp.w) + "px");
+      if (sp.w && stripMembers.indexOf(el) < 0) el.style.setProperty("--spawn-max-w", Math.ceil(sp.w) + "px");
+      el.classList.add("is-spawned");
       el.style.setProperty("--sticker-x", sp.x + "%");
       el.style.setProperty("--sticker-y", sp.y + "%");
       el.style.setProperty("--sticker-z", el.getAttribute("data-sticker-z") || "2");
@@ -893,6 +934,13 @@
     return String(slug || "").trim().replace(/^@/, "");
   }
 
+  /* Live Supabase session (not the local demo). */
+  function liveSignedInForTower() {
+    var s = getSessionObject();
+    if (!s || s.source !== "supabase" || !s.supabaseUserId) return false;
+    return !!signedInUserId() || usingRemoteSocial();
+  }
+
   function resolveActiveProfileId() {
     if (window.CognationAccounts && typeof window.CognationAccounts.ensureSeeded === "function") {
       try { window.CognationAccounts.ensureSeeded(); } catch (e) {}
@@ -903,6 +951,39 @@
     /* A #tower-profile-{handle} names that page. If it is not loaded, do not
        substitute the signed-in profile (often the professional page). */
     var slug = towerProfileSlug();
+    if (slug && liveSignedInForTower()) {
+      /* Signed in to the live site: the server's profiles decide. The local demo
+         registry (CognationAccounts) can hold a stale copy carrying this same
+         handle (it was seeded from the shared legacy tower key), which painted a
+         Pro page as the demo Personal record: music on, YouTube/Followers off,
+         Add friend on your own page, and drags never saved. */
+      var sessLive = getSessionObject();
+      var slugNorm = normalizeHandle(slug);
+      if (sessLive && sessLive.activeProfileId &&
+          (String(sessLive.activeProfileId) === slug ||
+           (sessLive.profileHandle && normalizeHandle(sessLive.profileHandle) === slugNorm))) {
+        return String(sessLive.activeProfileId);
+      }
+      var socialLive = remoteSocial();
+      if (socialLive) {
+        var mineLive = typeof socialLive.getMyProfiles === "function" ? socialLive.getMyProfiles() || [] : [];
+        for (var ml = 0; ml < mineLive.length; ml++) {
+          var own = mineLive[ml];
+          if (own && (String(own.id) === slug || normalizeHandle(own.handle || "") === slugNorm)) return String(own.id);
+        }
+        if (typeof socialLive.getProfile === "function") {
+          var liveById = socialLive.getProfile(slug);
+          if (liveById && liveById.id) return liveById.id;
+        }
+        if (typeof socialLive.getProfileForHandle === "function") {
+          var liveNamed = socialLive.getProfileForHandle(slug);
+          if (liveNamed && liveNamed.id) return liveNamed.id;
+        }
+      }
+      var friendLive = directoryFriendBySlug(slug);
+      if (friendLive) return "directory-" + friendLive.id;
+      return "viewed:" + slug;
+    }
     if (slug) {
       /* Author links carry the profile id (handle only when there is no id);
          resolve the id first. Display names are never used. */
@@ -1759,7 +1840,13 @@
         if (id && window.CognationAccounts && typeof window.CognationAccounts.updateProfileTower === "function") {
           try { window.CognationAccounts.updateProfileTower(id, towerBlob); } catch (eGeo) {}
         }
-        try { localStorage.setItem(TOWER_PROFILE_KEY, JSON.stringify(towerBlob)); } catch (eGeo2) {}
+        /* The legacy key is one blob for the whole browser (no face, no profile
+           id). Live geometry already lives in the per-profile scrapbook copy and
+           tower_widget_layouts; writing a Pro drag here leaked the Pro handle into
+           the demo Personal record on the next load. */
+        if (!liveSignedInForTower()) {
+          try { localStorage.setItem(TOWER_PROFILE_KEY, JSON.stringify(towerBlob)); } catch (eGeo2) {}
+        }
         return true;
       }
       if (id && window.CognationAccounts && typeof window.CognationAccounts.updateProfileTower === "function") {

@@ -661,6 +661,12 @@
     /* Mark the layout once the one-time pass has run (with YouTube on screen), so
        later owner drags are respected again. Saved even when nothing moved. */
     var markNow = oneTime && ytReady;
+    /* Prior positions (#151 _backup), captured before the repair or the _compacted
+       mark rewrites the layout in place. */
+    var priorLayout = null;
+    if (ids.length) {
+      try { priorLayout = layout ? JSON.parse(JSON.stringify(layout)) : null; } catch (eBk) { priorLayout = null; }
+    }
     if (markNow) layout._compacted = 1;
     if (!ids.length) {
       if (markNow) {
@@ -703,6 +709,13 @@
       var pid = String(p._profileId || "");
       if (repairSavedSig[pid] !== sig) {
         repairSavedSig[pid] = sig;
+        /* Owner only: keep the last pre-repair copy on the profile (layout JSON
+           _backup in tower_widget_layouts; no SQL). Overwrites the previous copy. */
+        if (priorLayout && Object.keys(priorLayout).length) {
+          var priorPositions = {};
+          Object.keys(priorLayout).forEach(function (k) { if (k !== "_backup") priorPositions[k] = priorLayout[k]; });
+          p.layoutBackup = { at: new Date().toISOString(), layout: priorPositions };
+        }
         p.widgetLayout = lay;
         setTimeout(function () {
           try { TowerProfileStore.save(p, { geometry: true }); } catch (eRep) {}

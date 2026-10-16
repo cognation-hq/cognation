@@ -13718,3 +13718,119 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 @media (prefers-reduced-motion: reduce) {
   .commune-room[data-commune-room-overlay], .commune-room[data-commune-room-overlay] * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* ===== tower-widgets PR ===== */
+/* 1. Drag handle: no circle (no border, no fill); the ⋮⋮ dots stay. */
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker-handle,
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker-handle[hidden] {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #e8e4ff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* 3. Resize grip (owner, Public side only) on MP3, Calendar and quotes. */
+.tower-widget-resize {
+  display: none;
+}
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-layout--scrapbook:not(.is-phone-stack) .tower-widget-resize {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  z-index: 6;
+  width: 1.4rem;
+  height: 1.4rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #e8e4ff;
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: nwse-resize;
+  touch-action: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker.tower-sticker--calendar[data-sticker-w] {
+  width: var(--sticker-w);
+  min-width: 0;
+  max-width: 100%;
+}
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--quote[data-sticker-w] {
+  width: var(--sticker-w);
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--music[data-sticker-w] > .tower-music {
+  zoom: var(--music-zoom, 1);
+}
+
+/* 4. Calendar contrast (LOOK: design-comps/calendar-contrast 02-visitor-fixed).
+   Dark panel, #f7f9ff / #d9d2f0 type, lilac today/selected; no pale pink, no amber. */
+[data-tower-app] .tower-layout--scrapbook.is-sticker-stage .tower-sticker--calendar {
+  background: rgba(18, 16, 38, 0.92) !important;
+  border-color: rgba(209, 241, 255, 0.28) !important;
+  color: #f7f9ff;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal--public,
+[data-tower-app] .tower-sticker--calendar .tower-cal-day-panel,
+[data-tower-app] .tower-sticker--calendar .tower-cal-scheduler {
+  background: transparent !important;
+  color: #f7f9ff;
+  filter: none;
+  opacity: 1;
+}
+[data-tower-app] .tower-sticker--calendar :is(.tower-cal-public-title, .tower-cal-label, .tower-cal-day-heading, .tower-cal-event-title) {
+  color: #f7f9ff !important;
+  font-family: inherit;
+}
+[data-tower-app] .tower-sticker--calendar :is(.tower-cal-dow, .tower-cal-event-time, .form-hint, p, .tower-cal-empty) {
+  color: #d9d2f0 !important;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-cell {
+  color: #f7f9ff !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-cell:hover,
+[data-tower-app] .tower-sticker--calendar .tower-cal-cell:focus-visible {
+  background: rgba(197, 166, 255, 0.14) !important;
+  border-color: rgba(197, 166, 255, 0.5) !important;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-cell.is-today {
+  border-color: rgba(197, 166, 255, 0.85) !important;
+  font-weight: 700;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-cell.is-selected {
+  background: rgba(197, 166, 255, 0.28) !important;
+  border-color: rgba(197, 166, 255, 0.85) !important;
+  color: #f7f9ff !important;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-cell.has-events .tower-cal-dot {
+  background: rgba(197, 166, 255, 0.95);
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-cell.has-pending .tower-cal-dot {
+  background: #d9d2f0;
+}
+[data-tower-app] .tower-sticker--calendar :is(.tower-cal-nav-btn, .tower-cal-book, .tower-cal-suggest, .btn) {
+  background: rgba(18, 16, 38, 0.6) !important;
+  border: 1px solid rgba(209, 241, 255, 0.28) !important;
+  color: #f7f9ff !important;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-event {
+  background: rgba(18, 16, 38, 0.92) !important;
+  border-color: rgba(209, 241, 255, 0.28) !important;
+  color: #f7f9ff !important;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-event.is-pending {
+  background: rgba(44, 30, 18, 0.92) !important;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-scheduler {
+  border-top-color: rgba(209, 241, 255, 0.28) !important;
+}

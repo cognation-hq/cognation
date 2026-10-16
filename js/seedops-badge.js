@@ -31,6 +31,10 @@
       return null;
     }
     host.setAttribute(HOST_ATTR, classify(record).accountKind);
+    /* One badge per host: drop any copies left by earlier renders. */
+    Array.prototype.slice.call(host.querySelectorAll("." + BADGE_CLASS), 1).forEach(function (dup) {
+      if (dup.parentNode) dup.parentNode.removeChild(dup);
+    });
     if (!existing) {
       existing = document.createElement("span");
       existing.className = BADGE_CLASS;
@@ -74,7 +78,15 @@
         var id = root.getAttribute("data-view-profile-id") || "";
         if (id) profile = window.CognationAccounts.getProfileById(id);
       }
-      ensureBadge(nameWrap, profile);
+      var kept = ensureBadge(nameWrap, profile);
+      /* Tower shows the owner's Demo badge once, next to the name. Remove any
+         other copy inside this Tower's profile widgets (avatar card, name card,
+         profile strip). */
+      root.querySelectorAll(
+        "[data-tower-widget='identity'] ." + BADGE_CLASS + ", [data-tower-widget='avatar'] ." + BADGE_CLASS + ", [data-tower-profile-strip] ." + BADGE_CLASS
+      ).forEach(function (b) {
+        if (b !== kept && b.parentNode) b.parentNode.removeChild(b);
+      });
     });
   }
 

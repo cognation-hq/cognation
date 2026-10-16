@@ -560,10 +560,74 @@
         }
       }
       if (hit || invalid) moves[it.id] = { x: box.x, y: box.y };
+      box.id = it.id;
+      box.dragged = !!it.dragged;
       fixed.push(box);
+    });
+    /* Second pass (r146): compact upward. A widget with a big empty band above it
+       (more than COMPACT_MIN_GAP px, e.g. YouTube parked far down on an old saved
+       layout) moves up to the nearest free spot; the identity row stays pinned.
+       The YouTube link chip is seated right under the YouTube widget. Smaller gaps
+       are kept, and owner-dragged widgets never move up, so a spot the owner
+       chose is not touched. */
+    var rowCount = rowItems.length;
+    var seated = fixed.slice(0, rowCount);
+    var rest = fixed.slice(rowCount).sort(function (a, b) { return a.y - b.y || a.x - b.x; });
+    var chip = null;
+    rest = rest.filter(function (b) {
+      if (b.id === "social-youtube") { chip = b; return false; }
+      return true;
+    });
+    var yt = rest.filter(function (b) { return b.id === "youtube"; })[0] || null;
+    /* YouTube widget not on screen yet (still loading): leave the chip where it is. */
+    if (chip && !yt) { chip.dragged = true; rest.push(chip); }
+    function freeAt(cand) {
+      return !seated.some(function (f) { return boxesOverlap(cand, f); });
+    }
+    function seat(b, forceY) {
+      var startY = b.y;
+      if (typeof forceY === "number") {
+        var c0 = { x: b.x, y: forceY, w: b.w, h: b.h };
+        if (freeAt(c0)) b.y = forceY;
+        else {
+          var ysF = seated.map(function (f) { return f.y + f.h + gap; }).filter(function (y) { return y >= forceY; }).sort(function (m, n) { return m - n; });
+          for (var k = 0; k < ysF.length; k++) {
+            var cf = { x: b.x, y: ysF[k], w: b.w, h: b.h };
+            if (freeAt(cf)) { b.y = ysF[k]; break; }
+          }
+        }
+      } else if (!b.dragged) {
+        var ups = [gap].concat(seated.map(function (f) { return f.y + f.h + gap; }))
+          .filter(function (y) { return y < b.y; })
+          .sort(function (m, n) { return m - n; });
+        for (var u = 0; u < ups.length; u++) {
+          if (startY - ups[u] <= COMPACT_MIN_GAP) break;
+          var cu = { x: b.x, y: ups[u], w: b.w, h: b.h };
+          if (freeAt(cu)) { b.y = ups[u]; break; }
+        }
+      }
+      if (!freeAt(b)) {
+        var lowest = 0;
+        seated.forEach(function (f) { lowest = Math.max(lowest, f.y + f.h + gap); });
+        b.y = lowest;
+      }
+      seated.push(b);
+      if (b.y !== startY) {
+        var m0 = moves[b.id];
+        moves[b.id] = { x: m0 ? m0.x : b.x, y: b.y };
+      }
+    }
+    rest.forEach(function (b) {
+      seat(b);
+      if (chip && b === yt) {
+        var cx = Math.max(0, Math.min(Math.max(0, stageW - chip.w), yt.x));
+        if (chip.x !== cx) { chip.x = cx; moves[chip.id] = { x: cx, y: chip.y }; }
+        seat(chip, yt.y + yt.h + 8);
+      }
     });
     return moves;
   }
+  var COMPACT_MIN_GAP = 160;
   function repairLayoutOverlaps(stage, p, layout, spawnIds) {
     if (!stage || isPhoneStage(stage) || stage.classList.contains("is-default-grid")) return false;
     var stageW = stage.clientWidth || 0;
@@ -576,7 +640,13 @@
       if (!el.offsetWidth || !el.offsetHeight) return;
       items.push({ id: id, el: el, x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight, dragged: !!(layout && layout[id] && layout[id].dragged === true) });
     });
-    var moves = planLayoutRepair(items, stageW, SPAWN_GAP);
+    var planned = planLayoutRepair(items, stageW, SPAWN_GAP);
+    /* Keep only real moves (more than 1px) so a stable layout is never re-saved. */
+    var moves = {};
+    items.forEach(function (it) {
+      var mv = planned[it.id];
+      if (mv && (Math.abs(mv.x - it.x) >= 1 || Math.abs(mv.y - it.y) >= 1)) moves[it.id] = mv;
+    });
     var ids = Object.keys(moves);
     if (!ids.length) return false;
     var bottom = 0;
@@ -732,6 +802,8 @@
   function setStickerWidth(el, w) {
     if (!el || !el.style) return;
     var n = Math.round(parseFloat(w));
+    var wid = el.getAttribute ? el.getAttribute("data-tower-widget") : "";
+    if (n > 0 && RESIZE_LIMITS[wid]) n = clampResizeWidth(wid, n);
     if (n > 0) {
       el.style.setProperty("--sticker-w", n + "px");
       el.setAttribute("data-sticker-w", String(n));
@@ -739,6 +811,110 @@
       el.style.removeProperty("--sticker-w");
       el.removeAttribute("data-sticker-w");
     }
+    /* The MP3 player is a fixed-size drawing: scale it to the chosen width. */
+    if (wid === "music") {
+      if (n > 0) el.style.setProperty("--music-zoom", String(Math.round((n / MUSIC_BASE_W) * 1000) / 1000));
+      else el.style.removeProperty("--music-zoom");
+    }
+  }
+
+  /* Resize limits (px). Calendar keeps a minimum readable size (7 day columns
+     stay legible at 260px). */
+  var MUSIC_BASE_W = 316;
+  var RESIZE_LIMITS = {
+    music: { min: 200, max: 520 },
+    calendar: { min: 260, max: 760 },
+    quote: { min: 140, max: 560 },
+  };
+  function clampResizeWidth(wid, w) {
+    var lim = RESIZE_LIMITS[wid];
+    if (!lim) return w;
+    return Math.max(lim.min, Math.min(lim.max, Math.round(w)));
+  }
+
+  function ensureResizeHandle(el, label) {
+    if (!el || el.querySelector(":scope > [data-tower-widget-resize]")) return;
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "tower-widget-resize";
+    b.setAttribute("data-tower-widget-resize", "");
+    b.setAttribute("aria-label", "Resize " + (label || "widget"));
+    b.tabIndex = -1;
+    b.textContent = "◢";
+    el.appendChild(b);
+  }
+
+  /* Owner-only resize for MP3 (Personal), Calendar and quote stickers. Width is
+     saved as wPx (layout row) or quote.w, so it survives reload. */
+  function initWidgetResize(root) {
+    var stage = root && root.querySelector("[data-tower-scrapbook]");
+    if (!stage || stage.__cognationWidgetResize) return;
+    stage.__cognationWidgetResize = true;
+    stage.addEventListener("pointerdown", function (ev) {
+      var grip = ev.target && ev.target.closest && ev.target.closest("[data-tower-widget-resize]");
+      if (!grip || !stage.contains(grip)) return;
+      var sticker = grip.closest("[data-tower-widget]");
+      if (!sticker) return;
+      var p0 = TowerProfileStore.get();
+      if (!isTowerOwner(p0) || root.getAttribute("data-tower-side") !== "public") return;
+      if (isPhoneStage(stage)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      var wid = sticker.getAttribute("data-tower-widget");
+      if (wid !== "quote") liftDefaultGrid(stage);
+      var startX = ev.clientX;
+      var startW = sticker.offsetWidth || 0;
+      var curW = startW;
+      sticker.classList.add("is-resizing");
+      function onMove(e) {
+        curW = clampResizeWidth(wid, startW + (e.clientX - startX));
+        setStickerWidth(sticker, curW);
+        if (e.cancelable) e.preventDefault();
+      }
+      function onUp() {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        document.removeEventListener("pointercancel", onUp);
+        sticker.classList.remove("is-resizing");
+        var p = TowerProfileStore.get();
+        if (wid === "quote") {
+          var qid = sticker.getAttribute("data-tower-quote-id");
+          p.quoteStickers = getQuoteStickers(p).map(function (q) {
+            if (!q || q.id !== qid) return q;
+            var nq = {};
+            Object.keys(q).forEach(function (k) { nq[k] = q[k]; });
+            nq.w = curW;
+            return nq;
+          });
+          TowerProfileStore.save(p, { geometry: true });
+          return;
+        }
+        var layout = getWidgetLayout(p) || {};
+        freezeSpawnedWidgets(root, layout);
+        sticker.classList.remove("is-spawned");
+        var cur = layout[wid] && typeof layout[wid] === "object" ? layout[wid] : {};
+        layout[wid] = {
+          x: typeof cur.x === "number" ? cur.x : parseFloat(sticker.getAttribute("data-sticker-x") || "0"),
+          y: typeof cur.y === "number" ? cur.y : parseFloat(sticker.getAttribute("data-sticker-y") || "0"),
+          z: typeof cur.z === "number" ? cur.z : parseInt(sticker.getAttribute("data-sticker-z") || "2", 10),
+          tilt: typeof cur.tilt === "number" ? cur.tilt : 0,
+          dragged: true,
+          wPx: curW,
+        };
+        if (typeof cur.yPx === "number") layout[wid].yPx = cur.yPx;
+        else if (typeof sticker.offsetTop === "number") layout[wid].yPx = Math.round(sticker.offsetTop);
+        p.widgetLayout = layout;
+        TowerProfileStore.save(p, { geometry: true });
+        try {
+          var spawnIdsR = {};
+          spawnRowsFor(p).forEach(function (r) { r.forEach(function (w) { spawnIdsR[w] = true; }); });
+          repairLayoutOverlaps(stage, p, getWidgetLayout(p), spawnIdsR);
+        } catch (eRz) {}
+      }
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+      document.addEventListener("pointercancel", onUp);
+    });
   }
 
   /* MP3 is Personal only. On Pro the music widget is not just hidden: its layout
@@ -4739,6 +4915,13 @@
     if (!p.socialLinks || typeof p.socialLinks !== "object") p.socialLinks = {};
     p.socialLinks[netId] = "";
     writeSocialLinksLocal(p._profileId, p.socialLinks);
+    /* Update the layout row's public copy first: the next get() re-applies it,
+       which otherwise put the removed link straight back. */
+    try {
+      if (window.CognationTowerLayoutSync && CognationTowerLayoutSync.savePublic) {
+        CognationTowerLayoutSync.savePublic(p);
+      }
+    } catch (eRem0) {}
     if (p.widgetLayout && p.widgetLayout[socialWidgetId(netId)]) {
       delete p.widgetLayout[socialWidgetId(netId)];
     }
@@ -4801,13 +4984,6 @@
         var body = document.createElement("div");
         body.className = "tower-social-chip-body";
         el.appendChild(body);
-        var rm = document.createElement("button");
-        rm.type = "button";
-        rm.className = "tower-social-chip-remove";
-        rm.setAttribute("data-tower-social-remove", net.id);
-        rm.setAttribute("aria-label", "Remove " + net.label);
-        rm.textContent = "×";
-        el.appendChild(rm);
         stage.appendChild(el);
       }
       var quiet = net.quiet || (net.id === "venmo" && profileKind === "professional");
@@ -4843,16 +5019,10 @@
       el.classList.remove("is-widget-off");
     });
 
-    if (!root.__cognationSocialRemoveBound) {
-      root.__cognationSocialRemoveBound = true;
-      root.addEventListener("click", function (ev) {
-        var btn = ev.target && ev.target.closest && ev.target.closest("[data-tower-social-remove]");
-        if (!btn || !root.contains(btn)) return;
-        ev.preventDefault();
-        ev.stopPropagation();
-        removeSocialWidget(root, btn.getAttribute("data-tower-social-remove"));
-      });
-    }
+    /* Old builds left an X button on each chip; drop any still in the DOM. */
+    stage.querySelectorAll(".tower-social-chip-remove").forEach(function (x) {
+      if (x.parentNode) x.parentNode.removeChild(x);
+    });
     syncOwnerStickerHandles(root);
   }
 
@@ -6032,6 +6202,10 @@
       bar.setAttribute("aria-hidden", "false");
       var rotateBtn = bar.querySelector("[data-tower-rotate]");
       if (rotateBtn) rotateBtn.disabled = !(owner && selected);
+      var removeSel = bar.querySelector("[data-tower-remove-selected]");
+      var anySel = stage && stage.querySelector(".is-widget-selected");
+      var selId = anySel ? anySel.getAttribute("data-tower-widget") : "";
+      if (removeSel) removeSel.disabled = !(owner && anySel && selId !== "avatar" && selId !== "friends");
     }
     var scrap = root.querySelector("[data-tower-scrapbook-bar]");
     if (scrap) {
@@ -8333,6 +8507,8 @@
       el.style.setProperty("--sticker-tilt", (q.tilt || 0) + "deg");
       el.innerHTML = '<blockquote class="tower-quote-card"></blockquote>';
       el.querySelector(".tower-quote-card").textContent = q.text;
+      if (typeof q.w === "number" && q.w > 0) setStickerWidth(el, q.w);
+      ensureResizeHandle(el, "Quote");
       stage.appendChild(el);
     });
     syncOwnerStickerHandles(root);
@@ -8401,7 +8577,9 @@
     }
     p.quoteStickers = quotes.map(function (q) {
       if (!q || q.id !== id) return q;
-      return { id: q.id, text: text, x: q.x, y: q.y, z: q.z, tilt: q.tilt };
+      var edited = { id: q.id, text: text, x: q.x, y: q.y, z: q.z, tilt: q.tilt };
+      if (typeof q.w === "number") edited.w = q.w;
+      return edited;
     });
     sticker.setAttribute("data-quote-text", text);
     el.textContent = text;
@@ -8990,7 +9168,7 @@
           var quotes = getQuoteStickers(p);
           p.quoteStickers = quotes.map(function (q) {
             if (q.id !== qid) return q;
-            return {
+            var moved = {
               id: q.id,
               text: q.text,
               x: dropX,
@@ -8998,6 +9176,8 @@
               z: dropZ,
               tilt: dropTilt,
             };
+            if (typeof q.w === "number") moved.w = q.w;
+            return moved;
           });
           TowerProfileStore.save(p, { geometry: true });
         } else {
@@ -9141,9 +9321,18 @@
           return;
         }
         if (ev.key !== "Backspace" && ev.key !== "Delete") return;
+        var selectedKey = stage.querySelector(".is-widget-selected");
+        if (!selectedKey || !stage.contains(selectedKey)) return;
+        ev.preventDefault();
+        removeSelectedWidget();
+      });
+      /* One removal path for Backspace/Delete and the touch "Remove" button.
+         Owner only, Public side only; never runs while typing (the key handler
+         returns early for inputs and contenteditable). */
+      var removeSelectedWidget = function () {
+        if (!ownerOnPublic()) return;
         var selected = stage.querySelector(".is-widget-selected");
         if (!selected || !stage.contains(selected)) return;
-        ev.preventDefault();
 
         /* Individual friend pin */
         var friendId = selected.getAttribute("data-tower-friend-pin");
@@ -9233,6 +9422,14 @@
         if (!id || id === "avatar" || id === "feed" || id === "messages") return;
         clearWidgetSelection(stage);
         syncRotateToolbar(root);
+        /* Social link chip (the X button is gone): clear that link, same as the
+           old X did, so it stays removed after reload. */
+        var socialNet = socialNetIdFromWidget(id);
+        if (socialNet) {
+          removeSocialWidget(root, socialNet);
+          setProfileStatusSafe((selected.getAttribute("data-sticker-label") || "Link") + " link removed. Add it again in Edit profile.", false);
+          return;
+        }
         var label = selected.getAttribute("data-sticker-label") || id;
         if (id === "polaroid") {
           pushWidgetUndo({ type: "shell", id: id, label: label });
@@ -9260,7 +9457,17 @@
           }
         }
         setProfileStatusSafe(label + " removed — Undo to restore.", false);
-      });
+      };
+      root.__cognationRemoveSelected = removeSelectedWidget;
+      var removeBtn = root.querySelector("[data-tower-remove-selected]");
+      if (removeBtn && !removeBtn.__cognationBound) {
+        removeBtn.__cognationBound = true;
+        removeBtn.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          removeSelectedWidget();
+          syncRotateToolbar(root);
+        });
+      }
     }
 
     /* Live Public widgets checkboxes */
@@ -10024,6 +10231,11 @@
     syncOwnerStickerHandles(root);
     renderQuoteStickers(root, p);
     initAddWidgetUi(root);
+    try {
+      ensureResizeHandle(root.querySelector('[data-tower-widget="music"]'), "MP3 player");
+      ensureResizeHandle(root.querySelector('[data-tower-widget="calendar"]'), "Calendar");
+    } catch (eRh) {}
+    initWidgetResize(root);
     syncCollageForm(root, p);
     syncPublicLookForm(root, p);
     var countSel = root.querySelector("[data-tower-friends-count]");

@@ -222,6 +222,9 @@
   }
 
   function ownProfileOnScreen(btn) {
+    /* tower.js marks the page when the viewer owns it (same check that unlocks editing). */
+    var root = btn && btn.closest && btn.closest("[data-tower-is-owner]");
+    if (root && root.getAttribute("data-tower-is-owner") === "true") return true;
     var p = activeProfile();
     if (p && p._loading) return true;
     if (signInPending()) return true;

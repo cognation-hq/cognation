@@ -13781,3 +13781,27 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 @media (prefers-reduced-motion: reduce) {
   .circle-fall[data-pulse-bg]::after { animation: none; transform: none; }
 }
+/* pulse-background r2 (Designer LOOK-NO): no faint top edge behind the list. */
+.circle-fall[data-pulse-bg]::before {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 16%, #000 86%, transparent 100%), radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 16%, #000 86%, transparent 100%), radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+  mask-composite: intersect;
+}
+/* Letters on the small friend circles: light, readable on the dark background. */
+.circle-fall[data-pulse-bg] a.pulse-fall-circle { color: #f7f9ff !important; }
+/* Desktop: the friends list sits above the ring, capped at 3 lines with a fade
+   (6 lines can't clear the ring). Phone layout (≤600px) is unchanged. */
+@media (min-width: 601px) {
+  .circle-fall[data-pulse-bg] .circle-relations {
+    margin-top: 1rem;
+    max-height: 6.9rem;
+    overflow-y: auto;
+    scrollbar-width: none;
+    background: none;
+    -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
+  }
+  .circle-fall[data-pulse-bg] .circle-relations::-webkit-scrollbar { display: none; }
+  .circle-fall[data-pulse-bg] .circle-relations li { margin: 0.6rem 0; }
+}

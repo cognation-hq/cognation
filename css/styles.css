@@ -13508,3 +13508,7 @@ svg.circle-bolt {
 [data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-layout--scrapbook .tower-sticker--social-chip {
   padding-left: 2.2rem;
 }
+
+/* Tower "Message" action next to Add friend (another member's personal page). */
+.tower-follow-row .tower-message-btn { margin-left: 0.5rem; }
+.tower-follow-row .tower-message-status { margin: 0.35rem 0 0; flex-basis: 100%; }

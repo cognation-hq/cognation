@@ -522,14 +522,60 @@
     stage.querySelectorAll("[data-tower-widget]").forEach(function (el) {
       if (el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
       var r = el.getBoundingClientRect();
-      spots.push({ el: el, x: Math.round(((r.left - sr.left) / w) * 1000) / 10, y: Math.round(((r.top - sr.top) / h) * 1000) / 10, w: r.width });
+      spots.push({ el: el, left: r.left - sr.left, top: r.top - sr.top, w: r.width, half: el.classList.contains("is-spawn-half") });
     });
-    stage.style.minHeight = Math.ceil(h) + "px";
+    /* Profile strip (avatar | name/@handle/quote) is one grid row. Freeze its
+       members too, in the same top row, so the first drag on a fresh page never
+       sends the profile card below the other widgets (spawn lock, LOOK v3). */
+    var strip = typeof stage.querySelector === "function" ? stage.querySelector("[data-tower-profile-strip]") : null;
+    var stripMembers = [];
+    var stripTop = 0;
+    var stripBottom = 0;
+    var stripLeft = 0;
+    if (strip && strip.parentNode === stage) {
+      var str = strip.getBoundingClientRect();
+      stripTop = str.top - sr.top;
+      stripBottom = str.bottom - sr.top;
+      stripLeft = str.left - sr.left;
+      Array.prototype.forEach.call(strip.querySelectorAll(":scope > [data-tower-widget]"), function (el) {
+        if (!el.hidden && !el.classList.contains("is-widget-off")) stripMembers.push(el);
+      });
+      unwrapProfileStrip(stage);
+    }
     stage.classList.remove("is-default-grid", "is-desktop-grid");
+    /* Out of the strip the members take their sticker size; lay them in one row
+       from the strip's left edge and push everything below down by the extra height. */
+    var cursorX = stripLeft;
+    var rowH = 0;
+    stripMembers.forEach(function (el) {
+      el.classList.remove("is-spawn-full", "is-spawn-half");
+      el.style.removeProperty("--spawn-max-w");
+      var mw = el.offsetWidth || 0;
+      var mh = el.offsetHeight || 0;
+      spots.push({ el: el, left: cursorX, top: stripTop, w: mw });
+      cursorX += mw + 12;
+      rowH = Math.max(rowH, mh);
+    });
+    var delta = stripMembers.length ? Math.max(0, stripTop + rowH + SPAWN_GAP - stripBottom) : 0;
+    if (delta) {
+      spots.forEach(function (sp) {
+        if (stripMembers.indexOf(sp.el) < 0 && sp.top >= stripBottom - 1) sp.top += delta;
+      });
+    }
+    h += delta;
+    stage.style.minHeight = Math.ceil(h) + "px";
     spots.forEach(function (sp) {
       var el = sp.el;
+      sp.x = Math.round((sp.left / w) * 1000) / 10;
+      sp.y = Math.round((sp.top / h) * 1000) / 10;
       el.classList.remove("is-spawn-full", "is-spawn-half");
-      if (sp.w) el.style.setProperty("--spawn-max-w", Math.ceil(sp.w) + "px");
+      if (sp.w && stripMembers.indexOf(el) < 0) {
+        el.style.setProperty("--spawn-max-w", Math.ceil(sp.w) + "px");
+        /* Half-row widgets keep their column width. Full rows (YouTube, Music)
+           were height-capped by the grid, so they return to their own size. */
+        if (sp.half) setStickerWidth(el, sp.w);
+      }
+      el.classList.add("is-spawned");
       el.style.setProperty("--sticker-x", sp.x + "%");
       el.style.setProperty("--sticker-y", sp.y + "%");
       el.style.setProperty("--sticker-z", el.getAttribute("data-sticker-z") || "2");
@@ -540,6 +586,36 @@
       spawnCache[el.getAttribute("data-tower-widget")] = { x: sp.x, y: sp.y, z: 2, tilt: 0 };
     });
     return true;
+  }
+
+  /* A widget keeps the width it had on the grid once it is frozen or dragged,
+     so a drag never shrinks it to its text width (big empty area on the right). */
+  function setStickerWidth(el, w) {
+    if (!el || !el.style) return;
+    var n = Math.round(parseFloat(w));
+    if (n > 0) {
+      el.style.setProperty("--sticker-w", n + "px");
+      el.setAttribute("data-sticker-w", String(n));
+    } else {
+      el.style.removeProperty("--sticker-w");
+      el.removeAttribute("data-sticker-w");
+    }
+  }
+
+  /* MP3 is Personal only. On Pro the music widget is not just hidden: its layout
+     spot and its show/hide switch are dropped from the profile and never saved. */
+  function stripProMusic(p) {
+    if (!isProTower(p)) return false;
+    var changed = false;
+    if (p.widgetLayout && typeof p.widgetLayout === "object" && p.widgetLayout.music) {
+      delete p.widgetLayout.music;
+      changed = true;
+    }
+    if (p.publicWidgets && typeof p.publicWidgets === "object" && Object.prototype.hasOwnProperty.call(p.publicWidgets, "music")) {
+      delete p.publicWidgets.music;
+      changed = true;
+    }
+    return changed;
   }
 
   /* Before saving any layout, pin every on-screen spawned widget where it is now,
@@ -561,6 +637,8 @@
         tilt: 0,
       };
       if (typeof el.offsetTop === "number" && (stage.clientHeight || 0) > 0) layout[id].yPx = Math.round(el.offsetTop);
+      var frozenW = parseFloat(el.getAttribute("data-sticker-w") || "");
+      if (frozenW > 0) layout[id].wPx = Math.round(frozenW);
       el.classList.remove("is-spawned");
     });
     return layout;
@@ -893,6 +971,13 @@
     return String(slug || "").trim().replace(/^@/, "");
   }
 
+  /* Live Supabase session (not the local demo). */
+  function liveSignedInForTower() {
+    var s = getSessionObject();
+    if (!s || s.source !== "supabase" || !s.supabaseUserId) return false;
+    return !!signedInUserId() || usingRemoteSocial();
+  }
+
   function resolveActiveProfileId() {
     if (window.CognationAccounts && typeof window.CognationAccounts.ensureSeeded === "function") {
       try { window.CognationAccounts.ensureSeeded(); } catch (e) {}
@@ -903,6 +988,39 @@
     /* A #tower-profile-{handle} names that page. If it is not loaded, do not
        substitute the signed-in profile (often the professional page). */
     var slug = towerProfileSlug();
+    if (slug && liveSignedInForTower()) {
+      /* Signed in to the live site: the server's profiles decide. The local demo
+         registry (CognationAccounts) can hold a stale copy carrying this same
+         handle (it was seeded from the shared legacy tower key), which painted a
+         Pro page as the demo Personal record: music on, YouTube/Followers off,
+         Add friend on your own page, and drags never saved. */
+      var sessLive = getSessionObject();
+      var slugNorm = normalizeHandle(slug);
+      if (sessLive && sessLive.activeProfileId &&
+          (String(sessLive.activeProfileId) === slug ||
+           (sessLive.profileHandle && normalizeHandle(sessLive.profileHandle) === slugNorm))) {
+        return String(sessLive.activeProfileId);
+      }
+      var socialLive = remoteSocial();
+      if (socialLive) {
+        var mineLive = typeof socialLive.getMyProfiles === "function" ? socialLive.getMyProfiles() || [] : [];
+        for (var ml = 0; ml < mineLive.length; ml++) {
+          var own = mineLive[ml];
+          if (own && (String(own.id) === slug || normalizeHandle(own.handle || "") === slugNorm)) return String(own.id);
+        }
+        if (typeof socialLive.getProfile === "function") {
+          var liveById = socialLive.getProfile(slug);
+          if (liveById && liveById.id) return liveById.id;
+        }
+        if (typeof socialLive.getProfileForHandle === "function") {
+          var liveNamed = socialLive.getProfileForHandle(slug);
+          if (liveNamed && liveNamed.id) return liveNamed.id;
+        }
+      }
+      var friendLive = directoryFriendBySlug(slug);
+      if (friendLive) return "directory-" + friendLive.id;
+      return "viewed:" + slug;
+    }
     if (slug) {
       /* Author links carry the profile id (handle only when there is no id);
          resolve the id first. Display names are never used. */
@@ -1139,6 +1257,8 @@
           tilt: layoutCoord(pos.tilt, layoutCoord(cur.tilt, 0)),
         };
         if (typeof pos.yPx === "number" && isFinite(pos.yPx)) base[id].yPx = pos.yPx;
+        if (typeof pos.wPx === "number" && isFinite(pos.wPx) && pos.wPx > 0) base[id].wPx = pos.wPx;
+        if (pos.dragged === true) base[id].dragged = true;
       });
       p.widgetLayout = base;
     }
@@ -1715,6 +1835,7 @@
       if (!isTowerOwner(data)) return false;
       /* The loading placeholder is never saved anywhere. */
       if (data._loading) return false;
+      stripProMusic(data);
       this._saving = true;
       try {
       writeScrapbookLayout(data, { keepLayout: !opts.geometry });
@@ -1759,7 +1880,13 @@
         if (id && window.CognationAccounts && typeof window.CognationAccounts.updateProfileTower === "function") {
           try { window.CognationAccounts.updateProfileTower(id, towerBlob); } catch (eGeo) {}
         }
-        try { localStorage.setItem(TOWER_PROFILE_KEY, JSON.stringify(towerBlob)); } catch (eGeo2) {}
+        /* The legacy key is one blob for the whole browser (no face, no profile
+           id). Live geometry already lives in the per-profile scrapbook copy and
+           tower_widget_layouts; writing a Pro drag here leaked the Pro handle into
+           the demo Personal record on the next load. */
+        if (!liveSignedInForTower()) {
+          try { localStorage.setItem(TOWER_PROFILE_KEY, JSON.stringify(towerBlob)); } catch (eGeo2) {}
+        }
         return true;
       }
       if (id && window.CognationAccounts && typeof window.CognationAccounts.updateProfileTower === "function") {
@@ -5564,6 +5691,7 @@
 
   function pruneEmptyPublicWidgetsInProfile(p) {
     if (!p) return p;
+    stripProMusic(p);
     p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
     var sloganText = typeof p.slogan === "string" ? p.slogan.trim() : "";
     var htmlText = typeof p.customHtml === "string" ? p.customHtml.trim() : "";
@@ -7121,6 +7249,8 @@
         btn.disabled = !hasRemote;
         if (!hasRemote && remoteKind === "professional") {
           btn.title = "Add a professional page from Edit profile";
+        } else {
+          btn.removeAttribute("title");
         }
       });
       return;
@@ -7145,6 +7275,7 @@
     /* Show both tabs if owner might add second — keep professional visible when only personal */
     var proBtn = toggle.querySelector('[data-tower-profile-kind="professional"]');
     var perBtn = toggle.querySelector('[data-tower-profile-kind="personal"]');
+    if (proBtn) proBtn.removeAttribute("title");
     if (proBtn && !profiles.some(function (p) { return p.kind === "professional"; })) {
       proBtn.hidden = false;
       proBtn.disabled = true;
@@ -7216,6 +7347,12 @@
       syncAddProfileUi(root);
     });
     document.addEventListener("cognation:session-started", function () {
+      syncProfileKindToggle(root);
+      syncAddProfileUi(root);
+    });
+    /* My profiles arrive after boot: re-check so "Add a professional page" hides
+       as soon as the Pro page is known. */
+    document.addEventListener("cognation:remote-profile-loaded", function () {
       syncProfileKindToggle(root);
       syncAddProfileUi(root);
     });
@@ -7856,6 +7993,7 @@
       el.setAttribute("data-sticker-x", String(x));
       el.setAttribute("data-sticker-y", String(y));
       el.setAttribute("data-sticker-z", String(z));
+      setStickerWidth(el, pos && typeof pos === "object" && isPlacedPos(layout, id) ? pos.wPx : 0);
     });
     stage.querySelectorAll("[data-tower-polaroid-extra]").forEach(function (extraEl) {
       if (extraEl.classList.contains("is-dragging")) return;
@@ -8660,8 +8798,18 @@
         if (e.cancelable) e.preventDefault();
         var dxPct = (dxPx / rect.width) * 100;
         var dyPct = (dyPx / rect.height) * 100;
-        var nx = Math.max(0, Math.min(88, startX + dxPct));
-        var ny = Math.max(0, Math.min(88, startY + dyPct));
+        /* Keep the whole widget inside the card: right edge stops at the card edge. */
+        var inset = rect.width > 0 ? (12 / rect.width) * 100 : 0;
+        var maxX = 88;
+        if (rect.width > 0 && sticker.offsetWidth > 0) {
+          maxX = Math.max(inset, 100 - inset - (sticker.offsetWidth / rect.width) * 100);
+        }
+        var maxY = 88;
+        if (rect.height > 0 && sticker.offsetHeight > 0) {
+          maxY = Math.max(0, 100 - (sticker.offsetHeight / rect.height) * 100);
+        }
+        var nx = Math.max(inset, Math.min(maxX, startX + dxPct));
+        var ny = Math.max(0, Math.min(maxY, startY + dyPct));
         sticker.style.setProperty("--sticker-x", nx + "%");
         sticker.style.setProperty("--sticker-y", ny + "%");
         sticker.setAttribute("data-sticker-x", String(Math.round(nx * 10) / 10));
@@ -8725,6 +8873,8 @@
             /* Owner drag: free placement, never treated as an auto-spawn pile. */
             dragged: true,
           };
+          var dropW = parseFloat(sticker.getAttribute("data-sticker-w") || "") || (prev && prev.wPx) || 0;
+          if (dropW > 0) layout[id].wPx = Math.round(dropW);
           var dropYPx = stickerYPxFromDrop(dropY, stage.clientHeight || rect.height || 0);
           if (dropYPx != null) layout[id].yPx = dropYPx;
           p.widgetLayout = layout;

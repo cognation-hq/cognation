@@ -54,6 +54,8 @@
       if (pos.dragged === true) entry.dragged = true;
       /* Stage-pixel y (stage height varies between loads; % drifted). */
       if (typeof pos.yPx === "number" && isFinite(pos.yPx)) entry.yPx = Math.round(Math.max(0, Math.min(20000, pos.yPx)));
+      /* Width (px) a widget had on the grid when it was first frozen or dragged. */
+      if (typeof pos.wPx === "number" && isFinite(pos.wPx) && pos.wPx > 0) entry.wPx = Math.round(Math.max(80, Math.min(4000, pos.wPx)));
       out[id] = entry;
     });
     if (layout._public && typeof layout._public === "object") {
@@ -122,6 +124,7 @@
             x: next.x, y: next.y, z: next.z, tilt: next.tilt, dragged: true
           };
           if (typeof saved[wid].yPx === "number") next.yPx = saved[wid].yPx;
+          if (typeof saved[wid].wPx === "number") next.wPx = saved[wid].wPx;
         }
         base[wid] = next;
       });

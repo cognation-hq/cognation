@@ -12917,6 +12917,16 @@ a.site-switch-side:focus-visible {
   box-sizing: border-box;
 }
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker.is-spawned {
+  /* Strip members flow inside the strip. Without this they kept the sticker
+     default position:absolute + their --sticker-x/y and floated over YouTube /
+     Music / Followers on every fresh page (SeedOps 2026-10-15 fresh account). */
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  z-index: 1;
   background: transparent;
   border: none;
   border-radius: 0;
@@ -12986,6 +12996,71 @@ a.site-switch-side:focus-visible {
   content: none !important;
   display: none !important;
 }
+/* Profile strip v3.4 (PR #143): avatar shown whole (no clipping under GO LIVE /
+   Edit profile), and each member's move handle sits in its own left gutter so it
+   never covers the avatar or the name. */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] {
+  max-height: none;
+  overflow: visible;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned {
+  flex-direction: row;
+  gap: 10px;
+  padding-left: 32px;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--identity.is-spawned {
+  padding-left: 32px;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker.is-spawned > .tower-sticker-handle {
+  left: 2px;
+  top: 50%;
+  right: auto;
+  transform: translateY(-50%);
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned .tower-avatar-stack {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  height: auto;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned .tower-profile-actions {
+  width: auto;
+  margin: 0;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned .tower-go-live-btn {
+  width: auto;
+  height: auto;
+  white-space: nowrap;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned .tower-profile-edit {
+  width: auto;
+  margin: 0;
+}
+/* Free layout too: the name's move handle sits in a gutter, not on the first letter. */
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--identity {
+  padding-left: 36px;
+}
+/* Followers has no frame of its own (the grid gave it one). Keep the same card
+   frame once it is dragged and after every reload, with the handle in a gutter. */
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--followers {
+  background: rgba(16, 19, 48, 0.42);
+  border: 1px solid rgba(209, 241, 255, 0.28);
+  border-radius: 1rem;
+  padding: 8px 12px 8px 40px;
+  box-sizing: border-box;
+}
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--followers > .tower-sticker-handle {
+  left: 8px;
+  top: 8px;
+}
+/* After a drag a widget keeps the width it had on the grid (wPx). */
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker[data-sticker-w] {
+  width: var(--sticker-w);
+  max-width: 100%;
+  box-sizing: border-box;
+}
 /* Half-height media / followers strips on default grid */
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--youtube.is-spawned {
   max-height: 112px;
@@ -13003,6 +13078,33 @@ a.site-switch-side:focus-visible {
   max-height: 72px;
   transform: none;
 }
+/* PR #143: the 72px strip squeezed the iPod but not its screen, so the black
+   screen and the wheel spilled over the player and onto Calendar. Lay the
+   compact player out as one row (screen | wheel) and clip to the player. */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--music.is-spawned .tower-ipod {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  height: 72px;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 6px 10px;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--music.is-spawned .tower-ipod-screen {
+  flex: 1 1 auto;
+  height: 56px;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--music.is-spawned .tower-ipod-wheel {
+  flex: 0 0 auto;
+  zoom: 0.46;
+  margin: 0;
+}
+
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--followers.is-spawned {
   min-height: 0;
   padding: 8px 12px;

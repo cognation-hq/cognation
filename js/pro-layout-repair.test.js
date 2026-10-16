@@ -37,7 +37,8 @@ var b = [
 var mb = ctx.plan(b, 1068, 24);
 assert.strictEqual(anyOverlap(b, mb), "", "browser B repaired");
 assert.ok(!mb.calendar, "owner-dragged Calendar keeps its spot");
-assert.ok(!mb.avatar && !mb.identity && !mb.youtube, "non-colliding widgets stay put");
+assert.ok(!mb.youtube, "non-colliding widgets stay put");
+assert.ok(!mb.avatar || mb.avatar.y === 24, "avatar seated at top");
 assert.ok(mb.followers && mb.followers.x === 16 && mb.followers.y > 374, "only Followers moves, down, same x");
 
 /* 2. Old Shawn-style layout: avatar/name x YouTube, YouTube x Followers. */
@@ -50,7 +51,14 @@ var old = [
 ];
 var mo = ctx.plan(old, 1068, 24);
 assert.strictEqual(anyOverlap(old, mo), "", "old layout repaired");
-assert.ok(!mo.calendar && !mo.avatar, "first-seated widgets stay");
+assert.ok(!mo.calendar, "dragged Calendar not colliding stays");
+assert.strictEqual(mo.avatar.y, 24, "avatar card at the top");
+assert.strictEqual(mo.identity.y, 24, "name card at the top, beside the avatar");
+assert.strictEqual(mo.identity.x, mo.avatar.x + 121 + 12, "side by side");
+["youtube", "followers"].forEach(function (id) {
+  var it = old.filter(function (o) { return o.id === id; })[0];
+  assert.ok(!mo[id] || mo[id].y >= it.y, id + " only moves down");
+});
 
 /* 3. Invalid spots are clamped into the card; a clean layout is untouched. */
 var bad = [{ id: "followers", x: -40, y: -10, w: 300, h: 100 }, { id: "calendar", x: 900, y: 0, w: 400, h: 100 }];

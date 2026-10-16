@@ -523,6 +523,25 @@
     });
     var fixed = [];
     var moves = {};
+    /* Identity row first (PM, #146): avatar card and name card sit side by side
+       at the top, at a valid spot, and are never pushed down. Everything else is
+       repaired around them, moving down only. */
+    var rowIds = ["avatar", "identity"];
+    var rowItems = rowIds.map(function (rid) {
+      return items.filter(function (it) { return it.id === rid; })[0];
+    }).filter(Boolean);
+    if (rowItems.length) {
+      var rx = rowItems[0].x;
+      if (!isFinite(rx) || rx < 0) rx = 0;
+      rowItems.forEach(function (it) {
+        var bx = Math.max(0, Math.min(Math.max(0, stageW - it.w), rx));
+        var box = { x: bx, y: gap, w: it.w, h: it.h };
+        if (box.x !== it.x || box.y !== it.y) moves[it.id] = { x: box.x, y: box.y };
+        fixed.push(box);
+        rx = bx + it.w + 12;
+      });
+      order = order.filter(function (it) { return rowIds.indexOf(it.id) < 0; });
+    }
     order.forEach(function (it) {
       var box = { x: it.x, y: it.y, w: it.w, h: it.h };
       var invalid = false;

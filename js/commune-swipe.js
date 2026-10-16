@@ -914,6 +914,8 @@
   }
 
   function classroomAllowed() {
+    /* Signed in: the saved birth month (user_birth) decides. */
+    if (liveSignedIn() && datingBirthAge != null) return datingBirthAge >= 18;
     var age = getMemberAge();
     return age != null && age >= 18;
   }
@@ -1713,6 +1715,40 @@
     }
   }
 
+  /* Join refused with no_birth: same message plus #141's Add birth month button
+     (opens js/birth-prompt.js). After an adult month saves, Join works again
+     without a reload (cognation:birth-saved updates the age below). */
+  function openBirthPrompt() {
+    var bp = window.CognationBirthPrompt;
+    if (bp && typeof bp.open === "function") bp.open();
+    else setStatus("Add your birth year and month in your profile.");
+  }
+  function setBirthNeededStatus(msg) {
+    setStatus(msg);
+    if (!state.statusEl) return;
+    state.statusEl.appendChild(document.createTextNode(" "));
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-primary btn-small";
+    btn.setAttribute("data-commune-add-birth", "");
+    btn.textContent = "Add birth month";
+    btn.addEventListener("click", openBirthPrompt);
+    state.statusEl.appendChild(btn);
+  }
+  function showJoinError(mapped) {
+    if (mapped && mapped.code === "no_birth") setBirthNeededStatus(mapped.message);
+    else setStatus(mapped ? mapped.message : "");
+  }
+  document.addEventListener("cognation:birth-saved", function (ev) {
+    var d = (ev && ev.detail) || {};
+    var y = parseInt(d.year, 10), m = parseInt(d.month, 10);
+    if (!y || !m) return;
+    var now = new Date();
+    var age = now.getFullYear() - y - (now.getMonth() + 1 < m ? 1 : 0);
+    setDatingBirthAge(age);
+    if (state.statusEl && state.statusEl.querySelector("[data-commune-add-birth]")) setStatus("");
+  });
+
   function noticesFor(profileId) {
     var doc = readJson(localStorage, NOTICES_KEY, { byProfile: {} });
     var list = doc.byProfile && doc.byProfile[profileId];
@@ -2428,7 +2464,7 @@
         return liveRoomUnavailable("Live rooms aren't ready yet. Try again soon.");
       }
       var mapped = mapChatRoomError(err);
-      setStatus(mapped.message);
+      showJoinError(mapped);
       return false;
     });
   }
@@ -2599,6 +2635,10 @@
     if (!classroomAllowed()) {
       syncAgeFromAuthMetadata();
     }
+    if (liveBirthMissing()) {
+      setBirthNeededStatus("Add your birth year and month in your profile to join classrooms.");
+      return false;
+    }
     if (!classroomAllowed()) {
       setStatus("Classroom is for members 18+. Update your age in your profile to join.");
       return false;
@@ -2655,13 +2695,7 @@
             : '<p class="commune-swipe-empty commune-swipe-empty--rooms">No chat rooms match your age and interests yet. Update age or interests in your profile, then come back.</p>');
       state.deck.innerHTML = empty;
       var addBirth = state.deck.querySelector("[data-commune-add-birth]");
-      if (addBirth) {
-        addBirth.addEventListener("click", function () {
-          var bp = window.CognationBirthPrompt;
-          if (bp && typeof bp.open === "function") bp.open();
-          else setStatus("Add your birth year and month in your profile.");
-        });
-      }
+      if (addBirth) addBirth.addEventListener("click", openBirthPrompt);
       syncActionLabels();
       return;
     }

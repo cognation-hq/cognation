@@ -2632,6 +2632,10 @@
     var p = TowerProfileStore.get();
     var owner = isTowerOwner(p);
     root.setAttribute("data-tower-is-owner", owner ? "true" : "false");
+    /* Your own Tower never shows Add friend / Message. */
+    if (owner) {
+      root.querySelectorAll("[data-tower-follow-row]").forEach(function (row) { row.hidden = true; });
+    }
     if (!owner) {
       root.querySelectorAll("[contenteditable='true']").forEach(function (el) {
         el.removeAttribute("contenteditable");

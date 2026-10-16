@@ -11712,10 +11712,34 @@
     placeCircleSpots();
   }
 
+  /* With Alexa's background on, the five spots sit where her five placeholder
+     squares were (image px, relative to the ring centre at 605,262), still. */
+  var PULSE_BG_SQUARES = {
+    left: { x: -478, y: -42, s: 1.15 },
+    center: { x: 12, y: 146, s: 1.4 },
+    right: { x: 503, y: -42, s: 1.15 },
+    "back-right": { x: 216, y: -202, s: 1 },
+    "back-left": { x: -192, y: -202, s: 1 }
+  };
+  function pinCircleSpotsToBackground(spots) {
+    var layer = document.querySelector("[data-circle-fall][data-pulse-bg]");
+    if (!layer) return false;
+    var k = parseFloat(getComputedStyle(layer).getPropertyValue("--pulse-bg-k")) || 0.954;
+    var grow = Math.max(k, 0.55);
+    for (var i = 0; i < spots.length; i++) {
+      var sq = PULSE_BG_SQUARES[spots[i].getAttribute("data-circle-spot")];
+      if (!sq) continue;
+      spots[i].style.transform = "translate(-50%, -50%) translate(" + (sq.x * k).toFixed(1) + "px," + (sq.y * k).toFixed(1) + "px) scale(" + (sq.s * grow).toFixed(3) + ")";
+      spots[i].style.zIndex = String(Math.round(sq.s * 100));
+    }
+    return true;
+  }
+
   function placeCircleSpots() {
     if (!circleFallState) return;
     var spots = document.querySelectorAll("[data-circle-ring] [data-circle-spot]");
     if (!spots.length) return;
+    if (pinCircleSpotsToBackground(spots)) return;
     var shift = ((performance.now() - circleFallState.ringStarted) / 28000) * CIRCLE_SPOTS.length;
     var i;
     for (i = 0; i < spots.length; i++) {
@@ -11842,6 +11866,8 @@
     layer.setAttribute("data-circle-count", "0");
     layer.removeAttribute("data-circle-refresh-ms");
     layer.setAttribute("data-circle-ring-shell", "");
+    /* Alexa's PULSE background image (pulse-background PR). */
+    layer.setAttribute("data-pulse-bg", "");
     paintCircleRingShell(layer, []);
     circleFallState = {
       bodies: [],
@@ -11856,7 +11882,13 @@
       var st = circleFallState;
       if (!st || !st.shellOnly) return;
       placeCircleSpots();
+      /* Pinned spots on the background are still: no per-frame loop (light on phones). */
+      if (layer.hasAttribute("data-pulse-bg")) { st.raf = 0; return; }
       st.raf = requestAnimationFrame(frameShell);
+    }
+    if (!window.__cognationPulseBgResize) {
+      window.__cognationPulseBgResize = true;
+      window.addEventListener("resize", function () { if (circleFallState) placeCircleSpots(); });
     }
     circleFallState.raf = requestAnimationFrame(frameShell);
     var circlePage = document.querySelector("[data-circle-page]") || layer;

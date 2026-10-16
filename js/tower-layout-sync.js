@@ -61,7 +61,24 @@
     if (layout._public && typeof layout._public === "object") {
       out._public = cleanPublic(layout._public);
     }
+    if (layout._backup && typeof layout._backup === "object") {
+      var bk = cleanBackup(layout._backup);
+      if (bk) out._backup = bk;
+    }
     return out;
+  }
+
+  /* One prior copy of widget positions, saved before an automatic overlap repair
+     rewrites them: { at: ISO time, layout: {...positions} }. Last copy only. */
+  function cleanBackup(b) {
+    if (!b || typeof b !== "object" || !b.layout || typeof b.layout !== "object") return null;
+    var inner = Object.assign({}, b.layout);
+    delete inner._public;
+    delete inner._backup;
+    var positions = clean(inner);
+    if (!Object.keys(positions).length) return null;
+    var at = String(b.at || "");
+    return { at: isNaN(Date.parse(at)) ? new Date().toISOString() : new Date(at).toISOString(), layout: positions };
   }
 
   function profileId(p) {
@@ -115,7 +132,7 @@
     if (saved && Object.keys(saved).length) {
       var base = p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : {};
       Object.keys(saved).forEach(function (wid) {
-        if (wid === "_public") return;
+        if (wid === "_public" || wid === "_backup") return;
         var next = saved[wid];
         var prev = base[wid];
         /* Keep a local dragged mark when an older DB row predated that flag. */
@@ -165,6 +182,9 @@
         socialLinks: Object.assign({}, (prevPub && prevPub.socialLinks) || {}, p.socialLinks || {}),
       });
     }
+    /* Keep the last pre-repair copy (new one from the repair, else the saved one). */
+    var bk = cleanBackup(p.layoutBackup) || (cache[id] && cache[id]._backup) || null;
+    if (bk) layout._backup = bk;
     if (!Object.keys(layout).length) return false;
     return upsert(id, layout);
   }
@@ -192,6 +212,7 @@
     _publicCache: publicCache,
     _clean: clean,
     _cleanPublic: cleanPublic,
+    _cleanBackup: cleanBackup,
   };
   root.CognationTowerLayoutSync = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

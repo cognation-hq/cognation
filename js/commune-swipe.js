@@ -156,6 +156,8 @@
   PRO_MARK[PRO.FIELD] = "Field";
   PRO_MARK[PRO.POP] = "Pop-culture";
   var DEMO_LABEL = "Demo · placeholder";
+  /* Standing rule: no feature-level demo placeholders (waits for Alexa's go). */
+  var SHOW_PRO_PLACEHOLDERS = false;
   var PRO_WEBINARS = [
     { id: "pro-webinar-ethics", title: "Ethical collaboration in practice", body: "Credit, consent, and clear roles when people build together." },
     { id: "pro-webinar-async", title: "Async work that respects time", body: "Written decisions, clean handoffs, and calm response windows." },
@@ -1513,11 +1515,6 @@
       });
     });
     out.sort(function (a, b) { return b.score - a.score; });
-    if (!out.length) {
-      out.push(proPlaceholder(PRO.KNOW, "pro-know-placeholder", "Professionals you might know",
-        "Professional pages that match your field show here once real pages connect.",
-        "Matched by shared field and interests only.", 13));
-    }
     return out;
   }
 
@@ -1558,6 +1555,10 @@
     lanes[PRO.POP] = [proPlaceholder(PRO.POP, "pro-popculture-" + (slug(field) || "general"), "Pop culture \u00d7 " + fieldName,
       "Pop-culture moments that touch " + fieldName + " show here once a feed connects.", fieldWhy)];
     Object.keys(lanes).forEach(function (type) {
+      /* Placeholder cards (demo: true — webinars, research, auction, podcasts,
+         field, pop culture) stay hidden until a real feed backs them. Seed Demo
+         badges are separate and unaffected. */
+      if (!SHOW_PRO_PLACEHOLDERS) lanes[type] = lanes[type].filter(function (c) { return c && !c.demo; });
       lanes[type] = omitPassed(lanes[type].filter(professionalCardAllowed));
     });
     return lanes;
@@ -3553,6 +3554,8 @@
     setDatingBirthAge: setDatingBirthAge,
     roomSwipeIsNext: roomSwipeIsNext,
     openPersonTower: openPersonTower,
+    /* Tests only: the old placeholder lanes stay in code (hidden) until real feeds land. */
+    _setShowProPlaceholders: function (on) { SHOW_PRO_PLACEHOLDERS = !!on; },
     roomTimeLabel: roomTimeLabel,
     getDatingBirthAge: getDatingBirthAge,
     liveBirthMissing: liveBirthMissing,

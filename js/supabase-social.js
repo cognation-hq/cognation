@@ -764,6 +764,13 @@
     getProfile: profileForId,
     getProfileForHandle: profileForHandle,
     getProfileForUser: profileForUser,
+    /* Server profiles loaded this session (others only, no Sage rows). */
+    listProfiles: function () {
+      var me = identity();
+      return Object.keys(state.profiles).map(function (id) { return state.profiles[id]; }).filter(function (p) {
+        return p && (!me || p.user_id !== me.supabaseUserId) && !isSageRow(p);
+      });
+    },
     getMyProfiles: function () {
       return state.myProfiles.slice();
     },

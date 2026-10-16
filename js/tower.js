@@ -579,6 +579,9 @@
     var moves = planLayoutRepair(items, stageW, SPAWN_GAP);
     var ids = Object.keys(moves);
     if (!ids.length) return false;
+    /* Prior positions, captured before the repair below rewrites them in place. */
+    var priorLayout = null;
+    try { priorLayout = layout ? JSON.parse(JSON.stringify(layout)) : null; } catch (eBk) { priorLayout = null; }
     var bottom = 0;
     items.forEach(function (it) {
       var m = moves[it.id];
@@ -613,6 +616,13 @@
       var pid = String(p._profileId || "");
       if (repairSavedSig[pid] !== sig) {
         repairSavedSig[pid] = sig;
+        /* Owner only: keep the last pre-repair copy on the profile (layout JSON
+           _backup in tower_widget_layouts; no SQL). Overwrites the previous copy. */
+        if (priorLayout && Object.keys(priorLayout).length) {
+          var priorPositions = {};
+          Object.keys(priorLayout).forEach(function (k) { if (k !== "_backup") priorPositions[k] = priorLayout[k]; });
+          p.layoutBackup = { at: new Date().toISOString(), layout: priorPositions };
+        }
         p.widgetLayout = lay;
         setTimeout(function () {
           try { TowerProfileStore.save(p, { geometry: true }); } catch (eRep) {}

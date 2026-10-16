@@ -494,7 +494,10 @@ assert.ok(/a\.target = "_blank";\s*a\.rel = "noopener noreferrer";/.test(tower),
 
   assert.ok(html.indexOf('data-tower-widget="social"') < 0, "HTML has no grouped social box");
   assert.ok(/data-tower-social-chip/.test(tower), "chips carry data-tower-social-chip");
-  assert.ok(/data-tower-social-remove/.test(tower), "each chip has its own remove");
+  /* tower-widgets PR: the X on each chip is gone; Backspace/Delete (and the touch
+     Remove button) clear the selected chip's link instead. */
+  assert.ok(!/rm\.setAttribute\("data-tower-social-remove"/.test(tower), "no X button on social chips");
+  assert.ok(/var socialNet = socialNetIdFromWidget\(id\);\s*if \(socialNet\) \{\s*removeSocialWidget\(root, socialNet\);/.test(tower), "selected chip removable by key / Remove button");
   assert.ok(/tower-sticker--social-chip/.test(css), "chip CSS present");
   assert.ok(/migrateGroupedSocialLayout/.test(tower), "old grouped layout.social maps to first chip");
 

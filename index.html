@@ -479,7 +479,9 @@
                   <button type="button" class="btn btn-secondary" data-tower-reset-layout>Reset layout</button>
                   <div class="tower-rotate-toolbar" data-tower-rotate-toolbar>
                     <button type="button" class="btn btn-secondary tower-rotate-btn" data-tower-rotate="5" title="Rotate selected widget 5° clockwise">Rotate</button>
+                    <button type="button" class="btn btn-secondary tower-remove-btn" data-tower-remove-selected disabled title="Remove the selected widget (or press Backspace / Delete)">Remove</button>
                   </div>
+                  <button type="button" class="btn btn-secondary" data-tower-add-widget title="Add a quote or text sticker">Add widget</button>
                   <div class="tower-emoji-bar" data-tower-emoji-bar role="group" aria-label="Emoji widgets"></div>
                 </div>
 
@@ -1370,7 +1372,7 @@
   <div class="tower-add-widget-dialog" data-tower-add-widget-dialog hidden role="dialog" aria-modal="true" aria-labelledby="tower-add-widget-title">
     <div class="tower-add-widget-dialog-card">
       <h3 id="tower-add-widget-title" class="tower-add-widget-title">Add to scrapbook</h3>
-      <p class="form-hint">Personal page: drop a quote or text sticker you can drag around.</p>
+      <p class="form-hint">Add a quote or text sticker you can drag and resize.</p>
       <div class="tower-add-widget-choices">
         <button type="button" class="btn btn-primary" data-tower-add-choice="quote">Quote / text</button>
         <button type="button" class="btn btn-secondary" data-tower-add-choice="slogan">Slogan card</button>

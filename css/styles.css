@@ -13772,6 +13772,22 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
    so they sit with the image strands instead of doubling them. */
 .circle-fall[data-pulse-bg] .circle-lightning,
 .circle-fall[data-pulse-bg] svg.circle-bolt { filter: opacity(0.55); mix-blend-mode: screen; }
+/* r4 masked (PM, pending Alexa): the painted lightning + bolt are masked off
+   Alexa's image strands so no painted line sits on them (no second ring).
+   pulse-bolt-mask.png is drawn in the lightning's own 1040x520 frame from the
+   image: strands (dilated) are cut out and the flat back/inner line is dropped,
+   so the bolt only shows in the dark gaps of the front arc. It scales with the
+   element on phones. */
+.circle-fall[data-pulse-bg] .circle-lightning,
+.circle-fall[data-pulse-bg] svg.circle-bolt {
+  -webkit-mask-image: url("../assets/pulse/pulse-bolt-mask.png");
+  mask-image: url("../assets/pulse/pulse-bolt-mask.png");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  mask-mode: alpha;
+}
 /* Halo glow over the image (the image is opaque, so the page halo alone is hidden). */
 .circle-fall[data-pulse-bg] .circle-ring::before {
   content: "";

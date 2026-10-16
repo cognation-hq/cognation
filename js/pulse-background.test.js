@@ -28,5 +28,14 @@ assert.ok(/layer\.setAttribute\("data-pulse-bg", ""\)/.test(tower), "PULSE layer
 assert.ok(/PULSE_BG_SQUARES/.test(tower) && /pinCircleSpotsToBackground\(spots\)/.test(tower), "spots sit where the squares were");
 assert.ok(!/\.circle-lightning,\s*\.circle-fall\[data-pulse-bg\] svg\.circle-bolt \{ display: none/.test(tail), "lightning + bolt not hidden");
 assert.ok(/svg\.circle-bolt \{ filter: opacity\(0\.55\); mix-blend-mode: screen; \}/.test(tail), "lightning + bolt toned, not hidden");
+assert.ok(/svg\.circle-bolt \{\s*-webkit-mask-image: url\("\.\.\/assets\/pulse\/pulse-bolt-mask\.png"\);\s*mask-image: url\("\.\.\/assets\/pulse\/pulse-bolt-mask\.png"\);[\s\S]*?mask-size: 100% 100%;/.test(tail), "lightning + bolt masked off the image strands");
+(function () {
+  var p = path.join(root, "assets/pulse/pulse-bolt-mask.png");
+  assert.ok(fs.existsSync(p) && fs.statSync(p).size < 60 * 1024, "bolt mask exists and is web-light");
+  var b = fs.readFileSync(p);
+  assert.strictEqual(b.readUInt32BE(16), 1040, "mask matches the lightning frame width");
+  assert.strictEqual(b.readUInt32BE(20), 520, "mask matches the lightning frame height");
+})();
+assert.ok(/max-width: 600px[\s\S]*svg\.circle-bolt \{ transform: translate\(-50%, -50%\) scale\(0\.325\); \}/.test(tail), "lightning + bolt (and mask) scale on phones");
 assert.ok(/\.circle-ring::before \{[\s\S]*?rgba\(168, 244, 255, 0\.16\)[\s\S]*?rgba\(197, 166, 255, 0\.2\)/.test(tail), "halo blended over the image");
 console.log("pulse-background.test: ok");

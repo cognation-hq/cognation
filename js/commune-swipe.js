@@ -1953,7 +1953,12 @@
     if (card.type === TYPE.CHAT) {
       wireClassroomCardClick(el, card, function () { openRoom(card.id, true); });
     }
-    if ((card.type === TYPE.KNOW || card.type === TYPE.FRIEND || card.type === TYPE.EVENT || card.type === TYPE.CONTENT) && card.handle) {
+    if ((card.type === TYPE.KNOW || card.type === TYPE.FRIEND) && (card.profileId || card.handle)) {
+      el.setAttribute("data-commune-opens-profile", "");
+      wireClassroomCardClick(el, card, function () { openPersonTower(card); });
+    }
+    /* Event / Content: the poster's Tower by handle (unchanged). */
+    if ((card.type === TYPE.EVENT || card.type === TYPE.CONTENT) && card.handle) {
       el.setAttribute("data-commune-opens-profile", "");
       wireClassroomCardClick(el, card, function () { openProfessionalPage(card); });
     }
@@ -1977,6 +1982,29 @@
       if (Math.abs(state.lastDragDx || 0) >= 10) return;
       open(card.id, true);
     });
+  }
+
+  /* Person cards: the person's Personal Tower, except a card that came from a
+     Professional item, which opens that Pro page. */
+  function personCardIsPro(card) {
+    if (!card) return false;
+    if (String(card.type || "").indexOf("pro-") === 0) return true;
+    if (card.record && (card.record.kind === "professional" || card.record._profileKind === "professional")) return true;
+    var rec = card.profileId ? profileById(card.profileId) : null;
+    return !!(rec && rec.kind === "professional");
+  }
+  function openPersonTower(card) {
+    if (!card) return false;
+    if (personCardIsPro(card)) { openProfessionalPage(card); return "pro"; }
+    /* Profile id first: #tower-profile-<id> resolves to exactly that (personal) page. */
+    var target = String(card.profileId || card.handle || "").replace(/^@/, "");
+    if (!target) return false;
+    if (window.CognationTowerOpenProfile) {
+      try { window.CognationTowerOpenProfile(target); } catch (eT) {}
+    } else {
+      try { location.hash = "tower-profile-" + encodeURIComponent(target); } catch (eH) {}
+    }
+    return "personal";
   }
 
   function openProfessionalPage(card) {
@@ -2579,7 +2607,8 @@
       return !!(a && panel.contains(a) && /^(TEXTAREA|INPUT|SELECT)$/.test(a.tagName));
     }
     panel.addEventListener("pointerdown", function (ev) {
-      if (!panel.hasAttribute("data-commune-room-overlay") || panel.hasAttribute("data-commune-room-view")) { start = null; return; }
+      /* Live rooms and the classroom / auction views (data-commune-room-view) alike. */
+      if (!panel.hasAttribute("data-commune-room-overlay")) { start = null; return; }
       if (ev.pointerType === "mouse" && ev.button !== 0) return;
       if (ev.target && ev.target.closest && ev.target.closest("textarea, input, select, button, a, [data-commune-room-more]")) { start = null; return; }
       var log = panel.querySelector("[data-commune-room-log]");
@@ -2748,6 +2777,7 @@
     var panel = roomEl();
     if (!panel || !item) return false;
     ensureRoomHeader(panel);
+    wireRoomSwipe(panel);
     var title = panel.querySelector("[data-commune-room-title]");
     var topic = panel.querySelector("[data-commune-room-topic]");
     var log = panel.querySelector("[data-commune-room-log]");
@@ -3522,6 +3552,7 @@
     datingAgeOk: datingAgeOk,
     setDatingBirthAge: setDatingBirthAge,
     roomSwipeIsNext: roomSwipeIsNext,
+    openPersonTower: openPersonTower,
     roomTimeLabel: roomTimeLabel,
     getDatingBirthAge: getDatingBirthAge,
     liveBirthMissing: liveBirthMissing,

@@ -30,5 +30,26 @@ assert.ok(/ev\.key === "Escape"[\s\S]{0,60}closeRoom\(\)/.test(src), "Escape clo
 assert.ok(/commune-room-view-open/.test(src) && /body\.commune-room-view-open \{ overflow: hidden/.test(css), "body scroll locked");
 assert.ok(/state\.roomReturnFocus/.test(src), "focus returns");
 assert.ok(/var on = kind === "classroom";/.test(src), "deck stays under the overlay (Back returns to same card)");
-assert.ok(/card\.type === TYPE\.KNOW \|\| card\.type === TYPE\.FRIEND/.test(src), "person cards open Tower");
+assert.ok(/\(card\.type === TYPE\.KNOW \|\| card\.type === TYPE\.FRIEND\)[\s\S]{0,200}openPersonTower\(card\)/.test(src), "know/friend cards open the person's Tower");
+assert.ok(/\(card\.type === TYPE\.EVENT \|\| card\.type === TYPE\.CONTENT\) && card\.handle\)[\s\S]{0,200}openProfessionalPage\(card\)/.test(src), "event/content keep the poster's Tower by handle");
+// Swipe closes classroom/auction views too (no data-commune-room-view exclusion).
+assert.ok(!/hasAttribute\("data-commune-room-overlay"\) \|\| panel\.hasAttribute\("data-commune-room-view"\)/.test(src), "swipe also closes card views");
+assert.ok(/function paintCardView[\s\S]{0,300}wireRoomSwipe\(panel\)/.test(src), "classroom/auction views get the swipe");
+// openPersonTower behaviour.
+(function () {
+  const pm = src.match(/function personCardIsPro[\s\S]*?\n  \}\n  function openPersonTower[\s\S]*?\n  \}\n/);
+  assert.ok(pm, "openPersonTower present");
+  let opened = [], proOpened = [];
+  const recs = { "p-pro": { kind: "professional" }, "p-per": { kind: "personal" } };
+  const win = { CognationTowerOpenProfile: function (h) { opened.push(h); } };
+  const fn = new Function("window", "location", "profileById", "openProfessionalPage", pm[0] + "; return openPersonTower;")(
+    win, {}, function (id) { return recs[id] || null; }, function (c) { proOpened.push(c.handle); });
+  assert.strictEqual(fn({ type: "know", profileId: "p-per", handle: "sam" }), "personal");
+  assert.deepStrictEqual(opened, ["p-per"], "personal Tower opened by profile id");
+  assert.strictEqual(fn({ type: "friend", profileId: "p-pro", handle: "acme" }), "pro", "share from a Pro item opens the Pro page");
+  assert.strictEqual(fn({ type: "pro-know", profileId: "x", handle: "doc" }), "pro");
+  assert.deepStrictEqual(proOpened, ["acme", "doc"]);
+  assert.strictEqual(fn({ type: "friend", profileId: "", handle: "@lee" }), "personal");
+  assert.strictEqual(opened[1], "lee", "falls back to handle");
+})();
 console.log("room-chat-view ok");

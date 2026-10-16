@@ -515,7 +515,8 @@
     var iy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
     return ix > 2 && iy > 2;
   }
-  function planLayoutRepair(items, stageW, gap) {
+  function planLayoutRepair(items, stageW, gap, opts) {
+    opts = opts || {};
     /* items: [{id, x, y, w, h, dragged}] in stage px. Returns {id: {x, y}} for moved ones. */
     var order = items.slice().sort(function (a, b) {
       if (!!a.dragged !== !!b.dragged) return a.dragged ? -1 : 1;
@@ -580,6 +581,10 @@
     });
     var yt = rest.filter(function (b) { return b.id === "youtube"; })[0] || null;
     /* YouTube widget not on screen yet (still loading): leave the chip where it is. */
+    /* One-time compaction of an old layout (no _compacted mark yet): every widget
+       in those rows carries an owner-dragged mark, so the marks are ignored on
+       this pass only. The identity row stays pinned (seated above). */
+    if (opts.ignoreDragged) rest.forEach(function (b) { b.dragged = false; });
     if (chip && !yt) { chip.dragged = true; rest.push(chip); }
     function freeAt(cand) {
       return !seated.some(function (f) { return boxesOverlap(cand, f); });
@@ -640,7 +645,12 @@
       if (!el.offsetWidth || !el.offsetHeight) return;
       items.push({ id: id, el: el, x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight, dragged: !!(layout && layout[id] && layout[id].dragged === true) });
     });
-    var planned = planLayoutRepair(items, stageW, SPAWN_GAP);
+    /* One-time pass: an owner layout saved before compaction existed. */
+    var owner = !!(p && layout && isTowerOwner(p) && !p._loading);
+    var oneTime = owner && !layout._compacted;
+    var ytEl = stage.querySelector('[data-tower-widget="youtube"]');
+    var ytReady = !ytEl || items.some(function (it) { return it.id === "youtube"; });
+    var planned = planLayoutRepair(items, stageW, SPAWN_GAP, { ignoreDragged: oneTime && ytReady });
     /* Keep only real moves (more than 1px) so a stable layout is never re-saved. */
     var moves = {};
     items.forEach(function (it) {
@@ -648,7 +658,17 @@
       if (mv && (Math.abs(mv.x - it.x) >= 1 || Math.abs(mv.y - it.y) >= 1)) moves[it.id] = mv;
     });
     var ids = Object.keys(moves);
-    if (!ids.length) return false;
+    /* Mark the layout once the one-time pass has run (with YouTube on screen), so
+       later owner drags are respected again. Saved even when nothing moved. */
+    var markNow = oneTime && ytReady;
+    if (markNow) layout._compacted = 1;
+    if (!ids.length) {
+      if (markNow) {
+        p.widgetLayout = layout;
+        setTimeout(function () { try { TowerProfileStore.save(p, { geometry: true }); } catch (eMk) {} }, 0);
+      }
+      return false;
+    }
     var bottom = 0;
     items.forEach(function (it) {
       var m = moves[it.id];
@@ -677,7 +697,7 @@
     });
     /* Save once per profile + repaired result, and only for the owner. */
     if (p && layout && isTowerOwner(p) && !p._loading) {
-      var sig = String(p._profileId || "") + "|" + ids.sort().map(function (id) {
+      var sig = String(p._profileId || "") + "|" + (markNow ? "c1|" : "") + ids.sort().map(function (id) {
         return id + ":" + (lay[id] ? lay[id].x + "," + lay[id].yPx : "spawn");
       }).join(";");
       var pid = String(p._profileId || "");
@@ -1575,6 +1595,7 @@
         if (typeof pos.wPx === "number" && isFinite(pos.wPx) && pos.wPx > 0) base[id].wPx = pos.wPx;
         if (pos.dragged === true) base[id].dragged = true;
       });
+      if (saved.widgetLayout._compacted) base._compacted = saved.widgetLayout._compacted;
       p.widgetLayout = base;
     }
     if (saved.musicYoutubeWidth != null && !isNaN(parseInt(saved.musicYoutubeWidth, 10))) {

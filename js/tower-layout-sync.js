@@ -61,6 +61,8 @@
     if (layout._public && typeof layout._public === "object") {
       out._public = cleanPublic(layout._public);
     }
+    /* One-time compaction done (old layouts). */
+    if (layout._compacted) out._compacted = 1;
     return out;
   }
 
@@ -115,6 +117,7 @@
     if (saved && Object.keys(saved).length) {
       var base = p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : {};
       Object.keys(saved).forEach(function (wid) {
+        if (wid === "_compacted") { base._compacted = 1; return; }
         if (wid === "_public") return;
         var next = saved[wid];
         var prev = base[wid];

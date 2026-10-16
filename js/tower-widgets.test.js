@@ -66,4 +66,33 @@ assert.ok(moves.youtube && moves.youtube.y < 600, "youtube gap closed");
 var ytY = moves.youtube.y;
 assert.ok(moves["social-youtube"] && moves["social-youtube"].y >= ytY + 215, "chip sits with youtube");
 assert.ok(!moves.calendar || moves.calendar.y >= 900, "dragged widget not compacted");
+
+/* r4: one-time pass on an old layout where every widget is owner-dragged. */
+var allDragged = [
+  { id: "avatar", x: 24, y: 24, w: 200, h: 140, dragged: true },
+  { id: "identity", x: 240, y: 24, w: 300, h: 120, dragged: true },
+  { id: "followers", x: 24, y: 450, w: 300, h: 130, dragged: true },
+  { id: "social-youtube", x: 24, y: 190, w: 80, h: 50, dragged: true },
+  { id: "calendar", x: 600, y: 260, w: 340, h: 340, dragged: true },
+  { id: "youtube", x: 80, y: 1681, w: 314, h: 215, dragged: true }
+];
+var keep = ctx.plan(JSON.parse(JSON.stringify(allDragged)), 1100, 24);
+assert.ok(!keep.youtube, "normal pass still respects owner-dragged marks");
+var once = ctx.plan(JSON.parse(JSON.stringify(allDragged)), 1100, 24, { ignoreDragged: true });
+assert.ok(once.youtube && once.youtube.y < 700, "one-time pass compacts YouTube despite dragged marks: " + JSON.stringify(once.youtube));
+assert.ok((!once.avatar || once.avatar.y === 24) && (!once.identity || once.identity.y === 24), "identity row still pinned");
+assert.ok(once["social-youtube"] && once["social-youtube"].y >= once.youtube.y + 215, "chip under YouTube");
+Object.keys(once).forEach(function (id) {
+  var it = allDragged.filter(function (x) { return x.id === id; })[0];
+  if (id !== "social-youtube" && id !== "avatar" && id !== "identity") assert.ok(once[id].y <= it.y, id + " only moves up on compaction");
+});
+assert.ok(/var oneTime = owner && !layout\._compacted;/.test(tower) && /if \(markNow\) layout\._compacted = 1;/.test(tower), "one-time mark set after the pass");
+var syncSrc = fs.readFileSync(path.join(__dirname, "tower-layout-sync.js"), "utf8");
+assert.ok(/if \(layout\._compacted\) out\._compacted = 1;/.test(syncSrc) && /wid === "_compacted"/.test(syncSrc), "mark persists in the layout row, never applied as a widget");
+
+/* r4: chip label not squeezed, muted logo; titles clear of the drag dots. */
+var cssR4 = fs.readFileSync(path.join(__dirname, "..", "css", "styles.css"), "utf8");
+assert.ok(/\.tower-social-chip-body \.tower-social-btn\.is-logo \{\s*width: auto !important;/.test(cssR4), "chip button sizes to content");
+assert.ok(/\.tower-social-chip-body \.tower-social-btn\.is-logo img \{[\s\S]*?grayscale\(1\)/.test(cssR4), "muted logo, no red tile");
+assert.ok(/\.tower-sticker--followers \.tower-widget-title,[\s\S]*?\.tower-sticker--calendar \.tower-cal-public-title \{\s*padding-left: calc\(1\.6rem \+ 14px\);/.test(cssR4), "titles nudged 14px right of the dots");
 console.log("tower-widgets.test: ok");

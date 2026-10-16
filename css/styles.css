@@ -13839,3 +13839,36 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   background: transparent !important;
   border-color: rgba(209, 241, 255, 0.28) !important;
 }
+
+/* r4 (PR #149): YouTube link chip — the logo button kept its 2.35rem round
+   crop inside the chip, so the "YouTube" label was squeezed to a stray dot and
+   the red brand tile sat alone. Inside a chip the button sizes to its content,
+   the logo is a small muted mark and the label shows in full (website colours). */
+.tower-social-chip-body .tower-social-btn.is-logo {
+  width: auto !important;
+  height: auto !important;
+  border-radius: 0.5rem;
+  overflow: visible;
+  gap: 8px;
+  color: var(--cgn-text, #f7f9ff);
+}
+.tower-social-chip-body .tower-social-btn.is-logo img {
+  width: 22px !important;
+  height: 22px !important;
+  flex: 0 0 22px;
+  border-radius: 6px;
+  filter: grayscale(1) brightness(1.35);
+  opacity: 0.9;
+}
+.tower-social-chip-body .tower-social-chip-label {
+  overflow: visible;
+  text-overflow: clip;
+  color: var(--cgn-text, #f7f9ff);
+}
+
+/* r4: Calendar and Followers titles sit ~14px right of the ⋮⋮ drag dots so the
+   handle never covers the first letter (owner, public side). */
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker--followers .tower-widget-title,
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker--calendar .tower-cal-public-title {
+  padding-left: calc(1.6rem + 14px);
+}

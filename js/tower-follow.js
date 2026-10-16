@@ -221,6 +221,35 @@
     return false;
   }
 
+  function normHandle(h) {
+    return String(h || "").trim().replace(/^@/, "").toLowerCase();
+  }
+  /* #tower-profile-<handle> can open your own page as a directory shell
+     (id "directory-…"), so also match the viewed handle / friend id against
+     the signed-in account's own profiles. */
+  function isOwnHandleOrFriendId(p) {
+    if (!p) return false;
+    var session = readSession();
+    if (!session) return false;
+    var h = normHandle(p.handle);
+    var fid = p._friendId ? String(p._friendId) : "";
+    if (fid && isOwnProfileId(fid)) return true;
+    if (!h) return false;
+    if (normHandle(session.handle) === h || normHandle(session.username) === h) return true;
+    var lists = [];
+    try {
+      var social = window.CognationSupabaseSocial;
+      if (social && typeof social.getMyProfiles === "function") lists.push(social.getMyProfiles() || []);
+      var accounts = window.CognationAccounts;
+      if (accounts && session.username && typeof accounts.getProfilesForUsername === "function") {
+        lists.push(accounts.getProfilesForUsername(session.username) || []);
+      }
+    } catch (eH) {}
+    return lists.some(function (list) {
+      return list.some(function (q) { return q && normHandle(q.handle) === h; });
+    });
+  }
+
   function ownProfileOnScreen(btn) {
     /* tower.js marks the page when the viewer owns it (same check that unlocks editing). */
     var root = btn && btn.closest && btn.closest("[data-tower-is-owner]");
@@ -228,6 +257,7 @@
     var p = activeProfile();
     if (p && p._loading) return true;
     if (signInPending()) return true;
+    if (isOwnHandleOrFriendId(p)) return true;
     return isOwnProfileId(resolveProfileId(btn));
   }
 

@@ -51,6 +51,8 @@ assert.ok(/\.tower-sticker--identity\.is-spawned \{\s*padding-left: 32px;/.test(
 
 assert.ok(/:not\(\.is-default-grid\) > \.tower-sticker--identity \{\s*padding-left: 36px;/.test(css), "free layout name clears handle");
 
+assert.ok(/:not\(\.is-default-grid\) > \.tower-sticker--followers \{[^}]*border: 1px solid[^}]*padding: 8px 12px 8px 40px;/.test(css), "dragged Followers keeps its frame and handle gutter");
+
 /* 7. Drag stays inside the card and keeps column width. */
 assert.ok(/maxX = Math\.max\(inset, 100 - inset - \(sticker\.offsetWidth \/ rect\.width\) \* 100\)/.test(tower));
 assert.ok(/maxY = Math\.max\(0, 100 - \(sticker\.offsetHeight \/ rect\.height\) \* 100\)/.test(tower));

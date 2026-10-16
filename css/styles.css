@@ -13042,6 +13042,19 @@ a.site-switch-side:focus-visible {
 .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--identity {
   padding-left: 36px;
 }
+/* Followers has no frame of its own (the grid gave it one). Keep the same card
+   frame once it is dragged and after every reload, with the handle in a gutter. */
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--followers {
+  background: rgba(16, 19, 48, 0.42);
+  border: 1px solid rgba(209, 241, 255, 0.28);
+  border-radius: 1rem;
+  padding: 8px 12px 8px 40px;
+  box-sizing: border-box;
+}
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--followers > .tower-sticker-handle {
+  left: 8px;
+  top: 8px;
+}
 /* After a drag a widget keeps the width it had on the grid (wPx). */
 .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker[data-sticker-w] {
   width: var(--sticker-w);

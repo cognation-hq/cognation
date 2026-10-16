@@ -522,6 +522,12 @@
     birthMissing = datingBirthAge == null;
   }
   function getDatingBirthAge() { return datingBirthAge; }
+  /* Signed-in account with no user_birth row yet (real accounts made before the
+     birth month step; seeds were backfilled). Server treats null age as not
+     13+, so rooms can't be joined and 18+ classrooms stay hidden until it's set. */
+  function liveBirthMissing() {
+    return liveSignedIn() && datingBirthAge == null;
+  }
   function datingAgeOk(age) {
     return typeof age === "number" && age >= 18;
   }
@@ -2032,6 +2038,9 @@
       ["infinite recursion", "Live rooms are being fixed. Try again soon."],
     ];
     var i;
+    if (text.indexOf("under_13") !== -1 && liveBirthMissing()) {
+      return { code: "no_birth", message: codes[0][1] + "." };
+    }
     for (i = 0; i < codes.length; i++) {
       if (text.indexOf(codes[i][0]) !== -1) {
         return { code: codes[i][0], message: codes[i][1] };
@@ -2638,10 +2647,21 @@
       var roomsOpen = ensureSiteRooms().length;
       var empty =
         '<p class="commune-swipe-empty">You\'re caught up.</p>' +
-        (roomsOpen
-          ? ''
-          : '<p class="commune-swipe-empty commune-swipe-empty--rooms">No chat rooms match your age and interests yet. Update age or interests in your profile, then come back.</p>');
+        (liveBirthMissing()
+          ? '<p class="commune-swipe-empty commune-swipe-empty--rooms" data-commune-birth-needed>Chat rooms (13+) and classrooms (18+) need your birth year and month. Only the month and year are saved.</p>' +
+            '<p class="commune-swipe-empty"><button type="button" class="btn btn-primary" data-commune-add-birth>Add birth month</button></p>'
+          : roomsOpen
+            ? ''
+            : '<p class="commune-swipe-empty commune-swipe-empty--rooms">No chat rooms match your age and interests yet. Update age or interests in your profile, then come back.</p>');
       state.deck.innerHTML = empty;
+      var addBirth = state.deck.querySelector("[data-commune-add-birth]");
+      if (addBirth) {
+        addBirth.addEventListener("click", function () {
+          var bp = window.CognationBirthPrompt;
+          if (bp && typeof bp.open === "function") bp.open();
+          else setStatus("Add your birth year and month in your profile.");
+        });
+      }
       syncActionLabels();
       return;
     }
@@ -3254,6 +3274,7 @@
     datingAgeOk: datingAgeOk,
     setDatingBirthAge: setDatingBirthAge,
     getDatingBirthAge: getDatingBirthAge,
+    liveBirthMissing: liveBirthMissing,
     datingAllowed: datingAllowed,
     getSeeDating: getSeeDating,
     setSeeDating: setSeeDating,

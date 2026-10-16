@@ -13038,6 +13038,10 @@ a.site-switch-side:focus-visible {
   width: auto;
   margin: 0;
 }
+/* Free layout too: the name's move handle sits in a gutter, not on the first letter. */
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--identity {
+  padding-left: 36px;
+}
 /* After a drag a widget keeps the width it had on the grid (wPx). */
 .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker[data-sticker-w] {
   width: var(--sticker-w);

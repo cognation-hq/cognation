@@ -49,6 +49,8 @@ assert.ok(/\[data-tower-profile-strip\] \{\s*max-height: none;\s*overflow: visib
 assert.ok(/\[data-tower-profile-strip\] > \.tower-sticker\.is-spawned > \.tower-sticker-handle \{[^}]*left: 2px;[^}]*translateY\(-50%\)/.test(css), "handle in left gutter");
 assert.ok(/\.tower-sticker--identity\.is-spawned \{\s*padding-left: 32px;/.test(css), "name clears the handle");
 
+assert.ok(/:not\(\.is-default-grid\) > \.tower-sticker--identity \{\s*padding-left: 36px;/.test(css), "free layout name clears handle");
+
 /* 7. Drag stays inside the card and keeps column width. */
 assert.ok(/maxX = Math\.max\(inset, 100 - inset - \(sticker\.offsetWidth \/ rect\.width\) \* 100\)/.test(tower));
 assert.ok(/maxY = Math\.max\(0, 100 - \(sticker\.offsetHeight \/ rect\.height\) \* 100\)/.test(tower));

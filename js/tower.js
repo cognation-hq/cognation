@@ -415,6 +415,22 @@
         return;
       }
       el.classList.remove("is-spawned");
+      /* Back from the phone stack (390px and back), the stack had cleared this
+         placed widget's spot. Put its saved spot back before anything is packed
+         or repaired around it, so the saved layout is what gets checked. */
+      if (!el.hasAttribute("data-sticker-x") && layout[id] && isPlacedPos(layout, id)) {
+        var back = layout[id];
+        var bx = layoutCoord(back.x, 0);
+        var by = stickerYFromLayout(back, stage.clientHeight || 0);
+        el.style.setProperty("--sticker-x", bx + "%");
+        el.style.setProperty("--sticker-y", by.css);
+        el.style.setProperty("--sticker-z", String(layoutCoord(back.z, 2)));
+        el.style.setProperty("--sticker-tilt", layoutCoord(back.tilt, 0) + "deg");
+        el.setAttribute("data-sticker-x", String(bx));
+        el.setAttribute("data-sticker-y", String(by.pct));
+        el.setAttribute("data-sticker-z", String(layoutCoord(back.z, 2)));
+        setStickerWidth(el, back.wPx);
+      }
       occupied.push({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
     });
     /* Top Friends on default spots: one evenly spaced row right below the MP3
@@ -481,6 +497,129 @@
       el.setAttribute("data-sticker-y", String(y));
       el.setAttribute("data-sticker-z", "2");
     });
+    repairLayoutOverlaps(stage, p, layout, spawnIds);
+  }
+
+  /* Load-time layout repair (live check r143). A saved free layout can come back
+     overlapping: an old layout saved before the spawn lock, a viewport change
+     (390px and back) where a widget is now taller or wider than when it was
+     saved, or an invalid spot (off the card, NaN, negative). After every desktop
+     layout pass, measure the real boxes; widgets that do not collide stay put.
+     Each colliding (or invalid) widget moves to the nearest free spot below its
+     old one, at the same x when it fits. Owner-dragged widgets are seated first so
+     they keep their spot. The repaired layout is saved once (geometry save) for
+     the owner; nothing is deleted, only x/y/yPx of the moved widgets change. */
+  var repairSavedSig = {};
+  function boxesOverlap(a, b) {
+    var ix = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+    var iy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+    return ix > 2 && iy > 2;
+  }
+  function planLayoutRepair(items, stageW, gap) {
+    /* items: [{id, x, y, w, h, dragged}] in stage px. Returns {id: {x, y}} for moved ones. */
+    var order = items.slice().sort(function (a, b) {
+      if (!!a.dragged !== !!b.dragged) return a.dragged ? -1 : 1;
+      return a.y - b.y || a.x - b.x;
+    });
+    var fixed = [];
+    var moves = {};
+    /* Identity row first (PM, #146): avatar card and name card sit side by side
+       at the top, at a valid spot, and are never pushed down. Everything else is
+       repaired around them, moving down only. */
+    var rowIds = ["avatar", "identity"];
+    var rowItems = rowIds.map(function (rid) {
+      return items.filter(function (it) { return it.id === rid; })[0];
+    }).filter(Boolean);
+    if (rowItems.length) {
+      var rx = rowItems[0].x;
+      if (!isFinite(rx) || rx < 0) rx = 0;
+      rowItems.forEach(function (it) {
+        var bx = Math.max(0, Math.min(Math.max(0, stageW - it.w), rx));
+        var box = { x: bx, y: gap, w: it.w, h: it.h };
+        if (box.x !== it.x || box.y !== it.y) moves[it.id] = { x: box.x, y: box.y };
+        fixed.push(box);
+        rx = bx + it.w + 12;
+      });
+      order = order.filter(function (it) { return rowIds.indexOf(it.id) < 0; });
+    }
+    order.forEach(function (it) {
+      var box = { x: it.x, y: it.y, w: it.w, h: it.h };
+      var invalid = false;
+      if (!isFinite(box.x) || !isFinite(box.y)) { box.x = isFinite(box.x) ? box.x : 0; box.y = isFinite(box.y) ? box.y : 0; invalid = true; }
+      var maxX = Math.max(0, stageW - box.w);
+      if (box.x < 0 || box.x > maxX) { box.x = Math.max(0, Math.min(maxX, box.x)); invalid = true; }
+      if (box.y < 0) { box.y = 0; invalid = true; }
+      var hit = fixed.some(function (f) { return boxesOverlap(box, f); });
+      if (hit) {
+        /* Candidate rows: under each seated widget, nearest first, never above the old spot. */
+        var ys = fixed.map(function (f) { return f.y + f.h + gap; }).filter(function (y) { return y >= box.y; });
+        ys.sort(function (a, b) { return a - b; });
+        for (var i = 0; i < ys.length; i++) {
+          var cand = { x: box.x, y: ys[i], w: box.w, h: box.h };
+          if (!fixed.some(function (f) { return boxesOverlap(cand, f); })) { box.y = ys[i]; break; }
+        }
+      }
+      if (hit || invalid) moves[it.id] = { x: box.x, y: box.y };
+      fixed.push(box);
+    });
+    return moves;
+  }
+  function repairLayoutOverlaps(stage, p, layout, spawnIds) {
+    if (!stage || isPhoneStage(stage) || stage.classList.contains("is-default-grid")) return false;
+    var stageW = stage.clientWidth || 0;
+    if (!stageW) return false;
+    var items = [];
+    stage.querySelectorAll("[data-tower-widget]").forEach(function (el) {
+      var id = el.getAttribute("data-tower-widget");
+      if (!id || el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
+      if (el.classList.contains("is-dragging") || !spawnIds[id]) return;
+      if (!el.offsetWidth || !el.offsetHeight) return;
+      items.push({ id: id, el: el, x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight, dragged: !!(layout && layout[id] && layout[id].dragged === true) });
+    });
+    var moves = planLayoutRepair(items, stageW, SPAWN_GAP);
+    var ids = Object.keys(moves);
+    if (!ids.length) return false;
+    var bottom = 0;
+    items.forEach(function (it) {
+      var m = moves[it.id];
+      bottom = Math.max(bottom, (m ? m.y : it.y) + it.h);
+    });
+    if (bottom + SPAWN_GAP > (stage.clientHeight || 0)) stage.style.minHeight = Math.ceil(bottom + SPAWN_GAP) + "px";
+    var stageH = Math.max(stage.clientHeight || 0, bottom + SPAWN_GAP);
+    var lay = layout || {};
+    items.forEach(function (it) {
+      var m = moves[it.id];
+      if (!m) return;
+      var x = Math.round((m.x / stageW) * 1000) / 10;
+      var y = Math.round((m.y / stageH) * 1000) / 10;
+      it.el.style.setProperty("--sticker-x", x + "%");
+      it.el.style.setProperty("--sticker-y", Math.round(m.y) + "px");
+      it.el.setAttribute("data-sticker-x", String(x));
+      it.el.setAttribute("data-sticker-y", String(y));
+      var prev = lay[it.id] && typeof lay[it.id] === "object" ? lay[it.id] : null;
+      if (prev && isPlacedPos(lay, it.id)) {
+        prev.x = x;
+        prev.y = y;
+        prev.yPx = Math.round(m.y);
+      } else {
+        spawnCache[it.id] = { x: x, y: y, z: 2, tilt: 0 };
+      }
+    });
+    /* Save once per profile + repaired result, and only for the owner. */
+    if (p && layout && isTowerOwner(p) && !p._loading) {
+      var sig = String(p._profileId || "") + "|" + ids.sort().map(function (id) {
+        return id + ":" + (lay[id] ? lay[id].x + "," + lay[id].yPx : "spawn");
+      }).join(";");
+      var pid = String(p._profileId || "");
+      if (repairSavedSig[pid] !== sig) {
+        repairSavedSig[pid] = sig;
+        p.widgetLayout = lay;
+        setTimeout(function () {
+          try { TowerProfileStore.save(p, { geometry: true }); } catch (eRep) {}
+        }, 0);
+      }
+    }
+    return true;
   }
 
   /* Saved spot if the owner placed it, else the current spawn spot, else the old default. */
@@ -8888,6 +9027,17 @@
         sticker.setAttribute("data-sticker-y", String(dropY));
         sticker.setAttribute("data-sticker-z", String(dropZ));
         sticker.classList.remove("is-dragging");
+        /* The drop itself may leave a neighbour overlapping (a full-row widget
+           grows once it leaves the grid). Repair now; the dropped widget is
+           seated first, so only the others move. */
+        if (id !== "quote") {
+          try {
+            var pr = TowerProfileStore.get();
+            var spawnIdsDrop = {};
+            spawnRowsFor(pr).forEach(function (r) { r.forEach(function (w) { spawnIdsDrop[w] = true; }); });
+            repairLayoutOverlaps(stage, pr, getWidgetLayout(pr), spawnIdsDrop);
+          } catch (eRepair) {}
+        }
       }
 
       document.addEventListener("pointermove", onMove);

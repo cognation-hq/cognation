@@ -1,287 +1,259 @@
 /**
- * Tower messaging (demo / local) — lives under the profile picture on TOWER.
+ * Tower messaging — direct messages under the profile picture on TOWER.
  *
- * Storage is behind a small MessageStore interface so a real API can replace
- * localStorage later without rewriting the UI. This is NOT a live multi-user
- * server — threads live in this browser only.
- *
- * localStorage key: cognation.commune.messages.v1 (demo)
+ * Real DMs: threads and messages live in Supabase (public.direct_threads /
+ * public.direct_messages, SQL 20261017_direct_messages.sql). Opening, sending
+ * and listing go through RPCs that enforce blocks, real/seed separation, 13+
+ * and message rating. Nothing is saved in this browser; the store below is an
+ * in-memory copy of what the server returned. No demo threads, no local fallback.
  */
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "cognation.commune.messages.v1";
   var CURRENT_USER_ID = "you";
   var CURRENT_USER_NAME = "You";
+  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
   /** Quick tapback set (iMessage-style). */
   var QUICK_REACTIONS = ["❤️", "👍", "😂", "😮", "😢", "🙏"];
   /** Extra emojis behind the “+” picker. */
   var MORE_REACTIONS = ["🔥", "🎉", "💯", "🤗", "👀", "✨"];
 
-  /* —— Seed data (first visit only) —— */
-  var SEED = {
-    version: 1,
-    activeId: null,
-    conversations: [
-      {
-        id: "c1",
-        title: "Alex Rivera",
-        participants: [
-          { id: "you", name: "You" },
-          { id: "alex", name: "Alex Rivera" }
-        ],
-        messages: [
-          {
-            id: "m1",
-            senderId: "alex",
-            senderName: "Alex Rivera",
-            body: "Welcome to Tower messages — local demo thread.",
-            createdAt: "2026-09-14T15:00:00.000Z"
-          },
-          {
-            id: "m2",
-            senderId: "you",
-            senderName: "You",
-            body: "Got it. Messages stay in this browser until a backend is connected.",
-            createdAt: "2026-09-14T15:02:00.000Z"
-          },
-          {
-            id: "m3",
-            senderId: "alex",
-            senderName: "Alex Rivera",
-            body: "Try sending a reply below — it will appear here right away.",
-            createdAt: "2026-09-14T15:03:30.000Z"
-          }
-        ]
-      },
-      {
-        id: "c2",
-        title: "Jordan Lee",
-        participants: [
-          { id: "you", name: "You" },
-          { id: "jordan", name: "Jordan Lee" }
-        ],
-        messages: [
-          {
-            id: "m4",
-            senderId: "jordan",
-            senderName: "Jordan Lee",
-            body: "Hey — checking in from the second demo conversation.",
-            createdAt: "2026-09-13T18:20:00.000Z"
-          },
-          {
-            id: "m5",
-            senderId: "you",
-            senderName: "You",
-            body: "Looks good. We’ll swap localStorage for a real API later.",
-            createdAt: "2026-09-13T18:25:00.000Z"
-          }
-        ]
-      }
-    ]
-  };
+  var MATCH_INTRO = "You both swiped right. Say hello when you're ready.";
 
-  /* —— MessageStore: swap this object for API-backed methods later —— */
+  /* In-memory only (server is the source of truth). */
+  var memory = { activeId: null, conversations: [], loaded: false, live: false, status: "" };
+
+  function sb() {
+    var c = window.CognationSupabase;
+    if (!c || typeof c.configured !== "function" || !c.configured()) return null;
+    if (typeof c.rpc !== "function" || typeof c.rest !== "function") return null;
+    return c;
+  }
+
+  function liveSession() {
+    var c = sb();
+    if (!c || typeof c.getSession !== "function") return null;
+    var s = c.getSession();
+    return s && s.access_token ? s : null;
+  }
+
+  function myUserId() {
+    var s = liveSession();
+    return s && s.user && s.user.id ? String(s.user.id) : "";
+  }
+
+  function errorText(err) {
+    if (!err) return "";
+    var parts = [];
+    if (err.message) parts.push(String(err.message));
+    var body = err.body;
+    if (body && typeof body === "object") {
+      ["message", "details", "hint", "code", "error"].forEach(function (k) {
+        if (body[k]) parts.push(String(body[k]));
+      });
+    } else if (typeof body === "string") parts.push(body);
+    return parts.join(" ");
+  }
+
+  /** Honest status lines (same tone as live chat rooms, #139). */
+  function mapDmError(err) {
+    var text = errorText(err);
+    if (/direct_threads|direct_messages|open_direct_thread|send_direct_message|list_my_direct_threads/i.test(text) &&
+        /(PGRST20[25]|42P01|does not exist|schema cache|Could not find)/i.test(text)) {
+      return "Messages aren't available yet. Try again soon.";
+    }
+    var codes = [
+      ["Sign in first", "Sign in to send messages."],
+      ["under_13", "Messages are for members 13 and up."],
+      ["no_birth", "Add your birth year and month in your profile to send messages."],
+      ["blocked", "You can't message this person."],
+      ["real_seed_blocked", "You can't message this person."],
+      ["peer_unavailable", "You can't message this person."],
+      ["peer_not_found", "That person isn't available to message."],
+      ["thread_not_found", "That conversation isn't available."],
+      ["cannot_message_self", "You can't message yourself."],
+      ["bad_body", "Message must be 1–2000 characters."],
+      ["harmful", "That message can't be sent."],
+    ];
+    for (var i = 0; i < codes.length; i++) {
+      if (text.indexOf(codes[i][0]) !== -1) return codes[i][1];
+    }
+    return "Couldn't send. Check your connection and try again.";
+  }
+
+  function asArray(v) {
+    if (Array.isArray(v)) return v;
+    if (v && Array.isArray(v.data)) return v.data;
+    if (typeof v === "string") { try { return JSON.parse(v) || []; } catch (e) { return []; } }
+    return [];
+  }
+
+  function rowToMessage(row, conv, me) {
+    var mine = row.sender_user_id && String(row.sender_user_id) === me;
+    var system = !row.sender_user_id;
+    return {
+      id: String(row.id),
+      senderId: mine ? CURRENT_USER_ID : system ? "cognation" : String(conv.peerId || conv.peerUserId || ""),
+      senderName: mine ? CURRENT_USER_NAME : system ? "Cognation" : conv.title,
+      body: String(row.body || ""),
+      createdAt: row.created_at,
+      kind: row.kind || "friend",
+      reactions: {},
+    };
+  }
+
+  function findConv(id) {
+    for (var i = 0; i < memory.conversations.length; i++) {
+      if (memory.conversations[i].id === id) return memory.conversations[i];
+    }
+    return null;
+  }
+
   var MessageStore = {
-    load: function () {
-      try {
-        var raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return null;
-        var data = JSON.parse(raw);
-        if (!data || !Array.isArray(data.conversations)) return null;
-        return data;
-      } catch (err) {
-        return null;
+    getState: function () { return memory; },
+    isLive: function () { return memory.live; },
+    statusText: function () { return memory.status; },
+    listConversations: function () { return memory.conversations.slice(); },
+    getConversation: function (id) { return id ? findConv(id) : null; },
+    getActiveId: function () { return memory.activeId; },
+    setActiveId: function (id) { memory.activeId = id || null; },
+
+    /** Load my threads + messages from Supabase. Resolves to { ok, error? }. */
+    refresh: function () {
+      var c = sb();
+      var me = myUserId();
+      if (!c || !me) {
+        memory.live = false;
+        memory.loaded = true;
+        memory.conversations = memory.conversations.filter(function (conv) { return conv.localOnlyMatch; });
+        memory.status = "Sign in to see and send messages.";
+        MessageStore.refreshUi();
+        return Promise.resolve({ ok: false, error: memory.status });
       }
+      return c.rpc("list_my_direct_threads", {}).then(function (res) {
+        var threads = asArray(res);
+        var ids = threads.map(function (t) { return String(t.id); }).filter(function (id) { return UUID_RE.test(id); });
+        var convs = threads.map(function (t) {
+          return {
+            id: String(t.id),
+            title: t.peer_name || "Member",
+            peerId: t.peer_profile_id ? String(t.peer_profile_id) : "",
+            peerUserId: t.peer_user_id ? String(t.peer_user_id) : "",
+            mutualMatch: t.kind === "match",
+            messages: [],
+          };
+        });
+        if (!ids.length) return { convs: convs, rows: [] };
+        return c.rest("direct_messages", {
+          query: "select=id,thread_id,sender_user_id,body,kind,created_at&thread_id=in.(" + ids.join(",") + ")&order=created_at.asc&limit=2000",
+        }).then(function (rows) { return { convs: convs, rows: asArray(rows) }; });
+      }).then(function (out) {
+        var byId = {};
+        out.convs.forEach(function (conv) { byId[conv.id] = conv; });
+        out.rows.forEach(function (row) {
+          var conv = byId[String(row.thread_id)];
+          if (conv) conv.messages.push(rowToMessage(row, conv, me));
+        });
+        out.convs.forEach(function (conv) {
+          /* Match intro is derived from the saved thread kind, not stored text. */
+          var pending = findConv(conv.id);
+          if (conv.mutualMatch) {
+            conv.messages.unshift({
+              id: conv.id + "-match",
+              senderId: "cognation",
+              senderName: "Cognation",
+              body: MATCH_INTRO,
+              createdAt: conv.messages[0] ? conv.messages[0].createdAt : new Date().toISOString(),
+              kind: "friend",
+              mutualMatch: true,
+              eventLine: pending && pending.messages[0] && pending.messages[0].eventLine,
+              reactions: {},
+            });
+          }
+        });
+        memory.conversations = out.convs;
+        memory.live = true;
+        memory.loaded = true;
+        memory.status = "";
+        MessageStore.refreshUi();
+        return { ok: true };
+      }).catch(function (err) {
+        memory.live = false;
+        memory.loaded = true;
+        memory.status = mapDmError(err);
+        MessageStore.refreshUi();
+        return { ok: false, error: memory.status };
+      });
     },
 
-    save: function (data) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        return true;
-      } catch (err) {
-        return false;
-      }
-    },
-
-    /** Ensure seed exists; return working state. */
-    getState: function () {
-      var data = this.load();
-      if (!data) {
-        data = JSON.parse(JSON.stringify(SEED));
-        this.save(data);
-      }
-      return data;
-    },
-
-    listConversations: function () {
-      return this.getState().conversations.slice();
-    },
-
-    getConversation: function (id) {
-      var state = this.getState();
-      for (var i = 0; i < state.conversations.length; i++) {
-        if (state.conversations[i].id === id) return state.conversations[i];
-      }
-      return null;
-    },
-
-    getActiveId: function () {
-      return this.getState().activeId;
-    },
-
-    setActiveId: function (id) {
-      var state = this.getState();
-      state.activeId = id || null;
-      this.save(state);
-    },
-
-    /**
-     * Append a message. Replace with POST /api/messages later.
-     * @returns {{ ok: boolean, message?: object, error?: string }}
-     */
+    /** Send to Supabase. Resolves to { ok, message?, error? }. Nothing is kept locally on failure. */
     sendMessage: function (conversationId, body) {
       var text = String(body || "").trim();
-      if (!text) {
-        return { ok: false, error: "Message cannot be empty." };
+      if (!text) return Promise.resolve({ ok: false, error: "Message cannot be empty." });
+      var conv = findConv(conversationId);
+      if (!conv || !UUID_RE.test(String(conversationId))) {
+        return Promise.resolve({ ok: false, error: "That conversation isn't available." });
       }
-      var state = this.getState();
-      var conv = null;
-      for (var i = 0; i < state.conversations.length; i++) {
-        if (state.conversations[i].id === conversationId) {
-          conv = state.conversations[i];
-          break;
-        }
-      }
-      if (!conv) {
-        return { ok: false, error: "Conversation not found." };
-      }
-      var msg = {
-        id: "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-        senderId: CURRENT_USER_ID,
-        senderName: CURRENT_USER_NAME,
-        body: text,
-        createdAt: new Date().toISOString(),
-        reactions: {}
-      };
-      conv.messages.push(msg);
-      state.activeId = conversationId;
-      if (!this.save(state)) {
-        return { ok: false, error: "Could not save to local storage." };
-      }
-      return { ok: true, message: msg };
+      var c = sb();
+      var me = myUserId();
+      if (!c || !me) return Promise.resolve({ ok: false, error: "Sign in to send messages." });
+      return c.rpc("send_direct_message", { p_thread_id: conversationId, p_body: text }).then(function (row) {
+        if (Array.isArray(row)) row = row[0];
+        if (!row || !row.id) return { ok: false, error: "Couldn't send. Check your connection and try again." };
+        var msg = rowToMessage(row, conv, me);
+        conv.messages.push(msg);
+        memory.activeId = conversationId;
+        return { ok: true, message: msg };
+      }).catch(function (err) {
+        return { ok: false, error: mapDmError(err) };
+      });
     },
 
     /**
-     * Toggle current user's reaction on a message.
-     * reactions shape: { "❤️": ["you", "alex"], ... }
-     * @returns {{ ok: boolean, message?: object, error?: string }}
+     * Reactions are not saved server-side yet (reactions come later). They stay
+     * on screen for this page view only and are gone after a reload.
      */
     toggleReaction: function (conversationId, messageId, emoji) {
       var face = String(emoji || "").trim();
-      if (!face) {
-        return { ok: false, error: "Emoji required." };
-      }
-      var state = this.getState();
-      var conv = null;
-      for (var i = 0; i < state.conversations.length; i++) {
-        if (state.conversations[i].id === conversationId) {
-          conv = state.conversations[i];
-          break;
-        }
-      }
-      if (!conv) {
-        return { ok: false, error: "Conversation not found." };
-      }
+      if (!face) return { ok: false, error: "Emoji required." };
+      var conv = findConv(conversationId);
+      if (!conv) return { ok: false, error: "Conversation not found." };
       var msg = null;
       for (var j = 0; j < conv.messages.length; j++) {
-        if (conv.messages[j].id === messageId) {
-          msg = conv.messages[j];
-          break;
-        }
+        if (conv.messages[j].id === messageId) { msg = conv.messages[j]; break; }
       }
-      if (!msg) {
-        return { ok: false, error: "Message not found." };
-      }
-      if (!msg.reactions || typeof msg.reactions !== "object") {
-        msg.reactions = {};
-      }
+      if (!msg) return { ok: false, error: "Message not found." };
+      if (!msg.reactions || typeof msg.reactions !== "object") msg.reactions = {};
       var list = Array.isArray(msg.reactions[face]) ? msg.reactions[face].slice() : [];
       var idx = list.indexOf(CURRENT_USER_ID);
-      if (idx >= 0) {
-        list.splice(idx, 1);
-      } else {
-        list.push(CURRENT_USER_ID);
-      }
-      if (list.length) {
-        msg.reactions[face] = list;
-      } else {
-        delete msg.reactions[face];
-      }
-      if (!this.save(state)) {
-        return { ok: false, error: "Could not save to local storage." };
-      }
+      if (idx >= 0) list.splice(idx, 1); else list.push(CURRENT_USER_ID);
+      if (list.length) msg.reactions[face] = list; else delete msg.reactions[face];
       return { ok: true, message: msg };
-    }
+    },
   };
 
-
-  MessageStore.ensureConversation = function (peerId, peerName) {
+  /** Open (or find) the real thread with a person by profile UUID. Resolves to { ok, conversation?, error? }. */
+  MessageStore.ensureConversation = function (peerId, peerName, kind) {
     peerId = String(peerId || "").trim();
-    if (!peerId) return null;
-    var state = this.getState();
-    var cid = "dm-" + peerId;
-    var found = null;
-    for (var i = 0; i < state.conversations.length; i++) {
-      var c = state.conversations[i];
-      if (c.id === cid || c.peerId === peerId) {
-        found = c;
-        break;
-      }
-    }
-    if (!found) {
-      found = {
-        id: cid,
-        title: peerName || peerId,
-        peerId: peerId,
-        mutualMatch: false,
-        participants: [
-          { id: CURRENT_USER_ID, name: CURRENT_USER_NAME },
-          { id: peerId, name: peerName || peerId },
-        ],
-        messages: [],
-      };
-      state.conversations.push(found);
-      this.save(state);
-    } else if (peerName && found.title !== peerName) {
-      found.title = peerName;
-      this.save(state);
-    }
-    return found;
-  };
-
-  MessageStore.appendMessage = function (conversationId, msg) {
-    var state = this.getState();
-    var conv = null;
-    for (var i = 0; i < state.conversations.length; i++) {
-      if (state.conversations[i].id === conversationId) {
-        conv = state.conversations[i];
-        break;
-      }
-    }
-    if (!conv) return { ok: false, error: "Conversation not found." };
-    if (!msg || typeof msg !== "object") return { ok: false, error: "Invalid message." };
-    if (!msg.id) {
-      msg.id = "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    }
-    if (!msg.createdAt) msg.createdAt = new Date().toISOString();
-    if (!msg.reactions) msg.reactions = {};
-    conv.messages.push(msg);
-    if (msg.mutualMatch) conv.mutualMatch = true;
-    state.activeId = conversationId;
-    if (!this.save(state)) return { ok: false, error: "Could not save." };
-    return { ok: true, message: msg, conversation: conv };
+    if (!UUID_RE.test(peerId)) return Promise.resolve({ ok: false, error: "That person isn't available to message." });
+    var c = sb();
+    if (!c || !myUserId()) return Promise.resolve({ ok: false, error: "Sign in to send messages." });
+    return c.rpc("open_direct_thread", { p_peer_profile_id: peerId, p_kind: kind === "match" ? "match" : "dm" })
+      .then(function (row) {
+        if (Array.isArray(row)) row = row[0];
+        if (!row || !row.id) return { ok: false, error: "That conversation isn't available." };
+        var id = String(row.id);
+        var conv = findConv(id);
+        if (!conv) {
+          conv = { id: id, title: peerName || "Member", peerId: peerId, mutualMatch: row.kind === "match", messages: [] };
+          memory.conversations.unshift(conv);
+        }
+        memory.activeId = id;
+        MessageStore.refreshUi();
+        return { ok: true, conversation: conv };
+      })
+      .catch(function (err) { return { ok: false, error: mapDmError(err) }; });
   };
 
   function messageViewerIds() {
@@ -313,16 +285,11 @@
     return conv.title || "Messages";
   };
 
-  MessageStore.listConversations = function () {
-    var mine = messageViewerIds();
-    return this.getState().conversations.filter(function (conv) {
-      if (!conv || !conv.participantIds || !conv.participantIds.length) return true;
-      return conv.participantIds.some(function (id) {
-        return mine.indexOf(String(id)) >= 0;
-      });
-    });
-  };
-
+  /**
+   * Mutual dating match. Shows the match intro right away (in memory) and, when
+   * both ids are real profile UUIDs and the viewer is signed in, opens the real
+   * 'match' thread on the server; the next refresh replaces the in-memory copy.
+   */
   MessageStore.openMatch = function (a, b, opts) {
     a = a || {};
     b = b || {};
@@ -330,23 +297,16 @@
     if (!a.id || !b.id) return null;
     var ids = [String(a.id), String(b.id)].sort();
     var cid = "match-" + ids[0] + "--" + ids[1];
-    var state = this.getState();
-    var found = null;
-    for (var i = 0; i < state.conversations.length; i++) {
-      if (state.conversations[i].id === cid) {
-        found = state.conversations[i];
-        break;
-      }
-    }
+    var found = findConv(cid);
     if (!found) {
       /* Optional event line from dating-match path only — never invent seed copy here. */
       var eventLine = String(opts.eventLine || "").trim();
       if (eventLine && /cal-demo/i.test(eventLine)) eventLine = "";
       var matchMsg = {
-        id: "match-" + Date.now().toString(36),
+        id: cid + "-match",
         senderId: "cognation",
         senderName: "Cognation",
-        body: "You both swiped right. Say hello when you're ready.",
+        body: MATCH_INTRO,
         createdAt: new Date().toISOString(),
         kind: "friend",
         mutualMatch: true,
@@ -362,10 +322,20 @@
           { id: String(b.id), name: b.name || "Member" },
         ],
         mutualMatch: true,
+        localOnlyMatch: true,
         messages: [matchMsg],
       };
-      state.conversations.unshift(found);
-      this.save(state);
+      memory.conversations.unshift(found);
+      if (UUID_RE.test(String(b.id))) {
+        MessageStore.ensureConversation(String(b.id), b.name, "match").then(function (res) {
+          if (!res || !res.ok || !res.conversation) return;
+          res.conversation.messages = found.messages.concat(res.conversation.messages || []);
+          res.conversation.mutualMatch = true;
+          memory.conversations = memory.conversations.filter(function (c) { return c !== found; });
+          if (memory.activeId === cid) memory.activeId = res.conversation.id;
+          MessageStore.refreshUi();
+        });
+      }
     }
     this.refreshUi();
     return found;
@@ -420,7 +390,10 @@
     var shell = messagesRoot && messagesRoot.querySelector("[data-tower-messages-shell]");
     if (shell && messagesRoot) {
       shell.addEventListener("toggle", function () {
-        if (shell.open) messagesRoot.removeAttribute("data-tower-messages-closed");
+        if (shell.open) {
+          messagesRoot.removeAttribute("data-tower-messages-closed");
+          MessageStore.refresh(); /* pick up the other person's new messages */
+        }
         else messagesRoot.setAttribute("data-tower-messages-closed", "");
       });
     }
@@ -443,7 +416,7 @@
       (shell && !shell.open);
     if (startClosed) {
       activeId = null;
-      try { MessageStore.setActiveId(null); } catch (eClose) {}
+      MessageStore.setActiveId(null);
     }
     var threadEl0 = root.querySelector("[data-tower-thread], .tower-thread");
     if (threadEl0) {
@@ -600,7 +573,7 @@
 
       bar.appendChild(pills);
 
-      /* Prefer react control on incoming; allow on own for demo simplicity. */
+      /* Prefer react control on incoming; allow on own too. */
       var controls = document.createElement("div");
       controls.className = "commune-react-controls" + (isIncoming ? " is-incoming" : "");
 
@@ -720,18 +693,26 @@
       input.focus();
     }
 
+    var sending = false;
     form.addEventListener("submit", function (e) {
       e.preventDefault();
-      var result = MessageStore.sendMessage(activeId, input.value);
-      if (!result.ok) {
-        setStatus(result.error || "Could not send.", true);
-        return;
-      }
-      input.value = "";
-      setStatus("Saved locally (demo). Messages sync when auth/backend is connected.");
-      renderList();
-      renderThread();
-      input.focus();
+      if (sending) return;
+      var sentId = activeId;
+      sending = true;
+      setStatus("Sending…");
+      MessageStore.sendMessage(sentId, input.value).then(function (result) {
+        sending = false;
+        if (!result.ok) {
+          /* Nothing saved anywhere on failure; the text stays in the box to retry. */
+          setStatus(result.error || "Couldn't send. Check your connection and try again.", true);
+          return;
+        }
+        input.value = "";
+        setStatus("");
+        renderList();
+        renderThread();
+        input.focus();
+      });
     });
 
     input.addEventListener("keydown", function (e) {
@@ -767,6 +748,10 @@
 
     renderList();
     renderThread();
+    setStatus(MessageStore.statusText());
+    MessageStore.refresh().then(function () {
+      setStatus(MessageStore.statusText(), false);
+    });
   }
 
   function boot() {

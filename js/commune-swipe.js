@@ -156,6 +156,10 @@
   PRO_MARK[PRO.FIELD] = "Field";
   PRO_MARK[PRO.POP] = "Pop-culture";
   var DEMO_LABEL = "Demo · placeholder";
+  var SHOW_PRO_PLACEHOLDERS = false;
+  /* The legacy classroom panel. Not the deck's classroom CARD (it also carries
+     data-classroom="card"): hiding that card on Back left a blank deck. */
+  var CLASSROOM_PANEL_SEL = "[data-classroom]:not([data-commune-card]), #panel-classroom, [data-commune-classroom]";
   var PRO_WEBINARS = [
     { id: "pro-webinar-ethics", title: "Ethical collaboration in practice", body: "Credit, consent, and clear roles when people build together." },
     { id: "pro-webinar-async", title: "Async work that respects time", body: "Written decisions, clean handoffs, and calm response windows." },
@@ -1489,7 +1493,22 @@
     var field = viewerField();
     if (field && interests.indexOf(field) < 0) interests.unshift(field);
     var out = [];
-    eachProfile(function (rec) {
+    /* Live site: only real professional pages from the server (supabase-social).
+       The local registry (cognation.profiles.v1) holds demo records such as
+       prof-alexa-professional whose handle has no server page, so Open their page
+       landed on the viewer's own Tower. */
+    var social = window.CognationSupabaseSocial;
+    var each = eachProfile;
+    if (liveSignedIn()) {
+      each = function (fn) {
+        var rows = social && typeof social.listProfiles === "function" ? social.listProfiles() || [] : [];
+        rows.forEach(function (row) {
+          if (!row) return;
+          fn({ id: row.id, kind: row.kind, handle: row.handle, displayName: row.display_name, bio: row.bio || "", userId: row.user_id });
+        });
+      };
+    }
+    each(function (rec) {
       if (!rec || rec.kind !== "professional" || mine[String(rec.id)] || isFollowing(rec.id)) return;
       var name = rec.displayName || rec.handle;
       if (!name) return;
@@ -1513,11 +1532,6 @@
       });
     });
     out.sort(function (a, b) { return b.score - a.score; });
-    if (!out.length) {
-      out.push(proPlaceholder(PRO.KNOW, "pro-know-placeholder", "Professionals you might know",
-        "Professional pages that match your field show here once real pages connect.",
-        "Matched by shared field and interests only.", 13));
-    }
     return out;
   }
 
@@ -1558,6 +1572,10 @@
     lanes[PRO.POP] = [proPlaceholder(PRO.POP, "pro-popculture-" + (slug(field) || "general"), "Pop culture \u00d7 " + fieldName,
       "Pop-culture moments that touch " + fieldName + " show here once a feed connects.", fieldWhy)];
     Object.keys(lanes).forEach(function (type) {
+      /* Standing rule: no feature-level demo placeholders. Placeholder cards
+         (demo: true — webinars, research, auction, podcasts, field, pop culture)
+         stay hidden until a real feed backs them. Seed Demo badges are separate. */
+      if (!SHOW_PRO_PLACEHOLDERS) lanes[type] = lanes[type].filter(function (c) { return c && !c.demo; });
       lanes[type] = omitPassed(lanes[type].filter(professionalCardAllowed));
     });
     return lanes;
@@ -2080,7 +2098,7 @@
   function showSubpanel(kind) {
     /* kind: "" | "room" | "classroom" — hides deck when either panel is open */
     var room = roomEl();
-    var classroom = state.shell && state.shell.querySelector("[data-classroom], #panel-classroom, [data-commune-classroom]");
+    var classroom = state.shell && state.shell.querySelector(CLASSROOM_PANEL_SEL);
     var deck = state.deck;
     var actions = state.shell && state.shell.querySelector(".commune-swipe-actions");
     var on = kind === "classroom";
@@ -2832,7 +2850,7 @@
       state.classroomId = session.id;
       return;
     }
-    var panel = state.shell && state.shell.querySelector("[data-classroom], #panel-classroom, [data-commune-classroom]");
+    var panel = state.shell && state.shell.querySelector(CLASSROOM_PANEL_SEL);
     if (!panel || !session) return;
     var title = panel.querySelector("[data-classroom-title]");
     var topic = panel.querySelector("[data-classroom-topic]");
@@ -2894,7 +2912,7 @@
     }
     if (!state.shell) {
       /* Allow pathway smoke before shell bind: surface still exists in DOM. */
-      var panel = document.querySelector("[data-classroom], #panel-classroom, [data-commune-classroom]");
+      var panel = document.querySelector(CLASSROOM_PANEL_SEL);
       if (!panel) return false;
       state.shell = document.querySelector("[data-commune-shell]") || panel.closest("[data-commune-shell]") || null;
       if (!state.shell) state.shell = panel.parentElement;
@@ -3553,6 +3571,9 @@
     setDatingBirthAge: setDatingBirthAge,
     roomSwipeIsNext: roomSwipeIsNext,
     openPersonTower: openPersonTower,
+    buildProfessionalLanes: buildProfessionalLanes,
+    /* Tests only: the old placeholder lanes stay in code (hidden) until real feeds land. */
+    _setShowProPlaceholders: function (on) { SHOW_PRO_PLACEHOLDERS = !!on; },
     roomTimeLabel: roomTimeLabel,
     getDatingBirthAge: getDatingBirthAge,
     liveBirthMissing: liveBirthMissing,
@@ -3596,6 +3617,8 @@
     setMode: setMode,
     paceProfessional: paceProfessional,
     buildProfessionalLanes: buildProfessionalLanes,
+    /* Tests only: the old placeholder lanes stay in code (hidden) until real feeds land. */
+    _setShowProPlaceholders: function (on) { SHOW_PRO_PLACEHOLDERS = !!on; },
     MODE_KEY: MODE_KEY,
     PRO_ORDER: PRO_ORDER.slice(),
     PRO_MARK: PRO_MARK,

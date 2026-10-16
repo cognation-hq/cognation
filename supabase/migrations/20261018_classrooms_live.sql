@@ -2,7 +2,7 @@
 -- in the Supabase SQL editor. Safe to re-run.
 --
 -- Adds chat_rooms.min_age (default 13, so existing rooms are unchanged), adds the
--- three Cognation classrooms as 18+ rooms, and re-creates join_chat_room /
+-- three Cognation classrooms as 18+ rooms with no member cap, and re-creates join_chat_room /
 -- post_chat_room_message with one extra check: age < min_age -> 'under_18'.
 -- Everything else is copied unchanged from 20261016_seed_birth_backfill.sql.
 --
@@ -14,16 +14,26 @@
 --
 -- ROLLBACK: re-run the two functions from 20261016_seed_birth_backfill.sql, then
 --   delete from public.chat_rooms where slug like 'class-%';
+--   alter table public.chat_rooms drop constraint if exists chat_rooms_max_members_check;
+--   alter table public.chat_rooms alter column max_members set not null;
+--   alter table public.chat_rooms add constraint chat_rooms_max_members_check check (max_members between 2 and 20);
 --   alter table public.chat_rooms drop column if exists min_age;
 
 alter table public.chat_rooms
   add column if not exists min_age int not null default 13
   check (min_age between 13 and 21);
 
+/* Member cap: chatrooms keep their small cap (2–20). Classrooms (min_age >= 18)
+   have no cap: max_members is null, and join skips the cap check. */
+alter table public.chat_rooms alter column max_members drop not null;
+alter table public.chat_rooms drop constraint if exists chat_rooms_max_members_check;
+alter table public.chat_rooms add constraint chat_rooms_max_members_check
+  check (max_members between 2 and 20 or (max_members is null and min_age >= 18));
+
 insert into public.chat_rooms (id, slug, title, topic, body, rating, max_members, min_age) values
-  ('a2000000-0000-4000-8000-000000000001', 'class-insurance', 'Insurance basics', 'insurance', 'Cognation Classroom — life skills at a human pace.', 'PG-13', 20, 18),
-  ('a2000000-0000-4000-8000-000000000002', 'class-voting', 'Voting & civic basics', 'voting', 'Cognation Classroom — life skills at a human pace.', 'PG-13', 20, 18),
-  ('a2000000-0000-4000-8000-000000000003', 'class-business', 'Starting a small business', 'business', 'Cognation Classroom — life skills at a human pace.', 'PG-13', 20, 18)
+  ('a2000000-0000-4000-8000-000000000001', 'class-insurance', 'Insurance basics', 'insurance', 'Cognation Classroom — life skills at a human pace.', 'PG-13', null, 18),
+  ('a2000000-0000-4000-8000-000000000002', 'class-voting', 'Voting & civic basics', 'voting', 'Cognation Classroom — life skills at a human pace.', 'PG-13', null, 18),
+  ('a2000000-0000-4000-8000-000000000003', 'class-business', 'Starting a small business', 'business', 'Cognation Classroom — life skills at a human pace.', 'PG-13', null, 18)
 on conflict (id) do update set min_age = excluded.min_age, title = excluded.title, max_members = excluded.max_members;
 
 create or replace function public.join_chat_room(p_room_id uuid)
@@ -55,12 +65,13 @@ begin
   end if;
 
   select count(*)::int into members from public.chat_room_members where room_id = room.id;
-  if members >= room.max_members
+  if room.max_members is not null
+     and members >= room.max_members
      and not exists (
        select 1 from public.chat_room_members
        where room_id = room.id and user_id = auth.uid()
      ) then
-    raise exception 'room_full';
+    raise exception 'room_full:%', room.max_members;
   end if;
 
   insert into public.chat_room_members (room_id, user_id)
@@ -122,3 +133,5 @@ $$;
 revoke all on function public.post_chat_room_message(uuid, text) from public, anon;
 grant execute on function public.post_chat_room_message(uuid, text) to authenticated;
 
+comment on function public.join_chat_room(uuid) is
+  'Join a chat room. no_birth if user_birth missing; under_13 if age < 13; else cap/rating/blocks.';

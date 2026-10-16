@@ -2070,7 +2070,7 @@
       ["under_18", "Classrooms are for members 18 and up."],
       ["rating_blocked", "This room's rating is not available for your account."],
       ["blocked", "You can't join this room because of a block."],
-      ["room_full", "This room is full (12 people). Try another room or come back later."],
+      ["room_full", "This room is full. Try another room or come back later."],
       ["not_a_member", "Join the room before posting."],
       ["room_not_found", "That room is not available right now."],
       ["bad_body", "Message must be 1–500 characters."],
@@ -2082,6 +2082,11 @@
     var i;
     if (text.indexOf("under_13") !== -1 && liveBirthMissing()) {
       return { code: "no_birth", message: codes[0][1] + "." };
+    }
+    /* Full-room message uses the room's real cap from the server (room_full:<max_members>). */
+    var full = text.match(/room_full:(\d+)/);
+    if (full) {
+      return { code: "room_full", message: "This room is full (" + full[1] + " people). Try another room or come back later." };
     }
     for (i = 0; i < codes.length; i++) {
       if (text.indexOf(codes[i][0]) !== -1) {
@@ -2484,7 +2489,7 @@
         paintRoom(room, { live: true, sqlId: sqlId, classroom: isClass, messages: filterBlockedLiveMessages(messages) });
         paintRoomMembers(sqlId);
         setStatus(isClass
-          ? "You're in the " + (room.title || "classroom") + " classroom — live (up to 20)."
+          ? "You're in the " + (room.title || "classroom") + " classroom — live."
           : "You're in " + (room.title || "the room") + " — live group chat (up to 12).");
         friction("begin", isClass ? "classroom" : "chat", (isClass ? "classroom:" : "chatroom:") + room.id);
         if (scroll && state.shell && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });

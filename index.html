@@ -514,6 +514,14 @@
                             aria-pressed="false"
                             aria-label="Add this person as a friend"
                           >Add friend</button>
+                          <button
+                            type="button"
+                            class="tower-follow-btn tower-message-btn"
+                            data-tower-message
+                            aria-label="Send this person a message"
+                            hidden
+                          >Message</button>
+                          <p class="form-hint tower-message-status" data-tower-message-status role="status" aria-live="polite" hidden></p>
                         </div>
                         <button type="button" class="tower-go-live-btn" data-go-live aria-label="Go live">Go live</button>
                       </div>
@@ -1342,6 +1350,7 @@
   <script src="js/tower.js" defer></script>
   <script src="js/social-graph.js" defer></script>
   <script src="js/tower-follow.js" defer></script>
+  <script src="js/tower-message.js" defer></script>
   <script src="js/moderation.js" defer></script>
   <script src="js/commune.js" defer></script>
   <script src="js/commune-messages.js" defer></script>

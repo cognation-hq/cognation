@@ -40,8 +40,18 @@
 
   function myUserId() {
     var s = liveSession();
-    return s && s.user && s.user.id ? String(s.user.id) : "";
+    if (!s) return "";
+    if (s.user && s.user.id) return String(s.user.id);
+    try {
+      var auth = window.CognationAuth && typeof window.CognationAuth.getSession === "function"
+        ? window.CognationAuth.getSession()
+        : null;
+      if (auth && auth.source === "supabase" && auth.supabaseUserId) return String(auth.supabaseUserId);
+    } catch (eAuth) {}
+    return "";
   }
+
+  var EMPTY_SIGNED_IN = "No messages yet. Open a friend's Tower and tap Message to start one.";
 
   function errorText(err) {
     if (!err) return "";
@@ -175,7 +185,7 @@
         memory.conversations = out.convs;
         memory.live = true;
         memory.loaded = true;
-        memory.status = "";
+        memory.status = out.convs.length ? "" : EMPTY_SIGNED_IN;
         MessageStore.refreshUi();
         return { ok: true };
       }).catch(function (err) {
@@ -736,22 +746,42 @@
       if (e.key === "Escape") closeOpenPickers();
     });
 
+    /* Status follows the store on every refresh, so a line from before
+       sign-in (or an empty list) never sticks after the state changes. */
+    function syncStoreStatus() {
+      if (sending) return;
+      var text = MessageStore.statusText();
+      if (text === EMPTY_SIGNED_IN && activeId) text = "";
+      setStatus(text, false);
+    }
+
     MessageStore._uiRefresh = function () {
       renderList();
       renderThread();
+      syncStoreStatus();
+    };
+
+    /* Start or open a thread from elsewhere (Tower "Message" button). */
+    MessageStore._openThread = function (id) {
+      if (shell && !shell.open) shell.open = true;
+      if (messagesRoot) messagesRoot.removeAttribute("data-tower-messages-closed");
+      selectConversation(id);
     };
 
     document.addEventListener("cognation:messages-updated", function () {
       renderList();
       renderThread();
+      syncStoreStatus();
+    });
+
+    ["cognation:session-started", "cognation:auth-changed", "cognation:session-ended"].forEach(function (name) {
+      document.addEventListener(name, function () { MessageStore.refresh(); });
     });
 
     renderList();
     renderThread();
     setStatus(MessageStore.statusText());
-    MessageStore.refresh().then(function () {
-      setStatus(MessageStore.statusText(), false);
-    });
+    MessageStore.refresh();
   }
 
   function boot() {

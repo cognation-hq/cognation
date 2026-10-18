@@ -246,7 +246,7 @@ function testOwnProfileEitherFace() {
   /* Other people are unchanged. */
   var other = followPage({ session: ALEX, viewed: { _profileId: "p-luna" }, myProfiles: [ALEX_ROWS["p-alex"], ALEX_ROWS["p-alex-pro"]], rows: { "p-luna": { id: "p-luna", user_id: "u-luna" } } });
   assert.strictEqual(other.row.hidden, false); assert.strictEqual(other.btn.hidden, false);
-  assert.strictEqual(other.btn.textContent, "friend", "someone else's profile still offers friend");
+  assert.strictEqual(other.btn.textContent, "+ friend", "someone else's profile still offers + friend");
   var seedOther = followPage({ session: ALEX, viewed: { _profileId: "p-ada", seed: true } });
   assert.strictEqual(seedOther.btn.textContent, "Unavailable", "Ada's profile seen by Alex keeps the seed label");
 }

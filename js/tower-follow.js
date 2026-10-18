@@ -159,7 +159,7 @@
       btn.disabled = true;
       btn.setAttribute("aria-label", "Friend request sent");
     } else {
-      btn.textContent = "friend";
+      btn.textContent = "+ friend";
       btn.setAttribute("aria-label", "Add this person as a friend");
     }
   }
@@ -183,7 +183,7 @@
       })
       .catch(function () {
         btn.disabled = false;
-        btn.textContent = pro ? "+ follow" : "friend";
+        btn.textContent = pro ? "+ follow" : "+ friend";
         btn.setAttribute(
           "aria-label",
           "Could not load this member connection. Try again."
@@ -341,7 +341,7 @@
         return;
       }
     }
-    btn.textContent = friends ? "Friends" : "friend";
+    btn.textContent = friends ? "Friends" : "+ friend";
     btn.setAttribute("aria-label", friends ? "You are friends" : "Add this person as a friend");
     if (!id && !viewed) return;
   }

@@ -8869,8 +8869,9 @@ body.tower-messages-page [data-tower-follow-row],
 }
 
 .tower-follow-btn {
-  min-width: 0;
+  min-width: min-content;
   min-height: 0;
+  width: max-content;
   padding: 0.08rem 0.38rem;
   border-radius: 999px;
   border: 1px solid var(--color-accent);
@@ -8881,6 +8882,7 @@ body.tower-messages-page [data-tower-follow-row],
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: 0;
+  white-space: nowrap;
   cursor: pointer;
   box-shadow: none;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;

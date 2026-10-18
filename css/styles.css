@@ -13955,3 +13955,68 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   font-size: clamp(1.6rem, 4vw, 2.4rem);
   color: #f7f9ff !important;
 }
+
+/* Tower profile column: picture, add friends, mutual friends, Edit profile, top friends, badges.
+   Go live, the calendar, and events open from Edit profile. */
+#panel-tower .tower-friend-search {
+  max-width: 28rem;
+  margin: 0 auto 0.75rem;
+}
+#panel-tower .tower-under-photo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: 0.35rem;
+}
+#panel-tower .tower-mutual-friends {
+  margin: 0;
+  font-size: 0.78rem;
+  text-align: center;
+}
+#panel-tower [data-tower-is-owner="false"] [data-tower-add-friends] { display: none !important; }
+#panel-tower [data-tower-private-calendar],
+#panel-tower [data-tower-private-messages] { display: none !important; }
+#panel-tower .tower-edit-entries {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+#panel-tower .tower-edit-entries .tower-sticker--calendar {
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+  width: auto;
+  max-width: 100%;
+}
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid {
+  grid-template-columns: minmax(0, 28rem);
+  justify-content: center;
+}
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker.is-spawned { order: 4; }
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] {
+  order: 0;
+  flex-direction: column;
+  align-items: center;
+  max-height: none;
+}
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned {
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding-left: 0;
+}
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned .tower-avatar-stack {
+  flex-direction: column;
+  align-items: center;
+}
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--identity.is-spawned {
+  align-items: center;
+  text-align: center;
+  width: 100%;
+}
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--friends.is-spawned { order: 1; }
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--badges.is-spawned { order: 2; }

@@ -5276,11 +5276,6 @@
     ensureStickersOnStage(stage);
     if (profileIsProfessional(p)) {
       stage.querySelectorAll("[data-tower-friend-pin]").forEach(function (el) { el.remove(); });
-      var friendsWidget = stage.querySelector('[data-tower-widget="friends"]');
-      if (friendsWidget) {
-        friendsWidget.hidden = true;
-        friendsWidget.classList.add("is-widget-off");
-      }
       return;
     }
     if (p) settleArrivalTilts(p);
@@ -5748,9 +5743,7 @@
       publicEl.innerHTML = "";
       var heading = document.createElement("p");
       heading.className = "tower-friends-public-label";
-      heading.textContent = selected.length
-        ? "Top friends"
-        : "Top friends · set on Connections";
+      heading.textContent = "Top friends";
       publicEl.appendChild(heading);
     }
 
@@ -6099,8 +6092,8 @@
           else on = true;
         }
       }
-      if (id === "friends" && (!friendIds || !friendIds.length)) on = false;
-      if (id === "badges" && !profileHasVisibleBadges(p)) on = false;
+      /* Top friends and badges stay on the profile, under Edit profile. */
+      if (id === "friends" || id === "badges") on = true;
       /* The same Calendar sticker stays on the personal page and the professional page. */
       if (id === "calendar") on = true;
       var el = root.querySelector('[data-tower-widget="' + id + '"]');
@@ -7580,8 +7573,7 @@
     if (usingRemoteSocial()) {
       var social = remoteSocial();
       profiles = social && social.getMyProfiles ? social.getMyProfiles() : [];
-      var remoteOwner = isTowerOwner(TowerProfileStore.get());
-      toggle.hidden = !remoteOwner;
+      toggle.hidden = false;
       var currentRemoteKind =
         (TowerProfileStore.get() && TowerProfileStore.get()._profileKind) ||
         (session && session.profileKind) ||
@@ -7606,9 +7598,7 @@
     if (user && window.CognationAccounts) {
       profiles = window.CognationAccounts.getProfilesForUsername(user) || [];
     }
-    var owner = isTowerOwner(TowerProfileStore.get());
-    var show = owner && profiles.length > 0;
-    toggle.hidden = !show;
+    toggle.hidden = false;
     var active = TowerProfileStore.get();
     var kind = (active && active._profileKind) || (session && session.profileKind) || "personal";
     toggle.querySelectorAll("[data-tower-profile-kind]").forEach(function (btn) {
@@ -7871,7 +7861,8 @@
     var widgets = Array.prototype.slice.call(stage.querySelectorAll("[data-tower-widget]"));
     widgets.forEach(function (el) {
       var id = el.getAttribute("data-tower-widget");
-      if (id === "feed" || id === "messages") return;
+      /* Calendar stays inside Edit profile, not loose on the page. */
+      if (id === "feed" || id === "messages" || id === "calendar") return;
       if (el.parentNode === stage) return;
       stage.appendChild(el);
     });
@@ -12355,6 +12346,22 @@
   window.CognationTowerProfilePublicUrl = function (profile) {
     return profilePublicUrl(profile);
   };
+
+  document.addEventListener("click", function (ev) {
+    var hit = ev.target && ev.target.closest && ev.target.closest("[data-tower-add-friends], [data-tower-open-events]");
+    if (!hit) return;
+    if (hit.hasAttribute("data-tower-add-friends")) {
+      var search = document.getElementById("tower-people-search");
+      if (search) search.focus();
+      return;
+    }
+    var signal = document.getElementById("tab-signal");
+    if (signal) signal.click();
+    var feed = document.querySelector("[data-signal-pane-btn='feed']");
+    if (feed) feed.click();
+    var drop = document.querySelector("[data-tower-event-dropdown]");
+    if (drop) drop.open = true;
+  });
 
   function boot() {
     document.querySelectorAll("[data-tower-app]").forEach(initTower);

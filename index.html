@@ -328,6 +328,11 @@
               <header class="tower-header">
                 <h3 class="tower-title">TOWER</h3>
               </header>
+              <div class="people-search tower-friend-search" data-people-search>
+                <label class="visually-hidden" for="tower-people-search">Search friends</label>
+                <input id="tower-people-search" type="search" placeholder="Search friends" autocomplete="off" spellcheck="false" data-people-search-input>
+                <div class="people-search-results" data-people-search-results hidden role="listbox" aria-label="Friend results"></div>
+              </div>
               <div class="tower-app" data-tower-app data-tower-side="public" data-tower-is-owner="true">
               <section class="tower-live-screen" data-live-stage hidden aria-label="Live">
                 <div class="tower-live-screen-head">
@@ -538,6 +543,10 @@
                           <p class="form-hint tower-message-status" data-tower-message-status role="status" aria-live="polite" hidden></p>
                         </div>
                       </div>
+                      <div class="tower-under-photo" data-tower-under-photo>
+                        <button type="button" class="tower-follow-btn" data-tower-add-friends>Add friends</button>
+                        <p class="tower-mutual-friends" data-tower-mutual-friends>Mutual friends</p>
+                      </div>
                       </div>
                       <div class="tower-profile-edit" data-tower-profile-edit>
                         <button type="button" class="btn btn-secondary tower-edit-profile-btn" data-tower-edit-profile aria-expanded="false" aria-haspopup="true" aria-controls="tower-profile-edit-panel">
@@ -613,6 +622,19 @@
                         </div>
                         <p class="commune-status" data-tower-profile-status hidden role="status" aria-live="polite"></p>
                       </form>
+                      <div class="tower-edit-entries">
+                        <details class="tower-edit-entry" data-tower-edit-calendar>
+                          <summary>Calendar</summary>
+                          <div class="tower-sticker tower-sticker--calendar" data-tower-widget="calendar" data-sticker-label="Calendar" data-tower-calendar-personal>
+                            <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Calendar sticker" tabindex="-1" hidden>⋮⋮</button>
+                            <div class="tower-cal tower-cal--public" data-tower-cal-public data-tower-calendar-personal aria-label="Calendar">
+                              <h4 class="tower-cal-public-title">Calendar</h4>
+                              <div data-tower-cal-public-body></div>
+                            </div>
+                          </div>
+                        </details>
+                        <button type="button" class="btn btn-secondary" data-tower-open-events>Events</button>
+                      </div>
                         </div>
                       </div>
                       </div><div class="tower-sticker tower-sticker--identity" data-tower-widget="identity" data-sticker-label="Name"><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Name sticker" tabindex="-1" hidden>⋮⋮</button><div class="tower-profile-name-wrap" data-tower-profile-name-wrap><p class="tower-profile-name" data-tower-profile-name>You</p><button type="button" class="tower-name-resize" data-tower-name-resize aria-label="Drag to resize display name" title="Drag to resize name"></button></div>
@@ -736,13 +758,6 @@
                           <label class="visually-hidden" for="tower-followers-find">Search followers</label>
                           <input id="tower-followers-find" class="tower-followers-find" type="search" data-tower-followers-find placeholder="Search followers" autocomplete="off" hidden>
                           <ul class="tower-followers-results" data-tower-followers-results role="list"></ul>
-                        </div>
-                      </div>
-                      <div class="tower-sticker tower-sticker--calendar" data-tower-widget="calendar" data-sticker-label="Calendar" data-tower-calendar-personal>
-                        <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Calendar sticker" tabindex="-1" hidden>⋮⋮</button>
-                        <div class="tower-cal tower-cal--public" data-tower-cal-public data-tower-calendar-personal aria-label="Calendar">
-                          <h4 class="tower-cal-public-title">Calendar</h4>
-                          <div data-tower-cal-public-body></div>
                         </div>
                       </div>
                   </aside>

@@ -88,6 +88,20 @@
     start(btn);
   });
 
+  /* Envelope: visitor messages this profile; the owner opens their inbox. */
+  document.addEventListener("click", function (ev) {
+    var env = ev.target && ev.target.closest && ev.target.closest("[data-tower-envelope]");
+    if (!env) return;
+    ev.preventDefault();
+    var sticker = env.closest("[data-tower-widget]");
+    if (sticker && sticker.__cognationDraggedAt && Date.now() - sticker.__cognationDraggedAt < 700) return;
+    var app = document.querySelector("[data-tower-app]");
+    var owner = app && app.getAttribute("data-tower-is-owner") === "true";
+    var p = activeProfile() || {};
+    var id = !owner ? String(p._profileId || "") : "";
+    location.href = "messages.html" + (id ? "?to=" + encodeURIComponent(id) : "");
+  });
+
   [
     "cognation:tower-view-changed", "cognation:session-started", "cognation:session-ended",
     "cognation:auth-changed", "cognation:remote-profile-loaded", "cognation:active-profile-changed",

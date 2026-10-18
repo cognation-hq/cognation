@@ -14041,6 +14041,53 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 #panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--friends.is-spawned { order: 1; }
 #panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--badges.is-spawned { order: 2; }
 
+/* Message envelope: autospawns under mutual friends. A saved drag uses .is-placed. */
+#panel-tower .tower-sticker--envelope {
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  width: auto;
+  margin: 0.15rem 0 0;
+  order: 5;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+#panel-tower .tower-sticker--envelope.is-placed {
+  position: absolute !important;
+  left: var(--sticker-x) !important;
+  top: var(--sticker-y) !important;
+  z-index: 6;
+}
+.tower-envelope-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(209, 241, 255, 0.45);
+  background: rgba(16, 19, 48, 0.72);
+  color: #f7f9ff;
+  text-decoration: none;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+#panel-tower [data-tower-is-owner="true"] .tower-envelope-btn { cursor: grab; }
+.tower-messages-page { margin: 0; min-height: 100vh; background: #101330; color: #f7f9ff; }
+.tower-messages-room { max-width: 40rem; margin: 0 auto; padding: 1.25rem 1rem 2rem; }
+.tower-messages-room-head { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 0.75rem; }
+.tower-messages-room-head a { color: #f7f9ff; }
+.tower-messages-room-head h1 { margin: 0; font-size: 1.4rem; }
+.tower-messages-room .tower-messages { display: grid; grid-template-columns: 11rem 1fr; gap: 0.75rem; min-height: 70vh; }
+.tower-messages-room .tower-conv-list { margin: 0; padding: 0; list-style: none; }
+.tower-messages-room .tower-thread { display: flex; flex-direction: column; min-height: 70vh; border: 1px solid rgba(209, 241, 255, 0.28); border-radius: 1rem; padding: 0.75rem; }
+.tower-messages-room .commune-messages { flex: 1; }
 /* Six-dot handles stay in the markup. Drag the widget itself; no side button. */
 #panel-tower .tower-sticker-handle,
 #panel-tower .tower-sticker-handle[hidden] {

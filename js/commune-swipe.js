@@ -1929,6 +1929,7 @@
         html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
         html += '<p class="commune-card-meta">Life skills · ~18+</p>';
       }
+      if (card.liveJoin) html += '<button type="button" class="btn btn-primary" data-live-echo-join>Join</button>';
       if (card.type === TYPE.CONTENT) html += '<span class="commune-card-badge">Live</span>';
       if (card.type === TYPE.AD) html += '<span class="commune-card-badge commune-card-badge--ad">Ad</span>';
     }
@@ -1956,6 +1957,13 @@
       range.addEventListener("input", commit);
       range.addEventListener("change", commit);
     }
+    var joinLive = el.querySelector("[data-live-echo-join]");
+    if (joinLive) joinLive.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      var tab = document.getElementById("tab-tower");
+      if (tab) tab.click();
+      if (window.CognationLive && window.CognationLive.open) window.CognationLive.open();
+    });
     var sim = el.querySelector("[data-commune-enter-sim]");
     if (sim) sim.addEventListener("click", function (ev) { ev.stopPropagation(); openRoom(card.id, true); });
     var enterClass = el.querySelector("[data-commune-enter-classroom]");
@@ -2972,6 +2980,8 @@
 
   function refill() {
     state.cards = sampleDeck(12);
+    var live = window.CognationLive && window.CognationLive.echoCard && window.CognationLive.echoCard();
+    if (live) state.cards.unshift(live);
     state.index = 0;
   }
 

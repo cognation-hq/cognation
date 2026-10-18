@@ -13910,7 +13910,6 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   position: static;
   display: flex;
   flex-direction: column;
-  min-height: 70vh;
   margin: 0;
   background: #0e1028;
   color: #f7f9ff;
@@ -13919,10 +13918,23 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 .tower-live-screen-head {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.6rem;
   padding: 0.6rem 1rem;
   border-bottom: 1px solid rgba(220, 246, 255, 0.14);
 }
+.tower-live-share { display: flex; gap: 0.35rem; margin-left: auto; }
+#panel-tower .tower-live-share button {
+  border: 1px solid rgba(220, 246, 255, 0.24) !important;
+  border-radius: 999px;
+  background: rgba(16, 19, 48, 0.6) !important;
+  color: #f7f9ff !important;
+  padding: 0.3rem 0.65rem;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+#panel-tower .tower-live-share button[aria-pressed="true"] { border-color: rgba(183, 246, 255, 0.7) !important; }
 .tower-live-screen-titles { display: flex; flex-direction: column; min-width: 0; }
 #panel-tower .tower-live-screen .tower-live-screen-title { margin: 0; color: #f7f9ff !important; }
 #panel-tower .tower-live-screen .tower-live-screen-kind {
@@ -13941,19 +13953,78 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   cursor: pointer;
 }
 .tower-live-session {
-  flex: 1 1 auto;
-  min-height: 60vh;
+  position: relative;
+  overflow: hidden;
+  flex: 0 0 auto;
+  min-height: 9rem;
   display: grid;
   place-items: center;
-  margin: 0.8rem 1rem 1rem;
+  align-content: center;
+  margin: 0.8rem 1rem 0.4rem;
   border: 1px solid rgba(220, 246, 255, 0.14);
   border-radius: 12px;
   background: #12142e;
 }
-#panel-tower .tower-live-session .tower-live-session-name {
+.tower-live-preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+#panel-tower .tower-live-session .tower-live-session-kicker,
+#panel-tower .tower-live-joins-label,
+#panel-tower .tower-live-chat-label {
   margin: 0;
+  color: rgba(185, 191, 224, 0.75) !important;
+  font-size: 0.78rem;
+}
+#panel-tower .tower-live-session .tower-live-session-kicker,
+#panel-tower .tower-live-session .tower-live-session-name { position: relative; z-index: 1; }
+#panel-tower .tower-live-session .tower-live-session-name {
+  margin: 0.2rem 0 0;
   font-size: clamp(1.6rem, 4vw, 2.4rem);
   color: #f7f9ff !important;
+}
+.tower-live-joins,
+.tower-live-room-chat { margin: 0.6rem 1rem 0; }
+.tower-live-room-chat { margin-bottom: 1rem; }
+.tower-live-join-slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+#panel-tower .tower-live-join-slot {
+  position: relative;
+  overflow: hidden;
+  min-height: 3.4rem;
+  border: 1px solid rgba(220, 246, 255, 0.24) !important;
+  border-radius: 8px;
+  background: #12142e !important;
+  color: #f7f9ff !important;
+  font: inherit;
+  cursor: pointer;
+}
+#panel-tower .tower-live-join-slot[data-requested="1"] { border-color: rgba(183, 246, 255, 0.7) !important; }
+.tower-live-chat-log {
+  min-height: 5.5rem;
+  margin-top: 0.4rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid rgba(220, 246, 255, 0.14);
+  border-radius: 8px;
+  background: #12142e;
+}
+#panel-tower .tower-live-chat-line { margin: 0 0 0.35rem; color: #f7f9ff !important; }
+.tower-live-chat-form { display: flex; gap: 0.4rem; margin-top: 0.4rem; }
+#panel-tower .tower-live-chat-form input {
+  flex: 1;
+  min-width: 0;
+  color: #f7f9ff !important;
+  background: #12142e !important;
+}
+#panel-tower .tower-live-chat-send {
+  border: 1px solid rgba(220, 246, 255, 0.24) !important;
+  border-radius: 999px;
+  background: rgba(16, 19, 48, 0.6) !important;
+  color: #f7f9ff !important;
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  cursor: pointer;
 }
 
 /* Tower profile column: picture, add friends, mutual friends, Edit profile, top friends, badges.

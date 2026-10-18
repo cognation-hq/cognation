@@ -329,6 +329,18 @@
                 <h3 class="tower-title">TOWER</h3>
               </header>
               <div class="tower-app" data-tower-app data-tower-side="public" data-tower-is-owner="true">
+              <section class="tower-live-screen" data-live-stage hidden aria-label="Live">
+                <div class="tower-live-screen-head">
+                  <button type="button" class="tower-live-back" data-live-back>‹ Back</button>
+                  <div class="tower-live-screen-titles">
+                    <h4 class="tower-live-screen-title" data-live-host>Live</h4>
+                    <p class="tower-live-screen-kind" data-live-kind></p>
+                  </div>
+                </div>
+                <div class="tower-live-session" data-live-session>
+                  <p class="tower-live-session-name" data-live-session-name></p>
+                </div>
+              </section>
                 <div class="tower-side-toggle" data-tower-side-toggle role="tablist" aria-label="Tower side">
                   <button type="button" class="tower-side-btn" role="tab" data-tower-side-btn="private" aria-selected="false" id="tower-side-private">Connections</button>
                   <button type="button" class="tower-side-btn" role="tab" data-tower-side-btn="public" aria-selected="true" id="tower-side-public">Public profile</button>
@@ -525,48 +537,8 @@
                           >Message</button>
                           <p class="form-hint tower-message-status" data-tower-message-status role="status" aria-live="polite" hidden></p>
                         </div>
-                        <button type="button" class="tower-go-live-btn" data-go-live aria-label="Go live">Go live</button>
                       </div>
                       </div>
-                      <!-- CGN-010 Live stage shell (demo stubs) -->
-                      <section class="tower-live-panel" data-live-stage hidden>
-                        <header class="tower-live-panel-head">
-                          <h4 class="tower-live-panel-title">Live</h4>
-                          <p class="cgn-deferral" role="note">Demo / local only</p>
-                          <div class="tower-live-share" role="group" aria-label="Share live">
-                            <button type="button" class="btn btn-secondary" data-live-share-commune>Share to COMMUNE</button>
-                            <button type="button" class="btn btn-secondary" data-live-share-tower>Share to Tower</button>
-                          </div>
-                        </header>
-                        <div class="tower-live-multicam" data-live-cam-count="6" aria-label="Multi-cam grid">
-                          <div class="tower-live-cam" data-live-cam="1">Cam 1</div>
-                          <div class="tower-live-cam" data-live-cam="2">Cam 2</div>
-                          <div class="tower-live-cam" data-live-cam="3">Cam 3</div>
-                          <div class="tower-live-cam" data-live-cam="4">Cam 4</div>
-                          <div class="tower-live-cam" data-live-cam="5">Cam 5</div>
-                          <div class="tower-live-cam" data-live-cam="6">Cam 6</div>
-                        </div>
-                        <div class="tower-live-join" data-live-join-request>
-                          <p class="form-hint">Join request (demo)</p>
-                          <button type="button" class="btn btn-secondary" data-live-approve-join>Approve join</button>
-                        </div>
-                        <div class="tower-live-sales" role="group" aria-label="Pro sales">
-                          <p class="cgn-deferral" role="note">Demo / local only — not live backend</p>
-                          <button type="button" class="btn btn-primary" data-live-sales>Buy / tip</button>
-                          <button type="button" class="btn btn-secondary" data-live-class>Join class</button>
-                        </div>
-                        <div class="tower-live-comments" data-live-comments>
-                          <ul class="tower-live-comment-list" data-live-comment-list>
-                            <li>Demo: “Love this stream!”</li>
-                          </ul>
-                          <form class="tower-live-comment-form" data-live-comment-form action="#" method="post">
-                            <label class="visually-hidden" for="tower-live-comment-input">Comment</label>
-                            <input id="tower-live-comment-input" type="text" maxlength="280" placeholder="Say something…" autocomplete="off">
-                            <button type="submit" class="btn btn-primary">Send</button>
-                          </form>
-                        </div>
-                        <p class="commune-status" data-live-status hidden role="status" aria-live="polite"></p>
-                      </section>
                       <div class="tower-profile-edit" data-tower-profile-edit>
                         <button type="button" class="btn btn-secondary tower-edit-profile-btn" data-tower-edit-profile aria-expanded="false" aria-haspopup="true" aria-controls="tower-profile-edit-panel">
                           Edit profile
@@ -574,6 +546,7 @@
                         </button>
                         <div class="tower-profile-edit-dropdown" id="tower-profile-edit-panel" data-tower-profile-edit-panel hidden>
                           <div class="tower-profile-edit-sheet-head"><span class="tower-profile-edit-sheet-title">Edit profile</span><button type="button" class="tower-profile-edit-close" data-tower-profile-edit-close aria-label="Close Edit profile">×</button></div>
+                          <button type="button" class="tower-go-live-btn" data-go-live aria-label="Go live">Go live</button>
                           <form class="tower-profile-form" data-tower-profile-form action="#" method="post">
                         <div class="form-group tower-social-fields">
                           <p class="tower-social-fields-label">Social links</p>

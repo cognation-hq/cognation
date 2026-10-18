@@ -394,6 +394,32 @@
     });
   }
 
+  function profileOnScreen() {
+    var p = null;
+    try {
+      var store = window.CognationTowerProfileStore;
+      p = store && store.get ? store.get() : null;
+    } catch (e) {}
+    var nameNode = document.querySelector("[data-tower-profile-name]");
+    var name = (p && (p.displayName || p.handle)) || (nameNode && nameNode.textContent) || sessionUser();
+    var pro = !!(p && (p._profileKind === "professional" || p.kind === "professional"));
+    if (!pro) {
+      var proBtn = document.querySelector('[data-tower-profile-kind="professional"][aria-selected="true"]');
+      pro = !!proBtn;
+    }
+    return { name: String(name || "Live").trim() || "Live", kind: pro ? "Professional" : "Personal" };
+  }
+
+  function paintScreen(stage) {
+    var who = profileOnScreen();
+    var host = stage.querySelector("[data-live-host]");
+    var kind = stage.querySelector("[data-live-kind]");
+    var fill = stage.querySelector("[data-live-session-name]");
+    if (host) host.textContent = who.name;
+    if (kind) kind.textContent = who.kind + " · live";
+    if (fill) fill.textContent = who.name;
+  }
+
   function goOffline() {
     var live = getLive();
     if (live) {
@@ -407,6 +433,7 @@
       stage.removeAttribute("data-live-active");
       refresh(stage);
     }
+    if (root.classList) root.classList.remove("is-live-open");
     syncGoLiveButtons();
   }
 
@@ -414,29 +441,33 @@
     var root = document.querySelector("[data-tower-app]") || document;
     var stage = root.querySelector("[data-live-stage]");
     if (!stage) return;
+    paintScreen(stage);
     stage.hidden = false;
+    if (root.classList) root.classList.add("is-live-open");
     initStage(stage);
-    var live = ensureLive(stage);
+    ensureLive(stage);
     refresh(stage);
     syncGoLiveButtons();
-    if (!live) return;
-    try {
-      stage.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    } catch (e) {}
   }
 
   function init() {
     document.addEventListener("click", function (ev) {
-      var btn = ev.target && ev.target.closest("[data-go-live]");
+      var node = ev.target;
+      if (node && node.nodeType !== 1) node = node.parentElement;
+      var back = node && node.closest && node.closest("[data-live-back]");
+      if (back) {
+        ev.preventDefault();
+        goOffline();
+        return;
+      }
+      var btn = node && node.closest && node.closest("[data-go-live]");
       if (!btn) return;
       ev.preventDefault();
       ev.stopPropagation();
       var app = btn.closest && btn.closest("[data-tower-app]");
       if (btn.hidden || (app && app.getAttribute("data-tower-is-owner") !== "true")) return;
-      var live = getLive();
-      if (live && live.active) goOffline();
-      else openLive();
-    });
+      openLive();
+    }, true);
     syncGoLiveButtons();
     var root = document.querySelector("[data-tower-app]") || document;
     var stage = root.querySelector("[data-live-stage]");

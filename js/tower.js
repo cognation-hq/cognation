@@ -3162,6 +3162,7 @@
       else el.removeAttribute("hidden");
     });
     if (!owner) {
+      if (root.classList) root.classList.remove("is-live-open");
       root.querySelectorAll("[data-live-stage]").forEach(function (el) {
         el.hidden = true;
       });

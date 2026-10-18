@@ -10339,10 +10339,10 @@
     root.setAttribute("data-view-kind", profileIsProfessional(p) ? "professional" : "personal");
     var followBtn = root.querySelector("[data-tower-follow]");
     if (followBtn && profileIsProfessional(p)) {
-      followBtn.textContent = "Follow";
+      if (followBtn.textContent !== "Following") followBtn.textContent = "+ follow";
       followBtn.setAttribute("aria-label", "Follow this professional page");
-    } else if (followBtn && followBtn.textContent === "Follow") {
-      followBtn.textContent = "Add friend";
+    } else if (followBtn && (followBtn.textContent === "Follow" || followBtn.textContent === "+ follow")) {
+      followBtn.textContent = "friend";
       followBtn.setAttribute("aria-label", "Add this person as a friend");
     }
     try { syncProfileKindToggle(root); } catch (eKind) {}

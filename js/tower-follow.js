@@ -141,7 +141,7 @@
       state.mode === "following" || state.mode === "friends" ? "true" : "false"
     );
     if (pro) {
-      btn.textContent = state.mode === "following" ? "Following" : "Follow";
+      btn.textContent = state.mode === "following" ? "Following" : "+ follow";
       btn.setAttribute(
         "aria-label",
         state.mode === "following"
@@ -159,7 +159,7 @@
       btn.disabled = true;
       btn.setAttribute("aria-label", "Friend request sent");
     } else {
-      btn.textContent = "Add friend";
+      btn.textContent = "friend";
       btn.setAttribute("aria-label", "Add this person as a friend");
     }
   }
@@ -183,7 +183,7 @@
       })
       .catch(function () {
         btn.disabled = false;
-        btn.textContent = pro ? "Follow" : "Add friend";
+        btn.textContent = pro ? "+ follow" : "friend";
         btn.setAttribute(
           "aria-label",
           "Could not load this member connection. Try again."
@@ -310,7 +310,7 @@
       var following = alreadyFollowing(viewed);
       btn.setAttribute("aria-pressed", following ? "true" : "false");
       btn.classList.toggle("is-following", following);
-      btn.textContent = following ? "Following" : "Follow";
+      btn.textContent = following ? "Following" : "+ follow";
       btn.setAttribute(
         "aria-label",
         following
@@ -341,7 +341,7 @@
         return;
       }
     }
-    btn.textContent = friends ? "Friends" : "Add friend";
+    btn.textContent = friends ? "Friends" : "friend";
     btn.setAttribute("aria-label", friends ? "You are friends" : "Add this person as a friend");
     if (!id && !viewed) return;
   }

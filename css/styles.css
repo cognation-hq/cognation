@@ -12272,14 +12272,13 @@ a.circle-fall-portrait {
     radial-gradient(circle at 50% 40%, rgba(168, 244, 255, 0.12), transparent 62%),
     rgba(16, 19, 48, 0.42);
 }
-.pulse-intro {
-  position: absolute; z-index: 5; left: 50%; bottom: 11%; transform: translateX(-50%);
-  width: min(40rem, 94vw); margin: 0; text-align: center; color: #f7fbff; font-size: 1.2rem;
-  line-height: 1.45; pointer-events: auto; text-shadow: 0 2px 12px rgba(6, 10, 30, 0.75);
-}
-.pulse-intro button {
-  font: inherit; font-weight: 700; color: #101330; background: #f7fbff; border: 0;
-  border-radius: 999px; padding: 0.2rem 0.75rem; cursor: pointer; pointer-events: auto;
+.circle-spot.has-caption { overflow: visible; }
+.circle-spot-caption {
+  position: absolute; left: 50%; width: 8.2rem; margin: 0;
+  top: calc(100% + (0.08in / var(--spot-s, 1))); transform: translateX(-50%);
+  text-align: center; font-size: 0.62rem; font-weight: 650; line-height: 1.2;
+  letter-spacing: 0; color: #f7fbff !important; pointer-events: none;
+  text-shadow: 0 1px 6px rgba(6, 10, 30, 0.85);
 }
 #panel-commune .commune-swipe-header .commune-swipe-title {
   display: block;

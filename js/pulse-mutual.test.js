@@ -1,5 +1,5 @@
 /**
- * PULSE mutual introductions: friendships only, personal friend request, cap 5.
+ * PULSE mutual introductions: friendships only, caption on the picture, cap 5.
  * Run: node js/pulse-mutual.test.js
  */
 "use strict";
@@ -12,11 +12,14 @@ var api = require("./pulse-mutual.js");
 var root = path.join(__dirname, "..");
 var sql = fs.readFileSync(path.join(root, "supabase/migrations/20261018_pulse_mutual_introductions.sql"), "utf8");
 var src = fs.readFileSync(path.join(__dirname, "pulse-mutual.js"), "utf8");
+var tower = fs.readFileSync(path.join(__dirname, "tower.js"), "utf8");
+var css = fs.readFileSync(path.join(root, "css/styles.css"), "utf8");
 var html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 
 assert.strictEqual(api.REFRESH_MS, 15 * 60 * 1000, "refresh about every 15 minutes");
 assert.ok(!/\bfollows\b/.test(sql) && !/\bfollows\b/.test(src), "friendships only");
-assert.ok(!/toggle_profile_follow/.test(src), "not a follow");
+assert.ok(!/toggle_profile_follow/.test(src) && !/Add friend/.test(src) && !/pulse-intro/.test(css), "no separate add row");
+assert.ok(/circle-spot-caption/.test(tower) && /0\.08in/.test(css), "caption rides under the picture");
 assert.ok(/friendships/.test(sql) && /kind = 'personal'/.test(sql), "personal friends");
 assert.ok(/not exists/.test(sql) && /already\.friend_user_id/.test(sql), "skip people you already friend");
 assert.ok(/cognation_user_is_real/.test(sql) && /limit 5/.test(sql), "real people, five spots");
@@ -38,26 +41,4 @@ var people = api.peopleFrom(rows);
 assert.strictEqual(people.length, 5, "five introductions");
 assert.strictEqual(people[0].name, "N0");
 assert.strictEqual(people[0].mutualName, "Jo");
-
-var calls = [];
-global.CognationSocialGraph = {
-  relationship: function (id, kind) {
-    calls.push(["rel", id, kind]);
-    return Promise.resolve({ mode: calls.length > 2 ? "requested" : "friend" });
-  },
-  act: function (id, kind) {
-    calls.push(["act", id, kind]);
-    return Promise.resolve({ mode: "requested" });
-  },
-};
-api.addFriend("pid").then(function () {
-  assert.deepStrictEqual(calls, [["rel", "pid", "personal"], ["act", "pid", "personal"]]);
-  return api.addFriend("pid");
-}).then(function () {
-  assert.strictEqual(calls.length, 3, "pending request is not sent again");
-  assert.deepStrictEqual(calls[2], ["rel", "pid", "personal"]);
-  console.log("pulse-mutual.test.js ok");
-}).catch(function (err) {
-  console.error(err);
-  process.exit(1);
-});
+console.log("pulse-mutual.test.js ok");

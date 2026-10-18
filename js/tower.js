@@ -11938,6 +11938,14 @@
         /* Real friend photo (profiles.photo_url); no photo or a bad URL keeps the letter. */
         var photoApi = window.CognationProfilePhoto;
         if (person.photoUrl && photoApi && typeof photoApi.applyPhoto === "function") photoApi.applyPhoto(spot, person.photoUrl);
+        if (person.mutualName) {
+          spot.classList.add("has-caption");
+          var caption = document.createElement("span");
+          caption.className = "circle-spot-caption";
+          caption.setAttribute("data-circle-caption", "");
+          caption.textContent = "You and " + person.name + " both know " + person.mutualName;
+          spot.appendChild(caption);
+        }
       } else {
         spot.classList.add("is-empty");
         spot.classList.remove("is-filled");
@@ -11961,6 +11969,7 @@
       var pos = circleSpotAt(i + shift);
       spots[i].style.transform =
         "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + pos.y.toFixed(1) + "px) scale(" + pos.s.toFixed(3) + ")";
+      spots[i].style.setProperty("--spot-s", pos.s.toFixed(3));
       spots[i].style.zIndex = String(Math.round(pos.s * 100));
     }
   }

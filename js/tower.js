@@ -148,8 +148,45 @@
     return wid.indexOf("social-") === 0 ? wid.slice("social-".length) : "";
   }
 
+  /* Professional page shows the same logo chips as the personal profile
+     (YouTube, X, and the rest), plus any link saved on the pro page itself. */
+  function chipSocialLinks(p) {
+    var own = (p && p.socialLinks && typeof p.socialLinks === "object") ? p.socialLinks : {};
+    var pro = !!(p && (p._profileKind === "professional" || p.kind === "professional"));
+    if (!pro) return own;
+    var extra = null;
+    try {
+      var accounts = window.CognationAccounts;
+      var id = p._profileId || "";
+      var full = accounts && id && accounts.getProfileById ? accounts.getProfileById(id) : null;
+      var user = (full && full.accountUsername) || "";
+      if (!user && typeof getSessionObject === "function" && isTowerOwner(p)) {
+        var session = getSessionObject();
+        user = (session && session.username) || "";
+      }
+      if (accounts && user && accounts.getProfilesForUsername) {
+        var list = accounts.getProfilesForUsername(user) || [];
+        for (var i = 0; i < list.length; i++) {
+          var rec = list[i];
+          if (rec && rec.kind !== "professional" && rec.socialLinks) {
+            extra = rec.socialLinks;
+            break;
+          }
+        }
+      }
+    } catch (eChip) {}
+    var out = {};
+    socialLinkDefs().forEach(function (net) {
+      var a = own[net.id] || "";
+      var b = extra && extra[net.id] ? extra[net.id] : "";
+      out[net.id] = a || b || "";
+    });
+    if (!out.youtube && p.musicUrl && looksLikeYoutubeUrl(p.musicUrl)) out.youtube = String(p.musicUrl).trim();
+    return out;
+  }
+
   function optedInSocialNetIds(p) {
-    var links = (p && p.socialLinks) || {};
+    var links = chipSocialLinks(p);
     var kind = (p && (p._profileKind || p.kind)) || "personal";
     var widgets = (p && p.publicWidgets) || {};
     var out = [];
@@ -5002,7 +5039,7 @@
     syncEditSocialFields(root, p);
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (!stage) return;
-    var links = (p && p.socialLinks) || {};
+    var links = chipSocialLinks(p);
     var profileKind = (p && (p._profileKind || p.kind)) || "personal";
     var wanted = {};
     optedInSocialNetIds(p).forEach(function (id) { wanted[id] = true; });
@@ -5064,14 +5101,8 @@
           img.decoding = "async";
           img.loading = "lazy";
           a.appendChild(img);
-          /* The X name is one letter beside the logo, so it reads as a delete
-             control. Other chips keep logo + name. */
-          if (net.id !== "x") {
-            var lab = document.createElement("span");
-            lab.className = "tower-social-chip-label";
-            lab.textContent = net.label;
-            a.appendChild(lab);
-          }
+          /* Logo only. A name beside the mark (especially the letter X) reads
+             as a delete control, so no chip paints its site name. */
         } else {
           a.textContent = quiet ? net.label : net.short;
           a.classList.remove("is-logo");

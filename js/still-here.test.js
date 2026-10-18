@@ -455,10 +455,11 @@ assert.ok(/a\.target = "_blank";\s*a\.rel = "noopener noreferrer";/.test(tower),
   assert.ok(/CognationTowerLayoutSync\.savePublic/.test(tower), "Tower calls savePublic on social/YouTube save");
   assert.ok(/Empty local must not wipe server _public links/.test(tower), "empty localStorage does not clear server socials");
 
-  /* v3.2/v3.3 density: profile strip ~72–88px, YouTube band ~96–112px, quote under handle. */
+  /* v3.2/v3.3 density: profile strip ~72–88px. YouTube card keeps player + paste field. */
   assert.ok(/data-tower-profile-strip/.test(tower) && /ensureProfileStrip/.test(tower), "profile strip wrapper");
   assert.ok(/max-height:\s*88px/.test(css) && /min-height:\s*72px/.test(css), "profile strip height band");
-  assert.ok(/max-height:\s*112px/.test(css) && /max-height:\s*96px/.test(css), "YouTube thumb band");
+  assert.ok(/\.tower-sticker--youtube\.is-spawned \{\s*max-height: none;/.test(css), "YouTube card is not clipped after a link");
+  assert.ok(/data-music-mode="youtube"\] \.tower-music-owner/.test(css), "personal paste field stays with the player");
   assert.ok(/tower-profile-strip-quote/.test(css) && /content: none !important/.test(css), "quote under handle, no divider");
   assert.ok(/__socials__/.test(tower) && /socialWidgetId/.test(tower), "SPAWN_ROWS expands per-link social chips");
   assert.ok(!/\["friends", "social"\]/.test(tower) && !/\["social", "badges"\]/.test(tower), "grouped social spawn slots removed");
@@ -497,12 +498,12 @@ assert.ok(/a\.target = "_blank";\s*a\.rel = "noopener noreferrer";/.test(tower),
   /* tower-widgets PR: the X on each chip is gone; Backspace/Delete (and the touch
      Remove button) clear the selected chip's link instead. */
   assert.ok(!/rm\.setAttribute\("data-tower-social-remove"/.test(tower), "no X button on social chips");
-  assert.ok(/if \(net\.id !== "x"\)/.test(tower), "X chip keeps the logo and does not paint a letter that reads as delete");
+  assert.ok(!/className = "tower-social-chip-label"/.test(tower), "social chips are logos only; X paints no letter that reads as delete");
   assert.ok(/var socialNet = socialNetIdFromWidget\(id\);\s*if \(socialNet\) \{\s*removeSocialWidget\(root, socialNet\);/.test(tower), "selected chip removable by key / Remove button");
   assert.ok(/tower-sticker--social-chip/.test(css), "chip CSS present");
   assert.ok(/migrateGroupedSocialLayout/.test(tower), "old grouped layout.social maps to first chip");
 
-  var start = tower.indexOf("function optedInSocialNetIds");
+  var start = tower.indexOf("function chipSocialLinks");
   var end = tower.indexOf("function expandSpawnRows");
   assert.ok(start > 0 && end > start, "optedInSocialNetIds present");
   var ctx = vm.createContext({

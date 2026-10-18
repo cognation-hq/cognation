@@ -418,6 +418,35 @@
     if (host) host.textContent = who.name;
     if (kind) kind.textContent = who.kind + " · live";
     if (fill) fill.textContent = who.name;
+    bindRoom(stage, who.name);
+  }
+
+  function bindRoom(stage, name) {
+    if (!stage) return;
+    stage.__cognationRoomName = name;
+    if (stage.__cognationRoomBound) return;
+    stage.__cognationRoomBound = true;
+    stage.addEventListener("click", function (ev) {
+      var slot = ev.target && ev.target.closest && ev.target.closest("[data-live-join-slot]");
+      if (!slot || slot.getAttribute("data-requested") === "1") return;
+      if (stage.querySelectorAll('[data-live-join-slot][data-requested="1"]').length >= 9) return;
+      slot.setAttribute("data-requested", "1");
+      slot.textContent = stage.__cognationRoomName || "Request";
+    });
+    var form = stage.querySelector("[data-live-room-chat-form]");
+    if (!form) return;
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var input = form.querySelector("[data-live-room-chat-input]");
+      var text = input && String(input.value || "").trim();
+      if (!text) return;
+      var log = stage.querySelector("[data-live-chat-log]");
+      var line = document.createElement("p");
+      line.className = "tower-live-chat-line";
+      line.textContent = (stage.__cognationRoomName || "Viewer") + ": " + text.slice(0, 280);
+      if (log) log.appendChild(line);
+      input.value = "";
+    });
   }
 
   function goOffline() {

@@ -104,6 +104,15 @@
     return true;
   }
 
+  /* Follow / Add friend stay on the profile pages. Messages never shows them. */
+  function messagesSurface(btn) {
+    var body = document.body;
+    if (body && body.classList && body.classList.contains("tower-messages-page")) return true;
+    if (btn.closest("[data-tower-messages], .tower-messages-room, .tower-messages-page, .commune-thread")) return true;
+    var app = btn.closest("[data-tower-app]");
+    return !!(app && app.getAttribute("data-tower-side") === "private");
+  }
+
   /* Directory and saved profiles are pages. A "viewed:" id is a hash with no page. */
   function pageOpen() {
     var p = activeProfile();
@@ -282,6 +291,7 @@
       btn.hidden = true;
       return;
     }
+    if (messagesSurface(btn)) return hideNoPage(btn);
     var pro = isProfessionalContext(btn);
     if (graph && graph.isReady && graph.isReady()) {
       if (syncRemoteButton(btn, graph, id, pro) !== false) return;
@@ -343,6 +353,11 @@
   document.addEventListener("click", function (ev) {
     var btn = ev.target && ev.target.closest && ev.target.closest("[data-tower-follow]");
     if (!btn) return;
+    if (messagesSurface(btn)) {
+      ev.preventDefault();
+      hideNoPage(btn);
+      return;
+    }
     ev.preventDefault();
     var api = swipeApi();
     var graph = socialApi();
@@ -429,7 +444,7 @@
     syncAll();
     /* Re-sync when professional/personal tabs change */
     document.addEventListener("click", function (ev) {
-      if (ev.target && ev.target.closest && ev.target.closest("[data-tower-profile-kind]")) {
+      if (ev.target && ev.target.closest && ev.target.closest("[data-tower-profile-kind], [data-tower-side-btn], [data-tower-side-jump]")) {
         window.setTimeout(syncAll, 30);
       }
     });

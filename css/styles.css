@@ -8860,7 +8860,11 @@ body { padding-top: 0 !important; }
 }
 
 .tower-follow-row[hidden],
-.tower-follow-btn[hidden] {
+.tower-follow-btn[hidden],
+body.tower-messages-page [data-tower-follow-row],
+.tower-messages-room [data-tower-follow-row],
+[data-tower-messages] [data-tower-follow-row],
+[data-tower-app][data-tower-side="private"] [data-tower-follow-row] {
   display: none !important;
 }
 

@@ -11499,7 +11499,7 @@
       var depth = p.s / CIRCLE_SCALE;
       var flicker = 0.8 + 0.2 * Math.sin(i * 1.35);
       var side = Math.abs(Math.cos(turn * Math.PI * 2));
-      glowAt(p.x, p.y, (5 + 32 * side) * depth, circleGlowColor(turn), 0.06 * flicker * (1 + 2 * side));
+      glowAt(p.x, p.y, (1.2 + 34 * side) * depth, circleGlowColor(turn), 0.06 * flicker * (0.2 + 4.5 * side));
     }
     ring.appendChild(canvas);
     paintCircleBolt(ring);
@@ -11509,7 +11509,7 @@
      ead52bb swapped it for a 0.06-alpha blurred canvas glow that reads as
      nothing on the #61 indigo background, so the bolt looked missing. */
   function circleBoltSegments(radius, wobble, seed, baseWidth) {
-    var steps = 144;
+    var steps = 216;
     var chunk = 4;
     var segs = [];
     var start;
@@ -11522,8 +11522,10 @@
       for (i = start; i <= end; i++) {
         var n = Math.sin(i * 0.22 + seed);
         if (i === 0 || i === steps) n = 0;
-        var p = circleProjectRadius((i / steps) * 360, radius + n * wobble);
-        cmds.push((i === start ? "M" : "L") + p.x.toFixed(1) + " " + p.y.toFixed(1));
+        var ang = (i / steps) * Math.PI * 2;
+        var p = circleProjectRadius((i / steps) * 360, radius);
+        var ox = Math.cos(ang), oy = Math.sin(ang) * Math.cos(CIRCLE_TILT), olen = Math.sqrt(ox * ox + oy * oy) || 1;
+        cmds.push((i === start ? "M" : "L") + (p.x + n * wobble * ox / olen).toFixed(1) + " " + (p.y + n * wobble * oy / olen).toFixed(1));
         depthSum += p.s / CIRCLE_SCALE;
         count++;
       }
@@ -11590,7 +11592,7 @@
       }
       return filter;
     }
-    defs.appendChild(glowFilter("pulse-bolt-glow", 12, 5, false));
+    defs.appendChild(glowFilter("pulse-bolt-glow", 4.5, 1.15, true));
     defs.appendChild(glowFilter("pulse-bolt-core", 3.2, 1.1, false));
     svg.appendChild(defs);
     function addBolt(parent, d, color, width, opacity) {
@@ -11613,9 +11615,9 @@
       { color: "#3ecbff", opacity: 0.85 },
       { color: "#ff4ad8", opacity: 0.8 }
     ];
-    var strands = circleBoltSegments(CIRCLE_RING_R, 24, 0.2, 2.2).concat(circleBoltSegments(CIRCLE_RING_R, 24, 1.35, 2.2));
+    var strands = circleBoltSegments(CIRCLE_RING_R, 14, 0.2, 1.45).concat(circleBoltSegments(CIRCLE_RING_R, 14, 1.55, 1.45));
     strands.forEach(function (seg, index) {
-      addBolt(halo, seg.d, colors[index < 36 ? 1 : 0].color, seg.width, 0.72);
+      addBolt(halo, seg.d, colors[index < 54 ? 1 : 0].color, seg.width, 0.95);
     });
     addBolt(halo, strands[0].d, "#ff4ad8", 2, 0.55);
     addBolt(core, strands[1].d, "#e9f7ff", 1.2, 0.55);

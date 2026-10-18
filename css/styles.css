@@ -12271,10 +12271,10 @@ a.circle-fall-portrait {
 .circle-spot.has-caption { overflow: visible; }
 .circle-spot-caption {
   position: absolute; left: 50%; width: 7rem; margin: 0; padding: 0;
-  top: 100%; transform: translate(-50%, -0.86em);
+  top: 100%; transform: translate(-50%, -1.45em);
   text-align: center; font-size: 0.5rem; font-weight: 650; line-height: 1;
   letter-spacing: 0; color: #f7fbff !important; pointer-events: none;
-  text-shadow: 0 1px 4px rgba(6, 10, 30, 0.85);
+  text-shadow: none;
 }
 #panel-commune .commune-swipe-header .commune-swipe-title {
   display: block;

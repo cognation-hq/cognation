@@ -8859,6 +8859,11 @@ body { padding-top: 0 !important; }
   padding: 0 0.15rem;
 }
 
+.tower-follow-row[hidden],
+.tower-follow-btn[hidden] {
+  display: none !important;
+}
+
 .tower-follow-btn {
   min-width: 7.5rem;
   min-height: 2.65rem;

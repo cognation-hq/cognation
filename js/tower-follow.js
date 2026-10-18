@@ -95,10 +95,32 @@
     return !!(friends && typeof friends.has === "function" && friends.has(friendId));
   }
 
+  /* No page to open: hide the control. Never leave a dead button. */
+  function hideNoPage(btn) {
+    var row = btn.closest("[data-tower-follow-row]");
+    if (row) row.hidden = true;
+    btn.hidden = true;
+    btn.disabled = true;
+    return true;
+  }
+
+  /* Directory and saved profiles are pages. A "viewed:" id is a hash with no page. */
+  function pageOpen() {
+    var p = activeProfile();
+    if (!p || p._loading) return false;
+    var pid = String(p._profileId || p.id || "");
+    if (!pid || pid.indexOf("viewed:") === 0) return false;
+    return true;
+  }
+
   function renderRemoteState(btn, pro, state) {
     var row = btn.closest("[data-tower-follow-row]");
     if (state.mode === "self" || ownProfileOnScreen(btn)) {
       if (row) row.hidden = true;
+      return;
+    }
+    if (state.mode === "missing") {
+      hideNoPage(btn);
       return;
     }
     if (row) row.hidden = false;
@@ -141,22 +163,9 @@
   }
 
   function syncRemoteButton(btn, graph, id, pro) {
-    var row = btn.closest("[data-tower-follow-row]");
-    /* A saved profile page is on screen. The missing-page label is only for an id with no page. */
-    if (id && !graph.isRemoteProfileId(id) && localProfileExists(id)) return false;
-    if (!id || !graph.isRemoteProfileId(id)) {
-      if (row) row.hidden = false;
-      btn.hidden = false;
-      btn.disabled = true;
-      btn.classList.remove("is-following");
-      btn.setAttribute("aria-pressed", "false");
-      btn.textContent = "Member page unavailable";
-      btn.setAttribute(
-        "aria-label",
-        "This demo profile is not yet a Cognation member page"
-      );
-      return true;
-    }
+    /* A saved or directory page uses Follow / Add friend. No page: hide. */
+    if (id && !graph.isRemoteProfileId(id) && (localProfileExists(id) || pageOpen())) return false;
+    if (!id || !graph.isRemoteProfileId(id)) return hideNoPage(btn);
     btn.disabled = true;
     graph
       .relationship(id, pro ? "professional" : "personal")
@@ -274,11 +283,14 @@
       return;
     }
     var pro = isProfessionalContext(btn);
-    if (row) row.hidden = false;
-    btn.hidden = false;
     if (graph && graph.isReady && graph.isReady()) {
       if (syncRemoteButton(btn, graph, id, pro) !== false) return;
+    } else if (!(id && localProfileExists(id)) && !pageOpen()) {
+      hideNoPage(btn);
+      return;
     }
+    if (row) row.hidden = false;
+    btn.hidden = false;
     btn.disabled = false;
     var viewed = activeProfile();
     var face = viewerFace(btn);
@@ -336,14 +348,14 @@
     var graph = socialApi();
     var id = resolveProfileId(btn);
     if (!id) {
-      btn.setAttribute("aria-label", "Follow unavailable — no profile id");
+      hideNoPage(btn);
       return;
     }
     btn.setAttribute("data-profile-id", id);
     if (graph && graph.isReady && graph.isReady()) {
       if (!graph.isRemoteProfileId(id)) {
-        if (!localProfileExists(id)) {
-          btn.setAttribute("aria-label", "This demo profile is not yet a Cognation member page");
+        if (!localProfileExists(id) && !pageOpen()) {
+          hideNoPage(btn);
           return;
         }
       } else {

@@ -11494,11 +11494,12 @@
     var i;
     for (i = 0; i < steps; i++) {
       var turn = i / steps;
-      var wobble = Math.sin(i * 0.77 + 0.4) * 0.6 + Math.sin(i * 1.83 + 1.1) * 0.3;
+      var wobble = Math.sin(i * 0.09 + 0.2);
       var p = circleProjectRadius(turn * 360, CIRCLE_RING_R + wobble * 8);
       var depth = p.s / CIRCLE_SCALE;
       var flicker = 0.8 + 0.2 * Math.sin(i * 1.35);
-      glowAt(p.x, p.y, 34 * depth, circleGlowColor(turn), 0.06 * flicker);
+      var side = Math.abs(Math.cos(turn * Math.PI * 2));
+      glowAt(p.x, p.y, (5 + 32 * side) * depth, circleGlowColor(turn), 0.06 * flicker * (1 + 2 * side));
     }
     ring.appendChild(canvas);
     paintCircleBolt(ring);
@@ -11509,7 +11510,7 @@
      nothing on the #61 indigo background, so the bolt looked missing. */
   function circleBoltSegments(radius, wobble, seed, baseWidth) {
     var steps = 144;
-    var chunk = 6;
+    var chunk = 4;
     var segs = [];
     var start;
     for (start = 0; start < steps; start += chunk) {
@@ -11519,7 +11520,7 @@
       var end = Math.min(steps, start + chunk);
       var i;
       for (i = start; i <= end; i++) {
-        var n = Math.sin(i * 0.73 + seed) * 0.58 + Math.sin(i * 1.91 + seed * 1.4) * 0.42;
+        var n = Math.sin(i * 0.22 + seed);
         if (i === 0 || i === steps) n = 0;
         var p = circleProjectRadius((i / steps) * 360, radius + n * wobble);
         cmds.push((i === start ? "M" : "L") + p.x.toFixed(1) + " " + p.y.toFixed(1));
@@ -11589,7 +11590,7 @@
       }
       return filter;
     }
-    defs.appendChild(glowFilter("pulse-bolt-glow", 18, 7, false));
+    defs.appendChild(glowFilter("pulse-bolt-glow", 12, 5, false));
     defs.appendChild(glowFilter("pulse-bolt-core", 3.2, 1.1, false));
     svg.appendChild(defs);
     function addBolt(parent, d, color, width, opacity) {
@@ -11612,16 +11613,13 @@
       { color: "#3ecbff", opacity: 0.85 },
       { color: "#ff4ad8", opacity: 0.8 }
     ];
-    circleBoltSegments(CIRCLE_RING_R, 18, 1.2, 8).forEach(function (seg, index) {
-      var shift = Math.sin(index * 0.65) * 0.5 + 0.5;
-      var shift2 = Math.cos(index * 0.4) * 0.5 + 0.5;
-      var weights = [0.35 + 0.65 * shift, 0.3 + 0.55 * (1 - shift), 0.3 + 0.6 * shift2];
-      colors.forEach(function (ink, inkIndex) {
-        addBolt(halo, seg.d, ink.color, seg.width * 1.2, 0.28 + 0.5 * weights[inkIndex]);
-      });
-      addBolt(core, seg.d, "#e9f7ff", Math.max(0.9, seg.width * 0.16), 0.7);
+    var strands = circleBoltSegments(CIRCLE_RING_R, 24, 0.2, 2.2).concat(circleBoltSegments(CIRCLE_RING_R, 24, 1.35, 2.2));
+    strands.forEach(function (seg, index) {
+      addBolt(halo, seg.d, colors[index < 36 ? 1 : 0].color, seg.width, 0.72);
     });
-    var forks = [22, 64, 98, 146, 188, 228, 274, 332];
+    addBolt(halo, strands[0].d, "#ff4ad8", 2, 0.55);
+    addBolt(core, strands[1].d, "#e9f7ff", 1.2, 0.55);
+    var forks = [];
     forks.forEach(function (angle, index) {
       var outward = index % 2 === 0;
       var t = angle * Math.PI / 180;
@@ -11967,6 +11965,9 @@
     var i;
     for (i = 0; i < spots.length; i++) {
       var pos = circleSpotAt(i + shift);
+      var near = Math.max(0, Math.min(1, (pos.s - 0.9) / 0.7));
+      spots[i].style.width = (4.4 * (1 + 0.42 * near)).toFixed(2) + "rem";
+      spots[i].style.height = (4.4 * (1 - 0.12 * near)).toFixed(2) + "rem";
       spots[i].style.transform =
         "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + pos.y.toFixed(1) + "px) scale(" + pos.s.toFixed(3) + ")";
       spots[i].style.zIndex = String(Math.round(pos.s * 100));

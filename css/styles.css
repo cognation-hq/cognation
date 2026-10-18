@@ -12240,18 +12240,16 @@ a.circle-fall-portrait {
   height: 4.4rem;
   margin: 0;
   padding: 0;
-  border-radius: 50%;
-  border: 2px solid rgba(168, 244, 255, 0.38);
-  box-shadow:
-    0 0 22px rgba(197, 166, 255, 0.32),
-    inset 0 0 14px rgba(168, 244, 255, 0.14);
-  background: rgba(16, 19, 48, 0.42);
+  border-radius: 1px;
+  border: 1px solid rgba(214, 218, 232, 0.5);
+  box-shadow: none;
+  background: #070b16;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   pointer-events: none;
-  color: #f7fbff !important;
+  color: transparent !important;
   font-weight: 700;
   font-size: 1rem;
   line-height: 1;
@@ -12259,24 +12257,22 @@ a.circle-fall-portrait {
   text-shadow: 0 2px 10px rgba(6, 10, 30, 0.65);
 }
 .circle-spot.is-filled {
-  border-color: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 8px 18px rgba(8, 12, 32, 0.28);
+  border-color: rgba(220, 224, 238, 0.62);
+  box-shadow: none;
+  background: #070b16;
   background-size: cover;
   background-position: center;
   pointer-events: auto;
   cursor: default;
 }
 .circle-spot.is-empty {
-  /* hollow ghost — cyan/violet halo rim */
-  background:
-    radial-gradient(circle at 50% 40%, rgba(168, 244, 255, 0.12), transparent 62%),
-    rgba(16, 19, 48, 0.42);
+  background: #070b16;
 }
 .circle-spot.has-caption { overflow: visible; }
 .circle-spot-caption {
-  position: absolute; left: 50%; width: 7rem; margin: 0;
-  top: calc(100% - 0.55em); transform: translateX(-50%);
-  text-align: center; font-size: 0.42rem; font-weight: 650; line-height: 1.05;
+  position: absolute; left: 50%; width: 7rem; margin: 0; padding: 0;
+  top: 100%; transform: translate(-50%, -0.86em);
+  text-align: center; font-size: 0.5rem; font-weight: 650; line-height: 1;
   letter-spacing: 0; color: #f7fbff !important; pointer-events: none;
   text-shadow: 0 1px 4px rgba(6, 10, 30, 0.85);
 }

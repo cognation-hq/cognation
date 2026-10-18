@@ -9981,11 +9981,13 @@ body { padding-top: 0 !important; }
   outline: 2px solid #fff;
 }
 
-.tower-profile-actions .tower-go-live-btn[data-go-live] {
+.tower-profile-edit-dropdown .tower-go-live-btn[data-go-live] {
   position: static;
   left: auto;
   bottom: auto;
   transform: none;
+  display: inline-flex;
+  margin: 0.35rem 0.75rem 0.15rem;
 }
 
 /* Live stage */
@@ -13900,4 +13902,56 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 @media (prefers-reduced-motion: reduce) {
   [data-tower-app] .tower-avatar-resize,
   [data-tower-app] .tower-name-resize { transition: none; }
+}
+
+/* Go Live: one profile fills a screen in the page flow. Header stays. Page scrolls. */
+[data-tower-app].is-live-open > :not([data-live-stage]) { display: none !important; }
+.tower-live-screen[data-live-stage] {
+  position: static;
+  display: flex;
+  flex-direction: column;
+  min-height: 70vh;
+  margin: 0;
+  background: #0e1028;
+  color: #f7f9ff;
+}
+.tower-live-screen[data-live-stage][hidden] { display: none !important; }
+.tower-live-screen-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid rgba(220, 246, 255, 0.14);
+}
+.tower-live-screen-titles { display: flex; flex-direction: column; min-width: 0; }
+#panel-tower .tower-live-screen .tower-live-screen-title { margin: 0; color: #f7f9ff !important; }
+#panel-tower .tower-live-screen .tower-live-screen-kind {
+  margin: 0;
+  color: rgba(185, 191, 224, 0.75) !important;
+  font-size: 0.78rem;
+}
+#panel-tower .tower-live-screen .tower-live-back {
+  flex: none;
+  border: 1px solid rgba(220, 246, 255, 0.24) !important;
+  border-radius: 999px;
+  background: rgba(16, 19, 48, 0.6) !important;
+  color: #f7f9ff !important;
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  cursor: pointer;
+}
+.tower-live-session {
+  flex: 1 1 auto;
+  min-height: 60vh;
+  display: grid;
+  place-items: center;
+  margin: 0.8rem 1rem 1rem;
+  border: 1px solid rgba(220, 246, 255, 0.14);
+  border-radius: 12px;
+  background: #12142e;
+}
+#panel-tower .tower-live-session .tower-live-session-name {
+  margin: 0;
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  color: #f7f9ff !important;
 }

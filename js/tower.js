@@ -7728,6 +7728,11 @@
     var session = getSessionObject();
     var user = session && session.username ? String(session.username).toLowerCase() : "";
     if (!btn) return;
+    if (status) {
+      status.hidden = true;
+      status.textContent = "";
+      status.classList.remove("is-error");
+    }
     if (usingRemoteSocial()) {
       var social = remoteSocial();
       var remoteProfiles = social && social.getMyProfiles ? social.getMyProfiles() : [];
@@ -7735,12 +7740,8 @@
         return p.kind === "professional";
       });
       btn.hidden = hasRemoteProfessional;
-      if (status) {
-        status.hidden = !hasRemoteProfessional;
-        status.textContent = hasRemoteProfessional
-          ? "Your professional page is set up."
-          : "";
-        status.classList.remove("is-error");
+      if (hasRemoteProfessional) {
+        showStatusPopup("Your professional page is set up.", false, { once: true });
       }
       return;
     }
@@ -7757,11 +7758,7 @@
     var hasPro = profiles.some(function (p) { return p.kind === "professional"; });
     if (profiles.length >= 2 || (hasPersonal && hasPro)) {
       btn.hidden = true;
-      if (status) {
-        status.hidden = false;
-        status.textContent = "Both Personal and Professional pages are set up for this account.";
-        status.classList.remove("is-error");
-      }
+      showStatusPopup("Both Personal and Professional pages are set up for this account.", false, { once: true });
       return;
     }
     btn.hidden = false;
@@ -7778,12 +7775,8 @@
     if (!root || root.__cognationAddProfileBound) return;
     root.__cognationAddProfileBound = true;
     var btn = root.querySelector("[data-tower-add-profile]");
-    var status = root.querySelector("[data-tower-add-profile-status]");
     function setSt(msg, isError) {
-      if (!status) return;
-      status.hidden = !msg;
-      status.textContent = msg || "";
-      status.classList.toggle("is-error", !!isError);
+      showStatusPopup(msg, isError);
     }
     if (!btn) return;
     btn.addEventListener("click", function () {
@@ -8810,12 +8803,63 @@
     }
   }
 
+  function hideProfileStatusBoxes() {
+    var nodes = document.querySelectorAll("[data-tower-profile-status], [data-tower-add-profile-status]");
+    for (var i = 0; i < nodes.length; i++) {
+      nodes[i].hidden = true;
+      nodes[i].textContent = "";
+      nodes[i].classList.remove("is-error");
+    }
+  }
+
+  function showStatusPopup(msg, isError, opts) {
+    opts = opts || {};
+    hideProfileStatusBoxes();
+    msg = msg ? String(msg) : "";
+    if (!msg) return;
+    var host = document.querySelector("[data-status-popup-host]");
+    if (!host) {
+      host = document.createElement("div");
+      host.className = "status-popup-host";
+      host.setAttribute("data-status-popup-host", "");
+      document.body.appendChild(host);
+    }
+    if (opts.once) {
+      if (!host.__seen) host.__seen = {};
+      if (host.__seen[msg]) return;
+      host.__seen[msg] = true;
+    }
+    var popup = document.createElement("div");
+    popup.className = "status-popup" + (isError ? " is-error" : "");
+    popup.setAttribute("role", "status");
+    popup.setAttribute("data-status-popup", "");
+    var text = document.createElement("p");
+    text.className = "status-popup-text";
+    text.textContent = msg;
+    popup.appendChild(text);
+    var offerUndo = msg.indexOf("Undo to restore") !== -1;
+    if (offerUndo) {
+      var undo = document.createElement("button");
+      undo.type = "button";
+      undo.className = "status-popup-undo";
+      undo.setAttribute("data-status-popup-undo", "");
+      undo.textContent = "Undo";
+      undo.addEventListener("click", function () {
+        if (popup.parentNode) popup.remove();
+        var app = document.querySelector("[data-tower-app]");
+        if (app && typeof app.__cognationUndoWidget === "function") app.__cognationUndoWidget();
+      });
+      popup.appendChild(undo);
+    }
+    host.appendChild(popup);
+    while (host.children.length > 3) host.removeChild(host.firstChild);
+    window.setTimeout(function () {
+      if (popup.parentNode) popup.remove();
+    }, offerUndo ? 7000 : 5000);
+  }
+
   function setProfileStatusOn(root, msg, isError) {
-    var el = root.querySelector("[data-tower-profile-status]");
-    if (!el) return;
-    el.hidden = !msg;
-    el.textContent = msg || "";
-    el.classList.toggle("is-error", !!isError);
+    showStatusPopup(msg, isError);
   }
 
 
@@ -8832,11 +8876,7 @@
     if (!root.__cognationWidgetUndo) root.__cognationWidgetUndo = [];
 
     function setProfileStatusSafe(msg, isError) {
-      var el = root.querySelector("[data-tower-profile-status]");
-      if (!el) return;
-      el.hidden = !msg;
-      el.textContent = msg || "";
-      el.classList.toggle("is-error", !!isError);
+      showStatusPopup(msg, isError);
     }
 
     function syncUndoButton() {
@@ -8956,6 +8996,7 @@
       }
     }
 
+    root.__cognationUndoWidget = undoLastWidgetRemoval;
     syncUndoButton();
     if (undoBtn && !undoBtn.__cognationUndoBound) {
       undoBtn.__cognationUndoBound = true;
@@ -9760,12 +9801,7 @@
       applyAvatarFrame(root, id, color);
       var input = root.querySelector("[data-tower-avatar-frame-input]");
       if (input) input.value = id;
-      var status = root.querySelector("[data-tower-profile-status]");
-      if (status) {
-        status.hidden = false;
-        status.textContent = "Frame preview — click Save frame to keep it.";
-        status.classList.remove("is-error");
-      }
+      setProfileStatusOn(root, "Frame preview — click Save frame to keep it.", false);
     });
     if (colorChips && !colorChips.__cognationCowboyColorBound) {
       colorChips.__cognationCowboyColorBound = true;
@@ -9779,12 +9815,7 @@
         if (frameId !== "cowboy-hat") {
           applyAvatarFrame(root, "cowboy-hat", color);
         }
-        var status = root.querySelector("[data-tower-profile-status]");
-        if (status) {
-          status.hidden = false;
-          status.textContent = "Hat color preview — click Save frame to keep it.";
-          status.classList.remove("is-error");
-        }
+        setProfileStatusOn(root, "Hat color preview — click Save frame to keep it.", false);
       });
     }
     if (saveBtn && !saveBtn.__cognationFrameSaveBound) {
@@ -9800,12 +9831,7 @@
         p.avatarFrame = id;
         p.cowboyHatColor = color;
         TowerProfileStore.save(p);
-        var status = root.querySelector("[data-tower-profile-status]");
-        if (status) {
-          status.hidden = false;
-          status.textContent = id === "cowboy-hat" ? "Cowboy hat + color saved." : "Frame saved.";
-          status.classList.remove("is-error");
-        }
+        setProfileStatusOn(root, id === "cowboy-hat" ? "Cowboy hat + color saved." : "Frame saved.", false);
       });
     }
   }
@@ -10494,18 +10520,9 @@
 
     var profileForm = root.querySelector("[data-tower-profile-form]");
     var avatarFile = root.querySelector("[data-tower-avatar-file]");
-    var profileStatus = root.querySelector("[data-tower-profile-status]");
 
     function setProfileStatus(msg, isError) {
-      if (!profileStatus) return;
-      if (!msg) {
-        profileStatus.hidden = true;
-        profileStatus.textContent = "";
-        return;
-      }
-      profileStatus.hidden = false;
-      profileStatus.textContent = msg;
-      profileStatus.classList.toggle("is-error", !!isError);
+      showStatusPopup(msg, isError);
     }
 
     if (profileForm) {

@@ -1926,8 +1926,14 @@
         }
       }
       if (card.type === TYPE.CLASSROOM) {
-        html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
-        html += '<p class="commune-card-meta">Life skills · ~18+</p>';
+        var cast = window.CognationLive && window.CognationLive.professionalBroadcast && window.CognationLive.professionalBroadcast();
+        if (cast) {
+          html += '<p class="commune-card-meta">' + escapeHtml(cast.name) + " is live</p>";
+          html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Join live</button>';
+        } else {
+          html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
+          html += '<p class="commune-card-meta">Life skills · ~18+</p>';
+        }
       }
       if (card.liveJoin) html += '<button type="button" class="btn btn-primary" data-live-echo-join>Join</button>';
       if (card.type === TYPE.CONTENT) html += '<span class="commune-card-badge">Live</span>';
@@ -2909,6 +2915,14 @@
     if (!classroomAllowed()) {
       setStatus("Classroom is for members 18+. Update your age in your profile to join.");
       return false;
+    }
+    var cast = window.CognationLive && window.CognationLive.professionalBroadcast && window.CognationLive.professionalBroadcast();
+    if (cast && cast.handle) {
+      var tab = document.getElementById("tab-tower");
+      if (tab) tab.click();
+      if (window.CognationTowerOpenProfile) window.CognationTowerOpenProfile(cast.handle);
+      if (window.CognationLive.open) window.CognationLive.open();
+      return true;
     }
     var sessions = classroomCatalog();
     var session = null;

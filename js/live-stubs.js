@@ -553,10 +553,40 @@
       echoBtn.setAttribute("aria-pressed", "false");
       setEchoShare(false);
     }
+    refreshEcho();
     syncGoLiveButtons();
   }
 
-  function openLive() {
+  function refreshEcho() {
+    var swipe = window.CognationCommuneSwipe;
+    if (swipe && swipe.rebuild) swipe.rebuild();
+  }
+
+  function rememberBroadcaster(live) {
+    if (!live) return;
+    var who = profileOnScreen();
+    var p = null;
+    try { p = window.CognationTowerProfileStore && window.CognationTowerProfileStore.get(); } catch (e) {}
+    live.profileKind = who.kind === "Professional" ? "professional" : "personal";
+    live.profileId = p && (p._profileId || p.id) || "";
+    live.handle = (p && p.handle) || "";
+    live.displayName = who.name || "";
+    setLive(live);
+    if (live.profileKind === "professional") refreshEcho();
+  }
+
+  function professionalBroadcast() {
+    var live = getLive();
+    if (!live || !live.active || live.profileKind !== "professional" || !live.profileId) return null;
+    var accounts = window.CognationAccounts;
+    var rec = accounts && accounts.getProfileById && accounts.getProfileById(live.profileId);
+    if (!rec || rec.kind !== "professional") return null;
+    var handle = String(rec.handle || "").replace(/^@/, "");
+    if (!handle) return null;
+    return { profileId: rec.id, handle: handle, name: rec.displayName || live.displayName || handle };
+  }
+
+  function openLive(asBroadcaster) {
     var root = document.querySelector("[data-tower-app]") || document;
     var stage = root.querySelector("[data-live-stage]");
     if (!stage) return;
@@ -564,7 +594,8 @@
     stage.hidden = false;
     if (root.classList) root.classList.add("is-live-open");
     initStage(stage);
-    ensureLive(stage);
+    var live = ensureLive(stage);
+    if (asBroadcaster === true) rememberBroadcaster(live);
     refresh(stage);
     syncGoLiveButtons();
   }
@@ -594,7 +625,7 @@
       ev.stopPropagation();
       var app = btn.closest && btn.closest("[data-tower-app]");
       if (btn.hidden || (app && app.getAttribute("data-tower-is-owner") !== "true")) return;
-      openLive();
+      openLive(true);
       var session = document.querySelector("[data-tower-app] [data-live-session]");
       connectMedia(session);
     }, true);
@@ -615,5 +646,6 @@
     memberAge: memberAge,
     open: openLive,
     echoCard: echoCard,
+    professionalBroadcast: professionalBroadcast,
   };
 })();

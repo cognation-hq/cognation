@@ -11969,7 +11969,6 @@
       var pos = circleSpotAt(i + shift);
       spots[i].style.transform =
         "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + pos.y.toFixed(1) + "px) scale(" + pos.s.toFixed(3) + ")";
-      spots[i].style.setProperty("--spot-s", pos.s.toFixed(3));
       spots[i].style.zIndex = String(Math.round(pos.s * 100));
     }
   }

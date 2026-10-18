@@ -19,7 +19,7 @@ var html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 assert.strictEqual(api.REFRESH_MS, 15 * 60 * 1000, "refresh about every 15 minutes");
 assert.ok(!/\bfollows\b/.test(sql) && !/\bfollows\b/.test(src), "friendships only");
 assert.ok(!/toggle_profile_follow/.test(src) && !/Add friend/.test(src) && !/pulse-intro/.test(css), "no separate add row");
-assert.ok(/circle-spot-caption/.test(tower) && /0\.08in/.test(css), "caption rides under the picture");
+assert.ok(/circle-spot-caption/.test(tower) && /top:\s*calc\(100% - 0\.55em\)/.test(css), "caption sits on the picture");
 assert.ok(/friendships/.test(sql) && /kind = 'personal'/.test(sql), "personal friends");
 assert.ok(/not exists/.test(sql) && /already\.friend_user_id/.test(sql), "skip people you already friend");
 assert.ok(/cognation_user_is_real/.test(sql) && /limit 5/.test(sql), "real people, five spots");

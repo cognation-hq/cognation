@@ -12274,11 +12274,11 @@ a.circle-fall-portrait {
 }
 .circle-spot.has-caption { overflow: visible; }
 .circle-spot-caption {
-  position: absolute; left: 50%; width: 8.2rem; margin: 0;
-  top: calc(100% + (0.08in / var(--spot-s, 1))); transform: translateX(-50%);
-  text-align: center; font-size: 0.62rem; font-weight: 650; line-height: 1.2;
+  position: absolute; left: 50%; width: 7rem; margin: 0;
+  top: calc(100% - 0.55em); transform: translateX(-50%);
+  text-align: center; font-size: 0.42rem; font-weight: 650; line-height: 1.05;
   letter-spacing: 0; color: #f7fbff !important; pointer-events: none;
-  text-shadow: 0 1px 6px rgba(6, 10, 30, 0.85);
+  text-shadow: 0 1px 4px rgba(6, 10, 30, 0.85);
 }
 #panel-commune .commune-swipe-header .commune-swipe-title {
   display: block;

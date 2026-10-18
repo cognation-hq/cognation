@@ -338,7 +338,31 @@
                   </div>
                 </div>
                 <div class="tower-live-session" data-live-session>
+                  <p class="tower-live-session-kicker">Broadcaster</p>
                   <p class="tower-live-session-name" data-live-session-name></p>
+                </div>
+                <div class="tower-live-joins" data-live-joins>
+                  <p class="tower-live-joins-label">Join requests</p>
+                  <div class="tower-live-join-slots" data-live-join-slots>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="1">Request</button>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="2">Request</button>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="3">Request</button>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="4">Request</button>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="5">Request</button>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="6">Request</button>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="7">Request</button>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="8">Request</button>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="9">Request</button>
+                  </div>
+                </div>
+                <div class="tower-live-room-chat" data-live-room-chat>
+                  <p class="tower-live-chat-label">Chat</p>
+                  <div class="tower-live-chat-log" data-live-chat-log role="log" aria-live="polite"></div>
+                  <form class="tower-live-chat-form" data-live-room-chat-form action="#" method="post">
+                    <label class="visually-hidden" for="tower-live-room-chat">Message the broadcaster</label>
+                    <input id="tower-live-room-chat" data-live-room-chat-input type="text" maxlength="280" placeholder="Write to the broadcaster" autocomplete="off">
+                    <button type="submit" class="tower-live-chat-send">Send</button>
+                  </form>
                 </div>
               </section>
                 <div class="tower-side-toggle" data-tower-side-toggle role="tablist" aria-label="Tower side">

@@ -14040,3 +14040,10 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 }
 #panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--friends.is-spawned { order: 1; }
 #panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--badges.is-spawned { order: 2; }
+
+/* Six-dot handles stay in the markup. Drag the widget itself; no side button. */
+#panel-tower .tower-sticker-handle,
+#panel-tower .tower-sticker-handle[hidden] {
+  display: none !important;
+  pointer-events: none !important;
+}

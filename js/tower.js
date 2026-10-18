@@ -6116,8 +6116,10 @@
           else on = true;
         }
       }
-      /* Top friends and badges stay on the profile, under Edit profile. */
+      /* Top friends and badges stay on the profile, under Edit profile.
+         A badges shelf the owner just removed stays off until Undo. */
       if (id === "friends" || id === "badges") on = true;
+      if (id === "badges" && root.__cognationBadgesShelfRemoved) on = false;
       /* The same Calendar sticker stays on the personal page and the professional page. */
       if (id === "calendar") on = true;
       var el = root.querySelector('[data-tower-widget="' + id + '"]');
@@ -6182,6 +6184,7 @@
     var p = TowerProfileStore.get();
     p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
     p.publicWidgets[id] = !!on;
+    if (id === "badges") root.__cognationBadgesShelfRemoved = !on;
     TowerProfileStore.save(p);
     applyPublicWidgets(root, p);
     syncPublicWidgetsForm(root, p);

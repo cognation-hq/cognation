@@ -13,6 +13,7 @@ var css = fs.readFileSync(path.join(root, "css/styles.css"), "utf8");
 assert.ok(/function showStatusPopup\(msg, isError, opts\)/.test(tower), "popup helper");
 assert.ok(/data-status-popup-undo/.test(tower) && /textContent = "Undo"/.test(tower), "Undo button on the notice");
 assert.ok(/__cognationUndoWidget = undoLastWidgetRemoval/.test(tower), "Undo calls the restore stack");
+assert.ok(/root\.__cognationBadgesShelfRemoved = !on/.test(tower) && /__cognationBadgesShelfRemoved\) on = false/.test(tower), "removed badges shelf stays off until Undo");
 assert.ok(/offerUndo \? 7000 : 5000/.test(tower), "popup dismisses on its own");
 assert.ok(/showStatusPopup\("Your professional page is set up\.", false, \{ once: true \}\)/.test(tower), "setup notice is a popup");
 assert.ok(/function setProfileStatusOn\(root, msg, isError\) \{\s*showStatusPopup\(msg, isError\);/.test(tower), "profile status uses the popup");

@@ -314,25 +314,22 @@
     }
   }
 
-  /* Envelope autospawns under Add friends. A saved drag wins after that. */
+  /* Name and the envelope stay in the profile card. A saved drag does not pull them out. */
   function placeMessageEnvelope(root) {
-    var stage = root && root.querySelector("[data-tower-scrapbook]");
+    var stack = root && root.querySelector(".tower-avatar-stack");
+    var under = root && root.querySelector("[data-tower-under-photo]");
+    var name = root && root.querySelector('[data-tower-widget="identity"]');
     var env = root && root.querySelector('[data-tower-widget="envelope"]');
-    if (!stage || !env || env.hidden || env.classList.contains("is-widget-off") || env.classList.contains("is-dragging")) return;
-    var layout = getWidgetLayout(TowerProfileStore.get()) || {};
-    if (!isPlacedPos(layout, "envelope")) {
-      env.classList.remove("is-placed");
-      return;
+    var handle = root && root.querySelector("[data-tower-handle-badge]");
+    if (name && stack && !stack.contains(name)) {
+      var actions = stack.querySelector(".tower-profile-actions");
+      if (actions) stack.insertBefore(name, actions);
+      else stack.appendChild(name);
     }
-    if (env.parentNode !== stage) stage.appendChild(env);
-    env.classList.add("is-placed");
-    var pos = layout.envelope;
-    var x = layoutCoord(pos.x, 0);
-    var yAt = stickerYFromLayout(pos, stage.clientHeight || 0);
-    env.style.setProperty("--sticker-x", x + "%");
-    env.style.setProperty("--sticker-y", yAt.css);
-    env.setAttribute("data-sticker-x", String(x));
-    env.setAttribute("data-sticker-y", String(yAt.pct));
+    if (handle) handle.hidden = true;
+    if (!under || !env || env.classList.contains("is-dragging")) return;
+    if (env.parentNode !== under) under.appendChild(env);
+    env.classList.remove("is-placed");
   }
 
   function spawnUnplacedWidgets(root, p) {
@@ -519,8 +516,8 @@
       el.setAttribute("data-sticker-y", String(y));
       el.setAttribute("data-sticker-z", "2");
     });
-    repairLayoutOverlaps(stage, p, layout, spawnIds);
     placeMessageEnvelope(root);
+    repairLayoutOverlaps(stage, p, layout, spawnIds);
   }
 
   /* Load-time layout repair (live check r143). A saved free layout can come back
@@ -8685,8 +8682,15 @@
       if (!el || !root.contains(el) || recentDrag(el)) return;
       var isHandle = el.matches("[data-tower-handle-badge]");
       var isName = el.matches("[data-tower-profile-name]");
-      if (isHandle || isName) {
-        /* Professional name is the owner's label — a business or creator name — not the personal name. */
+      if (isName) {
+        if (!ownerPublic()) return;
+        if (el.getAttribute("contenteditable") === "true") return;
+        el.setAttribute("contenteditable", "true");
+        el.setAttribute("spellcheck", "false");
+        try { el.focus(); } catch (eName) {}
+        return;
+      }
+      if (isHandle) {
         if (!ownerPublic()) return;
       } else if (!canEdit()) return;
       if (el.getAttribute("contenteditable") === "true") return;
@@ -9135,21 +9139,8 @@
         : ev.target.closest("[data-tower-widget]");
       if (!sticker || !stage.contains(sticker)) return;
       var wid = sticker.getAttribute("data-tower-widget");
-      if (wid === "feed" || wid === "messages") return;
+      if (wid === "feed" || wid === "messages" || wid === "identity" || wid === "envelope") return;
       if (sticker.hidden || sticker.classList.contains("is-widget-off")) return;
-      /* First drag of the envelope leaves its autospawn spot and keeps that spot as the start. */
-      if (wid === "envelope" && sticker.parentNode !== stage) {
-        var envBox = sticker.getBoundingClientRect();
-        var stageBox = stage.getBoundingClientRect();
-        stage.appendChild(sticker);
-        sticker.classList.add("is-placed");
-        var envX = stageBox.width ? ((envBox.left - stageBox.left) / stageBox.width) * 100 : 0;
-        var envY = stageBox.height ? ((envBox.top - stageBox.top) / stageBox.height) * 100 : 0;
-        sticker.setAttribute("data-sticker-x", String(Math.round(envX * 10) / 10));
-        sticker.setAttribute("data-sticker-y", String(Math.round(envY * 10) / 10));
-        sticker.style.setProperty("--sticker-x", envX + "%");
-        sticker.style.setProperty("--sticker-y", envY + "%");
-      }
 
       var rect = stage.getBoundingClientRect();
       var start = pointerPos(ev);

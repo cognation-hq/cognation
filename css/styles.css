@@ -12272,6 +12272,15 @@ a.circle-fall-portrait {
     radial-gradient(circle at 50% 40%, rgba(168, 244, 255, 0.12), transparent 62%),
     rgba(16, 19, 48, 0.42);
 }
+.pulse-intro {
+  position: absolute; z-index: 5; left: 50%; bottom: 11%; transform: translateX(-50%);
+  width: min(40rem, 94vw); margin: 0; text-align: center; color: #f7fbff; font-size: 1.2rem;
+  line-height: 1.45; pointer-events: auto; text-shadow: 0 2px 12px rgba(6, 10, 30, 0.75);
+}
+.pulse-intro button {
+  font: inherit; font-weight: 700; color: #101330; background: #f7fbff; border: 0;
+  border-radius: 999px; padding: 0.2rem 0.75rem; cursor: pointer; pointer-events: auto;
+}
 #panel-commune .commune-swipe-header .commune-swipe-title {
   display: block;
   width: 100%;

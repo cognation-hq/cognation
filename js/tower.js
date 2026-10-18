@@ -11380,6 +11380,9 @@
   }
 
   function stopCircleFall() {
+    if (window.CognationPulseMutual && typeof window.CognationPulseMutual.stop === "function") {
+      window.CognationPulseMutual.stop();
+    }
     if (circleFallState) {
       if (circleFallState.raf) cancelAnimationFrame(circleFallState.raf);
       if (circleFallState.refreshTimer) clearInterval(circleFallState.refreshTimer);
@@ -11930,7 +11933,7 @@
         spot.classList.add("is-filled");
         spot.classList.remove("is-empty");
         spot.textContent = String(person.name).trim().charAt(0).toUpperCase() || "?";
-        spot.setAttribute("aria-label", person.name);
+        spot.setAttribute("aria-label", person.mutualName ? "You and " + person.name + " both know " + person.mutualName : person.name);
         if (person.userId) spot.setAttribute("data-circle-person", person.userId);
         /* Real friend photo (profiles.photo_url); no photo or a bad URL keeps the letter. */
         var photoApi = window.CognationProfilePhoto;
@@ -12098,6 +12101,9 @@
     var circlePage = document.querySelector("[data-circle-page]") || layer;
     if (window.CognationCircleRelations && typeof window.CognationCircleRelations.mount === "function") {
       window.CognationCircleRelations.mount(circlePage);
+    }
+    if (window.CognationPulseMutual && typeof window.CognationPulseMutual.mount === "function") {
+      window.CognationPulseMutual.mount();
     }
     /* PULSE falling friends restored (removed by #49 early return). Every
        server friend's Tower circle falls BEHIND the halo ring; tap opens Tower. */

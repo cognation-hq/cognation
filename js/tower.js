@@ -10338,12 +10338,21 @@
     syncPublicUrlFields(root, p);
     root.setAttribute("data-view-kind", profileIsProfessional(p) ? "professional" : "personal");
     var followBtn = root.querySelector("[data-tower-follow]");
-    if (followBtn && profileIsProfessional(p)) {
-      if (followBtn.textContent !== "Following") followBtn.textContent = "+ follow";
-      followBtn.setAttribute("aria-label", "Follow this professional page");
-    } else if (followBtn && (followBtn.textContent === "Follow" || followBtn.textContent === "+ follow" || followBtn.textContent === "friend")) {
-      followBtn.textContent = "+ friend";
-      followBtn.setAttribute("aria-label", "Add this person as a friend");
+    var addFriendsBtn = root.querySelector("[data-tower-add-friends]");
+    if (profileIsProfessional(p)) {
+      if (followBtn && followBtn.textContent !== "Following") followBtn.textContent = "+ follow";
+      if (followBtn) followBtn.setAttribute("aria-label", "Follow this professional page");
+      /* Owner professional page shows this control where Add friends sat. */
+      if (addFriendsBtn) {
+        addFriendsBtn.textContent = "+ follow";
+        addFriendsBtn.setAttribute("aria-label", "Follow this professional page");
+      }
+    } else {
+      if (followBtn && (followBtn.textContent === "Follow" || followBtn.textContent === "+ follow" || followBtn.textContent === "friend")) {
+        followBtn.textContent = "+ friend";
+        followBtn.setAttribute("aria-label", "Add this person as a friend");
+      }
+      if (addFriendsBtn && addFriendsBtn.textContent === "+ follow") addFriendsBtn.textContent = "Add friends";
     }
     try { syncProfileKindToggle(root); } catch (eKind) {}
     try { syncAddProfileUi(root); } catch (eAdd) {}

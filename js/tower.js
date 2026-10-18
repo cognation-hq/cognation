@@ -11499,7 +11499,7 @@
       var depth = p.s / CIRCLE_SCALE;
       var flicker = 0.8 + 0.2 * Math.sin(i * 1.35);
       var side = Math.abs(Math.cos(turn * Math.PI * 2));
-      glowAt(p.x, p.y, (1.2 + 34 * side) * depth, circleGlowColor(turn), 0.06 * flicker * (0.2 + 4.5 * side));
+      glowAt(p.x, p.y, (10 + 42 * side) * depth, circleGlowColor(turn), 0.06 * flicker * (1.4 + 6 * side));
     }
     ring.appendChild(canvas);
     paintCircleBolt(ring);
@@ -11521,7 +11521,7 @@
       var i;
       for (i = start; i <= end; i++) {
         var ang = (i / steps) * Math.PI * 2;
-        var n = Math.sin(i * 0.22 + seed) * (1 + 0.85 * Math.min(0, Math.sin(ang)));
+        var n = Math.sin(i * 0.17 + seed) * (1 + 0.75 * Math.min(0, Math.sin(ang)));
         if (i === 0 || i === steps) n = 0;
         var p = circleProjectRadius((i / steps) * 360, radius);
         var ox = Math.cos(ang), oy = Math.sin(ang) * Math.cos(CIRCLE_TILT), olen = Math.sqrt(ox * ox + oy * oy) || 1;
@@ -11592,7 +11592,7 @@
       }
       return filter;
     }
-    defs.appendChild(glowFilter("pulse-bolt-glow", 2.2, 0.55, true));
+    defs.appendChild(glowFilter("pulse-bolt-glow", 9, 1.6, true));
     defs.appendChild(glowFilter("pulse-bolt-core", 3.2, 1.1, false));
     svg.appendChild(defs);
     function addBolt(parent, d, color, width, opacity) {
@@ -11615,9 +11615,9 @@
       { color: "#3ecbff", opacity: 0.85 },
       { color: "#ff4ad8", opacity: 0.8 }
     ];
-    var strands = circleBoltSegments(CIRCLE_RING_R, 15, 0.15, 1.05).concat(circleBoltSegments(CIRCLE_RING_R, 15, 0.6, 1.05), circleBoltSegments(CIRCLE_RING_R, 14, 1.05, 1.05), circleBoltSegments(CIRCLE_RING_R, 14, 1.55, 1.05));
+    var strands = circleBoltSegments(CIRCLE_RING_R, 18, 0.1, 1.05).concat(circleBoltSegments(CIRCLE_RING_R, 16, 0.75, 1.05), circleBoltSegments(CIRCLE_RING_R, 18, 1.4, 1.05), circleBoltSegments(CIRCLE_RING_R, 15, 2.05, 1.05), circleBoltSegments(CIRCLE_RING_R, 17, 2.7, 1.05), circleBoltSegments(CIRCLE_RING_R, 14, 3.35, 1.05));
     strands.forEach(function (seg, index) {
-      addBolt(halo, seg.d, colors[Math.floor(index / 54) % 2 ? 0 : 1].color, seg.width, 0.92);
+      addBolt(halo, seg.d, colors[Math.floor(index / 54) % 2 ? 0 : 1].color, seg.width, 0.88);
     });
     addBolt(halo, strands[0].d, "#ff4ad8", 2, 0.55);
     addBolt(core, strands[1].d, "#e9f7ff", 1.2, 0.55);
@@ -11967,9 +11967,10 @@
     var i;
     for (i = 0; i < spots.length; i++) {
       var pos = circleSpotAt(i + shift);
-      var near = Math.max(0, Math.min(1, (pos.s - 0.9) / 0.7));
-      spots[i].style.width = (4.4 * (1 + 0.42 * near)).toFixed(2) + "rem";
-      spots[i].style.height = (4.4 * (1 - 0.12 * near)).toFixed(2) + "rem";
+      var tip = Math.abs(pos.x) > 240;
+      var front = pos.y > 60;
+      spots[i].style.width = (front ? 7.6 : tip ? 9.4 : 11.6).toFixed(2) + "rem";
+      spots[i].style.height = (front ? 4.8 : tip ? 9.4 : 11.6).toFixed(2) + "rem";
       spots[i].style.transform =
         "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + pos.y.toFixed(1) + "px) scale(" + pos.s.toFixed(3) + ")";
       spots[i].style.zIndex = String(Math.round(pos.s * 100));

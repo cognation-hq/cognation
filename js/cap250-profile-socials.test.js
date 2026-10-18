@@ -23,6 +23,8 @@ var css = src("css/styles.css");
 assert.ok(fs.existsSync(path.join(root, "assets/social/youtube.png")), "YouTube logo asset present");
 assert.ok(fs.existsSync(path.join(root, "assets/social/instagram.png")), "Instagram logo asset present");
 assert.ok(fs.existsSync(path.join(root, "assets/social/x.png")), "X logo asset present");
+var tiktokLogo = src("assets/social/tiktok.svg");
+assert.ok(/#25F4EE/.test(tiktokLogo) && /#fff/.test(tiktokLogo) && /#FE2C55/.test(tiktokLogo), "TikTok mark is the cyan, white, and pink note");
 
 assert.ok(/logo:\s*"assets\/social\/youtube\.png"/.test(tower), "SOCIAL_NETWORKS carries YouTube logo path");
 assert.ok(/classList\.add\("is-logo"\)|is-logo"/.test(tower), "renderSocialLinks paints logo buttons");

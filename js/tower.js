@@ -7338,16 +7338,11 @@
         var viewS = getCalendarViewState(root, "public");
         var slotIso = viewS.selected;
         if (!/^\d{2}:\d{2}$/.test(slotTime) || !/^\d{4}-\d{2}-\d{2}$/.test(slotIso)) return;
-        if (!isTowerOwner(TowerProfileStore.get())) {
-          viewS.schedulerOpen = true;
-          viewS.pickedTime = slotTime;
-          viewS.bookStatus = "";
-          ev.preventDefault();
-          refreshTowerCalendars(root);
-          return;
-        }
-        addScheduledHangout(slotIso, slotTime, false);
+        var fromVisitor = !isTowerOwner(TowerProfileStore.get());
+        var savedTime = addScheduledHangout(slotIso, slotTime, fromVisitor);
         viewS.schedulerOpen = true;
+        viewS.pickedTime = fromVisitor ? slotTime : "";
+        viewS.bookStatus = fromVisitor ? (savedTime ? "Booked." : "Couldn't save that time.") : "";
         ev.preventDefault();
         refreshTowerCalendars(root);
         return;

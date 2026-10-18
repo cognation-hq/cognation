@@ -14094,3 +14094,84 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   display: none !important;
   pointer-events: none !important;
 }
+
+/* Crisp lettering on the dark navy theme.
+   Bloom shadows (blur, no offset) rasterize glyphs, and the masthead
+   hover scales that bitmap. Muted ink was 66% and 48% white, so names,
+   "Mutual friends", and placeholders sank into the navy. */
+:root {
+  --cgn-ink: #ffffff;
+  --cgn-text: #ffffff;
+  --cgn-muted: rgba(247, 249, 255, 0.92);
+  --cgn-text-muted: rgba(247, 249, 255, 0.94);
+  --cgn-text-soft: rgba(247, 249, 255, 0.82);
+}
+
+.cognation-masthead-kicker,
+.cognation-masthead-home,
+.cognation-masthead-home:hover,
+.cognation-masthead-home:focus-visible,
+.login-gate--splash .login-gate-brand--splash .login-gate-brand-name,
+.login-gate-tagline,
+.login-gate-brand--splash .login-gate-tagline,
+.login-gate-eyebrow,
+.logo,
+.logo:hover,
+.tower-title,
+.commune-swipe-title,
+.pages-title,
+.paper-title,
+.circle-page-title,
+#panel-commune .commune-swipe-header .commune-swipe-title {
+  text-shadow: none !important;
+}
+
+.cognation-masthead-home,
+.cognation-masthead-home:hover,
+.cognation-masthead-home:focus-visible {
+  transform: none !important;
+}
+
+.cognation-masthead-kicker,
+.login-gate-brand--splash .login-gate-tagline,
+.login-gate-eyebrow {
+  color: #f4f7ff !important;
+  opacity: 1 !important;
+  font-size: 0.82rem !important;
+  letter-spacing: 0.12em !important;
+}
+
+.login-form .form-hint,
+.login-demo-hint,
+.login-demo-storage-hint,
+.login-profile-picker-desc,
+.login-gate-desc {
+  color: var(--cgn-muted) !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--cgn-text-soft) !important;
+  opacity: 1 !important;
+}
+
+#panel-tower :is(.tower-profile-name, .tower-mutual-friends, .tower-handle-badge, .tower-widget-title) {
+  color: #f7f9ff !important;
+}
+
+#panel-tower .tower-mutual-friends,
+#panel-tower .tower-handle-badge {
+  font-size: 0.9rem !important;
+}
+
+/* Float the brain artwork without scaling the bitmap. */
+@keyframes masthead-brain-float {
+  from { transform: translateY(-3px); }
+  to { transform: translateY(6px); }
+}
+@keyframes login-brain-float {
+  from { transform: translateY(-3px); }
+  to { transform: translateY(5px); }
+}

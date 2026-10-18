@@ -6116,8 +6116,8 @@
           else on = true;
         }
       }
-      /* Top friends and badges stay on the profile, under Edit profile. */
-      if (id === "friends" || id === "badges") on = true;
+      /* Badges and Top friends stay off the profile, including Edit profile. */
+      if (id === "friends" || id === "badges") on = false;
       /* The same Calendar sticker stays on the personal page and the professional page. */
       if (id === "calendar") on = true;
       var el = root.querySelector('[data-tower-widget="' + id + '"]');
@@ -6134,24 +6134,9 @@
     }
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (stage) {
-      stage.querySelectorAll("[data-tower-friend-pin]").forEach(function (pin) {
-        var showPins = resolveTopFriendIds(p).length > 0;
-        if (!showPins) {
-          pin.hidden = true;
-          pin.classList.add("is-widget-off");
-        } else {
-          pin.hidden = false;
-          pin.classList.remove("is-widget-off");
-        }
-      });
-      stage.querySelectorAll("[data-tower-badge-pin]").forEach(function (pin) {
-        if (!widgets.badges) {
-          pin.hidden = true;
-          pin.classList.add("is-widget-off");
-        } else {
-          pin.hidden = false;
-          pin.classList.remove("is-widget-off");
-        }
+      stage.querySelectorAll("[data-tower-friend-pin], [data-tower-badge-pin]").forEach(function (pin) {
+        pin.hidden = true;
+        pin.classList.add("is-widget-off");
       });
     }
   }
@@ -6177,6 +6162,7 @@
 
   function setPublicWidgetVisible(root, id, on) {
     if (!isTowerOwner(TowerProfileStore.get())) return;
+    if (id === "badges" || id === "friends") on = false;
     if (!id || id === "avatar" || id === "feed" || id === "messages") return;
     if (PUBLIC_WIDGET_IDS.indexOf(id) < 0) return;
     var p = TowerProfileStore.get();

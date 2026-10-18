@@ -14111,6 +14111,13 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 }
 #panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--friends.is-spawned { order: 1; }
 #panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--badges.is-spawned { order: 2; }
+/* Badges and Top friends stay off the profile. Do not put the buttons back. */
+#panel-tower [data-tower-widget="badges"],
+#panel-tower [data-tower-widget="friends"],
+#panel-tower [data-tower-friend-pin],
+#panel-tower [data-tower-badge-pin] {
+  display: none !important;
+}
 
 /* Message envelope: autospawns under mutual friends. A saved drag uses .is-placed. */
 #panel-tower .tower-sticker--envelope {

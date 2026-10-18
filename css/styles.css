@@ -14068,14 +14068,14 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.75rem;
+  height: 2.75rem;
   border-radius: 999px;
   border: 1px solid rgba(209, 241, 255, 0.45);
   background: rgba(16, 19, 48, 0.72);
   color: #f7f9ff;
   text-decoration: none;
-  font-size: 1.05rem;
+  font-size: 1.5rem;
   line-height: 1;
 }
 #panel-tower [data-tower-is-owner="true"] .tower-envelope-btn { cursor: grab; }

@@ -497,6 +497,7 @@ assert.ok(/a\.target = "_blank";\s*a\.rel = "noopener noreferrer";/.test(tower),
   /* tower-widgets PR: the X on each chip is gone; Backspace/Delete (and the touch
      Remove button) clear the selected chip's link instead. */
   assert.ok(!/rm\.setAttribute\("data-tower-social-remove"/.test(tower), "no X button on social chips");
+  assert.ok(/if \(net\.id !== "x"\)/.test(tower), "X chip keeps the logo and does not paint a letter that reads as delete");
   assert.ok(/var socialNet = socialNetIdFromWidget\(id\);\s*if \(socialNet\) \{\s*removeSocialWidget\(root, socialNet\);/.test(tower), "selected chip removable by key / Remove button");
   assert.ok(/tower-sticker--social-chip/.test(css), "chip CSS present");
   assert.ok(/migrateGroupedSocialLayout/.test(tower), "old grouped layout.social maps to first chip");

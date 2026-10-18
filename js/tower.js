@@ -5064,10 +5064,14 @@
           img.decoding = "async";
           img.loading = "lazy";
           a.appendChild(img);
-          var lab = document.createElement("span");
-          lab.className = "tower-social-chip-label";
-          lab.textContent = net.label;
-          a.appendChild(lab);
+          /* The X name is one letter beside the logo, so it reads as a delete
+             control. Other chips keep logo + name. */
+          if (net.id !== "x") {
+            var lab = document.createElement("span");
+            lab.className = "tower-social-chip-label";
+            lab.textContent = net.label;
+            a.appendChild(lab);
+          }
         } else {
           a.textContent = quiet ? net.label : net.short;
           a.classList.remove("is-logo");

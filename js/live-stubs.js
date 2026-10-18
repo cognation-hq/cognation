@@ -394,6 +394,140 @@
     });
   }
 
+  function profileOnScreen() {
+    var p = null;
+    try {
+      var store = window.CognationTowerProfileStore;
+      p = store && store.get ? store.get() : null;
+    } catch (e) {}
+    var nameNode = document.querySelector("[data-tower-profile-name]");
+    var name = (p && (p.displayName || p.handle)) || (nameNode && nameNode.textContent) || sessionUser();
+    var pro = !!(p && (p._profileKind === "professional" || p.kind === "professional"));
+    if (!pro) {
+      var proBtn = document.querySelector('[data-tower-profile-kind="professional"][aria-selected="true"]');
+      pro = !!proBtn;
+    }
+    return { name: String(name || "Live").trim() || "Live", kind: pro ? "Professional" : "Personal" };
+  }
+
+  function paintScreen(stage) {
+    var who = profileOnScreen();
+    var host = stage.querySelector("[data-live-host]");
+    var kind = stage.querySelector("[data-live-kind]");
+    var fill = stage.querySelector("[data-live-session-name]");
+    if (host) host.textContent = who.name;
+    if (kind) kind.textContent = who.kind + " · live";
+    if (fill) fill.textContent = who.name;
+    bindRoom(stage, who.name);
+  }
+
+  function connectMedia(box) {
+    if (!box || box.__cognationMediaAsked) return;
+    box.__cognationMediaAsked = true;
+    var devices = navigator.mediaDevices;
+    if (!devices || !devices.getUserMedia) return;
+    devices.getUserMedia({ video: true, audio: true }).then(function (stream) {
+      if (!box.__cognationMediaAsked) {
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        return;
+      }
+      box.__cognationStream = stream;
+      var video = document.createElement("video");
+      video.className = "tower-live-preview";
+      video.autoplay = true;
+      video.playsInline = true;
+      video.muted = true;
+      video.srcObject = stream;
+      box.appendChild(video);
+      if (video.play) video.play().catch(function () {});
+    }, function () { box.__cognationMediaAsked = false; });
+  }
+
+  function releaseMedia(stage) {
+    if (!stage) return;
+    stage.querySelectorAll("[data-live-session], [data-live-join-slot]").forEach(function (box) {
+      if (box.__cognationStream) box.__cognationStream.getTracks().forEach(function (t) { t.stop(); });
+      box.__cognationStream = null;
+      box.__cognationMediaAsked = false;
+      var video = box.querySelector("video");
+      if (video) video.remove();
+      if (box.hasAttribute("data-live-join-slot")) { box.removeAttribute("data-requested"); box.textContent = "Request"; }
+    });
+  }
+
+  var echoShared = false;
+  var SIGNAL_ID = "live-signal-share";
+
+  function setSignalShare(on) {
+    var store = window.CognationTowerStore;
+    if (!store || !store.load || !store.save) return;
+    var data = store.load() || { version: 1, posts: [] };
+    if (!Array.isArray(data.posts)) data.posts = [];
+    data.posts = data.posts.filter(function (p) { return !p || p.id !== SIGNAL_ID; });
+    if (on) {
+      var who = profileOnScreen();
+      data.posts.unshift({
+        id: SIGNAL_ID,
+        authorName: who.name,
+        body: who.name + " is live.",
+        createdAt: new Date().toISOString(),
+        attachments: [],
+        likes: 0
+      });
+    }
+    store.save(data);
+    document.dispatchEvent(new CustomEvent("cognation:tower-updated"));
+  }
+
+  function setEchoShare(on) {
+    echoShared = !!on;
+    var swipe = window.CognationCommuneSwipe;
+    if (swipe && swipe.rebuild) swipe.rebuild();
+  }
+
+  function echoCard() {
+    if (!echoShared) return null;
+    var who = profileOnScreen();
+    return {
+      id: "live-echo-share",
+      type: "live",
+      title: who.name + " is live",
+      body: "Anyone can join.",
+      liveJoin: true
+    };
+  }
+
+  function bindRoom(stage, name) {
+    if (!stage) return;
+    stage.__cognationRoomName = name;
+    if (stage.__cognationRoomBound) return;
+    stage.__cognationRoomBound = true;
+    stage.addEventListener("click", function (ev) {
+      var node = ev.target;
+      if (node && node.nodeType !== 1) node = node.parentElement;
+      var slot = node && node.closest && node.closest("[data-live-join-slot]");
+      if (!slot || slot.getAttribute("data-requested") === "1") return;
+      if (stage.querySelectorAll('[data-live-join-slot][data-requested="1"]').length >= 9) return;
+      slot.setAttribute("data-requested", "1");
+      slot.textContent = stage.__cognationRoomName || "Request";
+      connectMedia(slot);
+    });
+    var form = stage.querySelector("[data-live-room-chat-form]");
+    if (!form) return;
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var input = form.querySelector("[data-live-room-chat-input]");
+      var text = input && String(input.value || "").trim();
+      if (!text) return;
+      var log = stage.querySelector("[data-live-chat-log]");
+      var line = document.createElement("p");
+      line.className = "tower-live-chat-line";
+      line.textContent = (stage.__cognationRoomName || "Viewer") + ": " + text.slice(0, 280);
+      if (log) log.appendChild(line);
+      input.value = "";
+    });
+  }
+
   function goOffline() {
     var live = getLive();
     if (live) {
@@ -407,6 +541,18 @@
       stage.removeAttribute("data-live-active");
       refresh(stage);
     }
+    if (root.classList) root.classList.remove("is-live-open");
+    releaseMedia(stage);
+    var signalBtn = stage && stage.querySelector("[data-live-share-signal]");
+    var echoBtn = stage && stage.querySelector("[data-live-share-echo]");
+    if (signalBtn && signalBtn.getAttribute("aria-pressed") === "true") {
+      signalBtn.setAttribute("aria-pressed", "false");
+      setSignalShare(false);
+    }
+    if (echoBtn && echoBtn.getAttribute("aria-pressed") === "true") {
+      echoBtn.setAttribute("aria-pressed", "false");
+      setEchoShare(false);
+    }
     syncGoLiveButtons();
   }
 
@@ -414,29 +560,44 @@
     var root = document.querySelector("[data-tower-app]") || document;
     var stage = root.querySelector("[data-live-stage]");
     if (!stage) return;
+    paintScreen(stage);
     stage.hidden = false;
+    if (root.classList) root.classList.add("is-live-open");
     initStage(stage);
-    var live = ensureLive(stage);
+    ensureLive(stage);
     refresh(stage);
     syncGoLiveButtons();
-    if (!live) return;
-    try {
-      stage.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    } catch (e) {}
   }
 
   function init() {
     document.addEventListener("click", function (ev) {
-      var btn = ev.target && ev.target.closest("[data-go-live]");
+      var node = ev.target;
+      if (node && node.nodeType !== 1) node = node.parentElement;
+      var back = node && node.closest && node.closest("[data-live-back]");
+      if (back) {
+        ev.preventDefault();
+        goOffline();
+        return;
+      }
+      var share = node && node.closest && node.closest("[data-live-share-signal], [data-live-share-echo]");
+      if (share) {
+        ev.preventDefault();
+        var on = share.getAttribute("aria-pressed") !== "true";
+        share.setAttribute("aria-pressed", on ? "true" : "false");
+        if (share.hasAttribute("data-live-share-signal")) setSignalShare(on);
+        else setEchoShare(on);
+        return;
+      }
+      var btn = node && node.closest && node.closest("[data-go-live]");
       if (!btn) return;
       ev.preventDefault();
       ev.stopPropagation();
       var app = btn.closest && btn.closest("[data-tower-app]");
       if (btn.hidden || (app && app.getAttribute("data-tower-is-owner") !== "true")) return;
-      var live = getLive();
-      if (live && live.active) goOffline();
-      else openLive();
-    });
+      openLive();
+      var session = document.querySelector("[data-tower-app] [data-live-session]");
+      connectMedia(session);
+    }, true);
     syncGoLiveButtons();
     var root = document.querySelector("[data-tower-app]") || document;
     var stage = root.querySelector("[data-live-stage]");
@@ -453,5 +614,6 @@
     getSession: getLive,
     memberAge: memberAge,
     open: openLive,
+    echoCard: echoCard,
   };
 })();

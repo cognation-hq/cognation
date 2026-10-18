@@ -11520,9 +11520,9 @@
       var end = Math.min(steps, start + chunk);
       var i;
       for (i = start; i <= end; i++) {
-        var n = Math.sin(i * 0.22 + seed);
-        if (i === 0 || i === steps) n = 0;
         var ang = (i / steps) * Math.PI * 2;
+        var n = Math.sin(i * 0.22 + seed) * (1 + 0.85 * Math.min(0, Math.sin(ang)));
+        if (i === 0 || i === steps) n = 0;
         var p = circleProjectRadius((i / steps) * 360, radius);
         var ox = Math.cos(ang), oy = Math.sin(ang) * Math.cos(CIRCLE_TILT), olen = Math.sqrt(ox * ox + oy * oy) || 1;
         cmds.push((i === start ? "M" : "L") + (p.x + n * wobble * ox / olen).toFixed(1) + " " + (p.y + n * wobble * oy / olen).toFixed(1));
@@ -11592,7 +11592,7 @@
       }
       return filter;
     }
-    defs.appendChild(glowFilter("pulse-bolt-glow", 4.5, 1.15, true));
+    defs.appendChild(glowFilter("pulse-bolt-glow", 2.2, 0.55, true));
     defs.appendChild(glowFilter("pulse-bolt-core", 3.2, 1.1, false));
     svg.appendChild(defs);
     function addBolt(parent, d, color, width, opacity) {
@@ -11615,9 +11615,9 @@
       { color: "#3ecbff", opacity: 0.85 },
       { color: "#ff4ad8", opacity: 0.8 }
     ];
-    var strands = circleBoltSegments(CIRCLE_RING_R, 14, 0.2, 1.45).concat(circleBoltSegments(CIRCLE_RING_R, 14, 1.55, 1.45));
+    var strands = circleBoltSegments(CIRCLE_RING_R, 15, 0.15, 1.05).concat(circleBoltSegments(CIRCLE_RING_R, 15, 0.6, 1.05), circleBoltSegments(CIRCLE_RING_R, 14, 1.05, 1.05), circleBoltSegments(CIRCLE_RING_R, 14, 1.55, 1.05));
     strands.forEach(function (seg, index) {
-      addBolt(halo, seg.d, colors[index < 54 ? 1 : 0].color, seg.width, 0.95);
+      addBolt(halo, seg.d, colors[Math.floor(index / 54) % 2 ? 0 : 1].color, seg.width, 0.92);
     });
     addBolt(halo, strands[0].d, "#ff4ad8", 2, 0.55);
     addBolt(core, strands[1].d, "#e9f7ff", 1.2, 0.55);

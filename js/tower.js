@@ -7862,7 +7862,7 @@
     widgets.forEach(function (el) {
       var id = el.getAttribute("data-tower-widget");
       /* Calendar stays inside Edit profile, not loose on the page. */
-      if (id === "feed" || id === "messages" || id === "calendar") return;
+      if (id === "feed" || id === "messages" || id === "calendar" || id === "identity") return;
       if (el.parentNode === stage) return;
       stage.appendChild(el);
     });

@@ -13959,16 +13959,34 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 /* Tower profile column: picture, add friends, mutual friends, Edit profile, top friends, badges.
    Go live, the calendar, and events open from Edit profile. */
 #panel-tower .tower-friend-search {
+  width: min(28rem, 100%);
   max-width: 28rem;
   margin: 0 auto 0.75rem;
 }
+#panel-tower .tower-profile-kind-toggle { margin-left: auto; margin-right: auto; }
 #panel-tower .tower-under-photo {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.2rem;
   margin-top: 0.35rem;
+  order: 4;
 }
+#panel-tower .tower-avatar-stack > .tower-sticker--identity {
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+  order: 2;
+  width: auto;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+#panel-tower .tower-avatar-stack > .tower-profile-actions { order: 3; }
 #panel-tower .tower-mutual-friends {
   margin: 0;
   font-size: 0.78rem;
@@ -13976,7 +13994,8 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 }
 #panel-tower [data-tower-is-owner="false"] [data-tower-add-friends] { display: none !important; }
 #panel-tower [data-tower-private-calendar],
-#panel-tower [data-tower-private-messages] { display: none !important; }
+#panel-tower [data-tower-private-messages],
+#panel-tower [data-tower-public-look] { display: none !important; }
 #panel-tower .tower-edit-entries {
   display: flex;
   flex-direction: column;
@@ -13997,6 +14016,7 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   justify-content: center;
 }
 #panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker.is-spawned { order: 4; }
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--avatar.is-spawned { order: 0; }
 #panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] {
   order: 0;
   flex-direction: column;

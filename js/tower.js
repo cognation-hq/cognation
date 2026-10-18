@@ -12389,7 +12389,7 @@
     var hit = ev.target && ev.target.closest && ev.target.closest("[data-tower-add-friends], [data-tower-open-events]");
     if (!hit) return;
     if (hit.hasAttribute("data-tower-add-friends")) {
-      var search = document.getElementById("tower-people-search");
+      var search = document.getElementById("people-search-input");
       if (search) search.focus();
       return;
     }

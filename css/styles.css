@@ -14029,12 +14029,6 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 
 /* Tower profile column: picture, add friends, mutual friends, Edit profile, top friends, badges.
    Go live, the calendar, and events open from Edit profile. */
-#panel-tower .tower-friend-search {
-  width: min(28rem, 100%);
-  max-width: 28rem;
-  margin: 0 auto 0.75rem;
-}
-#panel-tower .tower-profile-kind-toggle { margin-left: auto; margin-right: auto; }
 #panel-tower .tower-under-photo {
   display: flex;
   flex-direction: column;
@@ -14164,4 +14158,68 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 #panel-tower .tower-sticker-handle[hidden] {
   display: none !important;
   pointer-events: none !important;
+}
+
+/* Tower Personal | Professional matches SIGNAL News | Feed (type, color, place, size). */
+#panel-tower .tower-profile-kind-toggle {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 0.85rem;
+  padding: 0.25rem;
+  background: rgba(16, 19, 48, 0.32);
+  border: 1px solid var(--cgn-border, rgba(185, 238, 255, 0.22));
+  border-radius: 999px;
+  box-shadow: none;
+}
+#panel-tower .tower-kind-btn {
+  appearance: none;
+  margin: 0;
+  border: 1px solid transparent !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  color: var(--cgn-text-muted, rgba(247, 249, 255, 0.7)) !important;
+  font-family: "Oswald", system-ui, sans-serif !important;
+  font-weight: 800 !important;
+  font-size: clamp(0.72rem, 1.6vw, 0.92rem) !important;
+  letter-spacing: 0.06em !important;
+  line-height: 1.1;
+  text-transform: uppercase;
+  text-shadow: none;
+  padding: 0.4rem 0.95rem !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+#panel-tower .tower-kind-btn:hover,
+#panel-tower .tower-kind-btn:focus-visible {
+  color: var(--cgn-text, #f7f9ff) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  outline: none;
+}
+#panel-tower .tower-kind-btn.is-selected,
+#panel-tower .tower-kind-btn[aria-selected="true"] {
+  color: #fff !important;
+  text-shadow: 0 1px 3px rgba(90, 50, 90, 0.4) !important;
+  border-color: transparent !important;
+  background:
+    linear-gradient(
+      105deg,
+      rgba(232, 214, 245, 0.98) 0%,
+      rgba(244, 220, 238, 0.97) 42%,
+      rgba(255, 220, 232, 0.96) 100%
+    ) !important;
+  box-shadow: none !important;
+}
+@media (max-width: 640px) {
+  #panel-tower .tower-kind-btn {
+    font-size: 0.65rem !important;
+    padding: 0.35rem 0.75rem !important;
+  }
+  #panel-tower .tower-profile-kind-toggle {
+    gap: 0.22rem;
+    padding: 0.25rem;
+  }
 }

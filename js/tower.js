@@ -11665,44 +11665,32 @@
     var i;
     for (i = 0; i < steps; i++) {
       var turn = i / steps;
-      var wobble = Math.sin(i * 0.09 + 0.2);
-      var p = circleProjectRadius(turn * 360, CIRCLE_RING_R + wobble * 8);
+      var ang = turn * Math.PI * 2;
+      var n = Math.sin(ang * 4 + 0.4) * 0.72 + Math.sin(ang * 7 + 0.68) * 0.28;
+      var p = circleProjectRadius(turn * 360, CIRCLE_RING_R);
+      var ox = Math.cos(ang), oy = Math.sin(ang) * Math.cos(CIRCLE_TILT), olen = Math.sqrt(ox * ox + oy * oy) || 1;
       var depth = p.s / CIRCLE_SCALE;
       var flicker = 0.8 + 0.2 * Math.sin(i * 1.35);
-      var side = Math.abs(Math.cos(turn * Math.PI * 2));
-      glowAt(p.x, p.y, (10 + 42 * side) * depth, circleGlowColor(turn), 0.06 * flicker * (1.4 + 6 * side));
+      var side = Math.abs(Math.cos(ang));
+      glowAt(p.x + n * 14 * ox / olen, p.y + n * 14 * oy / olen, (18 + 36 * side) * depth, circleGlowColor(turn), 0.06 * flicker * (1.4 + 6 * side));
     }
     ring.appendChild(canvas);
     paintCircleBolt(ring);
   }
 
-  /* PULSE lightning bolt restored from 9d88e68 (last bolt look, Oct 1).
-     ead52bb swapped it for a 0.06-alpha blurred canvas glow that reads as
-     nothing on the #61 indigo background, so the bolt looked missing. */
+  /* One tilted oval. A short wave rides the ring so the light stays a single ribbon. */
   function circleBoltSegments(radius, wobble, seed, baseWidth) {
-    var steps = 216;
-    var chunk = 4;
-    var segs = [];
-    var start;
-    for (start = 0; start < steps; start += chunk) {
-      var cmds = [];
-      var depthSum = 0;
-      var count = 0;
-      var end = Math.min(steps, start + chunk);
-      var i;
-      for (i = start; i <= end; i++) {
-        var ang = (i / steps) * Math.PI * 2;
-        var n = Math.sin(i * 0.17 + seed) * (1 + 0.75 * Math.min(0, Math.sin(ang)));
-        if (i === 0 || i === steps) n = 0;
-        var p = circleProjectRadius((i / steps) * 360, radius);
-        var ox = Math.cos(ang), oy = Math.sin(ang) * Math.cos(CIRCLE_TILT), olen = Math.sqrt(ox * ox + oy * oy) || 1;
-        cmds.push((i === start ? "M" : "L") + (p.x + n * wobble * ox / olen).toFixed(1) + " " + (p.y + n * wobble * oy / olen).toFixed(1));
-        depthSum += p.s / CIRCLE_SCALE;
-        count++;
-      }
-      segs.push({ d: cmds.join(" "), width: Math.max(0.7, baseWidth * (depthSum / count)) });
+    var steps = 140;
+    var cmds = [];
+    var i;
+    for (i = 0; i <= steps; i++) {
+      var ang = (i / steps) * Math.PI * 2;
+      var n = Math.sin(ang * 4 + seed) * 0.72 + Math.sin(ang * 7 + seed * 1.7) * 0.28;
+      var p = circleProjectRadius((i / steps) * 360, radius);
+      var ox = Math.cos(ang), oy = Math.sin(ang) * Math.cos(CIRCLE_TILT), olen = Math.sqrt(ox * ox + oy * oy) || 1;
+      cmds.push((i ? "L" : "M") + (p.x + n * wobble * ox / olen).toFixed(1) + " " + (p.y + n * wobble * oy / olen).toFixed(1));
     }
-    return segs;
+    return [{ d: cmds.join(" "), width: baseWidth }];
   }
 
   function circleBranchPath(angleDeg, radius, length, seed) {
@@ -11763,8 +11751,8 @@
       }
       return filter;
     }
-    defs.appendChild(glowFilter("pulse-bolt-glow", 9, 1.6, true));
-    defs.appendChild(glowFilter("pulse-bolt-core", 3.2, 1.1, false));
+    defs.appendChild(glowFilter("pulse-bolt-glow", 18, 7, false));
+    defs.appendChild(glowFilter("pulse-bolt-core", 3.5, 1.2, false));
     svg.appendChild(defs);
     function addBolt(parent, d, color, width, opacity) {
       var path = document.createElementNS(ns, "path");
@@ -11786,12 +11774,11 @@
       { color: "#3ecbff", opacity: 0.85 },
       { color: "#ff4ad8", opacity: 0.8 }
     ];
-    var strands = circleBoltSegments(CIRCLE_RING_R, 18, 0.1, 1.05).concat(circleBoltSegments(CIRCLE_RING_R, 16, 0.75, 1.05), circleBoltSegments(CIRCLE_RING_R, 18, 1.4, 1.05), circleBoltSegments(CIRCLE_RING_R, 15, 2.05, 1.05), circleBoltSegments(CIRCLE_RING_R, 17, 2.7, 1.05), circleBoltSegments(CIRCLE_RING_R, 14, 3.35, 1.05));
-    strands.forEach(function (seg, index) {
-      addBolt(halo, seg.d, colors[Math.floor(index / 54) % 2 ? 0 : 1].color, seg.width, 0.88);
-    });
-    addBolt(halo, strands[0].d, "#ff4ad8", 2, 0.55);
-    addBolt(core, strands[1].d, "#e9f7ff", 1.2, 0.55);
+    var wave = circleBoltSegments(CIRCLE_RING_R, 14, 0.4, 12)[0];
+    addBolt(halo, wave.d, colors[0].color, 36, 0.42);
+    addBolt(halo, wave.d, colors[1].color, 18, 0.7);
+    addBolt(halo, wave.d, colors[2].color, 10, 0.5);
+    addBolt(core, wave.d, "#e9f7ff", 4.5, 0.55);
     var forks = [];
     forks.forEach(function (angle, index) {
       var outward = index % 2 === 0;
@@ -12138,12 +12125,13 @@
     var i;
     for (i = 0; i < spots.length; i++) {
       var pos = circleSpotAt(i + shift);
-      var tip = Math.abs(pos.x) > 240;
-      var front = pos.y > 60;
-      spots[i].style.width = (front ? 7.6 : tip ? 9.4 : 11.6).toFixed(2) + "rem";
-      spots[i].style.height = (front ? 4.8 : tip ? 9.4 : 11.6).toFixed(2) + "rem";
+      var depth = pos.s / CIRCLE_SCALE;
+      var scale = 0.8 + Math.max(0, depth - 0.68) * 0.4;
+      var size = 5.6;
+      spots[i].style.width = size.toFixed(2) + "rem";
+      spots[i].style.height = size.toFixed(2) + "rem";
       spots[i].style.transform =
-        "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + pos.y.toFixed(1) + "px) scale(" + pos.s.toFixed(3) + ")";
+        "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + pos.y.toFixed(1) + "px) scale(" + scale.toFixed(3) + ")";
       spots[i].style.zIndex = String(Math.round(pos.s * 100));
     }
   }

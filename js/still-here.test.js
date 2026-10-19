@@ -30,6 +30,8 @@ assert.ok(start.slice(0, firstReturn).indexOf("paintCircleRingShell(layer") > 0,
 
 /* Halo circles: in front, visual only */
 assert.ok(/CIRCLE_SPOTS\s*=\s*\[/.test(tower) && /\.circle-spot\.is-empty/.test(css), "halo circles");
+assert.ok(/\.circle-spot\s*\{[^}]*border-radius:\s*50%/.test(css), "halo frames are circles");
+assert.ok(/var size = 5\.6;[\s\S]{0,160}style\.height = size/.test(tower), "frames stay round; front scale is larger");
 assert.ok(/\.circle-ring\s*\{[^}]*z-index:\s*2/.test(css), "halo in front");
 assert.ok(/\.pulse-fall-stack\s*\{[^}]*z-index:\s*1/.test(css), "friends behind");
 
@@ -96,7 +98,8 @@ assert.ok(ringNode.children.some(function (c) { return c.attrs["data-circle-ligh
 var bolt = ringNode.children.filter(function (c) { return c.attrs["data-circle-bolt"] !== undefined; })[0];
 assert.ok(bolt, "lightning bolt SVG attached");
 var strokes = draw.paths.filter(function (pth) { return parseFloat(pth.attrs.opacity) >= 0.5 && parseFloat(pth.attrs["stroke-width"]) > 0.5; });
-assert.ok(strokes.length >= 50, "bolt has visible strokes (" + strokes.length + ")");
+assert.ok(strokes.length >= 3 && strokes.length <= 8, "one halo glow (" + strokes.length + ")");
+assert.ok(strokes.every(function (pth) { return (pth.attrs.d.match(/L/g) || []).length > 40; }), "glow is one oval, not chopped loops");
 ["#b44bff", "#3ecbff", "#ff4ad8", "#e9f7ff"].forEach(function (c) {
   assert.ok(draw.paths.some(function (pth) { return pth.attrs.stroke === c; }), "old bolt color " + c);
 });

@@ -12872,6 +12872,17 @@ a.site-switch-side:focus-visible {
 .login-age-block { text-align: center; padding: 1.5rem 0.5rem; }
 .login-age-block[hidden] { display: none; }
 .login-age-block p { font-size: 1.1rem; margin: 0; }
+.login-area-block {
+  margin: 0.75rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: 0.7rem;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  color: #e8fcff;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.login-area-block[hidden] { display: none; }
 
 /* Default spawn spots (tower-default-layout LOOK lock): CSS grid when nothing
    is owner-dragged. Absolute free x/y only after a user drag. Gap 24px. */

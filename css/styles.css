@@ -9027,6 +9027,12 @@ body.tower-messages-page [data-tower-follow-row],
   object-fit: cover;
 }
 
+.commune-market-photos { display: flex; gap: .4rem; overflow: hidden; }
+.commune-market-photo {
+  width: 7.5rem; height: 7.5rem; object-fit: cover; border-radius: 12px;
+  border: 2px solid var(--color-border); background: var(--color-surface-2);
+}
+
 .commune-dating-rate {
   margin-top: 0.75rem;
   padding: 0.75rem;

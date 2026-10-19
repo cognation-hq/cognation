@@ -325,7 +325,7 @@
         body: {
           author_profile_id: profileId,
           body: body.slice(0, 2000),
-          visibility: "friends",
+          visibility: (window.CognationEchoGroups && window.CognationEchoGroups.isGroupPost(body)) ? "public" : "friends",
           attachments: Array.isArray(fields && fields.attachments)
             ? fields.attachments.map(function (attachment) {
                 var item = {

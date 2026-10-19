@@ -75,5 +75,4 @@ assert.strictEqual(young.getItem("cognation.commune.market.bids.v1"), null);
 var src = fs.readFileSync(path.join(__dirname, "commune-swipe.js"), "utf8");
 assert.ok(src.indexOf("data-market-bid") !== -1);
 assert.ok(!/Apple Pay|apple-pay|ApplePay/.test(src));
-assert.ok(!/TYPE\.GROUP|#group/.test(src));
 console.log("echo-marketplace.test.js ok");

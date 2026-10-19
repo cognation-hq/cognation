@@ -50,12 +50,13 @@
     DATING: "dating",
     CONTENT: "content",
     MARKET: "marketplace",
+    GROUP: "group",
   };
 
   /* Alexa lock 2026-10-02: Personal featured mix is 1:1 across five families.
      Marketplace rides the content slot. It is not a sixth family. */
   var FEATURED_ORDER = [TYPE.CLASSROOM, TYPE.AD, TYPE.CHAT, TYPE.DATING, TYPE.CONTENT];
-  var CONTENT_SUBTYPES = [TYPE.MARKET, TYPE.FACT, TYPE.WELLNESS, TYPE.FRIEND, TYPE.EVENT, TYPE.KNOW, TYPE.CONTENT];
+  var CONTENT_SUBTYPES = [TYPE.MARKET, TYPE.GROUP, TYPE.FACT, TYPE.WELLNESS, TYPE.FRIEND, TYPE.EVENT, TYPE.KNOW, TYPE.CONTENT];
   var AD_MAX_MS = 3000;
   var REPEATABLE = {};
   /* Featured families stay repeatable so a long Personal deck holds true 1:1 rotation. */
@@ -326,7 +327,10 @@
           }
           var card = takeFromList(sub, list, null);
           if (!card) continue;
-          cursors._contentRot = (CONTENT_SUBTYPES.indexOf(sub) + 1) % CONTENT_SUBTYPES.length;
+          /* Each #group post is one card; keep this slot until those posts are placed. */
+          if (!(sub === TYPE.GROUP && (cursors[sub] || 0) < list.length)) {
+            cursors._contentRot = (CONTENT_SUBTYPES.indexOf(sub) + 1) % CONTENT_SUBTYPES.length;
+          }
           return card;
         }
         return null;
@@ -1492,6 +1496,12 @@
     return SITE_ROOMS.filter(roomVisible).map(roomCard);
   }
 
+  function groupLane() {
+    var api = window.CognationEchoGroups;
+    var list = api && typeof api.cards === "function" ? api.cards() : [];
+    return Array.isArray(list) ? list : [];
+  }
+
   function buildLanes() {
     var lanes = {};
     lanes[TYPE.CLASSROOM] = visibleClassroomSessions();
@@ -1504,6 +1514,7 @@
     lanes[TYPE.KNOW] = peopleYouMayKnow();
     lanes[TYPE.CONTENT] = towerLiveContentCards();
     lanes[TYPE.MARKET] = marketplaceCards();
+    lanes[TYPE.GROUP] = groupLane();
     Object.keys(lanes).forEach(function (type) {
       lanes[type] = omitPassed((lanes[type] || []).filter(ageSafeFeaturedCard).filter(function (card) {
         /* Repeated lefts fade a topic out of the deck (friend shares handled separately). */
@@ -1720,6 +1731,7 @@
       case TYPE.DATING: return "Dating";
       case TYPE.CONTENT: return "Content";
       case TYPE.MARKET: return "Marketplace";
+      case TYPE.GROUP: return "Group";
       default: return "Echo";
     }
   }
@@ -2074,6 +2086,8 @@
       el.setAttribute("data-commune-opens-profile", "");
       wireClassroomCardClick(el, card, function () { openProfessionalPage(card); });
     }
+    var groups = window.CognationEchoGroups;
+    if (groups && typeof groups.bind === "function") groups.bind(el, card);
     if (card.type === TYPE.AD && card.handle) {
       el.addEventListener("click", function (ev) {
         if (ev.target.closest("button, a, input, video, iframe")) return;
@@ -3647,6 +3661,7 @@
       rebuildDeck();
     });
     document.addEventListener("cognation:tower-updated", function () { rebuildDeck(); });
+    document.addEventListener("cognation:echo-group-notice", function () { renderNotices(); });
     refreshSeedGates();
   }
 

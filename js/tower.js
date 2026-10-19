@@ -2695,6 +2695,7 @@
           ? window.CognationAutoRate.rate(body, (fields && fields.attachments) || []).rating
           : "NR",
         likes: 0,
+        visibility: (window.CognationEchoGroups && window.CognationEchoGroups.isGroupPost(body)) ? "public" : "friends",
         handle: (window.CognationTowerProfileStore
           ? normalizeHandle(window.CognationTowerProfileStore.get().handle || "")
           : ""),

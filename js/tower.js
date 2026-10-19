@@ -3288,15 +3288,8 @@
     if (!root || root.__cognationSideBound) return;
     root.__cognationSideBound = true;
     var owner = isTowerOwner(TowerProfileStore.get());
-    var initial = "public";
-    if (owner) {
-      if (hashRequestsPublicSide()) initial = "public";
-      else initial = readStoredTowerSide() || "public";
-    } else {
-      initial = "public";
-    }
-    applyTowerSide(root, initial, { persist: false });
-    if (owner) writeStoredTowerSide(initial);
+    applyTowerSide(root, "public", { persist: false });
+    if (owner) writeStoredTowerSide("public");
 
     root.querySelectorAll("[data-tower-side-btn]").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -3320,10 +3313,7 @@
     });
 
     document.addEventListener("cognation:session-started", function () {
-      var o = isTowerOwner(TowerProfileStore.get());
-      var side = o ? readStoredTowerSide() || "private" : "public";
-      if (hashRequestsPublicSide()) side = "public";
-      applyTowerSide(root, side);
+      applyTowerSide(root, "public");
       syncPublicUrlFields(root, TowerProfileStore.get());
     });
   }

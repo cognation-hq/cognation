@@ -2596,8 +2596,8 @@
         return String(b.createdAt).localeCompare(String(a.createdAt));
       });
     },
-    /* NEWS reads this: most reacted personal and professional Feed posts (signals). */
-    newsList: function () {
+    /* Hidden desk ranks this plate: every personal and professional Feed post. */
+    feedPlate: function () {
       var personal = this.list().map(function (post) {
         var copy = {};
         Object.keys(post || {}).forEach(function (key) { copy[key] = post[key]; });
@@ -2606,8 +2606,11 @@
           : "personal";
         return copy;
       });
-      var professional = newsProfessionalPosts();
-      return personal.concat(professional).map(function (post) {
+      return personal.concat(newsProfessionalPosts());
+    },
+    /* NEWS reads this: most reacted personal and professional Feed posts (signals). */
+    newsList: function () {
+      return this.feedPlate().map(function (post) {
         post.rating = postRating(post); /* rating carries unchanged into SIGNAL and ECHO */
         return post;
       }).filter(function (post) {

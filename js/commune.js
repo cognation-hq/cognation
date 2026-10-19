@@ -1151,7 +1151,11 @@
       if (!window.CognationTowerStore || typeof window.CognationTowerStore.newsList !== "function") {
         return [];
       }
-      var list = window.CognationTowerStore.newsList();
+      /* Cognation Times places the top of the hidden like-ranked desk. */
+      var rate = window.CognationFeedRating;
+      var list = rate && typeof rate.forPaper === "function"
+        ? rate.forPaper()
+        : window.CognationTowerStore.newsList();
       return list.map(function (p) {
         var author = p.authorName || "Neighbor";
         /* Author link by profile id (handle only when there is no id), never by

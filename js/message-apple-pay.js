@@ -106,7 +106,7 @@
     var row = document.createElement("div");
     row.className = "message-apple-pay";
     row.setAttribute("data-apple-pay-row", "");
-    row.innerHTML = '<label>Amount <input data-apple-pay-amount inputmode="decimal" maxlength="7" placeholder="0.00" autocomplete="off" aria-label="Amount in dollars"></label><button type="button" class="btn" data-apple-pay aria-label="Pay the other person in this thread with Apple Pay">Apple Pay</button><p data-apple-pay-note role="status"></p>';
+    row.innerHTML = '<label>Amount <input data-apple-pay-amount inputmode="decimal" maxlength="7" placeholder="0.00" autocomplete="off" aria-label="Amount in dollars"></label><button type="button" data-apple-pay aria-label="Pay the other person in this thread with Apple Pay">Apple Pay</button><p data-apple-pay-note role="status"></p>';
     form.insertAdjacentElement("afterend", row);
     var note = row.querySelector("[data-apple-pay-note]");
     if (!ready()) note.textContent = NOT_READY;

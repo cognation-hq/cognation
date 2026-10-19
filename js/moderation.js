@@ -121,6 +121,10 @@
     saveHidden(map);
   }
 
+  function hideContent(postId) {
+    hidePostForReporter(postId);
+  }
+
   function isPostHidden(postId) {
     if (!postId) return false;
     var map = loadHidden();
@@ -294,6 +298,7 @@
     enqueue: enqueue,
     listQueue: listQueue,
     isPostHidden: isPostHidden,
+    hideContent: hideContent,
     exportQueueJson: exportQueueJson,
     exportNewsModerationFile: exportNewsModerationFile,
     downloadQueueSnapshot: downloadQueueSnapshot,

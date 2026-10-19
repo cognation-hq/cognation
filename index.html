@@ -318,7 +318,6 @@
                 <span class="site-switch-sep" aria-hidden="true">|</span>
                 <a class="site-switch-side" href="https://waymakers.pages.dev/" data-site-switch-waymakers>WAYMAKERS</a>
               </div>
-              <a class="app-logout-btn" href="/blocked.html" style="text-decoration:none;display:inline-flex;align-items:center">Blocked</a>
               <button type="button" class="app-logout-btn" data-cognation-logout>Log out</button>
             </div>
           </div>
@@ -616,6 +615,7 @@
                           </div>
                         </details>
                         <button type="button" class="btn btn-secondary" data-tower-open-events>Events</button>
+                        <a class="btn btn-secondary" href="/blocked.html">Block list</a>
                       </div>
                         </div>
                       </div>
@@ -750,6 +750,9 @@
             </div><!-- /#panel-tower -->
 
             <div role="tabpanel" id="panel-signal" class="signal-tab-panel" aria-labelledby="tab-signal" hidden>
+              <header class="tower-header">
+                <h3 class="tower-title">SIGNAL</h3>
+              </header>
               <!-- Second row under SIGNAL: News | Feed pipe-switch (same chrome as COGNATION|WAYMAKERS / Personal|Professional) -->
               <div class="signal-subtabs site-switch" data-signal-subtabs role="tablist" aria-label="SIGNAL views">
                 <button type="button" class="signal-subtab site-switch-side is-selected" role="tab" id="signal-sub-news" data-signal-pane-btn="news" aria-controls="signal-pane-news" aria-selected="true" tabindex="0">News</button>

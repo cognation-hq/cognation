@@ -278,7 +278,10 @@
       host.innerHTML = '<p class="news-comment-signin">Sign in to see and post comments.</p>';
       return host;
     }
-    var comments = listForStory(storyId);
+    var comments = listForStory(storyId).filter(function (c) {
+      var mod = window.CognationModeration;
+      return !(mod && mod.isPostHidden && mod.isPostHidden(c.id));
+    });
     var under13 = age() < 13;
     /* ⋯ menu with Report: signed-in shared comments only (never signed out). */
     var canReport = remoteOn() && !!signed;
@@ -287,9 +290,7 @@
       var option = c.reportedByMe
         ? '<button type="button" class="news-report-option" disabled data-news-comment-reported>Reported</button>'
         : '<button type="button" class="news-report-option" data-news-comment-report data-comment-id="' + esc(c.id) + '">Report</button>';
-      var blockBtn = c.authorUserId
-        ? '<button type="button" class="news-report-option" data-news-comment-block data-author-user-id="' + esc(c.authorUserId) + '">Block</button>'
-        : "";
+      var blockBtn = '<button type="button" class="news-report-option" data-news-comment-block data-comment-id="' + esc(c.id) + '">Block</button>';
       return '<button type="button" class="news-comment-more" data-news-comment-more aria-haspopup="true" aria-expanded="false" aria-label="More for this comment">⋯</button>' +
         '<div class="news-report-menu" data-news-comment-menu hidden>' + option + blockBtn + "</div>";
     }
@@ -421,15 +422,14 @@
           return;
         }
         var blockBtn = ev.target && ev.target.closest("[data-news-comment-block]");
-      if (blockBtn) {
+      if (blockBtn && host.contains(blockBtn)) {
         ev.preventDefault();
-        var uid = blockBtn.getAttribute("data-author-user-id");
-        if (uid && window.CognationBlock) {
-          blockBtn.disabled = true;
-          window.CognationBlock.blockUser(uid).then(function () {
-            blockBtn.textContent = "Blocked";
-          }, function () { blockBtn.disabled = false; });
+        var cid = blockBtn.getAttribute("data-comment-id");
+        if (cid && window.CognationModeration && window.CognationModeration.hideContent) {
+          window.CognationModeration.hideContent(cid);
         }
+        var item = blockBtn.closest(".news-comment-item");
+        if (item) item.hidden = true;
         return;
       }
       var reportBtn = ev.target && ev.target.closest("[data-news-comment-report]");

@@ -2299,8 +2299,8 @@
         escapeHtml(uid) +
         '">Report</button>';
     var blockBtn =
-      '<button type="button" class="news-report-option" data-commune-room-block data-author-user-id="' +
-      escapeHtml(uid) +
+      '<button type="button" class="news-report-option" data-commune-room-block data-message-id="' +
+      escapeHtml(mid) +
       '">Block</button>';
     return (
       '<button type="button" class="commune-room-more" data-commune-room-more aria-haspopup="true" aria-expanded="false" aria-label="More for this message">⋯</button>' +
@@ -3451,13 +3451,9 @@
       if (blockBtn && roomPanel.contains(blockBtn)) {
         ev.preventDefault();
         ev.stopPropagation();
-        var blockUid = blockBtn.getAttribute("data-author-user-id");
-        if (!blockUid) return;
-        blockBtn.disabled = true;
-        blockLiveRoomAuthor(blockUid).then(function (res) {
-          if (!res || !res.ok) blockBtn.disabled = false;
-          else blockBtn.textContent = "Blocked";
-        });
+        var blockMid = blockBtn.getAttribute("data-message-id");
+        if (!blockMid) return;
+        hideLiveMessageLocally(blockMid);
         return;
       }
       var reportBtn = ev.target && ev.target.closest("[data-commune-room-report]");

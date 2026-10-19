@@ -10378,7 +10378,10 @@
         followBtn.textContent = "+ friend";
         followBtn.setAttribute("aria-label", "Add this person as a friend");
       }
-      if (addFriendsBtn && addFriendsBtn.textContent === "+ follow") addFriendsBtn.textContent = "Add friends";
+      if (addFriendsBtn) {
+        addFriendsBtn.textContent = "+ friend";
+        addFriendsBtn.setAttribute("aria-label", "Add this person as a friend");
+      }
     }
     try { syncProfileKindToggle(root); } catch (eKind) {}
     try { syncAddProfileUi(root); } catch (eAdd) {}

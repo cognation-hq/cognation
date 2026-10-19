@@ -118,6 +118,10 @@ assert.ok(/window\.CognationTowerOpenOwn = function/.test(tower), "CognationTowe
 assert.ok(/name === "tower" && typeof window\.CognationTowerOpenOwn === "function"/.test(fs.readFileSync(path.join(__dirname, "tabs.js"), "utf8")), "Tower tab click opens own Tower");
 assert.ok(/data-tower-add-profile/.test(html) && /Add a professional page/.test(html), "Add a professional page in Edit profile markup");
 assert.ok(/btn\.textContent = "Add a professional page"/.test(tower), "Add a professional page button label");
+assert.ok(/data-tower-add-friends[^>]*>\+ friend</.test(html), "owner action starts as + friend");
+assert.ok(!/textContent = "Add friends"/.test(tower), "personal page does not force the Add friends label");
+assert.ok(/addFriendsBtn\.textContent = "\+ follow"/.test(tower), "professional owner action stays + follow");
+assert.ok(/addFriendsBtn\.textContent = "\+ friend"/.test(tower), "personal owner action stays + friend");
 assert.ok(/if \(!anyDragged\) return null;/.test(tower), "never-dragged layouts use default grid (no overlap)");
 assert.ok(/var handleHit = ev\.target\.closest\("\[data-tower-sticker-handle\]"\);/.test(tower), "sticker handle starts a drag");
 assert.ok(/_userId: profile\.user_id \|\| ""/.test(fs.readFileSync(path.join(__dirname, "supabase-social.js"), "utf8")), "remote Tower profile carries user id for owner check");

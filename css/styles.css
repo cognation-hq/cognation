@@ -14384,3 +14384,9 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
     padding: 0.25rem;
   }
 }
+
+.message-apple-pay { display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; padding: 0 1rem 0.85rem; color: #1c140c; }
+.message-apple-pay input { width: 5.5rem; margin-left: 0.35rem; padding: 0.35rem 0.5rem; border-radius: 0.4rem; border: 1px solid #111; background: #fff !important; color: #111 !important; }
+.message-apple-pay input::placeholder { color: #5c5346 !important; }
+.message-apple-pay [data-apple-pay] { background: #000 !important; color: #fff !important; border: 0 !important; border-radius: 0.5rem !important; padding: 0.45rem 0.8rem !important; }
+.message-apple-pay [data-apple-pay-note] { flex: 1 1 100%; margin: 0; font-size: 0.9rem; font-weight: 600; color: #3d2914 !important; }

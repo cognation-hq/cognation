@@ -93,6 +93,7 @@ assert.ok(/if \(layout\._compacted\) out\._compacted = 1;/.test(syncSrc) && /wid
 /* r4: chip label not squeezed, muted logo; titles clear of the drag dots. */
 var cssR4 = fs.readFileSync(path.join(__dirname, "..", "css", "styles.css"), "utf8");
 assert.ok(/\.tower-social-chip-body \.tower-social-btn\.is-logo \{\s*width: auto !important;/.test(cssR4), "chip button sizes to content");
-assert.ok(/\.tower-social-chip-body \.tower-social-btn\.is-logo img \{[\s\S]*?grayscale\(1\)/.test(cssR4), "muted logo, no red tile");
+assert.ok(/\.tower-social-chip-body \.tower-social-btn\.is-logo img \{[\s\S]*?filter:\s*none/.test(cssR4), "logo keeps its brand color");
+assert.ok(/\.tower-social-chip-body \.tower-social-btn\.is-logo img \{[\s\S]*?width:\s*32px/.test(cssR4), "logo a tad bigger");
 assert.ok(/\.tower-sticker--followers \.tower-widget-title,[\s\S]*?\.tower-sticker--calendar \.tower-cal-public-title \{\s*padding-left: calc\(1\.6rem \+ 14px\);/.test(cssR4), "titles nudged 14px right of the dots");
 console.log("tower-widgets.test: ok");

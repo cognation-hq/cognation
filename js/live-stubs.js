@@ -414,10 +414,8 @@
     var who = profileOnScreen();
     var host = stage.querySelector("[data-live-host]");
     var kind = stage.querySelector("[data-live-kind]");
-    var fill = stage.querySelector("[data-live-session-name]");
     if (host) host.textContent = who.name;
     if (kind) kind.textContent = who.kind + " · live";
-    if (fill) fill.textContent = who.name;
     bindRoom(stage, who.name);
   }
 

@@ -8859,19 +8859,32 @@ body { padding-top: 0 !important; }
   padding: 0 0.15rem;
 }
 
+.tower-follow-row[hidden],
+.tower-follow-btn[hidden],
+body.tower-messages-page [data-tower-follow-row],
+.tower-messages-room [data-tower-follow-row],
+[data-tower-messages] [data-tower-follow-row],
+[data-tower-app][data-tower-side="private"] [data-tower-follow-row] {
+  display: none !important;
+}
+
 .tower-follow-btn {
-  min-width: 7.5rem;
-  min-height: 2.65rem;
-  padding: 0.55rem 1.35rem;
+  min-width: min-content;
+  min-height: 0;
+  width: max-content;
+  padding: 0.08rem 0.38rem;
   border-radius: 999px;
-  border: 2px solid var(--color-accent);
+  border: 1px solid var(--color-accent);
   background: var(--color-accent);
   color: var(--color-navy);
   font: inherit;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0;
+  white-space: nowrap;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(244, 164, 196, 0.45);
+  box-shadow: none;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
@@ -9958,10 +9971,7 @@ body { padding-top: 0 !important; }
   display: none !important;
 }
 .tower-go-live-btn[data-go-live] {
-  position: absolute;
-  left: 50%;
-  bottom: 0.15rem;
-  transform: translateX(-50%);
+  position: static;
   z-index: 8;
   padding: 0.2rem 0.55rem;
   font-size: 0.68rem;
@@ -14043,20 +14053,25 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   margin-top: 0.35rem;
   order: 4;
 }
-#panel-tower .tower-avatar-stack > .tower-sticker--identity {
+#panel-tower .tower-avatar-stack > .tower-sticker--identity,
+#panel-tower .tower-sticker--avatar .tower-sticker--identity {
   position: static !important;
   left: auto !important;
   top: auto !important;
   transform: none !important;
   order: 2;
-  width: auto;
+  grid-column: 1 / -1;
+  width: 100%;
   max-width: 100%;
   margin: 0;
   padding: 0;
-  background: transparent;
-  border: none;
-  box-shadow: none;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  text-align: center;
 }
+#panel-tower .tower-handle-badge { display: none !important; }
+#panel-tower .tower-under-photo { grid-column: 1 / -1; }
 #panel-tower .tower-avatar-stack > .tower-profile-actions { order: 3; }
 #panel-tower .tower-mutual-friends {
   margin: 0;
@@ -14130,10 +14145,9 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   padding: 0;
 }
 #panel-tower .tower-sticker--envelope.is-placed {
-  position: absolute !important;
-  left: var(--sticker-x) !important;
-  top: var(--sticker-y) !important;
-  z-index: 6;
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
 }
 .tower-envelope-btn {
   display: inline-flex;

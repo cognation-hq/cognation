@@ -14263,70 +14263,50 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 }
 #panel-signal .paper-grid { display: block !important; overflow: visible; }
 #panel-signal .commune-feed-list {
-  display: grid !important;
-  grid-template-columns: 1.15fr 0.95fr 1.05fr;
-  gap: 0.7rem 0.95rem;
-  align-items: start;
-  margin-top: 0.75rem;
+  display: block !important;
+  column-count: 3;
+  column-gap: 1.15rem;
+  column-rule: 1px solid #16120c;
+  column-fill: balance;
+  margin-top: 0.85rem;
 }
-#panel-signal .commune-feed-item { padding: 0 !important; }
+#panel-signal .commune-feed-item {
+  display: inline-block !important;
+  width: 100% !important;
+  break-inside: avoid;
+  padding: 0 0 0.8rem !important;
+  margin: 0 0 0.8rem !important;
+  border: 0 !important;
+  border-bottom: 1px solid #16120c !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  text-align: left !important;
+}
 #panel-signal .commune-feed-meta {
+  display: flex !important;
+  justify-content: space-between !important;
+  gap: 0.45rem !important;
+  align-items: baseline !important;
   font-family: "Special Elite", "Courier New", monospace !important;
   font-size: 0.68rem !important;
   letter-spacing: 0.06em !important;
   text-transform: uppercase;
-  margin: 0 0 0.25rem !important;
+  margin: 0 0 0.3rem !important;
 }
-#panel-signal .commune-feed-body {
-  margin: 0 !important;
-  font-size: 0.92rem !important;
-  line-height: 1.35 !important;
-}
-#panel-signal .commune-feed-item.is-lead { grid-column: 1; grid-row: 1; }
+#panel-signal .commune-feed-body,
 #panel-signal .is-lead .commune-feed-body {
-  font-family: Oswald, Impact, sans-serif !important;
-  font-size: clamp(1.2rem, 2.1vw, 1.65rem) !important;
-  font-weight: 700 !important;
-  line-height: 1.02 !important;
-  letter-spacing: 0.02em !important;
-  text-transform: uppercase;
-}
-#panel-signal .commune-feed-item.is-lead + .commune-feed-item {
-  grid-column: 2;
-  grid-row: 1;
-  min-height: 9.5rem;
-  padding: 0.55rem !important;
-  background:
-    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.05) 0 1px, transparent 1px 4px),
-    #d7d0c3 !important;
-  border: 3px solid #111 !important;
-}
-#panel-signal .commune-feed-item.is-lead + .commune-feed-item + .commune-feed-item { grid-column: 3; grid-row: 1; }
-#panel-signal .commune-feed-item.is-lead + .commune-feed-item + .commune-feed-item + .commune-feed-item {
-  grid-column: 1 / -1;
-  grid-row: 2;
-  border-block: 3px double #111 !important;
-  padding: 0.4rem 0.35rem !important;
-  text-align: center;
-}
-#panel-signal .commune-feed-item.is-lead + .commune-feed-item + .commune-feed-item + .commune-feed-item .commune-feed-body {
-  font-family: Oswald, Impact, sans-serif !important;
-  font-size: 1.05rem !important;
-  font-weight: 700 !important;
-  letter-spacing: 0.04em !important;
-  text-transform: uppercase;
+  margin: 0 !important;
+  font-family: "Old Standard TT", Georgia, "Times New Roman", serif !important;
+  font-size: 0.92rem !important;
+  font-weight: 400 !important;
+  line-height: 1.35 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  text-align: left !important;
 }
 @media (max-width: 720px) {
   #panel-signal .paper-title { white-space: normal; font-size: 2.6rem !important; }
-  #panel-signal .commune-feed-list { grid-template-columns: 1fr !important; }
-  #panel-signal .commune-feed-item.is-lead,
-  #panel-signal .commune-feed-item.is-lead + .commune-feed-item,
-  #panel-signal .commune-feed-item.is-lead + .commune-feed-item + .commune-feed-item,
-  #panel-signal .commune-feed-item.is-lead + .commune-feed-item + .commune-feed-item + .commune-feed-item {
-    grid-column: auto !important;
-    grid-row: auto !important;
-    min-height: 0;
-  }
+  #panel-signal .commune-feed-list { column-count: 1 !important; }
 }
 
 /* Tower Personal | Professional matches SIGNAL News | Feed (type, color, place, size). */

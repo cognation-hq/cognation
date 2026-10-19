@@ -3232,8 +3232,8 @@
     var owner = isTowerOwner(TowerProfileStore.get());
     root.setAttribute("data-tower-is-owner", owner ? "true" : "false");
     try { syncViewerMutateUi(root); } catch (eMut) {}
-    if (!owner) side = "public";
-    side = side === "public" ? "public" : "private";
+    /* Connections | Public profile switch is gone. The profile stays on the public page. */
+    side = "public";
     root.setAttribute("data-tower-side", side);
     var privateSide = root.querySelector("[data-tower-private-side]");
     var publicSide = root.querySelector("[data-tower-public-side]");
@@ -3288,15 +3288,8 @@
     if (!root || root.__cognationSideBound) return;
     root.__cognationSideBound = true;
     var owner = isTowerOwner(TowerProfileStore.get());
-    var initial = "public";
-    if (owner) {
-      if (hashRequestsPublicSide()) initial = "public";
-      else initial = readStoredTowerSide() || "public";
-    } else {
-      initial = "public";
-    }
-    applyTowerSide(root, initial, { persist: false });
-    if (owner) writeStoredTowerSide(initial);
+    applyTowerSide(root, "public", { persist: false });
+    if (owner) writeStoredTowerSide("public");
 
     root.querySelectorAll("[data-tower-side-btn]").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -3320,10 +3313,7 @@
     });
 
     document.addEventListener("cognation:session-started", function () {
-      var o = isTowerOwner(TowerProfileStore.get());
-      var side = o ? readStoredTowerSide() || "private" : "public";
-      if (hashRequestsPublicSide()) side = "public";
-      applyTowerSide(root, side);
+      applyTowerSide(root, "public");
       syncPublicUrlFields(root, TowerProfileStore.get());
     });
   }
@@ -6256,8 +6246,8 @@
           else on = true;
         }
       }
-      /* Top friends stay. Badges stay off until this person applies a staff milestone. */
-      if (id === "friends") on = true;
+      /* Default Top friends bar stays off. Badges stay off until this person applies a staff milestone. */
+      if (id === "friends") on = false;
       var milestones = id === "badges" ? appliedMilestoneList(p) : null;
       if (id === "badges") on = !!(milestones && milestones.length);
       /* The same Calendar sticker stays on the personal page and the professional page. */
@@ -6323,6 +6313,7 @@
 
   function setPublicWidgetVisible(root, id, on) {
     if (!isTowerOwner(TowerProfileStore.get())) return;
+    if (id === "friends") on = false;
     if (!id || id === "avatar" || id === "feed" || id === "messages") return;
     if (PUBLIC_WIDGET_IDS.indexOf(id) < 0) return;
     var p = TowerProfileStore.get();
@@ -12488,9 +12479,7 @@
       }
     }
     document.querySelectorAll("[data-tower-app]").forEach(function (root) {
-      var side = readStoredTowerSide() || "public";
-      if (hashRequestsPublicSide()) side = "public";
-      applyTowerSide(root, side);
+      applyTowerSide(root, "public");
       renderProfileChrome(root);
       syncProfileKindToggle(root);
       syncAddProfileUi(root);

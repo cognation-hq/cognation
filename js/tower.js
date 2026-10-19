@@ -12091,7 +12091,7 @@
         spot.classList.add("is-filled");
         spot.classList.remove("is-empty");
         spot.textContent = String(person.name).trim().charAt(0).toUpperCase() || "?";
-        spot.setAttribute("aria-label", person.mutualName ? "You and " + person.name + " both know " + person.mutualName : person.name);
+        spot.setAttribute("aria-label", person.activity ? person.name + ". " + person.activity : person.name);
         if (person.userId) spot.setAttribute("data-circle-person", person.userId);
         /* Tower picture: server photo_url, else that profile's Tower avatar. */
         var photoApi = window.CognationProfilePhoto;
@@ -12102,12 +12102,12 @@
           spot.setAttribute("data-circle-handle", handle);
           spot.addEventListener("click", openCircleProfile(handle));
         }
-        if (person.mutualName) {
+        if (person.activity) {
           spot.classList.add("has-caption");
           var caption = document.createElement("span");
           caption.className = "circle-spot-caption";
           caption.setAttribute("data-circle-caption", "");
-          caption.textContent = "You and " + person.name + " both know " + person.mutualName;
+          caption.textContent = person.activity;
           spot.appendChild(caption);
         }
       } else {
@@ -12129,6 +12129,8 @@
     if (!spots.length) return;
     var shift = ((performance.now() - circleFallState.ringStarted) / 28000) * CIRCLE_SPOTS.length;
     var i;
+    var front = 0;
+    var frontScale = -1;
     for (i = 0; i < spots.length; i++) {
       var pos = circleSpotAt(i + shift);
       var depth = pos.s / CIRCLE_SCALE;
@@ -12139,6 +12141,11 @@
       spots[i].style.transform =
         "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + pos.y.toFixed(1) + "px) scale(" + scale.toFixed(3) + ")";
       spots[i].style.zIndex = String(Math.round(pos.s * 100));
+      if (scale > frontScale) { frontScale = scale; front = i; }
+    }
+    for (i = 0; i < spots.length; i++) {
+      var cap = spots[i].querySelector("[data-circle-caption]");
+      if (cap) cap.hidden = i !== front;
     }
   }
 

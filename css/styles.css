@@ -14175,6 +14175,160 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   pointer-events: none !important;
 }
 
+/* SIGNAL → Cognation Times. From the publication block down: broadsheet, not the NEWS card. */
+#panel-signal .commune-paper {
+  background: #f4efe4 !important;
+  color: #16120c !important;
+  border: 1px solid #16120c !important;
+  border-radius: 0 !important;
+  padding: 0.7rem 1rem 1.25rem !important;
+  box-shadow: none !important;
+}
+#panel-signal .commune-paper,
+#panel-signal .commune-paper * {
+  font-family: "Old Standard TT", Georgia, "Times New Roman", serif !important;
+  color: #16120c !important;
+}
+#panel-signal .paper-eyebrow,
+#panel-signal .paper-subtitle,
+#panel-signal .cgn-deferral,
+#panel-signal .paper-edition-scope,
+#panel-signal .paper-col--left,
+#panel-signal .paper-col--right,
+#panel-signal .paper-section-kicker,
+#panel-signal .paper-dek,
+#panel-signal .commune-ai-note,
+#panel-signal .commune-endless-toggle,
+#panel-signal .commune-social-kind,
+#panel-signal .commune-feed-item.is-wire,
+#panel-signal .commune-feed-sentinel,
+#panel-signal .commune-feed-loading,
+#panel-signal .paper-rule-block,
+#panel-signal .commune-feed-source,
+#panel-signal .news-story-comments,
+#panel-signal .news-report-bar {
+  display: none !important;
+}
+#panel-signal .paper-masthead {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0.1rem 0 0 !important;
+  text-align: center !important;
+}
+#panel-signal .paper-title {
+  margin: 0 0 0.4rem !important;
+  font-family: Oswald, Impact, "Arial Narrow", sans-serif !important;
+  font-size: clamp(3.4rem, 8.6vw, 6.6rem) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.045em !important;
+  line-height: 0.78 !important;
+  text-align: center !important;
+  text-transform: uppercase !important;
+  color: #111 !important;
+  text-shadow: none !important;
+  white-space: nowrap;
+}
+#panel-signal .paper-dateline,
+#panel-signal .paper-volume,
+#panel-signal .paper-price,
+#panel-signal .paper-date {
+  color: #111 !important;
+  font-family: "Special Elite", "Courier New", monospace !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.14em !important;
+}
+#panel-signal .paper-dateline {
+  display: flex !important;
+  justify-content: space-between !important;
+  gap: 0.6rem !important;
+  border-block: 4px double #111 !important;
+  margin: 0 !important;
+  padding: 0.28rem 0.2rem !important;
+}
+#panel-signal .paper-rule { background: #111 !important; width: 1.5rem !important; height: 2px !important; }
+#panel-signal .paper-grid,
+#panel-signal .paper-col,
+#panel-signal .paper-section,
+#panel-signal .commune-feed,
+#panel-signal .commune-feed-item,
+#panel-signal .commune-social-card,
+#panel-signal .commune-profile-card,
+#panel-signal .paper-brief {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+#panel-signal .paper-grid { display: block !important; overflow: visible; }
+#panel-signal .commune-feed-list {
+  display: grid !important;
+  grid-template-columns: 1.15fr 0.95fr 1.05fr;
+  gap: 0.7rem 0.95rem;
+  align-items: start;
+  margin-top: 0.75rem;
+}
+#panel-signal .commune-feed-item { padding: 0 !important; }
+#panel-signal .commune-feed-meta {
+  font-family: "Special Elite", "Courier New", monospace !important;
+  font-size: 0.68rem !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase;
+  margin: 0 0 0.25rem !important;
+}
+#panel-signal .commune-feed-body {
+  margin: 0 !important;
+  font-size: 0.92rem !important;
+  line-height: 1.35 !important;
+}
+#panel-signal .commune-feed-item.is-lead { grid-column: 1; grid-row: 1; }
+#panel-signal .is-lead .commune-feed-body {
+  font-family: Oswald, Impact, sans-serif !important;
+  font-size: clamp(1.2rem, 2.1vw, 1.65rem) !important;
+  font-weight: 700 !important;
+  line-height: 1.02 !important;
+  letter-spacing: 0.02em !important;
+  text-transform: uppercase;
+}
+#panel-signal .commune-feed-item.is-lead + .commune-feed-item {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  min-height: 12rem;
+  padding: 0.55rem !important;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.05) 0 1px, transparent 1px 4px),
+    #d7d0c3 !important;
+  border: 3px solid #111 !important;
+}
+#panel-signal .commune-feed-item.is-lead + .commune-feed-item + .commune-feed-item { grid-column: 3; grid-row: 1; }
+#panel-signal .commune-feed-item.is-lead + .commune-feed-item + .commune-feed-item + .commune-feed-item {
+  grid-column: 1 / 3;
+  grid-row: 2;
+  border-block: 3px double #111 !important;
+  padding: 0.4rem 0.35rem !important;
+  text-align: center;
+}
+#panel-signal .commune-feed-item.is-lead + .commune-feed-item + .commune-feed-item + .commune-feed-item .commune-feed-body {
+  font-family: Oswald, Impact, sans-serif !important;
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase;
+}
+@media (max-width: 720px) {
+  #panel-signal .paper-title { white-space: normal; font-size: 2.6rem !important; }
+  #panel-signal .commune-feed-list { grid-template-columns: 1fr !important; }
+  #panel-signal .commune-feed-item.is-lead,
+  #panel-signal .commune-feed-item.is-lead + .commune-feed-item,
+  #panel-signal .commune-feed-item.is-lead + .commune-feed-item + .commune-feed-item,
+  #panel-signal .commune-feed-item.is-lead + .commune-feed-item + .commune-feed-item + .commune-feed-item {
+    grid-column: auto !important;
+    grid-row: auto !important;
+    min-height: 0;
+  }
+}
+
 /* Tower Personal | Professional matches SIGNAL News | Feed (type, color, place, size). */
 #panel-tower .tower-profile-kind-toggle {
   display: inline-flex;

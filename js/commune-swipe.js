@@ -1321,6 +1321,61 @@
     var price = marketMoney(card && card.ask);
     return price ? "Bid " + price : "Bid";
   }
+  var MARKET_MILES = 20;
+  var LOC_KEY = "cognation.member.location.v1";
+  function asPoint(obj) {
+    if (!obj || typeof obj !== "object") return null;
+    var lat = Number(obj.lat != null ? obj.lat : obj.latitude);
+    var lng = Number(obj.lng != null ? obj.lng : (obj.longitude != null ? obj.longitude : obj.lon));
+    if (!isFinite(lat) || !isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    return { lat: lat, lng: lng };
+  }
+  function milesApart(a, b) {
+    var r = 3958.7613;
+    var dLat = (b.lat - a.lat) * Math.PI / 180;
+    var dLng = (b.lng - a.lng) * Math.PI / 180;
+    var s1 = Math.sin(dLat / 2);
+    var s2 = Math.sin(dLng / 2);
+    var h = s1 * s1 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * s2 * s2;
+    return 2 * r * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+  function viewerPoint() {
+    var member = getMemberProfile() || {};
+    return asPoint(member) || asPoint(member.location) || asPoint(readJson(localStorage, LOC_KEY, null));
+  }
+  function sellerPoint(post) {
+    var direct = asPoint(post) || asPoint(post && post.location);
+    if (direct) return direct;
+    var atts = post && post.attachments;
+    var i;
+    if (Array.isArray(atts)) {
+      for (i = 0; i < atts.length; i++) {
+        var found = asPoint(atts[i]);
+        if (found) return found;
+      }
+    }
+    var rec = post && post.authorProfileId ? profileById(post.authorProfileId) : null;
+    return asPoint(rec) || asPoint(rec && rec.location);
+  }
+  /* Both points are required. No guess, no city fallback. */
+  function marketLocal(post) {
+    var viewer = viewerPoint();
+    var seller = sellerPoint(post);
+    if (!viewer || !seller) return false;
+    return milesApart(viewer, seller) <= MARKET_MILES;
+  }
+  function askViewerPoint() {
+    if (viewerPoint()) return;
+    if (typeof navigator === "undefined" || !navigator.geolocation || !navigator.geolocation.getCurrentPosition) return;
+    try {
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        var point = asPoint({ lat: pos && pos.coords && pos.coords.latitude, lng: pos && pos.coords && pos.coords.longitude });
+        if (!point) return;
+        writeJson(localStorage, LOC_KEY, point);
+        rebuildDeck();
+      }, function () {}, { maximumAge: 300000, timeout: 8000 });
+    } catch (eGeo) {}
+  }
   function marketPictures(post) {
     var out = [];
     (post && Array.isArray(post.attachments) ? post.attachments : []).forEach(function (a) {
@@ -1335,6 +1390,7 @@
     var out = [];
     posts.forEach(function (post) {
       if (!post || !marketTagged((post.body || "") + " " + (post.title || ""))) return;
+      if (!marketLocal(post)) return;
       var body = String(post.body || "").replace(/(^|[^a-z0-9])#market(?![a-z0-9])/ig, "$1").replace(/\s+/g, " ").trim();
       out.push({
         id: "market-" + (post.id || out.length),
@@ -3685,6 +3741,7 @@
     });
     document.addEventListener("cognation:tower-updated", function () { rebuildDeck(); });
     document.addEventListener("cognation:echo-group-notice", function () { renderNotices(); });
+    askViewerPoint();
     refreshSeedGates();
   }
 

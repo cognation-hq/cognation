@@ -334,6 +334,10 @@
                 };
                 var pic = String((attachment && attachment.dataUrl) || "");
                 if (pic.indexOf("data:image/") === 0 && pic.length < 180000) item.dataUrl = pic;
+                if (attachment && attachment.kind === "location" && isFinite(Number(attachment.lat)) && isFinite(Number(attachment.lng))) {
+                  item.lat = Number(attachment.lat);
+                  item.lng = Number(attachment.lng);
+                }
                 return item;
               })
             : [],

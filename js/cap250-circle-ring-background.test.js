@@ -43,7 +43,7 @@ assert.ok(/list\.classList\.add\("is-empty"\)/.test(relations), "empty list flag
 assert.ok(/\.circle-relations\.is-empty[\s\S]*?display:\s*none/.test(css), "empty list hidden so ring is the empty state");
 
 /* Hydrate still fills spots when lines exist */
-assert.ok(/peopleForSpots/.test(relations) && /fillRingSpots\(peopleForSpots\(lines\)\)/.test(relations), "hydrate fills spots from lines");
+assert.ok(/peopleForSpots/.test(relations) && !/fillRingSpots\(peopleForSpots\(lines\)\)/.test(relations), "saved lines do not fill ring spots");
 assert.ok(typeof relApi.peopleForSpots === "function", "peopleForSpots exported");
 
 var sample = relApi.peopleForSpots([

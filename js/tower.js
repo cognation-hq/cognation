@@ -11551,6 +11551,9 @@
   }
 
   function stopCircleFall() {
+    if (window.CognationPulseMutual && typeof window.CognationPulseMutual.stop === "function") {
+      window.CognationPulseMutual.stop();
+    }
     if (circleFallState) {
       if (circleFallState.raf) cancelAnimationFrame(circleFallState.raf);
       if (circleFallState.refreshTimer) clearInterval(circleFallState.refreshTimer);
@@ -11662,11 +11665,12 @@
     var i;
     for (i = 0; i < steps; i++) {
       var turn = i / steps;
-      var wobble = Math.sin(i * 0.77 + 0.4) * 0.6 + Math.sin(i * 1.83 + 1.1) * 0.3;
+      var wobble = Math.sin(i * 0.09 + 0.2);
       var p = circleProjectRadius(turn * 360, CIRCLE_RING_R + wobble * 8);
       var depth = p.s / CIRCLE_SCALE;
       var flicker = 0.8 + 0.2 * Math.sin(i * 1.35);
-      glowAt(p.x, p.y, 34 * depth, circleGlowColor(turn), 0.06 * flicker);
+      var side = Math.abs(Math.cos(turn * Math.PI * 2));
+      glowAt(p.x, p.y, (10 + 42 * side) * depth, circleGlowColor(turn), 0.06 * flicker * (1.4 + 6 * side));
     }
     ring.appendChild(canvas);
     paintCircleBolt(ring);
@@ -11676,8 +11680,8 @@
      ead52bb swapped it for a 0.06-alpha blurred canvas glow that reads as
      nothing on the #61 indigo background, so the bolt looked missing. */
   function circleBoltSegments(radius, wobble, seed, baseWidth) {
-    var steps = 144;
-    var chunk = 6;
+    var steps = 216;
+    var chunk = 4;
     var segs = [];
     var start;
     for (start = 0; start < steps; start += chunk) {
@@ -11687,10 +11691,12 @@
       var end = Math.min(steps, start + chunk);
       var i;
       for (i = start; i <= end; i++) {
-        var n = Math.sin(i * 0.73 + seed) * 0.58 + Math.sin(i * 1.91 + seed * 1.4) * 0.42;
+        var ang = (i / steps) * Math.PI * 2;
+        var n = Math.sin(i * 0.17 + seed) * (1 + 0.75 * Math.min(0, Math.sin(ang)));
         if (i === 0 || i === steps) n = 0;
-        var p = circleProjectRadius((i / steps) * 360, radius + n * wobble);
-        cmds.push((i === start ? "M" : "L") + p.x.toFixed(1) + " " + p.y.toFixed(1));
+        var p = circleProjectRadius((i / steps) * 360, radius);
+        var ox = Math.cos(ang), oy = Math.sin(ang) * Math.cos(CIRCLE_TILT), olen = Math.sqrt(ox * ox + oy * oy) || 1;
+        cmds.push((i === start ? "M" : "L") + (p.x + n * wobble * ox / olen).toFixed(1) + " " + (p.y + n * wobble * oy / olen).toFixed(1));
         depthSum += p.s / CIRCLE_SCALE;
         count++;
       }
@@ -11757,7 +11763,7 @@
       }
       return filter;
     }
-    defs.appendChild(glowFilter("pulse-bolt-glow", 18, 7, false));
+    defs.appendChild(glowFilter("pulse-bolt-glow", 9, 1.6, true));
     defs.appendChild(glowFilter("pulse-bolt-core", 3.2, 1.1, false));
     svg.appendChild(defs);
     function addBolt(parent, d, color, width, opacity) {
@@ -11780,16 +11786,13 @@
       { color: "#3ecbff", opacity: 0.85 },
       { color: "#ff4ad8", opacity: 0.8 }
     ];
-    circleBoltSegments(CIRCLE_RING_R, 18, 1.2, 8).forEach(function (seg, index) {
-      var shift = Math.sin(index * 0.65) * 0.5 + 0.5;
-      var shift2 = Math.cos(index * 0.4) * 0.5 + 0.5;
-      var weights = [0.35 + 0.65 * shift, 0.3 + 0.55 * (1 - shift), 0.3 + 0.6 * shift2];
-      colors.forEach(function (ink, inkIndex) {
-        addBolt(halo, seg.d, ink.color, seg.width * 1.2, 0.28 + 0.5 * weights[inkIndex]);
-      });
-      addBolt(core, seg.d, "#e9f7ff", Math.max(0.9, seg.width * 0.16), 0.7);
+    var strands = circleBoltSegments(CIRCLE_RING_R, 18, 0.1, 1.05).concat(circleBoltSegments(CIRCLE_RING_R, 16, 0.75, 1.05), circleBoltSegments(CIRCLE_RING_R, 18, 1.4, 1.05), circleBoltSegments(CIRCLE_RING_R, 15, 2.05, 1.05), circleBoltSegments(CIRCLE_RING_R, 17, 2.7, 1.05), circleBoltSegments(CIRCLE_RING_R, 14, 3.35, 1.05));
+    strands.forEach(function (seg, index) {
+      addBolt(halo, seg.d, colors[Math.floor(index / 54) % 2 ? 0 : 1].color, seg.width, 0.88);
     });
-    var forks = [22, 64, 98, 146, 188, 228, 274, 332];
+    addBolt(halo, strands[0].d, "#ff4ad8", 2, 0.55);
+    addBolt(core, strands[1].d, "#e9f7ff", 1.2, 0.55);
+    var forks = [];
     forks.forEach(function (angle, index) {
       var outward = index % 2 === 0;
       var t = angle * Math.PI / 180;
@@ -12101,11 +12104,19 @@
         spot.classList.add("is-filled");
         spot.classList.remove("is-empty");
         spot.textContent = String(person.name).trim().charAt(0).toUpperCase() || "?";
-        spot.setAttribute("aria-label", person.name);
+        spot.setAttribute("aria-label", person.mutualName ? "You and " + person.name + " both know " + person.mutualName : person.name);
         if (person.userId) spot.setAttribute("data-circle-person", person.userId);
         /* Real friend photo (profiles.photo_url); no photo or a bad URL keeps the letter. */
         var photoApi = window.CognationProfilePhoto;
         if (person.photoUrl && photoApi && typeof photoApi.applyPhoto === "function") photoApi.applyPhoto(spot, person.photoUrl);
+        if (person.mutualName) {
+          spot.classList.add("has-caption");
+          var caption = document.createElement("span");
+          caption.className = "circle-spot-caption";
+          caption.setAttribute("data-circle-caption", "");
+          caption.textContent = "You and " + person.name + " both know " + person.mutualName;
+          spot.appendChild(caption);
+        }
       } else {
         spot.classList.add("is-empty");
         spot.classList.remove("is-filled");
@@ -12127,6 +12138,10 @@
     var i;
     for (i = 0; i < spots.length; i++) {
       var pos = circleSpotAt(i + shift);
+      var tip = Math.abs(pos.x) > 240;
+      var front = pos.y > 60;
+      spots[i].style.width = (front ? 7.6 : tip ? 9.4 : 11.6).toFixed(2) + "rem";
+      spots[i].style.height = (front ? 4.8 : tip ? 9.4 : 11.6).toFixed(2) + "rem";
       spots[i].style.transform =
         "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + pos.y.toFixed(1) + "px) scale(" + pos.s.toFixed(3) + ")";
       spots[i].style.zIndex = String(Math.round(pos.s * 100));
@@ -12269,6 +12284,9 @@
     var circlePage = document.querySelector("[data-circle-page]") || layer;
     if (window.CognationCircleRelations && typeof window.CognationCircleRelations.mount === "function") {
       window.CognationCircleRelations.mount(circlePage);
+    }
+    if (window.CognationPulseMutual && typeof window.CognationPulseMutual.mount === "function") {
+      window.CognationPulseMutual.mount();
     }
     /* PULSE falling friends restored (removed by #49 early return). Every
        server friend's Tower circle falls BEHIND the halo ring; tap opens Tower. */

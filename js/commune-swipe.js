@@ -31,6 +31,7 @@
   var INBOUND_KEY = "cognation.commune.dating.inbound.v1";
   var NOTICES_KEY = "cognation.commune.notices.v1";
   var SHARES_KEY = "cognation.commune.friend-shares.v1";
+  var BIDS_KEY = "cognation.commune.market.bids.v1";
   var FADE_LEFT_THRESHOLD = 3;
   var OFF_INTEREST_FRIEND_RATIO = 6;
   var ROOMS_KEY = "cognation.commune.site-rooms.v1";
@@ -48,11 +49,13 @@
     KNOW: "know",
     DATING: "dating",
     CONTENT: "content",
+    MARKET: "marketplace",
   };
 
-  /* Alexa lock 2026-10-02: Personal featured mix is 1:1 across five families. */
+  /* Alexa lock 2026-10-02: Personal featured mix is 1:1 across five families.
+     Marketplace rides the content slot. It is not a sixth family. */
   var FEATURED_ORDER = [TYPE.CLASSROOM, TYPE.AD, TYPE.CHAT, TYPE.DATING, TYPE.CONTENT];
-  var CONTENT_SUBTYPES = [TYPE.FACT, TYPE.WELLNESS, TYPE.FRIEND, TYPE.EVENT, TYPE.KNOW, TYPE.CONTENT];
+  var CONTENT_SUBTYPES = [TYPE.MARKET, TYPE.FACT, TYPE.WELLNESS, TYPE.FRIEND, TYPE.EVENT, TYPE.KNOW, TYPE.CONTENT];
   var AD_MAX_MS = 3000;
   var REPEATABLE = {};
   /* Featured families stay repeatable so a long Personal deck holds true 1:1 rotation. */
@@ -1289,6 +1292,73 @@
     return out;
   }
 
+  /* A feed post tagged #market becomes a Marketplace card in the 1:1 content slot. */
+  function marketTagged(text) {
+    return /(^|[^a-z0-9])#market(?![a-z0-9])/i.test(String(text || ""));
+  }
+  function marketCanBid() {
+    var age = getMemberAge();
+    return typeof age === "number" && age >= 16;
+  }
+  function marketPictures(post) {
+    var out = [];
+    (post && Array.isArray(post.attachments) ? post.attachments : []).forEach(function (a) {
+      var url = String((a && (a.dataUrl || a.url || a.src || a.imageUrl)) || "");
+      if (url.indexOf("data:image/") === 0 || /^https?:\/\//.test(url)) out.push(url);
+    });
+    return out;
+  }
+  function marketplaceCards() {
+    var doc = readJson(localStorage, "cognation.tower.posts.v3", null);
+    var posts = doc && Array.isArray(doc.posts) ? doc.posts : [];
+    var out = [];
+    posts.forEach(function (post) {
+      if (!post || !marketTagged((post.body || "") + " " + (post.title || ""))) return;
+      var body = String(post.body || "").replace(/(^|[^a-z0-9])#market(?![a-z0-9])/ig, "$1").replace(/\s+/g, " ").trim();
+      out.push({
+        id: "market-" + (post.id || out.length),
+        type: TYPE.MARKET,
+        title: body.split(/[.!\n]/)[0].slice(0, 80) || "For sale",
+        body: body,
+        fromName: post.authorName || "",
+        handle: String(post.handle || "").replace(/^@/, ""),
+        profileId: post.authorProfileId || "",
+        pictures: marketPictures(post),
+      });
+    });
+    return out;
+  }
+  function marketOptedIn(cardId) {
+    var doc = readJson(localStorage, BIDS_KEY, {});
+    var row = doc[currentProfileId()];
+    return !!(row && row[cardId]);
+  }
+  function optInToBid(cardId) {
+    if (!marketCanBid()) return false;
+    var doc = readJson(localStorage, BIDS_KEY, {});
+    var mine = currentProfileId();
+    if (!doc[mine] || typeof doc[mine] !== "object") doc[mine] = {};
+    doc[mine][cardId] = Date.now();
+    writeJson(localStorage, BIDS_KEY, doc);
+    return true;
+  }
+  function marketCardHtml(card) {
+    var html = "";
+    (card.pictures || []).forEach(function (src) {
+      html += '<img class="commune-market-photo" alt="' + escapeHtml(card.title || "Item") + '" src="' + escapeHtml(src) + '">';
+    });
+    if (html) html = '<div class="commune-market-photos" data-market-photos>' + html + "</div>";
+    if (!marketCanBid()) {
+      return html + '<p class="commune-card-meta" data-market-bid-note>Bidding is for ages 16 and up.</p>';
+    }
+    var opted = marketOptedIn(card.id);
+    return html +
+      '<button type="button" class="btn btn-primary" data-market-bid aria-pressed="' + (opted ? "true" : "false") + '">' +
+      (opted ? "Opted in" : "Bid") + "</button>" +
+      '<p class="commune-card-meta" data-market-bid-note>' +
+      (opted ? "You're opted in to bid. Nothing is charged." : "Opt in only. Nothing is charged.") + "</p>";
+  }
+
   function ageSafeFeaturedCard(card) {
     if (!card) return false;
     if (!isUnder13()) return true;
@@ -1433,6 +1503,7 @@
     lanes[TYPE.EVENT] = publicEvents();
     lanes[TYPE.KNOW] = peopleYouMayKnow();
     lanes[TYPE.CONTENT] = towerLiveContentCards();
+    lanes[TYPE.MARKET] = marketplaceCards();
     Object.keys(lanes).forEach(function (type) {
       lanes[type] = omitPassed((lanes[type] || []).filter(ageSafeFeaturedCard).filter(function (card) {
         /* Repeated lefts fade a topic out of the deck (friend shares handled separately). */
@@ -1648,6 +1719,7 @@
       case TYPE.KNOW: return "People you may know";
       case TYPE.DATING: return "Dating";
       case TYPE.CONTENT: return "Content";
+      case TYPE.MARKET: return "Marketplace";
       default: return "Echo";
     }
   }
@@ -1911,6 +1983,7 @@
       if (card.fromName) html += '<p class="commune-card-meta">' + escapeHtml(card.fromName) + "</p>";
       if (card.videoUrl) html += videoHtml(card.videoUrl);
       if (card.body) html += '<p class="commune-card-body">' + escapeHtml(card.body) + "</p>";
+      if (card.type === TYPE.MARKET) html += marketCardHtml(card);
       if (card.type === TYPE.AD && card.handle) {
         html += '<button type="button" class="btn btn-secondary" data-commune-open-profile>Open their page</button>';
         html += '<p class="commune-card-meta">Book on the calendar, or follow this professional page.</p>';
@@ -1957,6 +2030,16 @@
       range.addEventListener("input", commit);
       range.addEventListener("change", commit);
     }
+    var bidBtn = el.querySelector("[data-market-bid]");
+    if (bidBtn) bidBtn.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!optInToBid(card.id)) return;
+      bidBtn.textContent = "Opted in";
+      bidBtn.setAttribute("aria-pressed", "true");
+      var note = el.querySelector("[data-market-bid-note]");
+      if (note) note.textContent = "You're opted in to bid. Nothing is charged.";
+    });
     var joinLive = el.querySelector("[data-live-echo-join]");
     if (joinLive) joinLive.addEventListener("click", function (ev) {
       ev.stopPropagation();
@@ -3563,6 +3646,7 @@
       syncDatingVisibility();
       rebuildDeck();
     });
+    document.addEventListener("cognation:tower-updated", function () { rebuildDeck(); });
     refreshSeedGates();
   }
 
@@ -3629,6 +3713,9 @@
     sendPersonalFriendRequest: sendPersonalFriendRequest,
     publicEvents: publicEvents,
     towerLiveContentCards: towerLiveContentCards,
+    marketplaceCards: marketplaceCards,
+    marketCanBid: marketCanBid,
+    optInToBid: optInToBid,
     featuredFamily: featuredFamily,
     getMode: getMode,
     setMode: setMode,

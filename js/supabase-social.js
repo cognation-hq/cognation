@@ -328,10 +328,13 @@
           visibility: "friends",
           attachments: Array.isArray(fields && fields.attachments)
             ? fields.attachments.map(function (attachment) {
-                return {
+                var item = {
                   kind: String(attachment.kind || "document"),
                   label: String(attachment.label || attachment.name || "Attachment").slice(0, 160),
                 };
+                var pic = String((attachment && attachment.dataUrl) || "");
+                if (pic.indexOf("data:image/") === 0 && pic.length < 180000) item.dataUrl = pic;
+                return item;
               })
             : [],
         },

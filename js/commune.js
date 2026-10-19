@@ -1071,6 +1071,7 @@
         '<div class="news-report-menu" data-news-report-menu hidden>' +
         '<button type="button" class="news-report-option" data-news-report-reason="harmful">Harmful</button>' +
         '<button type="button" class="news-report-option" data-news-report-reason="untruthful">Untruthful</button>' +
+        '<button type="button" class="news-report-option" data-news-report-block>Block</button>' +
         "</div>" +
         '<span class="news-report-status" data-news-report-status hidden role="status"></span>' +
         "</footer>";

@@ -12171,7 +12171,7 @@ a.circle-fall-portrait {
   content: "";
 }
 /* TOWER sits in the page flow under the tab row, centered like COMMUNE, above the reaction row. */
-#panel-tower > .tower-header {
+:is(#panel-tower, #panel-signal) > .tower-header {
   position: static;
   z-index: auto;
   margin: 0.15rem 0 0.2rem;
@@ -12181,7 +12181,7 @@ a.circle-fall-portrait {
   border: 0 !important;
   box-shadow: none !important;
 }
-#panel-tower > .tower-header .tower-title {
+:is(#panel-tower, #panel-signal) > .tower-header .tower-title {
   display: block;
   position: static;
   width: 100%;

@@ -12283,7 +12283,7 @@ a.circle-fall-portrait {
 .circle-spot.has-caption { overflow: visible; }
 .circle-spot-caption {
   position: absolute; left: 50%; width: 7rem; margin: 0; padding: 0;
-  top: 100%; transform: translate(-50%, -0.5em);
+  top: 100%; transform: translate(-50%, -0.28em);
   text-align: center; font-size: 0.5rem; font-weight: 650; line-height: 1;
   letter-spacing: 0; color: #f7fbff !important; pointer-events: none;
   text-shadow: none;
@@ -13559,6 +13559,10 @@ svg.circle-bolt {
 }
 @media (prefers-reduced-motion: reduce) {
   svg.circle-bolt { animation: none; }
+}
+body.is-circle-open .circle-spot.is-filled {
+  pointer-events: auto !important;
+  cursor: pointer;
 }
 
 

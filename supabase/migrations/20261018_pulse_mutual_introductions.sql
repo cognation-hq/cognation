@@ -2,8 +2,10 @@
 -- your friend yet. Friendships only. Personal profiles. Alexa runs this in the
 -- SQL editor. Rollback: drop function if exists public.pulse_mutual_introductions();
 
+drop function if exists public.pulse_mutual_introductions();
+
 create or replace function public.pulse_mutual_introductions()
-returns table (profile_id uuid, display_name text, mutual_name text)
+returns table (profile_id uuid, display_name text, mutual_name text, handle text, photo_url text)
 language sql stable security definer set search_path = public
 as $$
   with me as (
@@ -16,7 +18,7 @@ as $$
     join me on f.user_id = me.uid
     where public.cognation_user_is_real(f.friend_user_id)
   )
-  select p.id, p.display_name, m.display_name
+  select p.id, p.display_name, m.display_name, p.handle, p.photo_url
   from (
     select ff.friend_user_id as uid, min(ff.user_id::text) as via
     from public.friendships ff

@@ -19,7 +19,12 @@
       var mutual = String(row.mutual_name || "").trim();
       if (!name || !id || !mutual || seen[id]) return;
       seen[id] = true;
-      out.push({ name: name, profileId: id, userId: id, mutualName: mutual });
+      var person = { name: name, profileId: id, userId: id, mutualName: mutual };
+      var handle = String(row.handle || "").trim().replace(/^@/, "");
+      var photo = String(row.photo_url || "").trim();
+      if (handle) person.handle = handle;
+      if (photo) person.photoUrl = photo;
+      out.push(person);
     });
     return out;
   }

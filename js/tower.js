@@ -12093,9 +12093,15 @@
         spot.textContent = String(person.name).trim().charAt(0).toUpperCase() || "?";
         spot.setAttribute("aria-label", person.mutualName ? "You and " + person.name + " both know " + person.mutualName : person.name);
         if (person.userId) spot.setAttribute("data-circle-person", person.userId);
-        /* Real friend photo (profiles.photo_url); no photo or a bad URL keeps the letter. */
+        /* Tower picture: server photo_url, else that profile's Tower avatar. */
         var photoApi = window.CognationProfilePhoto;
         if (person.photoUrl && photoApi && typeof photoApi.applyPhoto === "function") photoApi.applyPhoto(spot, person.photoUrl);
+        else paintFriendPicture(spot, { id: person.handle || person.userId, name: person.name }, i);
+        if (person.handle) {
+          var handle = String(person.handle);
+          spot.setAttribute("data-circle-handle", handle);
+          spot.addEventListener("click", openCircleProfile(handle));
+        }
         if (person.mutualName) {
           spot.classList.add("has-caption");
           var caption = document.createElement("span");
@@ -12134,6 +12140,14 @@
         "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + pos.y.toFixed(1) + "px) scale(" + scale.toFixed(3) + ")";
       spots[i].style.zIndex = String(Math.round(pos.s * 100));
     }
+  }
+
+  function openCircleProfile(handle) {
+    return function () {
+      if (!handle) return;
+      if (window.CognationTowerOpenProfile) window.CognationTowerOpenProfile(handle);
+      try { stopCircleFall(); } catch (eStop) {}
+    };
   }
 
   function fillCircleSpots(people) {

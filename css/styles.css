@@ -14262,21 +14262,33 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   box-shadow: none !important;
 }
 #panel-signal .paper-grid { display: block !important; overflow: visible; }
-#panel-signal .commune-feed-list {
-  display: block !important;
-  column-count: 3;
-  column-gap: 1.15rem;
-  column-rule: 1px solid #16120c;
-  column-fill: balance;
-  margin-top: 0.85rem;
+#panel-signal .commune-feed-list,
+#panel-signal .commune-feed-list.is-endless {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 9.1rem;
+  align-items: stretch;
+  max-height: none !important;
+  overflow: visible !important;
+  margin: 0.85rem 0 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-top: 1px solid #16120c !important;
+  border-left: 1px solid #16120c !important;
+  border-radius: 0 !important;
+  background: transparent !important;
 }
 #panel-signal .commune-feed-item {
-  display: inline-block !important;
-  width: 100% !important;
-  break-inside: avoid;
-  padding: 0 0 0.8rem !important;
-  margin: 0 0 0.8rem !important;
+  display: flex !important;
+  flex-direction: column;
+  width: auto !important;
+  height: 9.1rem !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0.65rem 0.75rem !important;
+  overflow: hidden !important;
   border: 0 !important;
+  border-right: 1px solid #16120c !important;
   border-bottom: 1px solid #16120c !important;
   background: transparent !important;
   box-shadow: none !important;
@@ -14306,7 +14318,7 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 }
 @media (max-width: 720px) {
   #panel-signal .paper-title { white-space: normal; font-size: 2.6rem !important; }
-  #panel-signal .commune-feed-list { column-count: 1 !important; }
+  #panel-signal .commune-feed-list { grid-template-columns: minmax(0, 1fr) !important; }
 }
 
 /* Tower Personal | Professional matches SIGNAL News | Feed (type, color, place, size). */

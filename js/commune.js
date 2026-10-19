@@ -1265,6 +1265,14 @@
         posts.forEach(function (post, idx) {
           appendPostEl(post, { lead: idx === 0 });
         });
+        /* Fill the last row so the three columns stay the same height. */
+        var spare = (3 - (posts.length % 3)) % 3;
+        for (var pad = 0; pad < spare; pad++) {
+          var blank = document.createElement("div");
+          blank.className = "commune-feed-item times-column-pad";
+          blank.setAttribute("aria-hidden", "true");
+          feedList.appendChild(blank);
+        }
       }
       setEndlessUi(endlessOn);
       if (wireOn) {

@@ -11666,29 +11666,23 @@
     for (i = 0; i < steps; i++) {
       var turn = i / steps;
       var ang = turn * Math.PI * 2;
-      var n = Math.sin(ang * 4 + 0.4) * 0.72 + Math.sin(ang * 7 + 0.68) * 0.28;
       var p = circleProjectRadius(turn * 360, CIRCLE_RING_R);
-      var ox = Math.cos(ang), oy = Math.sin(ang) * Math.cos(CIRCLE_TILT), olen = Math.sqrt(ox * ox + oy * oy) || 1;
       var depth = p.s / CIRCLE_SCALE;
       var flicker = 0.8 + 0.2 * Math.sin(i * 1.35);
-      var side = Math.abs(Math.cos(ang));
-      glowAt(p.x + n * 14 * ox / olen, p.y + n * 14 * oy / olen, (18 + 36 * side) * depth, circleGlowColor(turn), 0.06 * flicker * (1.4 + 6 * side));
+      glowAt(p.x, p.y, 32 * depth, circleGlowColor(turn), 0.06 * flicker);
     }
     ring.appendChild(canvas);
     paintCircleBolt(ring);
   }
 
-  /* One tilted oval. A short wave rides the ring so the light stays a single ribbon. */
+  /* One smooth tilted oval. No wave, so the light stays an even ribbon. */
   function circleBoltSegments(radius, wobble, seed, baseWidth) {
     var steps = 140;
     var cmds = [];
     var i;
     for (i = 0; i <= steps; i++) {
-      var ang = (i / steps) * Math.PI * 2;
-      var n = Math.sin(ang * 4 + seed) * 0.72 + Math.sin(ang * 7 + seed * 1.7) * 0.28;
       var p = circleProjectRadius((i / steps) * 360, radius);
-      var ox = Math.cos(ang), oy = Math.sin(ang) * Math.cos(CIRCLE_TILT), olen = Math.sqrt(ox * ox + oy * oy) || 1;
-      cmds.push((i ? "L" : "M") + (p.x + n * wobble * ox / olen).toFixed(1) + " " + (p.y + n * wobble * oy / olen).toFixed(1));
+      cmds.push((i ? "L" : "M") + p.x.toFixed(1) + " " + p.y.toFixed(1));
     }
     return [{ d: cmds.join(" "), width: baseWidth }];
   }
@@ -12091,17 +12085,23 @@
         spot.classList.add("is-filled");
         spot.classList.remove("is-empty");
         spot.textContent = String(person.name).trim().charAt(0).toUpperCase() || "?";
-        spot.setAttribute("aria-label", person.mutualName ? "You and " + person.name + " both know " + person.mutualName : person.name);
+        spot.setAttribute("aria-label", person.activity ? person.name + ". " + person.activity : person.name);
         if (person.userId) spot.setAttribute("data-circle-person", person.userId);
-        /* Real friend photo (profiles.photo_url); no photo or a bad URL keeps the letter. */
+        /* Tower picture: server photo_url, else that profile's Tower avatar. */
         var photoApi = window.CognationProfilePhoto;
         if (person.photoUrl && photoApi && typeof photoApi.applyPhoto === "function") photoApi.applyPhoto(spot, person.photoUrl);
-        if (person.mutualName) {
+        else paintFriendPicture(spot, { id: person.handle || person.userId, name: person.name }, i);
+        if (person.handle) {
+          var handle = String(person.handle);
+          spot.setAttribute("data-circle-handle", handle);
+          spot.addEventListener("click", openCircleProfile(handle));
+        }
+        if (person.activity) {
           spot.classList.add("has-caption");
           var caption = document.createElement("span");
           caption.className = "circle-spot-caption";
           caption.setAttribute("data-circle-caption", "");
-          caption.textContent = "You and " + person.name + " both know " + person.mutualName;
+          caption.textContent = person.activity;
           spot.appendChild(caption);
         }
       } else {
@@ -12123,6 +12123,8 @@
     if (!spots.length) return;
     var shift = ((performance.now() - circleFallState.ringStarted) / 28000) * CIRCLE_SPOTS.length;
     var i;
+    var front = 0;
+    var frontScale = -1;
     for (i = 0; i < spots.length; i++) {
       var pos = circleSpotAt(i + shift);
       var depth = pos.s / CIRCLE_SCALE;
@@ -12133,7 +12135,20 @@
       spots[i].style.transform =
         "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + pos.y.toFixed(1) + "px) scale(" + scale.toFixed(3) + ")";
       spots[i].style.zIndex = String(Math.round(pos.s * 100));
+      if (scale > frontScale) { frontScale = scale; front = i; }
     }
+    for (i = 0; i < spots.length; i++) {
+      var cap = spots[i].querySelector("[data-circle-caption]");
+      if (cap) cap.hidden = i !== front;
+    }
+  }
+
+  function openCircleProfile(handle) {
+    return function () {
+      if (!handle) return;
+      if (window.CognationTowerOpenProfile) window.CognationTowerOpenProfile(handle);
+      try { stopCircleFall(); } catch (eStop) {}
+    };
   }
 
   function fillCircleSpots(people) {

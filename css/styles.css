@@ -12252,7 +12252,7 @@ a.circle-fall-portrait {
   height: 4.4rem;
   margin: 0;
   padding: 0;
-  border-radius: 1px;
+  border-radius: 50%;
   border: 1px solid rgba(214, 218, 232, 0.5);
   box-shadow: none;
   background: #070b16;

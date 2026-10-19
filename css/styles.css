@@ -2903,6 +2903,19 @@ body.login-gate-open .app-topbar {
   color: var(--color-heading);
 }
 
+.tower-feed-photo {
+  display: block;
+  width: 100%;
+  max-height: 22rem;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  flex: 1 0 100%;
+}
+
+.tower-compose-audience {
+  margin: 0.4rem 0 0;
+}
+
 
 /* TOWER layout: profile+messages rail | feed */
 .tower-layout {

@@ -374,43 +374,10 @@
                   </form>
                 </div>
               </section>
-                <div class="tower-side-toggle" data-tower-side-toggle role="tablist" aria-label="Tower side">
-                  <button type="button" class="tower-side-btn" role="tab" data-tower-side-btn="private" aria-selected="false" id="tower-side-private">Connections</button>
-                  <button type="button" class="tower-side-btn" role="tab" data-tower-side-btn="public" aria-selected="true" id="tower-side-public">Public profile</button>
-                </div>
 
                 <!-- PRIVATE: profiles + connections (Feed compose lives under SIGNAL) -->
                 <div class="tower-private-side" data-tower-private-side>
                   <div class="tower-main">
-                    <p class="tower-side-jump-row">
-                      <button type="button" class="tower-side-jump" data-tower-side-jump="public">Public profile →</button>
-                    </p>
-                    <details class="tower-private-theme tower-private-friends tower-compact-block tower-densify-section" data-tower-private-friends data-tower-top-friends open>
-                      <summary class="tower-private-theme-summary">Top friends</summary>
-                      <div class="tower-private-theme-body">
-                        <p class="form-hint">Feature pins on Public · drag to place</p>
-                        <div class="form-group tower-friends-display">
-                          <label for="tower-friends-count">Public friends to display</label>
-                          <select id="tower-friends-count" name="friendsDisplayCount" data-tower-friends-count>
-                            <option value="3">Top 3</option>
-                            <option value="6">Top 6</option>
-                            <option value="8">Top 8</option>
-                          </select>
-                          <fieldset class="tower-friends-pick" data-tower-friends-pick>
-                            <legend class="visually-hidden">Search friends to feature</legend>
-                            <label class="tower-friends-search-label" for="tower-friends-search">Search friends</label>
-                            <input id="tower-friends-search" type="search" data-tower-friends-search placeholder="Type a name" autocomplete="off">
-                            <div class="tower-friends-search-results" data-tower-friends-search-results hidden></div>
-                            <div class="tower-friends-chips" data-tower-friends-chips></div>
-                            <div class="tower-friends-save-row" style="margin-top:0.5rem;display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;">
-                              <button type="button" class="btn btn-primary tower-btn-compact" data-tower-save-friends>Save</button>
-                              <span class="form-hint" data-tower-friends-status role="status" aria-live="polite"></span>
-                            </div>
-                          </fieldset>
-                        </div>
-                      </div>
-                    </details>
-
                     <details class="tower-private-theme tower-private-calendar tower-compact-block tower-densify-section" data-tower-private-calendar data-tower-calendar open>
                       <summary class="tower-private-theme-summary">Calendar</summary>
                       <div class="tower-private-theme-body">
@@ -497,9 +464,6 @@
 
                 <!-- PUBLIC: scrapbook face visitors see -->
                 <div class="tower-public-side" data-tower-public-side hidden>
-                  <p class="tower-side-jump-row tower-side-jump-row--public">
-                    <button type="button" class="tower-side-jump" data-tower-side-jump="private">← Connections</button>
-                  </p>
                   <div class="tower-profile-kind-toggle" data-tower-profile-kind-toggle role="tablist" aria-label="Public profile page" hidden>
                     <button type="button" class="tower-kind-btn" role="tab" data-tower-profile-kind="personal" aria-selected="true" id="tower-kind-personal">Personal page</button>
                     <button type="button" class="tower-kind-btn" role="tab" data-tower-profile-kind="professional" aria-selected="false" id="tower-kind-professional">Professional page</button>
@@ -722,7 +686,7 @@
                         <div class="tower-badge-stage" data-tower-badge-stage hidden></div>
                       </div>
 
-                      </div><div class="tower-sticker tower-sticker--friends" data-tower-widget="friends" data-sticker-label="Friends">
+                      </div><div class="tower-sticker tower-sticker--friends" data-tower-widget="friends" data-sticker-label="Friends" hidden>
                         <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Friends sticker" tabindex="-1" hidden>⋮⋮</button>
                         <div class="tower-friends-public" data-tower-friends-public aria-label="Featured friends"></div>
                       </div>

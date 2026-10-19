@@ -14269,7 +14269,7 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 #panel-signal .commune-feed-list.is-endless {
   display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: 12.5rem;
+  grid-auto-rows: minmax(12.5rem, auto);
   align-items: stretch;
   max-height: none !important;
   overflow: visible !important;
@@ -14346,8 +14346,24 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   text-align: left !important;
   color: #0c0b0a !important;
 }
+#panel-signal .commune-feed-item.is-lead {
+  grid-column: 1 / -1 !important; height: auto !important; overflow: visible !important;
+  padding: 1.15rem 1.25rem 1.3rem !important;
+}
+#panel-signal .times-lead-headline {
+  margin: 0 0 0.35rem !important; font-size: clamp(1.7rem, 3vw, 2.25rem) !important;
+  font-weight: 700 !important; letter-spacing: 0 !important; line-height: 1.2 !important;
+  text-transform: none !important; color: #0c0b0a !important;
+}
+#panel-signal .times-lead-byline {
+  margin: 0 0 0.7rem !important; font-size: 1.125rem !important; font-style: italic !important;
+  font-weight: 500 !important; line-height: 1.4 !important; color: #0c0b0a !important;
+}
+#panel-signal .times-lead-byline time { font-style: normal !important; font-weight: 500 !important; }
+#panel-signal .is-lead .commune-feed-body { font-size: 1.25rem !important; line-height: 1.55 !important; }
 @media (max-width: 720px) {
   #panel-signal .paper-title { white-space: normal; font-size: 1.85rem !important; line-height: 1.15 !important; }
+  #panel-signal .times-lead-headline { font-size: 1.65rem !important; }
   #panel-signal .commune-feed-list { grid-template-columns: minmax(0, 1fr) !important; }
 }
 

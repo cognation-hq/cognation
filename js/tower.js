@@ -3727,6 +3727,8 @@
     stage.querySelectorAll("[data-tower-badge-pin]").forEach(function (el) {
       el.remove();
     });
+    /* Milestone text lives on the Badges sticker. Pins are not a public gallery. */
+    return;
     if (!widgets.badges) return;
 
     var items = collectVisibleBadgePins(p);
@@ -6067,6 +6069,111 @@
     return false;
   }
 
+  var milestoneByProfile = {};
+
+  function appliedMilestoneList(p) {
+    var out = [];
+    var seen = {};
+    function add(id, title) {
+      id = String(id || "");
+      title = String(title || "").trim();
+      if (!id || !title || seen[id]) return;
+      seen[id] = 1;
+      out.push({ id: id, title: title.slice(0, 48) });
+    }
+    var list = (p && p.awardedBadges) || [];
+    if (Array.isArray(list)) {
+      list.forEach(function (b) {
+        if (b && b.kind === "milestone" && b.applied === true) add(b.id, b.title);
+      });
+    }
+    var pid = p && String(p._profileId || p.id || "");
+    var cached = pid && milestoneByProfile[pid];
+    if (Array.isArray(cached)) cached.forEach(function (b) { if (b) add(b.id, b.title); });
+    return out;
+  }
+
+  function loadAppliedMilestones(root, p) {
+    var id = p && String(p._profileId || p.id || "");
+    if (!id || milestoneByProfile[id]) return;
+    var c = window.CognationSupabase;
+    if (!c || typeof c.configured !== "function" || !c.configured() || typeof c.rpc !== "function") return;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return;
+    milestoneByProfile[id] = "pending";
+    c.rpc("applied_milestones_for_profile", { p_profile_id: id }).then(function (rows) {
+      milestoneByProfile[id] = Array.isArray(rows) ? rows : [];
+      try { applyPublicWidgets(root, TowerProfileStore.get()); } catch (eMs) {}
+    }, function () { milestoneByProfile[id] = []; });
+  }
+
+  function noteLocalMilestone(id, title) {
+    var p = TowerProfileStore.get();
+    if (!p || !isTowerOwner(p)) return;
+    if (!Array.isArray(p.awardedBadges)) p.awardedBadges = [];
+    var found = false;
+    p.awardedBadges.forEach(function (b) {
+      if (!b || b.id !== id) return;
+      b.kind = "milestone";
+      b.applied = true;
+      b.title = title;
+      found = true;
+    });
+    if (!found) p.awardedBadges.push({ id: id, title: title, kind: "milestone", applied: true });
+    var pid = String(p._profileId || p.id || "");
+    if (pid) delete milestoneByProfile[pid];
+    TowerProfileStore.save(p);
+  }
+
+  function bootMilestoneApply(root) {
+    if (!root) return;
+    if (!root.__milestoneListen) {
+      root.__milestoneListen = true;
+      document.addEventListener("cognation:session-started", function () {
+        root.__milestoneBoot = false;
+        bootMilestoneApply(root);
+      });
+    }
+    if (root.__milestoneBoot) return;
+    root.__milestoneBoot = true;
+    var params;
+    try { params = new URLSearchParams(window.location.search || ""); } catch (eQ) { return; }
+    var c = window.CognationSupabase;
+    var live = !!(c && typeof c.configured === "function" && c.configured() && typeof c.rpc === "function");
+    if (!live) return;
+    if (params.get("staff-badge") === "1") {
+      params.delete("staff-badge");
+      try {
+        history.replaceState(null, "", (location.pathname || "/") + (params.toString() ? "?" + params.toString() : "") + (location.hash || ""));
+      } catch (eStaff) {}
+      c.rpc("cognation_is_staff", {}).then(function (yes) {
+        if (yes !== true) return;
+        var email = window.prompt("Email for this one milestone");
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) return;
+        email = String(email).trim();
+        var title = window.prompt("Milestone name");
+        title = String(title || "").trim().slice(0, 48);
+        if (!title) return;
+        c.rpc("staff_award_milestone", { recipient_email: email, title: title }).then(function (id) {
+          if (!id) return;
+          var link = (location.origin || "") + (location.pathname || "/") + "?apply-badge=" + encodeURIComponent(id);
+          var body = "Cognation made you a milestone badge.\n\nApply:\n" + link + "\n";
+          window.location.href = "mailto:" + email + "?subject=" + encodeURIComponent("Your Cognation milestone") + "&body=" + encodeURIComponent(body);
+        }, function () {});
+      }, function () {});
+    }
+    var awardId = params.get("apply-badge");
+    if (!awardId) return;
+    c.rpc("apply_milestone", { award_id: awardId }).then(function (title) {
+      if (!title) return;
+      noteLocalMilestone(awardId, String(title));
+      try {
+        params.delete("apply-badge");
+        history.replaceState(null, "", (location.pathname || "/") + (params.toString() ? "?" + params.toString() : "") + (location.hash || ""));
+      } catch (eHist) {}
+      applyPublicWidgets(root, TowerProfileStore.get());
+    }, function () {});
+  }
+
   function profileHasVisibleBadges(p) {
     var vis = (p && p.badgeVisibility) || {};
     var awarded = (p && p.awardedBadges) || {};
@@ -6121,6 +6228,7 @@
 
   function applyPublicWidgetsInner(root, p) {
     if (p) pruneEmptyPublicWidgetsInProfile(p);
+    loadAppliedMilestones(root, p);
     var widgets = normalizePublicWidgets(p && p.publicWidgets);
     var sloganText = p && typeof p.slogan === "string" ? p.slogan.trim() : "";
     var htmlText = p && typeof p.customHtml === "string" ? p.customHtml.trim() : "";
@@ -6148,12 +6256,18 @@
           else on = true;
         }
       }
-      /* Top friends and badges stay on the profile, under Edit profile. */
-      if (id === "friends" || id === "badges") on = true;
+      /* Top friends stay. Badges stay off until this person applies a staff milestone. */
+      if (id === "friends") on = true;
+      var milestones = id === "badges" ? appliedMilestoneList(p) : null;
+      if (id === "badges") on = !!(milestones && milestones.length);
       /* The same Calendar sticker stays on the personal page and the professional page. */
       if (id === "calendar") on = true;
       var el = root.querySelector('[data-tower-widget="' + id + '"]');
       if (!el) return;
+      if (id === "badges") {
+        var badgeLabel = el.querySelector("[data-tower-badges-public]");
+        if (badgeLabel) badgeLabel.textContent = on ? milestones.map(function (b) { return b.title; }).join(" · ") : "Badges";
+      }
       el.hidden = !on;
       el.classList.toggle("is-widget-off", !on);
       if (!on) el.classList.remove("is-widget-selected");
@@ -10526,6 +10640,7 @@
     initDensifySections(root);
     initTowerCalendar(root);
     initGoingLive(root);
+    bootMilestoneApply(root);
 
     var profileForm = root.querySelector("[data-tower-profile-form]");
     var avatarFile = root.querySelector("[data-tower-avatar-file]");

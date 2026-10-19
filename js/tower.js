@@ -2705,15 +2705,6 @@
           ? "professional"
           : "personal",
       };
-      if (/(^|[^a-z0-9])#market(?![a-z0-9])/i.test(body)) {
-        try {
-          var memberLoc = JSON.parse(localStorage.getItem("cognation.member.profile.v1") || "{}");
-          var savedLoc = JSON.parse(localStorage.getItem("cognation.member.location.v1") || "null");
-          var lat = Number(memberLoc && memberLoc.lat != null ? memberLoc.lat : savedLoc && savedLoc.lat);
-          var lng = Number(memberLoc && memberLoc.lng != null ? memberLoc.lng : savedLoc && savedLoc.lng);
-          if (isFinite(lat) && isFinite(lng)) { post.lat = lat; post.lng = lng; }
-        } catch (eLoc) {}
-      }
       data.posts.unshift(post);
       if (!this.save(data)) return { ok: false, error: "Could not save post." };
       document.dispatchEvent(

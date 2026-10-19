@@ -47,7 +47,7 @@ var local = memoryStorage();
 local.setItem("cognation.tower.posts.v3", JSON.stringify({
   version: 1,
   posts: [
-    { id: "sale-1", authorName: "Sam", handle: "sam", body: "Blue mug for sale #market", attachments: [{ kind: "photo", dataUrl: pic }] },
+    { id: "sale-1", authorName: "Sam", handle: "sam", body: "fairly new shoes $5 #market", attachments: [{ kind: "photo", dataUrl: pic }] },
     { id: "group-1", authorName: "Sam", body: "Study night #group", attachments: [{ kind: "photo", dataUrl: pic }] },
     { id: "plain-1", authorName: "Sam", body: "Market square this morning." },
   ],
@@ -58,10 +58,14 @@ var cards = api.marketplaceCards();
 assert.strictEqual(cards.length, 1, "only #market");
 assert.strictEqual(cards[0].type, "marketplace");
 assert.strictEqual(cards[0].pictures[0], pic);
+assert.strictEqual(cards[0].ask, 5);
+assert.strictEqual(api.marketBidLabel(cards[0]), "Bid $5");
 assert.strictEqual(api.featuredFamily("marketplace"), "content");
 assert.ok(api.sampleDeck(12).some(function (c) { return c.type === "marketplace" && c.pictures[0] === pic; }));
 assert.strictEqual(api.marketCanBid(), true);
-assert.strictEqual(api.optInToBid(cards[0].id), true);
+assert.strictEqual(api.optInToBid(cards[0].id, cards[0].ask), true);
+var saved = JSON.parse(local.getItem("cognation.commune.market.bids.v1"));
+assert.strictEqual(saved.you["market-sale-1"].amount, 5);
 assert.strictEqual(api.optInToBid("nope-under"), true);
 
 var young = memoryStorage();

@@ -1304,6 +1304,23 @@
     var age = getMemberAge();
     return typeof age === "number" && age >= 16;
   }
+  /* First $ amount in the post is where the bid starts. No amount, no price. */
+  function marketAsk(text) {
+    var m = String(text || "").match(/\$\s*(\d{1,7}(?:,\d{3})*(?:\.\d{1,2})?)/);
+    if (!m) return null;
+    var n = Number(String(m[1]).replace(/,/g, ""));
+    return isFinite(n) && n >= 0 ? n : null;
+  }
+  function marketMoney(amount) {
+    var n = Number(amount);
+    if (!isFinite(n) || n < 0) return "";
+    var whole = Math.abs(n - Math.round(n)) < 0.001;
+    return "$" + (whole ? String(Math.round(n)) : n.toFixed(2));
+  }
+  function marketBidLabel(card) {
+    var price = marketMoney(card && card.ask);
+    return price ? "Bid " + price : "Bid";
+  }
   function marketPictures(post) {
     var out = [];
     (post && Array.isArray(post.attachments) ? post.attachments : []).forEach(function (a) {
@@ -1328,6 +1345,7 @@
         handle: String(post.handle || "").replace(/^@/, ""),
         profileId: post.authorProfileId || "",
         pictures: marketPictures(post),
+        ask: marketAsk((post.body || "") + " " + (post.title || "")),
       });
     });
     return out;
@@ -1337,12 +1355,13 @@
     var row = doc[currentProfileId()];
     return !!(row && row[cardId]);
   }
-  function optInToBid(cardId) {
+  function optInToBid(cardId, amount) {
     if (!marketCanBid()) return false;
     var doc = readJson(localStorage, BIDS_KEY, {});
     var mine = currentProfileId();
     if (!doc[mine] || typeof doc[mine] !== "object") doc[mine] = {};
-    doc[mine][cardId] = Date.now();
+    var start = Number(amount);
+    doc[mine][cardId] = { at: Date.now(), amount: isFinite(start) && start >= 0 ? start : null };
     writeJson(localStorage, BIDS_KEY, doc);
     return true;
   }
@@ -1355,12 +1374,15 @@
     if (!marketCanBid()) {
       return html + '<p class="commune-card-meta" data-market-bid-note>Bidding is for ages 16 and up.</p>';
     }
+    var price = marketMoney(card.ask);
     var opted = marketOptedIn(card.id);
+    var note = opted
+      ? "You're opted in" + (price ? " at " + price : "") + ". Nothing is charged."
+      : (price ? "Starts at " + price + ". " : "") + "Opt in only. Nothing is charged.";
     return html +
       '<button type="button" class="btn btn-primary" data-market-bid aria-pressed="' + (opted ? "true" : "false") + '">' +
-      (opted ? "Opted in" : "Bid") + "</button>" +
-      '<p class="commune-card-meta" data-market-bid-note>' +
-      (opted ? "You're opted in to bid. Nothing is charged." : "Opt in only. Nothing is charged.") + "</p>";
+      escapeHtml(marketBidLabel(card)) + "</button>" +
+      '<p class="commune-card-meta" data-market-bid-note>' + escapeHtml(note) + "</p>";
   }
 
   function ageSafeFeaturedCard(card) {
@@ -2046,11 +2068,12 @@
     if (bidBtn) bidBtn.addEventListener("click", function (ev) {
       ev.preventDefault();
       ev.stopPropagation();
-      if (!optInToBid(card.id)) return;
-      bidBtn.textContent = "Opted in";
+      if (!optInToBid(card.id, card.ask)) return;
+      bidBtn.textContent = marketBidLabel(card);
       bidBtn.setAttribute("aria-pressed", "true");
       var note = el.querySelector("[data-market-bid-note]");
-      if (note) note.textContent = "You're opted in to bid. Nothing is charged.";
+      var price = marketMoney(card.ask);
+      if (note) note.textContent = "You're opted in" + (price ? " at " + price : "") + ". Nothing is charged.";
     });
     var joinLive = el.querySelector("[data-live-echo-join]");
     if (joinLive) joinLive.addEventListener("click", function (ev) {
@@ -3730,6 +3753,7 @@
     towerLiveContentCards: towerLiveContentCards,
     marketplaceCards: marketplaceCards,
     marketCanBid: marketCanBid,
+    marketBidLabel: marketBidLabel,
     optInToBid: optInToBid,
     featuredFamily: featuredFamily,
     getMode: getMode,

@@ -1033,7 +1033,7 @@
       article.innerHTML =
         '<header class="commune-feed-meta">' +
         '<span class="commune-social-kind">' +
-        escapeHtml(kind === "social" ? "Social" : kind === "wire" ? "Wire" : "News") +
+        escapeHtml(kind === "social" ? "Social" : kind === "wire" ? "Wire" : "Desk") +
         "</span>" +
         '<span class="commune-feed-author">' +
         authorHtml +
@@ -1235,10 +1235,11 @@
 
     function renderFeed() {
       if (!feedList) return;
-      var posts =
-        editionId === "local" || editionId === "statewide"
-          ? postsFromTower()
-          : natIntlFloor(FeedStore.listPosts(editionId));
+      /* Front page prefers the rated Feed plate (personal and professional). */
+      var towerPlate = postsFromTower();
+      var posts = towerPlate.length || editionId === "local" || editionId === "statewide"
+        ? towerPlate
+        : natIntlFloor(FeedStore.listPosts(editionId));
       floorUnder13AtRender = newsViewerUnder13();
       try {
         if (window.CognationSeedOpsNewsLog && window.CognationSeedOpsNewsLog.onTowerPostsForNews) {
@@ -1264,6 +1265,14 @@
         posts.forEach(function (post, idx) {
           appendPostEl(post, { lead: idx === 0 });
         });
+        /* Fill the last row so the three columns stay the same height. */
+        var spare = (3 - (posts.length % 3)) % 3;
+        for (var pad = 0; pad < spare; pad++) {
+          var blank = document.createElement("div");
+          blank.className = "commune-feed-item times-column-pad";
+          blank.setAttribute("aria-hidden", "true");
+          feedList.appendChild(blank);
+        }
       }
       setEndlessUi(endlessOn);
       if (wireOn) {

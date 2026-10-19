@@ -11666,29 +11666,23 @@
     for (i = 0; i < steps; i++) {
       var turn = i / steps;
       var ang = turn * Math.PI * 2;
-      var n = Math.sin(ang * 4 + 0.4) * 0.72 + Math.sin(ang * 7 + 0.68) * 0.28;
       var p = circleProjectRadius(turn * 360, CIRCLE_RING_R);
-      var ox = Math.cos(ang), oy = Math.sin(ang) * Math.cos(CIRCLE_TILT), olen = Math.sqrt(ox * ox + oy * oy) || 1;
       var depth = p.s / CIRCLE_SCALE;
       var flicker = 0.8 + 0.2 * Math.sin(i * 1.35);
-      var side = Math.abs(Math.cos(ang));
-      glowAt(p.x + n * 14 * ox / olen, p.y + n * 14 * oy / olen, (18 + 36 * side) * depth, circleGlowColor(turn), 0.06 * flicker * (1.4 + 6 * side));
+      glowAt(p.x, p.y, 32 * depth, circleGlowColor(turn), 0.06 * flicker);
     }
     ring.appendChild(canvas);
     paintCircleBolt(ring);
   }
 
-  /* One tilted oval. A short wave rides the ring so the light stays a single ribbon. */
+  /* One smooth tilted oval. No wave, so the light stays an even ribbon. */
   function circleBoltSegments(radius, wobble, seed, baseWidth) {
     var steps = 140;
     var cmds = [];
     var i;
     for (i = 0; i <= steps; i++) {
-      var ang = (i / steps) * Math.PI * 2;
-      var n = Math.sin(ang * 4 + seed) * 0.72 + Math.sin(ang * 7 + seed * 1.7) * 0.28;
       var p = circleProjectRadius((i / steps) * 360, radius);
-      var ox = Math.cos(ang), oy = Math.sin(ang) * Math.cos(CIRCLE_TILT), olen = Math.sqrt(ox * ox + oy * oy) || 1;
-      cmds.push((i ? "L" : "M") + (p.x + n * wobble * ox / olen).toFixed(1) + " " + (p.y + n * wobble * oy / olen).toFixed(1));
+      cmds.push((i ? "L" : "M") + p.x.toFixed(1) + " " + p.y.toFixed(1));
     }
     return [{ d: cmds.join(" "), width: baseWidth }];
   }

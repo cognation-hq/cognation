@@ -72,6 +72,11 @@ assert.ok(shellBlock, "Cap 250 early shell path present");
 assert.ok(/shellOnly:\s*true/.test(shellBlock[0]), "shellOnly — no portrait physics");
 assert.ok(!/applyCircleTopics/.test(shellBlock[0]), "no 15-minute demo topics on shell path");
 
+/* The masthead line meets the tab bar. Section padding must not open a dark band above it. */
+var circleTabs = css.match(/body\.is-circle-open #main \.tabs-section\s*\{[\s\S]*?\n\}/);
+assert.ok(circleTabs, "circle tabs-section rule present");
+assert.ok(/margin-top:\s*0\s*;/.test(circleTabs[0]) && /padding-top:\s*0\s*;/.test(circleTabs[0]), "no empty gap above the PULSE bar");
+
 /* Full-page ring — not shrunk blank panel */
 var hasRel = css.match(/\.circle-fall:has\(\[data-circle-relations\]\)\s*\{[\s\S]*?\n\}/);
 assert.ok(hasRel && /height:\s*100vh/.test(hasRel[0]), "relations overlay keeps full-page ring height");

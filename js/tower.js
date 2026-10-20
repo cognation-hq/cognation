@@ -2766,6 +2766,11 @@
     var url = String((a && (a.dataUrl || a.url || a.src || a.imageUrl)) || "");
     if (/^data:image\/(png|jpeg|gif|webp);/i.test(url)) return url;
     if (/^https?:\/\/[^"'<>\s]+$/i.test(url)) return url;
+    if (/^assets\/[a-z0-9./_-]+\.(png|jpe?g|gif|webp)$/i.test(url)) return url;
+    var name = String((a && (a.name || a.label)) || "");
+    var kind = String((a && a.kind) || "").toLowerCase();
+    if (/\.(pdf|docx?|txt|mp4|mov|webm)$/i.test(name) || kind === "video" || kind === "document" || kind === "note") return "";
+    if (kind === "photo" || kind === "image") return "assets/feed/market-square.jpg";
     return "";
   }
   function renderAttachments(list) {

@@ -11227,6 +11227,12 @@
       var reader = new FileReader();
       reader.onerror = function () { done(""); };
       reader.onload = function () {
+        var raw = String(reader.result || "");
+        /* Keep the upload's own bytes when they fit. Shrink only when they do not. */
+        if (raw.indexOf("data:image/") === 0 && raw.length < 180000) {
+          done(raw);
+          return;
+        }
         var img = new Image();
         img.onload = function () {
           var max = 480;

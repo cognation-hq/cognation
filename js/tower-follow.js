@@ -159,6 +159,19 @@
       btn.disabled = true;
       btn.setAttribute("aria-label", "Friend request sent");
     } else {
+      /* SeedOps: real ↛ seed/ops (send_friend_request also refuses). The server
+         row in state.target carries account_kind / seed_fleet_id. */
+      var gateRemote = window.CognationSeedOpsFriendGate;
+      var blockedRemote =
+        gateRemote && typeof gateRemote.canFriend === "function" && state.target
+          ? gateRemote.canFriend(null, state.target)
+          : { ok: true };
+      if (!blockedRemote.ok) {
+        btn.disabled = true;
+        btn.textContent = "Unavailable";
+        btn.setAttribute("aria-label", blockedRemote.message || "Cannot friend seed or ops accounts");
+        return;
+      }
       btn.textContent = "+ friend";
       btn.setAttribute("aria-label", "Add this person as a friend");
     }

@@ -49,6 +49,12 @@
       var fleet = api.getByFleetId(id);
       if (fleet) return fleet;
     }
+    /* Server profile cache (supabase-social): carries account_kind / seed_fleet_id. */
+    var social = window.CognationSupabaseSocial;
+    if (social && typeof social.getProfile === "function") {
+      var row = social.getProfile(id);
+      if (row && row.account_kind) return row;
+    }
     /* Heuristic for remote / unresolved ids */
     if (/^seed-|^prof-seed-|^ops-|^prof-ops-/.test(id.toLowerCase())) {
       return { id: id, accountKind: /^ops-|^prof-ops-/.test(id.toLowerCase()) ? "ops" : "seed", isSeed: !/^ops-/.test(id.toLowerCase()), isOpsBot: /^ops-|^prof-ops-/.test(id.toLowerCase()) };
@@ -72,6 +78,13 @@
             }
           }
           if (session.accountKind || session.isSeed || session.isOpsBot) return session;
+          /* Signed in: the viewer's own server row (account_kind / seed_fleet_id),
+             never the Tower page on screen (that is the person being viewed). */
+          var social = window.CognationSupabaseSocial;
+          if (session.activeProfileId && social && typeof social.getProfile === "function") {
+            var mine = social.getProfile(session.activeProfileId);
+            if (mine && mine.account_kind) return mine;
+          }
         }
       }
     } catch (e) {}

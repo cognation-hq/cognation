@@ -101,6 +101,11 @@
           rec = window.CognationAccounts.getProfileByHandle(handle);
         }
       }
+      /* Signed in: server profile cache carries account_kind / seed_fleet_id. */
+      if (!rec && id && window.CognationSupabaseSocial && typeof window.CognationSupabaseSocial.getProfile === "function") {
+        var row = window.CognationSupabaseSocial.getProfile(id);
+        if (row && row.account_kind) rec = row;
+      }
       if (!rec && (li.textContent || "").indexOf("seed-") >= 0) {
         rec = { accountKind: "seed", isSeed: true };
       }

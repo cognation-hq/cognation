@@ -175,6 +175,12 @@
       _remote: true,
       displayName: profile.display_name,
       handle: profile.handle,
+      /* Seed/ops Demo badge (syncTowerBadges) and the friend gate
+         (tower-follow "Unavailable") read these, never the handle. */
+      accountKind: String(profile.account_kind || "").toLowerCase(),
+      isSeed: String(profile.account_kind || "").toLowerCase() === "seed",
+      isOpsBot: String(profile.account_kind || "").toLowerCase() === "ops",
+      seedFleetId: String(profile.seed_fleet_id || ""),
       slogan: profile.bio,
       socialLinks: {},
       badges: { role: "", interest: "", status: "" },

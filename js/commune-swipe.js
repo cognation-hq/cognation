@@ -1623,7 +1623,9 @@
         var rows = social && typeof social.listProfiles === "function" ? social.listProfiles() || [] : [];
         rows.forEach(function (row) {
           if (!row) return;
-          fn({ id: row.id, kind: row.kind, handle: row.handle, displayName: row.display_name, bio: row.bio || "", userId: row.user_id });
+          /* accountKind / seedFleetId: the card's Demo badge reads them (not the handle). */
+          fn({ id: row.id, kind: row.kind, handle: row.handle, displayName: row.display_name, bio: row.bio || "", userId: row.user_id,
+            accountKind: String(row.account_kind || "").toLowerCase(), seedFleetId: String(row.seed_fleet_id || "") });
         });
       };
     }

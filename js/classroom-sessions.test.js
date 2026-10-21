@@ -31,6 +31,25 @@ var OTHER_UID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 var NOW = Date.parse("2026-10-20T19:45:00-05:00");
 var MIN = 60000;
 
+/* Pinned clock: the fixtures are built around NOW, and the code under test reads
+   Date.now() / new Date(). Without this the test starts failing once the real clock
+   passes the fixture sessions. Every module here (and the vm windows below, which get
+   `Date: Date`) sees this pinned Date. Explicit arguments behave exactly as before. */
+var RealDate = Date;
+function PinnedDate() {
+  var args = Array.prototype.slice.call(arguments);
+  if (!(this instanceof PinnedDate)) return new RealDate(NOW).toString();
+  return args.length ? new (Function.prototype.bind.apply(RealDate, [null].concat(args)))() : new RealDate(NOW);
+}
+PinnedDate.prototype = RealDate.prototype;
+PinnedDate.now = function () { return NOW; };
+PinnedDate.parse = RealDate.parse;
+PinnedDate.UTC = RealDate.UTC;
+global.Date = PinnedDate;
+assert.strictEqual(Date.now(), NOW, "clock pinned");
+assert.strictEqual(new Date().getTime(), NOW, "new Date() pinned");
+assert.ok(new Date(0) instanceof RealDate && new Date(0).getTime() === 0, "explicit dates unchanged");
+
 function host(id, opts) {
   opts = opts || {};
   return { id: id, handle: opts.handle || "host-" + id.slice(0, 4), display_name: opts.name || "Host " + id.slice(0, 4),
@@ -110,12 +129,15 @@ function loadAll(opts) {
   assert.strictEqual(A.canSchedule(owner, { id: "prof-alexa-professional", kind: "professional", userId: OWNER_UID }), false, "local demo record is not a server page");
   var sched = A.normalizeRow(row(sid(1), host(HOST, { uid: OWNER_UID })));
   var other = A.normalizeRow(row(sid(2), host(HOST2), { status: "live" }));
-  assert.strictEqual(A.canGoLive(owner, proPage, sched, [sched]), true, "host goes live on own scheduled session");
-  assert.strictEqual(A.canGoLive({ userId: OTHER_UID }, proPage, sched, [sched]), false, "only the host");
-  assert.strictEqual(A.canGoLive(owner, { id: HOST, kind: "personal", userId: OWNER_UID }, sched, [sched]), false, "only a Professional page");
+  /* sched starts at NOW + 60 min; Go live opens 30 min before start (NOW + 30 min). */
+  var GO_LIVE_AT = NOW + 30 * MIN;
+  assert.strictEqual(A.canGoLive(owner, proPage, sched, [sched], GO_LIVE_AT), true, "host goes live on own scheduled session");
+  assert.strictEqual(A.canGoLive({ userId: OTHER_UID }, proPage, sched, [sched], GO_LIVE_AT), false, "only the host");
+  assert.strictEqual(A.canGoLive(owner, { id: HOST, kind: "personal", userId: OWNER_UID }, sched, [sched], GO_LIVE_AT), false, "only a Professional page");
   var liveOwn = A.normalizeRow(row(sid(3), host(HOST, { uid: OWNER_UID }), { status: "live" }));
-  assert.strictEqual(A.canGoLive(owner, proPage, sched, [sched, liveOwn]), false, "one live session per host");
-  assert.strictEqual(A.canGoLive(owner, proPage, other, [other]), false, "not another host's session");
+  assert.strictEqual(A.canGoLive(owner, proPage, sched, [sched, liveOwn], GO_LIVE_AT), false, "one live session per host");
+  assert.strictEqual(A.canGoLive(owner, proPage, other, [other], GO_LIVE_AT), false, "not another host's session");
+  assert.strictEqual(A.canGoLive(owner, proPage, sched, [sched], NOW), false, "at NOW (60 min early) Go live is still closed");
   assert.strictEqual(A.canEnd(owner, proPage, liveOwn), true, "host ends own live session");
   assert.strictEqual(A.canEnd({ userId: OTHER_UID }, proPage, liveOwn), false, "only the host ends it");
   [["scheduled", "live", true], ["scheduled", "ended", true], ["live", "ended", true],

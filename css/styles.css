@@ -14969,6 +14969,7 @@ body.cgn-cal-page {
   border: 0 !important;
   margin: 0.3rem 0 0 !important; /* was 0 1rem 0.5rem (boxed status) */
   padding: 0 0 0 0.45rem !important; /* .news-comment-item .news-report-option */
+  font-size: 0.75rem !important; /* same size as the story-level line (.news-report-status); was 0.88rem from .commune-status */
 }
 
 /* TOWER Feed contrast (Designer follow-up). TOWER Feed only (.tower-feed[data-tower-feed]

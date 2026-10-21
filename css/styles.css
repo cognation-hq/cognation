@@ -14408,3 +14408,130 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
     padding: 0.25rem;
   }
 }
+
+
+/* pulse-background PR: Alexa's PULSE background (refs/alexa-final-2026-10-15.png),
+   used as-is with only the five placeholder squares removed. WebP with a JPEG
+   fallback; phones load the 760px file. Strands drift gently; off for reduced motion. */
+.circle-fall[data-pulse-bg] {
+  --pulse-bg-k: 0.954;            /* image px -> screen px (ring ~1040px wide) */
+  --pulse-bg-w: calc(1190px * var(--pulse-bg-k));
+  --pulse-bg-h: calc(600px * var(--pulse-bg-k));
+  /* Cap 250 halo kept, blended over the image's page colour. */
+  background:
+    radial-gradient(ellipse at 50% 44%, rgba(168, 244, 255, 0.16), transparent 42%),
+    radial-gradient(ellipse at 52% 52%, rgba(197, 166, 255, 0.2), transparent 58%),
+    #1b1545;
+}
+.circle-fall[data-pulse-bg]::before,
+.circle-fall[data-pulse-bg]::after {
+  content: "";
+  position: absolute;
+  /* ring centre in the image is (605, 262); pin it to the ring centre (50%, 48%) */
+  left: calc(50% - 605px * var(--pulse-bg-k));
+  top: calc(48% - 262px * var(--pulse-bg-k));
+  width: var(--pulse-bg-w);
+  height: var(--pulse-bg-h);
+  background-image: url("../assets/pulse/pulse-bg-1190.jpg");
+  background-image: image-set(url("../assets/pulse/pulse-bg-1190.webp") type("image/webp"), url("../assets/pulse/pulse-bg-1190.jpg") type("image/jpeg"));
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 0;
+}
+.circle-fall[data-pulse-bg]::before {
+  /* soft edge so the image melts into the page colour */
+  -webkit-mask-image: radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+  mask-image: radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+}
+.circle-fall[data-pulse-bg]::after {
+  /* drift layer: the same strands, masked to the ring band, shifted slowly */
+  opacity: 0.42;
+  mix-blend-mode: screen;
+  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 51% 44%, transparent 58%, #000 76%, #000 90%, transparent 100%);
+  mask-image: radial-gradient(ellipse 50% 50% at 51% 44%, transparent 58%, #000 76%, #000 90%, transparent 100%);
+  transform-origin: 51% 44%;
+  will-change: transform;
+  animation: pulse-strand-drift 16s ease-in-out infinite alternate;
+}
+@keyframes pulse-strand-drift {
+  0% { transform: translate3d(-4px, 1px, 0) rotate(-0.35deg) scale(1.004); }
+  50% { transform: translate3d(3px, -2px, 0) rotate(0.2deg) scale(1.012); }
+  100% { transform: translate3d(5px, 2px, 0) rotate(0.4deg) scale(0.998); }
+}
+/* Painted lightning + bolt stay on (still-here list), toned down and blended
+   so they sit with the image strands instead of doubling them. */
+.circle-fall[data-pulse-bg] .circle-lightning,
+.circle-fall[data-pulse-bg] svg.circle-bolt { display: none; } /* r4 (Designer + PM): hidden on PULSE, they doubled up with Alexa's image strands; code stays */
+/* Halo glow over the image (the image is opaque, so the page halo alone is hidden). */
+.circle-fall[data-pulse-bg] .circle-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(ellipse at 50% 44%, rgba(168, 244, 255, 0.16), transparent 42%),
+    radial-gradient(ellipse at 52% 52%, rgba(197, 166, 255, 0.2), transparent 58%);
+}
+.circle-fall[data-pulse-bg] .circle-ring { z-index: 2; }
+/* real friend circles sit on top of the background and the ring */
+.circle-fall[data-pulse-bg] .pulse-fall-stack { z-index: 3; }
+@media (max-width: 600px) {
+  .circle-fall[data-pulse-bg] { --pulse-bg-k: 0.31; }
+  .circle-fall[data-pulse-bg]::before,
+  .circle-fall[data-pulse-bg]::after {
+    background-image: url("../assets/pulse/pulse-bg-760.jpg");
+    background-image: image-set(url("../assets/pulse/pulse-bg-760.webp") type("image/webp"), url("../assets/pulse/pulse-bg-760.jpg") type("image/jpeg"));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .circle-fall[data-pulse-bg]::after { animation: none; transform: none; }
+}
+/* pulse-background r2 (Designer LOOK-NO): no faint top edge behind the list. */
+.circle-fall[data-pulse-bg]::before {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 16%, #000 86%, transparent 100%), radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 16%, #000 86%, transparent 100%), radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+  mask-composite: intersect;
+}
+/* Letters on the small friend circles: light, readable on the dark background. */
+.circle-fall[data-pulse-bg] a.pulse-fall-circle { color: #f7f9ff !important; }
+/* Desktop: the friends list sits above the ring, capped at 3 lines with a fade
+   (6 lines can't clear the ring). Phone layout (≤600px) is unchanged. */
+@media (min-width: 601px) {
+  .circle-fall[data-pulse-bg] .circle-relations {
+    margin-top: 1rem;
+    max-height: 6.9rem;
+    overflow-y: auto;
+    scrollbar-width: none;
+    background: none;
+    -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
+  }
+  .circle-fall[data-pulse-bg] .circle-relations::-webkit-scrollbar { display: none; }
+  .circle-fall[data-pulse-bg] .circle-relations li { margin: 0.6rem 0; }
+}
+.circle-fall[data-pulse-bg]::after {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 16%, #000 86%, transparent 100%), radial-gradient(ellipse 50% 50% at 51% 44%, transparent 58%, #000 76%, #000 90%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 16%, #000 86%, transparent 100%), radial-gradient(ellipse 50% 50% at 51% 44%, transparent 58%, #000 76%, #000 90%, transparent 100%);
+  mask-composite: intersect;
+}
+/* pulse-background r6 (Designer 390 fix): on phones the halo is an oval shaped to
+   the ring (about 1.4x the ring's width and height, centred on the ring), not a tall
+   column over the whole panel. Ring in the image: 1123 x 414 image px. The width is
+   capped at the panel so the glow fades out at the edges instead of being cut off. */
+@media (max-width: 600px) {
+  .circle-fall[data-pulse-bg] {
+    background:
+      radial-gradient(min(calc(786px * var(--pulse-bg-k)), calc(50vw - 16px)) calc(290px * var(--pulse-bg-k)) at 50% 48%, rgba(168, 244, 255, 0.16), transparent 100%),
+      radial-gradient(min(calc(786px * var(--pulse-bg-k)), calc(50vw - 16px)) calc(290px * var(--pulse-bg-k)) at 50% 48%, rgba(197, 166, 255, 0.2), transparent 100%),
+      #1b1545;
+  }
+  .circle-fall[data-pulse-bg] .circle-ring::before {
+    background:
+      radial-gradient(min(calc(786px * var(--pulse-bg-k)), calc(50vw - 16px)) calc(290px * var(--pulse-bg-k)) at 50% 48%, rgba(168, 244, 255, 0.16), transparent 100%),
+      radial-gradient(min(calc(786px * var(--pulse-bg-k)), calc(50vw - 16px)) calc(290px * var(--pulse-bg-k)) at 50% 48%, rgba(197, 166, 255, 0.2), transparent 100%);
+  }
+}

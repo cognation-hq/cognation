@@ -2538,15 +2538,38 @@
     return !!(post && post.seedopsTower && !post._remote);
   }
 
-  /* A server post that is not a SeedOps seed/ops post: a member's Feed copied
-     here by setRemotePosts while someone was signed in. Signed out (shared
-     device), those never show and are purged on sign-out; the signed-out Feed
-     is SeedOps content only (seed server posts + local templates). */
-  function isMemberCachePost(post) {
+  /* Signed out, the Feed is the normal signed-out seed set only: SeedOps local
+     templates (never _remote) plus server posts by seed/ops accounts that are
+     PUBLIC (what an anonymous visitor can read anyway). Any other server post
+     copied here while someone was signed in is hidden signed out and purged on
+     sign-out: a member's post, and (PM ruling on #209, 2026-10-21) a seed's or
+     ops account's friends-only/private post. A server post with no visibility
+     recorded is treated as not public. Name kept for the #209 callers. */
+  function isSignedOutSeedPost(post) {
     if (!post || !post._remote) return false;
     var kind = String(post.accountKind || "").toLowerCase();
-    if (post.isSeed || post.isOpsBot || kind === "seed" || kind === "ops" || post.seedFleetId) return false;
-    return true;
+    var seedOrOps = !!(post.isSeed || post.isOpsBot || kind === "seed" || kind === "ops" || post.seedFleetId);
+    return seedOrOps && String(post.visibility || "").toLowerCase() === "public";
+  }
+  function isMemberCachePost(post) {
+    if (!post || !post._remote) return false;
+    return !isSignedOutSeedPost(post);
+  }
+
+  /* SeedOps overlay (seedops-tower-hydrate keeps server seed rows there too):
+     on sign-out drop its non-public server rows the same way. */
+  var SEEDOPS_OVERLAY_KEY = "cognation.seedops.tower.posts.v1";
+  function clearOverlayNonPublic() {
+    try {
+      var raw = localStorage.getItem(SEEDOPS_OVERLAY_KEY);
+      if (!raw) return 0;
+      var doc = JSON.parse(raw);
+      if (!doc || !Array.isArray(doc.posts)) return 0;
+      var kept = doc.posts.filter(function (p) { return !isMemberCachePost(p); });
+      var dropped = doc.posts.length - kept.length;
+      if (dropped) { doc.posts = kept; localStorage.setItem(SEEDOPS_OVERLAY_KEY, JSON.stringify(doc)); }
+      return dropped;
+    } catch (e) { return 0; }
   }
 
   var TowerStore = {
@@ -2609,9 +2632,11 @@
         return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
       });
     },
-    /* Sign-out: drop the last member's cached Feed posts from this device.
-       SeedOps seed/ops posts and local templates stay. Returns how many went. */
+    /* Sign-out: drop cached server posts that are not public seed/ops posts
+       (member posts, and seed/ops friends-only posts). Public seed/ops posts and
+       local templates stay. Returns how many went from the Feed store. */
     clearMemberCache: function () {
+      clearOverlayNonPublic();
       var data = this.load();
       if (!data) return 0;
       var kept = data.posts.filter(function (p) { return !isMemberCachePost(p); });

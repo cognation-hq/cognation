@@ -2528,6 +2528,16 @@
     }
   }
 
+  /* Local SeedOps template posts (js/seedops-tower-posts.js buildPost:
+     seedopsTower, never _remote) are written into this store while signed out.
+     They stay there for signed-out visitors, but never enter the signed-in
+     feed: setRemotePosts drops them while signed in, and a remote store that
+     already holds copies reads without them while signed in. Server posts,
+     seed ones included, are kept. Signed out, nothing changes. */
+  function isLocalSeedTemplate(post) {
+    return !!(post && post.seedopsTower && !post._remote);
+  }
+
   var TowerStore = {
     load: function () {
       try {
@@ -2559,7 +2569,8 @@
       }
       if (!data) return [];
       if (clearLegacyReactionSelections(data)) this.save(data);
-      return data.posts.slice().sort(function (a, b) {
+      var posts = data.remote && usingRemoteSocial() ? data.posts.filter(function (p) { return !isLocalSeedTemplate(p); }) : data.posts;
+      return posts.slice().sort(function (a, b) {
         return String(b.createdAt).localeCompare(String(a.createdAt));
       });
     },
@@ -2589,7 +2600,9 @@
       var data = {
         version: 2,
         remote: true,
-        posts: Array.isArray(posts) ? posts.slice() : [],
+        posts: !Array.isArray(posts) ? [] : usingRemoteSocial()
+          ? posts.filter(function (p) { return !isLocalSeedTemplate(p); })
+          : posts.slice(),
       };
       this.save(data);
       document.dispatchEvent(

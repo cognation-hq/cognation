@@ -3162,23 +3162,35 @@
     });
   }
 
+  /* The pill under your photo ([data-tower-add-friends]) jumps to people search.
+     Only the owner sees it (CSS hides it for visitors), so on your own Tower it
+     reads "Find friends" (Personal) / "Find people" (Pro), never "+ friend" /
+     "+ follow". Visitor views keep the old label on the hidden pill. */
+  function syncOwnerPeoplePill(root, profile, owner) {
+    if (!root) return;
+    var pro = profileIsProfessional(profile);
+    root.querySelectorAll("[data-tower-add-friends]").forEach(function (el) {
+      if (owner) {
+        el.textContent = pro ? "Find people" : "Find friends";
+        el.setAttribute("aria-label", pro ? "Find people to follow" : "Find friends");
+      } else {
+        el.textContent = pro ? "+ follow" : "+ friend";
+        el.setAttribute("aria-label", pro ? "Follow this professional page" : "Add this person as a friend");
+      }
+    });
+  }
+
   /** Hide mutate chrome when the viewer is not the profile owner. */
   function syncViewerMutateUi(root) {
     if (!root) return;
     var p = TowerProfileStore.get();
     var owner = isTowerOwner(p);
     root.setAttribute("data-tower-is-owner", owner ? "true" : "false");
-    /* Your own Tower never shows Add friend / Follow / Message: not the visitor
-       row, and not the "+ friend" / "+ follow" pill under your photo either
-       (Personal or Pro). Visitors never see that pill (CSS), so it stays as is. */
+    /* Your own Tower never shows Add friend / Follow / Message (the visitor row). */
     if (owner) {
       root.querySelectorAll("[data-tower-follow-row]").forEach(function (row) { row.hidden = true; });
     }
-    root.querySelectorAll("[data-tower-add-friends]").forEach(function (el) {
-      el.hidden = owner;
-      if (owner) el.setAttribute("hidden", "");
-      else el.removeAttribute("hidden");
-    });
+    syncOwnerPeoplePill(root, p, owner);
     if (!owner) {
       root.querySelectorAll("[contenteditable='true']").forEach(function (el) {
         el.removeAttribute("contenteditable");
@@ -10555,21 +10567,14 @@
     if (profileIsProfessional(p)) {
       if (followBtn && followBtn.textContent !== "Following") followBtn.textContent = "+ follow";
       if (followBtn) followBtn.setAttribute("aria-label", "Follow this professional page");
-      /* Owner professional page shows this control where Add friends sat. */
-      if (addFriendsBtn) {
-        addFriendsBtn.textContent = "+ follow";
-        addFriendsBtn.setAttribute("aria-label", "Follow this professional page");
-      }
     } else {
       if (followBtn && (followBtn.textContent === "Follow" || followBtn.textContent === "+ follow" || followBtn.textContent === "friend")) {
         followBtn.textContent = "+ friend";
         followBtn.setAttribute("aria-label", "Add this person as a friend");
       }
-      if (addFriendsBtn) {
-        addFriendsBtn.textContent = "+ friend";
-        addFriendsBtn.setAttribute("aria-label", "Add this person as a friend");
-      }
     }
+    /* Owner pill under the photo: "Find friends" / "Find people" on your own Tower. */
+    if (addFriendsBtn) syncOwnerPeoplePill(root, p, isTowerOwner(p));
     try { syncProfileKindToggle(root); } catch (eKind) {}
     try { syncAddProfileUi(root); } catch (eAdd) {}
     try { syncRotateToolbar(root); } catch (eRot) {}

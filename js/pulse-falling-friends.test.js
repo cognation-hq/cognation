@@ -1,6 +1,7 @@
 /**
- * PULSE falling friends: N circles render, tap opens Tower, 6,000 cap,
- * quiet empty state, server-only (no demo fallback), halo pass-through.
+ * PULSE falling friends: N circles render, tap opens Tower, cap 30 (Alexa
+ * final spec 2026-10-20), placed outside the ring + frames, quiet empty
+ * state, server-only (no demo fallback), reduced motion is still.
  * Run: node js/pulse-falling-friends.test.js
  */
 "use strict";
@@ -33,10 +34,10 @@ function uuid(n) { var h = ("000000000000" + n.toString(16)).slice(-12); return 
 function friends(n) { var a = []; for (var i = 1; i <= n; i++) a.push({ userId: uuid(i), name: "F" + i, handle: "f" + i }); return a; }
 function circles(layer) { return layer.all().filter(function (e) { return "data-circle-fall-portrait" in e.attrs; }); }
 
-/* N friends -> N circles */
-[1, 7, 250].forEach(function (n) {
+/* N friends -> N circles (up to the cap) */
+[1, 7, 30].forEach(function (n) {
   var layer = new El("div");
-  api.render(layer, friends(n), {});
+  api.render(layer, friends(n), { width: 390, height: 844, band: { top: 300, bottom: 480 } });
   assert.strictEqual(circles(layer).length, n, n + " circles render");
   assert.strictEqual(layer.getAttribute("data-circle-count"), String(n));
 });
@@ -52,24 +53,46 @@ assert.strictEqual(opened, "f2", "tap opens friend Tower");
 assert.ok(prevented);
 assert.strictEqual(c.href, "#tower-profile-f2");
 
-/* 6,000 cap, no sampling below it */
+/* Cap 30 (seed-0001 showed 41 live) */
+assert.strictEqual(api.cap, 30, "PULSE_FALL_CAP = 30");
+assert.ok(/var PULSE_FALL_CAP = 30;/.test(fs.readFileSync(path.join(__dirname, "pulse-falling-friends.js"), "utf8")));
 layer = new El("div");
-api.render(layer, friends(6500), {});
-assert.strictEqual(circles(layer).length, 6000, "cap at 6,000");
-layer = new El("div");
-var all = friends(5999);
-api.render(layer, all, {});
+api.render(layer, friends(41), { width: 390, height: 844, band: { top: 300, bottom: 480 } });
+assert.strictEqual(circles(layer).length, 30, "41 friends -> 30 circles");
 var got = circles(layer).map(function (e) { return e.attrs["data-circle-fall-portrait"]; });
-assert.deepStrictEqual(got, all.map(function (f) { return f.userId; }), "every friend, in order, no sampling");
-var L = api.layout(6000, 390, 700);
-assert.ok(L.scroll && L.size <= 22, "big roster gets density + scroll");
-[0, 1, 777, L.cols - 1, 2 * L.cols - 1, 5999].forEach(function (i) {
-  var s = api.slot(i, L, 6000);
-  assert.ok(s.y >= 0 && s.y + L.size <= L.height, "circle " + i + " inside scroll area (reachable)");
-  assert.ok(s.x >= 0 && s.x + L.size <= 390, "circle " + i + " inside width");
-  var n = api.slot(i + 1, L, 6000);
-  if (i + 1 < 6000 && Math.floor((i + 1) / L.cols) === Math.floor(i / L.cols)) assert.ok(n.x - s.x >= L.size, "no overlap " + i);
+assert.deepStrictEqual(got, friends(30).map(function (f) { return f.userId; }), "given order kept (least engaged first)");
+
+/* Placement: never over the ring band, inside the panel, smaller than frame photos */
+[[390, 844, { top: 330, bottom: 478 }, 28], [1280, 900, { top: 200, bottom: 668 }, 40], [358, 600, { top: 200, bottom: 420 }, 28]].forEach(function (t) {
+  var L = api.layoutOutside(30, t[0], t[1], t[2]);
+  assert.strictEqual(L.slots.length, 30, t[0] + ": all 30 placed");
+  assert.ok(L.size <= t[3], t[0] + ": circle " + L.size + "px stays under the smallest frame photo");
+  L.slots.forEach(function (s, i) {
+    assert.ok(s.y + L.size <= t[2].top || s.y >= t[2].bottom, t[0] + ": circle " + i + " clear of ring + frames");
+    assert.ok(s.x >= 0 && s.x + L.size <= t[0] && s.y >= 0 && s.y + L.size <= t[1], t[0] + ": circle " + i + " inside panel");
+    var n = L.slots[i + 1];
+    if (n && n.y === s.y) assert.ok(n.x - s.x >= L.size, "no overlap " + i);
+  });
 });
+/* The drop-in is short (10px, inside the 14px pad) so a circle never passes over the ring */
+assert.ok(circles(layer).every(function (e) { return e.style["--pulse-fall-from"] === "-10px"; }), "short drop");
+
+/* No room at all: draw nothing rather than cover the ring */
+var tight = api.layoutOutside(30, 390, 300, { top: 0, bottom: 300 });
+assert.strictEqual(tight.slots.length, 0, "no free room -> no circles over the ring");
+layer = new El("div");
+api.render(layer, friends(5), { width: 390, height: 300, band: { top: 0, bottom: 300 } });
+assert.strictEqual(circles(layer).length, 0);
+
+/* Breathe/bounce motion; reduced motion is still */
+var cssAll = fs.readFileSync(path.join(__dirname, "..", "css/styles.css"), "utf8");
+var spec = cssAll.slice(cssAll.indexOf("PULSE friends by engagement (Alexa final spec 2026-10-20)"));
+assert.ok(/pulse-fall-breathe 3\.4s ease-in-out infinite alternate/.test(spec) && /@keyframes pulse-fall-breathe/.test(spec), "falling circles breathe");
+assert.ok(!/rotate\(/.test(spec.slice(spec.indexOf("@keyframes pulse-fall-breathe"), spec.indexOf("}\n}", spec.indexOf("@keyframes pulse-fall-breathe")))), "no orbit/rotation in the breathe");
+assert.ok(/\.circle-fall\[data-pulse-bg\] \.pulse-fall-stack \{ opacity: 0\.8; \}/.test(spec), "lighter than the frame photos");
+var rm = spec.slice(spec.indexOf("@media (prefers-reduced-motion: reduce)"));
+assert.ok(/a\.pulse-fall-circle \{ animation: none !important; transform: none !important; \}/.test(rm), "reduced motion: falling circles still");
+assert.ok(/::after \{ animation: none !important; transform: none !important; \}/.test(rm), "reduced motion: strands still");
 
 /* Empty: quiet real empty */
 layer = new El("div");
@@ -102,7 +125,7 @@ api.loadFriends(null, "").then(function (r) {
   } };
   return api.loadFriends(client, me);
 }).then(function (list) {
-  assert.strictEqual(list.length, 2500, "pages past 1,000 rows: all friends");
+  assert.strictEqual(list.length, 2500, "pages past 1,000 rows: every friend is ranked (only 30 fall)");
   assert.strictEqual(list[0].handle && list[0].handle.charAt(0), "f");
 
   /* Layering + pass-through */
@@ -114,6 +137,9 @@ api.loadFriends(null, "").then(function (r) {
   assert.ok(/a\.pulse-fall-circle\s*\{[^}]*pointer-events:\s*auto/.test(block), "friend circles take the tap");
   var tower = fs.readFileSync(path.join(__dirname, "tower.js"), "utf8");
   assert.ok(/CognationPulseFall\.mount\(layer/.test(tower), "PULSE open mounts falling friends");
+  var start = tower.slice(tower.indexOf("function startCircleFall()"));
+  start = start.slice(0, start.indexOf("    return;\n"));
+  assert.ok(!/CognationPulseMutual\.mount\(/.test(start), "halo frames come from engagement, not the mutual-activity fill");
   var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
   assert.ok(html.indexOf("js/pulse-falling-friends.js") > 0 && html.indexOf("js/pulse-falling-friends.js") < html.indexOf("js/tower.js"), "script loads before tower.js");
   console.log("pulse-falling-friends.test.js: OK");

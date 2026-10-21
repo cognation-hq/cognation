@@ -12264,7 +12264,8 @@
         spot.classList.add("is-filled");
         spot.classList.remove("is-empty");
         spot.textContent = String(person.name).trim().charAt(0).toUpperCase() || "?";
-        spot.setAttribute("aria-label", person.activity ? person.name + ". " + person.activity : person.name);
+        var spotCaption = person.caption || person.activity || "";
+        spot.setAttribute("aria-label", person.caption || !person.activity ? person.name : person.name + ". " + person.activity);
         if (person.userId) spot.setAttribute("data-circle-person", person.userId);
         /* Tower picture: server photo_url, else that profile's Tower avatar. */
         var photoApi = window.CognationProfilePhoto;
@@ -12273,14 +12274,20 @@
         if (person.handle) {
           var handle = String(person.handle);
           spot.setAttribute("data-circle-handle", handle);
-          spot.addEventListener("click", openCircleProfile(handle));
+          spot.setAttribute("role", "link");
+          spot.setAttribute("tabindex", "0");
+          var openSpot = openCircleProfile(handle);
+          spot.addEventListener("click", openSpot);
+          spot.addEventListener("keydown", function (ev) {
+            if (ev && (ev.key === "Enter" || ev.key === " ")) { if (ev.preventDefault) ev.preventDefault(); openSpot(); }
+          });
         }
-        if (person.activity) {
+        if (spotCaption) {
           spot.classList.add("has-caption");
           var caption = document.createElement("span");
           caption.className = "circle-spot-caption";
           caption.setAttribute("data-circle-caption", "");
-          caption.textContent = person.activity;
+          caption.textContent = spotCaption;
           spot.appendChild(caption);
         }
       } else {
@@ -12312,13 +12319,23 @@
        ring centre) stay at least 8px inside the panel. Desktop keeps its CSS scale. */
     var phone = window.matchMedia && window.matchMedia("(max-width: 600px)").matches;
     layer.style.removeProperty("--pulse-bg-k");
+    var GROW_MIN = 0.55;
     if (phone && layer.clientWidth > 0) {
       var cssK = parseFloat(getComputedStyle(layer).getPropertyValue("--pulse-bg-k")) || 0.31;
       var fitK = (layer.clientWidth / 2 - 8) / 576;
+      /* The left/right frames must also stay >= 8px inside the panel (live 390 check:
+         the right frame sat 7px from the edge). 10px target leaves room for rounding. */
+      for (var f = 0; f < spots.length; f++) {
+        var side = PULSE_BG_SQUARES[spots[f].getAttribute("data-circle-spot")];
+        if (!side || !side.x) continue;
+        var half = (spots[f].offsetWidth || 70.4) * side.s * Math.max(cssK, GROW_MIN) / 2;
+        var spotK = (layer.clientWidth / 2 - 10 - half) / Math.abs(side.x);
+        if (spotK < fitK) fitK = spotK;
+      }
       if (fitK < cssK) layer.style.setProperty("--pulse-bg-k", fitK.toFixed(4));
     }
     var k = parseFloat(getComputedStyle(layer).getPropertyValue("--pulse-bg-k")) || 0.954;
-    var grow = Math.max(k, 0.55);
+    var grow = Math.max(k, GROW_MIN);
     for (var i = 0; i < spots.length; i++) {
       var sq = PULSE_BG_SQUARES[spots[i].getAttribute("data-circle-spot")];
       if (!sq) continue;
@@ -12508,11 +12525,10 @@
     if (window.CognationCircleRelations && typeof window.CognationCircleRelations.mount === "function") {
       window.CognationCircleRelations.mount(circlePage);
     }
-    if (window.CognationPulseMutual && typeof window.CognationPulseMutual.mount === "function") {
-      window.CognationPulseMutual.mount();
-    }
-    /* PULSE falling friends restored (removed by #49 early return). Every
-       server friend's Tower circle falls BEHIND the halo ring; tap opens Tower. */
+    /* Alexa final spec 2026-10-20: the five halo frames are the viewer's MOST engaged
+       friends and the falling circles are the LEAST engaged (js/pulse-falling-friends.js
+       fills both from public Supabase activity). The pulse_mutual_introductions
+       "friends doing one thing together" fill is no longer mounted here. */
     if (window.CognationPulseFall && typeof window.CognationPulseFall.mount === "function") {
       window.CognationPulseFall.mount(layer, {
         paint: function (el, friend, i) {

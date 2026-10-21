@@ -18,7 +18,7 @@ var firstReturn = start.indexOf("    return;\n");
 assert.ok(firstReturn > 0 && start.slice(0, firstReturn).indexOf("CognationPulseFall.mount(layer") > 0, "falling friends mount on PULSE open");
 assert.ok(html.indexOf('src="js/pulse-falling-friends.js"') > 0, "falling friends script loaded");
 var pulse = require("./pulse-falling-friends.js");
-assert.strictEqual(pulse.cap, 6000, "falling friends cap 6,000");
+assert.strictEqual(pulse.cap, 30, "falling friends cap 30 (Alexa final spec 2026-10-20)");
 
 /* Electric lines: old color, crackle, brightness */
 var lightning = tower.slice(tower.indexOf("function paintCircleLightning"), tower.indexOf("var CIRCLE_REFRESH_MS"));

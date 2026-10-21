@@ -1,17 +1,24 @@
 /**
- * PULSE falling friends (Designer LOOK lock 2026-10-15).
- * Every friend's Tower picture circle falls from the top BEHIND the halo
- * circles. All friends from the server, up to 6,000, no sampling, no demo
- * fallback. Big rosters get smaller circles and a scrollable stack so every
- * circle stays reachable. A tap opens that person's Tower.
- * Empty PULSE is a quiet real empty state (no circles, no filler copy).
+ * PULSE friends by engagement (Alexa final spec 2026-10-20).
+ * Halo frames: the viewer's five friends they engage with MOST (name only,
+ * photo opens that friend's Tower). Falling circles: the friends they engage
+ * with LEAST, least first, up to 30, so they can reconnect or unfriend.
+ * Engagement is per viewer and counts PUBLIC Cognation activity only, read
+ * from Supabase: reactions on each other's Tower posts, @-tags in Tower posts
+ * and News comments, and reactions on each other's News comments.
+ * Direct messages and chat rooms are never read and never count.
+ * Falling circles sit outside the ring and the five frames, smaller and
+ * lighter than the frame photos; they breathe (no orbit), still for
+ * prefers-reduced-motion. Server only, no demo fallback.
  * Run: node js/pulse-falling-friends.test.js
  */
 (function (root) {
   "use strict";
 
-  var PULSE_FALL_CAP = 6000;
+  var PULSE_FALL_CAP = 30;
+  var HALO_COUNT = 5;
   var PAGE = 1000;
+  var FRIEND_CAP = 6000; /* friendships read for ranking (unchanged server page cap) */
 
   function safeId(value) {
     var id = String(value || "");
@@ -42,7 +49,7 @@
       if (!line || line.type !== "friendship") return;
       var friend = line.people && line.people[1];
       if (!friend || !friend.userId || seen[friend.userId]) return;
-      if (out.length >= PULSE_FALL_CAP) return;
+      if (out.length >= FRIEND_CAP) return;
       seen[friend.userId] = true;
       out.push({
         userId: friend.userId,
@@ -64,7 +71,7 @@
       }).then(function (part) {
         part = Array.isArray(part) ? part : [];
         rows = rows.concat(part);
-        if (part.length < PAGE || rows.length >= PULSE_FALL_CAP) return rows.slice(0, PULSE_FALL_CAP);
+        if (part.length < PAGE || rows.length >= FRIEND_CAP) return rows.slice(0, FRIEND_CAP);
         return page(offset + PAGE);
       });
     }
@@ -98,10 +105,15 @@
 
   /* Server only. Anything missing = empty list, never demo friends. */
   function loadFriends(client, id) {
+    return loadRoster(client, id).then(function (r) { return r.friends; });
+  }
+
+  function loadRoster(client, id) {
     client = client || (root && root.CognationSupabase);
     id = safeId(id || viewerId());
-    if (!id || !client || typeof client.rest !== "function") return Promise.resolve([]);
-    if (typeof client.configured === "function" && !client.configured()) return Promise.resolve([]);
+    var none = { viewerId: id, friends: [], profiles: [] };
+    if (!id || !client || typeof client.rest !== "function") return Promise.resolve(none);
+    if (typeof client.configured === "function" && !client.configured()) return Promise.resolve(none);
     return fetchFriendships(client, id).then(function (friendships) {
       var ids = [id];
       var seen = {};
@@ -113,33 +125,267 @@
         });
       });
       return fetchProfiles(client, ids).then(function (profiles) {
-        return friendsFromRows(id, friendships, profiles);
+        return { viewerId: id, friends: friendsFromRows(id, friendships, profiles), profiles: profiles };
       });
-    }, function () { return []; });
+    }).then(null, function () { return none; });
   }
 
-  /* Density: smaller circles as the roster grows; the stack scrolls past the fold. */
-  function layout(count, width, height) {
+  /* ---------- Engagement (public activity only; DMs never read) ---------- */
+
+  function chunks(list, n) {
+    var out = [];
+    for (var i = 0; i < list.length; i += n) out.push(list.slice(i, i + n));
+    return out;
+  }
+
+  function mentionCount(body, handle) {
+    handle = String(handle || "").replace(/^@/, "").toLowerCase();
+    if (!handle) return 0;
+    var text = String(body || "").toLowerCase();
+    var n = 0;
+    var at = text.indexOf("@" + handle);
+    while (at >= 0) {
+      var before = at > 0 ? text.charAt(at - 1) : "";
+      var after = text.charAt(at + handle.length + 1);
+      if (!/[a-z0-9_.-]/.test(before) && !/[a-z0-9_-]/.test(after)) n++;
+      at = text.indexOf("@" + handle, at + 1);
+    }
+    return n;
+  }
+
+  /* Pure scorer. data: {viewerProfileIds, profileOwner{profileId:userId},
+     handlesByUser{userId:[handle]}, viewerHandles, posts, postReactions,
+     comments, commentReactions}. Returns {userId: score}. Only rows between
+     the viewer and one friend count; friend-to-friend rows are ignored. */
+  function scoreEngagement(viewerUserId, friendIds, data) {
+    data = data || {};
+    var score = {};
+    var isFriend = {};
+    (friendIds || []).forEach(function (u) { score[u] = 0; isFriend[u] = true; });
+    var owner = data.profileOwner || {};
+    function who(profileId) {
+      var u = owner[profileId];
+      if (u === viewerUserId) return "viewer";
+      return u && isFriend[u] ? u : "";
+    }
+    function bump(u, n) { if (n === undefined) n = 1; if (u && isFriend[u] && n > 0) score[u] += n; }
+    var handlesByUser = data.handlesByUser || {};
+    var viewerHandles = data.viewerHandles || [];
+    function tags(authorSide, body) {
+      if (authorSide === "viewer") {
+        Object.keys(handlesByUser).forEach(function (u) {
+          if (!isFriend[u]) return;
+          (handlesByUser[u] || []).forEach(function (h) { bump(u, mentionCount(body, h)); });
+        });
+      } else if (authorSide) {
+        viewerHandles.forEach(function (h) { bump(authorSide, mentionCount(body, h)); });
+      }
+    }
+    var postAuthor = {};
+    (data.posts || []).forEach(function (p) {
+      if (!p || !p.id) return;
+      var side = who(p.author_profile_id);
+      postAuthor[p.id] = side;
+      tags(side, p.body);
+    });
+    (data.postReactions || []).forEach(function (r) {
+      if (!r) return;
+      var author = postAuthor[r.post_id];
+      var reactor = who(r.profile_id);
+      if (author === "viewer" && reactor && reactor !== "viewer") bump(reactor);
+      else if (reactor === "viewer" && author && author !== "viewer") bump(author);
+    });
+    var commentAuthor = {};
+    (data.comments || []).forEach(function (c) {
+      if (!c || !c.id) return;
+      var side = who(c.author_profile_id);
+      commentAuthor[c.id] = side;
+      tags(side, c.body);
+    });
+    (data.commentReactions || []).forEach(function (r) {
+      if (!r) return;
+      var author = commentAuthor[r.comment_id];
+      var reactor = who(r.profile_id);
+      if (author === "viewer" && reactor && reactor !== "viewer") bump(reactor);
+      else if (reactor === "viewer" && author && author !== "viewer") bump(author);
+    });
+    return score;
+  }
+
+  function byName(a, b) {
+    var x = String(a.name || "").toLowerCase(), y = String(b.name || "").toLowerCase();
+    return x < y ? -1 : x > y ? 1 : String(a.userId) < String(b.userId) ? -1 : 1;
+  }
+
+  /* Halo: five MOST engaged (ties by name). Falling: everyone else, LEAST first, cap 30. */
+  function rank(friends, scores) {
+    scores = scores || {};
+    var list = (friends || []).filter(function (f) { return f && f.userId; }).map(function (f) {
+      return Object.assign({}, f, { engagement: scores[f.userId] || 0 });
+    });
+    var most = list.slice().sort(function (a, b) { return b.engagement - a.engagement || byName(a, b); });
+    var halo = most.slice(0, HALO_COUNT);
+    var fall = most.slice(HALO_COUNT).sort(function (a, b) { return a.engagement - b.engagement || byName(a, b); });
+    return { halo: halo, fall: fall.slice(0, PULSE_FALL_CAP) };
+  }
+
+  /* Front frame gets the top friend: spot order is left, center, right, back-right, back-left. */
+  function haloSpots(halo) {
+    var order = [1, 0, 2, 4, 3];
+    var out = [];
+    order.forEach(function (rankIndex) {
+      var f = halo[rankIndex];
+      if (f) out.push({ name: f.name, userId: f.userId, handle: f.handle, photoUrl: f.photoUrl, caption: f.name });
+    });
+    /* fill spot slots in order; missing ranks leave later slots empty */
+    return out;
+  }
+
+  function readAll(client, table, select, filterKey, ids, size, newestFirst) {
+    if (!ids.length) return Promise.resolve([]);
+    return Promise.all(chunks(ids, size || 50).map(function (part) {
+      return client.rest(table, {
+        query: "select=" + select + "&" + filterKey + "=in.(" + part.join(",") + ")" +
+          (newestFirst ? "&order=created_at.desc" : "") + "&limit=" + PAGE,
+      }).then(function (r) { return Array.isArray(r) ? r : []; });
+    })).then(function (parts) { return [].concat.apply([], parts); });
+  }
+
+  /* Reads only public tables. A table that is missing or refused counts 0 and is listed in gaps. */
+  function fetchEngagement(client, roster) {
+    var viewer = roster.viewerId;
+    var friendIds = roster.friends.map(function (f) { return f.userId; });
+    var isFriend = {};
+    friendIds.forEach(function (u) { isFriend[u] = true; });
+    var profileOwner = {};
+    var handlesByUser = {};
+    var viewerHandles = [];
+    var people = [];
+    (roster.profiles || []).forEach(function (p) {
+      if (!p || !p.id || !p.user_id) return;
+      var u = String(p.user_id);
+      if (u !== viewer && !isFriend[u]) return;
+      if (!safeId(p.id)) return;
+      profileOwner[p.id] = u;
+      people.push(p.id);
+      if (p.handle) {
+        if (u === viewer) viewerHandles.push(String(p.handle));
+        else (handlesByUser[u] = handlesByUser[u] || []).push(String(p.handle));
+      }
+    });
+    var gaps = [];
+    function soft(name, promise) {
+      return promise.then(null, function () { gaps.push(name); return []; });
+    }
+    var data = { profileOwner: profileOwner, handlesByUser: handlesByUser, viewerHandles: viewerHandles };
+    var postsP = soft("tower_posts", readAll(client, "tower_posts", "id,author_profile_id,body", "author_profile_id", people, 50, true));
+    var commentsP = soft("news_story_comments", readAll(client, "news_story_comments", "id,author_profile_id,body", "author_profile_id", people, 50, true));
+    return Promise.all([postsP, commentsP]).then(function (r) {
+      data.posts = r[0];
+      data.comments = r[1];
+      var postIds = r[0].map(function (p) { return p.id; }).filter(safeId);
+      var commentIds = r[1].map(function (c) { return c.id; }).filter(safeId);
+      return Promise.all([
+        soft("tower_post_reactions", readAll(client, "tower_post_reactions", "post_id,profile_id", "post_id", postIds, 100)),
+        soft("news_story_comment_reactions", readAll(client, "news_story_comment_reactions", "comment_id,profile_id", "comment_id", commentIds, 100)),
+      ]);
+    }).then(function (r) {
+      data.postReactions = r[0];
+      data.commentReactions = r[1];
+      return { scores: scoreEngagement(viewer, friendIds, data), gaps: gaps };
+    });
+  }
+
+  function loadRanked(client, id) {
+    client = client || (root && root.CognationSupabase);
+    return loadRoster(client, id).then(function (roster) {
+      if (!roster.friends.length) return { halo: [], fall: [], scores: {}, gaps: [] };
+      return fetchEngagement(client, roster).then(function (e) {
+        var r = rank(roster.friends, e.scores);
+        r.scores = e.scores;
+        r.gaps = e.gaps;
+        return r;
+      }, function () {
+        var r = rank(roster.friends, {});
+        r.scores = {};
+        r.gaps = ["engagement"];
+        return r;
+      });
+    });
+  }
+
+  /* ---------- Placement: outside the ring and the five frames ---------- */
+
+  function num(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
+
+  /* Vertical band (layer px) covered by the ring image and the five frames + captions.
+     Read from layout values (offset sizes + the pinned transform), so the ring's
+     build animation (scale 0.82 -> 1) never skews the measurement. */
+  function blockedBand(layer) {
+    if (!layer) return null;
+    var H = layer.clientHeight || 0;
+    var cy = H * 0.48;
+    var k = 0;
+    try { k = num(root.getComputedStyle(layer).getPropertyValue("--pulse-bg-k")); } catch (e) {}
+    if (!k) k = 0.954;
+    var top = cy - 230 * k;
+    var bottom = cy + 230 * k;
+    var spots = layer.querySelectorAll ? layer.querySelectorAll("[data-circle-ring] [data-circle-spot]") : [];
+    for (var i = 0; i < spots.length; i++) {
+      var sp = spots[i];
+      var m = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)\s*scale\(([\d.]+)\)/.exec(sp.style.transform || "");
+      if (!m) continue;
+      var s = num(m[3]) || 1;
+      var half = (sp.offsetHeight || 0) * s / 2;
+      var y = cy + num(m[2]);
+      var cap = sp.querySelector ? sp.querySelector("[data-circle-caption]") : null;
+      var capH = cap ? (cap.offsetHeight || 0) * s : 0;
+      top = Math.min(top, y - half);
+      bottom = Math.max(bottom, y + half + capH);
+    }
+    return { top: Math.max(0, top), bottom: Math.min(H, bottom) };
+  }
+
+  /* Rows of small circles in the free space below the band, then above it.
+     Size stays under the smallest frame photo; shrinks only if needed to fit. */
+  function layoutOutside(count, width, height, band, opts) {
+    opts = opts || {};
     count = Math.max(0, Math.min(PULSE_FALL_CAP, count | 0));
-    width = Math.max(240, width || 390);
-    height = Math.max(320, height || 700);
-    var size = count <= 40 ? 64 : count <= 300 ? 44 : count <= 1500 ? 30 : 22;
-    var gap = Math.max(4, Math.round(size * 0.18));
-    /* Leave room for the half-step offset on odd rows so no circle is clipped. */
-    var cols = Math.max(1, Math.floor((width - gap - (size + gap) / 2) / (size + gap)));
-    var rows = Math.ceil(count / cols);
-    var stackHeight = Math.max(height, rows * (size + gap) + gap * 2);
-    return { size: size, gap: gap, cols: cols, rows: rows, height: stackHeight, scroll: stackHeight > height };
-  }
-
-  /* Circle i settles bottom-up (row 0 at the floor) like a pile. */
-  function slot(i, L, count) {
-    var row = Math.floor(i / L.cols);
-    var col = i % L.cols;
-    var offset = row % 2 ? (L.size + L.gap) / 2 : 0;
-    var x = L.gap + col * (L.size + L.gap) + offset;
-    var y = L.height - L.gap - (row + 1) * (L.size + L.gap);
-    return { x: Math.round(x), y: Math.round(y), delay: Math.min(i * 14, 6000) };
+    width = Math.max(200, width || 390);
+    height = Math.max(200, height || 700);
+    band = band || { top: height * 0.3, bottom: height * 0.7 };
+    var pad = opts.pad == null ? 14 : opts.pad;
+    var maxSize = opts.maxSize || (width <= 600 ? 28 : 40);
+    var topLimit = opts.topLimit || 0;
+    var regions = [
+      { y0: band.bottom + pad, y1: height - pad },
+      { y0: Math.max(topLimit, 0) + pad, y1: band.top - pad },
+    ].filter(function (r) { return r.y1 > r.y0; });
+    var size = maxSize;
+    function fit(sz) {
+      var gap = Math.max(6, Math.round(sz * 0.3));
+      var cols = Math.max(1, Math.floor((width - 2 * pad + gap) / (sz + gap)));
+      var cap = 0;
+      regions.forEach(function (r) { cap += cols * Math.max(0, Math.floor((r.y1 - r.y0 + gap) / (sz + gap))); });
+      return { gap: gap, cols: cols, cap: cap };
+    }
+    var f = fit(size);
+    while (f.cap < count && size > 16) { size -= 2; f = fit(size); }
+    var slots = [];
+    var left = count;
+    regions.forEach(function (r) {
+      var rows = Math.max(0, Math.floor((r.y1 - r.y0 + f.gap) / (size + f.gap)));
+      for (var row = 0; row < rows && left > 0; row++) {
+        var inRow = Math.min(f.cols, left);
+        var rowW = inRow * size + (inRow - 1) * f.gap;
+        var x0 = (width - rowW) / 2;
+        for (var c = 0; c < inRow; c++) {
+          slots.push({ x: Math.round(x0 + c * (size + f.gap)), y: Math.round(r.y0 + row * (size + f.gap)) });
+        }
+        left -= inRow;
+      }
+    });
+    return { size: size, gap: f.gap, cols: f.cols, slots: slots };
   }
 
   function render(layer, friends, opts) {
@@ -160,30 +406,35 @@
       layer.insertBefore(stack, layer.firstChild);
       return stack;
     }
+    stack.setAttribute("aria-label", "Friends you engage with least");
     var w = opts.width || layer.clientWidth || 0;
     var vw = root && root.innerWidth ? root.innerWidth : 0;
     if (vw && (!w || vw < w)) w = vw; /* never wider than the screen */
-    var L = layout(friends.length, w, opts.height || layer.clientHeight);
-    if (L.scroll) stack.classList.add("is-scroll");
+    var h = opts.height || layer.clientHeight || 0;
+    var band = opts.band || (typeof opts.avoid === "function" ? opts.avoid() : null);
+    var L = layoutOutside(friends.length, w, h, band, { topLimit: opts.topLimit });
     var inner = document.createElement("div");
     inner.className = "pulse-fall-inner";
-    inner.style.height = L.height + "px";
     stack.appendChild(inner);
     friends.forEach(function (friend, i) {
-      var s = slot(i, L, friends.length);
+      var s = L.slots[i];
+      if (!s) return; /* no free room left: never draw over the ring or frames */
       var el = document.createElement("a");
       el.className = "circle-fall-portrait pulse-fall-circle";
       el.setAttribute("data-circle-fall-portrait", friend.userId);
       el.setAttribute("data-friend-handle", friend.handle || "");
+      el.setAttribute("data-engagement", String(friend.engagement || 0));
       el.href = friend.handle ? "#tower-profile-" + friend.handle : "#";
       el.setAttribute("aria-label", "Open " + friend.name + " Tower");
       el.style.width = L.size + "px";
       el.style.height = L.size + "px";
       el.style.left = s.x + "px";
       el.style.top = s.y + "px";
-      el.style.fontSize = Math.max(9, Math.round(L.size * 0.32)) + "px";
-      el.style.setProperty("--pulse-fall-from", -(s.y + L.size + 40) + "px");
-      el.style.animationDelay = s.delay + "ms";
+      el.style.fontSize = Math.max(9, Math.round(L.size * 0.36)) + "px";
+      /* short drop into place with a bounce: a long fall would cross the ring */
+      el.style.setProperty("--pulse-fall-from", "-10px"); /* inside the 14px pad */
+      /* drop in, then breathe; staggered so the field never pulses in unison */
+      el.style.animationDelay = Math.min(i * 40, 1200) + "ms, " + (1100 + Math.min(i * 40, 1200) + (i % 5) * 230) + "ms";
       if (typeof opts.paint === "function") {
         try { opts.paint(el, friend, i); } catch (eP) {}
       }
@@ -227,22 +478,58 @@
     return true;
   }
 
+  var last = null;
+
+  function paintHalo(halo, opts) {
+    var people = haloSpots(halo || []);
+    if (opts && typeof opts.fillSpots === "function") { try { opts.fillSpots(people); } catch (e) {} return people; }
+    var fall = root && root.CognationCircleFall;
+    if (fall && typeof fall.fillSpots === "function") { try { fall.fillSpots(people); } catch (e2) {} }
+    return people;
+  }
+
+  function placeFalling(layer, list, opts) {
+    var o = Object.assign({}, opts);
+    if (!o.band && typeof o.avoid !== "function") o.avoid = function () { return blockedBand(layer); };
+    return render(layer, list, o);
+  }
+
   function mount(layer, opts) {
     opts = opts || {};
     render(layer, [], opts); /* quiet empty until the server answers */
-    return loadFriends(opts.client, opts.viewerId).then(function (friends) {
-      if (!layer.parentNode && !opts.detached) return friends;
-      render(layer, friends, opts);
-      return friends;
+    return loadRanked(opts.client, opts.viewerId).then(function (r) {
+      if (!layer.parentNode && !opts.detached) return r;
+      paintHalo(r.halo, opts);
+      if (r.gaps && r.gaps.length && layer.setAttribute) layer.setAttribute("data-pulse-engagement-gaps", r.gaps.join(" "));
+      placeFalling(layer, r.fall, opts);
+      last = { layer: layer, fall: r.fall, opts: opts };
+      return r;
+    });
+  }
+
+  if (root && root.addEventListener) {
+    var resizeTimer = 0;
+    root.addEventListener("resize", function () {
+      if (!last || !last.layer || !last.layer.parentNode) return;
+      if (resizeTimer) root.clearTimeout(resizeTimer);
+      resizeTimer = root.setTimeout(function () { placeFalling(last.layer, last.fall, last.opts); }, 160);
     });
   }
 
   var api = {
     cap: PULSE_FALL_CAP,
+    haloCount: HALO_COUNT,
     friendsFromRows: friendsFromRows,
     loadFriends: loadFriends,
-    layout: layout,
-    slot: slot,
+    loadRoster: loadRoster,
+    loadRanked: loadRanked,
+    fetchEngagement: fetchEngagement,
+    scoreEngagement: scoreEngagement,
+    mentionCount: mentionCount,
+    rank: rank,
+    haloSpots: haloSpots,
+    blockedBand: blockedBand,
+    layoutOutside: layoutOutside,
     render: render,
     letterFor: letterFor,
     paintPhotoWhenLoaded: paintPhotoWhenLoaded,

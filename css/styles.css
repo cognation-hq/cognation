@@ -14553,6 +14553,52 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   }
 }
 
+/* PULSE friends by engagement (Alexa final spec 2026-10-20).
+   Halo frames: the five friends you engage with most, name only.
+   Falling circles: the friends you engage with least (cap 30). They sit outside
+   the ring and the frames (placed in js/pulse-falling-friends.js), smaller and
+   lighter than the frame photos, and breathe in place (no orbit). Still for
+   prefers-reduced-motion. */
+.circle-fall[data-pulse-bg] .pulse-fall-stack { opacity: 0.8; }
+.circle-fall[data-pulse-bg] a.pulse-fall-circle {
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 4px 12px rgba(12, 16, 40, 0.22);
+  background-color: rgba(7, 11, 22, 0.45);
+  animation:
+    pulse-fall-drop 1.1s cubic-bezier(0.32, 0.02, 0.4, 1.18) both,
+    pulse-fall-breathe 3.4s ease-in-out infinite alternate;
+}
+@keyframes pulse-fall-breathe {
+  from { transform: translateY(0) scale(1); }
+  to { transform: translateY(-3px) scale(1.06); }
+}
+/* Halo frame names: plain name under each frame, readable on the image. */
+.circle-fall[data-pulse-bg] .circle-spot-caption {
+  font-size: 0.72rem;
+  text-shadow: 0 1px 3px rgba(6, 10, 30, 0.9);
+}
+@media (max-width: 600px) {
+  /* frames are scaled ~0.63 on phones; this lands the name near 11px */
+  .circle-fall[data-pulse-bg] .circle-spot-caption { font-size: 1.1rem; }
+  /* Strands drift visibly at 390 (live check: 0.2% of pixels changed in 4s vs
+     0.7-0.8% at 1280). Phones loop through four drift points instead of easing
+     back and forth, so no 4s stretch ever sits still at a turnaround. */
+  .circle-fall[data-pulse-bg]::after {
+    animation: pulse-strand-drift-phone 12s ease-in-out infinite;
+  }
+}
+@keyframes pulse-strand-drift-phone {
+  0%, 100% { transform: translate3d(-3px, 1.5px, 0) rotate(-0.3deg) scale(1.003); }
+  25% { transform: translate3d(2.5px, -1.5px, 0) rotate(0.15deg) scale(1.009); }
+  50% { transform: translate3d(4px, 1.5px, 0) rotate(0.33deg) scale(0.998); }
+  75% { transform: translate3d(-1px, 2.5px, 0) rotate(-0.08deg) scale(1.006); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .circle-fall[data-pulse-bg] a.pulse-fall-circle,
+  a.pulse-fall-circle { animation: none !important; transform: none !important; }
+  .circle-fall[data-pulse-bg]::after { animation: none !important; transform: none !important; }
+}
+
 /* COGNATION | WAYMAKERS switch is hidden (index.html `hidden`) until Waymakers has a
    full design. .site-switch sets display: inline-flex, so honour [hidden] here.
    Only the top-bar switch; the SIGNAL / ECHO pipe switches reuse .site-switch and stay. */

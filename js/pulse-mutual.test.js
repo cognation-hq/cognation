@@ -52,8 +52,8 @@ var store = { bag: {}, getItem: function (k) { return this.bag[k] || null; } };
 store.bag["cognation.profiles.v1"] = JSON.stringify({ profiles: {
   a: { id: "a", displayName: "Ada", calendarEvents: [{ date: "2026-10-19", signupFriendIds: ["a", "b"] }] },
   b: { id: "b", displayName: "Leo" },
-  c: { id: "c", displayName: "Mia", goingLive: { what: "OU TX", when: "2026-10-18T18:00" } },
-  d: { id: "d", displayName: "Noah", goingLive: { what: "OU TX", when: "2026-10-18T19:00" } }
+  c: { id: "c", displayName: "Mia", goingLive: { what: "OU TX", when: "2026-10-17T18:00" } },
+  d: { id: "d", displayName: "Noah", goingLive: { what: "OU TX", when: "2026-10-17T19:00" } }
 } });
 assert.strictEqual(api.localRows(store)[0].activity, "They are going to the same event.");
 store.bag["cognation.profiles.v1"] = JSON.stringify({ profiles: {

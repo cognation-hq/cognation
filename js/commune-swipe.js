@@ -1342,14 +1342,49 @@
   /* Tower posts for Marketplace. Goes through the tower module's list() so it gets the
      same filters as the TOWER Feed (#199: local SeedOps template posts never show
      signed in). Raw store read only if the tower module isn't loaded. */
+  /* Age line a #market post asks for: 18 or 21 from minAge, audience / roomKind,
+     an "18+" / "21+" in the text, or an R / MA rating. 0 = none. */
+  function marketPostMinAge(post) {
+    var need = Number(post && post.minAge) || 0;
+    var marks = [post && post.audience, post && post.roomKind];
+    marks.forEach(function (m) {
+      if (m === "21+") need = Math.max(need, 21);
+      else if (m === "18+") need = Math.max(need, 18);
+    });
+    var text = String((post && post.title) || "") + " " + String((post && post.body) || "");
+    if (typeof text.normalize === "function") text = text.normalize("NFKC");
+    if (/(^|\W)21\s?\+(?!\w)/.test(text)) need = Math.max(need, 21);
+    else if (/(^|\W)18\s?\+(?!\w)/.test(text)) need = Math.max(need, 18);
+    var rating = String((post && post.rating) || "").toUpperCase();
+    if (rating === "MA") need = Math.max(need, 21);
+    else if (rating === "R") need = Math.max(need, 18);
+    return need;
+  }
+  /* Same Tower rule as the feed and ECHO groups (echo-group.js posts():
+     CognationTowerPostVisibleToViewer, i.e. rating + the under-13 / unknown-age
+     floor), plus the post's own age line, so an 18-20 viewer never gets a 21+
+     sale. Unknown age counts as 0 (fail closed). */
+  function marketVisibleToViewer(post) {
+    var visible = window.CognationTowerPostVisibleToViewer;
+    if (typeof visible === "function" && !visible(post)) return false;
+    var need = marketPostMinAge(post);
+    if (!need) return true;
+    var floor = window.CognationAgeFloor;
+    var age = floor && typeof floor.viewerAge === "function" ? Number(floor.viewerAge()) || 0 : 0;
+    return age >= need;
+  }
   function marketSourcePosts() {
     var store = window.CognationTowerStore;
+    var list;
     if (store && typeof store.list === "function") {
-      var list = store.list();
-      return Array.isArray(list) ? list : [];
+      list = store.list();
+    } else {
+      var doc = readJson(localStorage, "cognation.tower.posts.v3", null);
+      list = doc && Array.isArray(doc.posts) ? doc.posts : [];
     }
-    var doc = readJson(localStorage, "cognation.tower.posts.v3", null);
-    return doc && Array.isArray(doc.posts) ? doc.posts : [];
+    return (Array.isArray(list) ? list : []).filter(function (post) {
+      return !!post && marketVisibleToViewer(post);
+    });
   }
   function marketplaceCards() {
     var posts = marketSourcePosts();

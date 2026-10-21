@@ -14777,3 +14777,28 @@ body.cgn-cal-page {
 .tower-visitor-calendar .tower-cal-cell { background: rgba(18,16,38,.92); color: #f7f9ff; border-color: rgba(209,241,255,.28); }
 .tower-visitor-calendar .tower-cal-cell.is-today, .tower-visitor-calendar .tower-cal-cell.is-selected { border-color: rgba(197,166,255,.85); box-shadow: 0 0 0 1px rgba(197,166,255,.45) inset; }
 .tower-visitor-calendar .tower-visitor-cal-link { color: #c5a6ff; }
+
+/* TOWER Feed contrast (Designer follow-up). TOWER Feed only (.tower-feed[data-tower-feed]
+   and the "Send a signal" composer in the same Feed panel):
+   - post cards use the site glass rgba(18,16,38,.92) so the existing body text reads
+     (about 6.6:1, was about 1.9:1 on the grey card), with 12px inner padding so text
+     and dates don't touch the card edge, and an 8px gap between cards;
+   - no outer border on the Feed list (it had the global hard black panel border);
+   - the composer uses the same glass; its placeholder moves to #d9d2f0 so it reads on
+     the glass. Buttons and behaviour unchanged.
+   The Times, the Demo badge and other panels are untouched. */
+.tower-feed[data-tower-feed] {
+  border: 0 !important;
+  gap: 8px !important;
+}
+.tower-feed[data-tower-feed] .tower-post {
+  background: rgba(18, 16, 38, 0.92) !important;
+  padding: 12px !important;
+}
+#panel-signal .signal-feed-host .tower-compose[data-tower-compose] {
+  background: rgba(18, 16, 38, 0.92) !important;
+}
+#panel-signal .signal-feed-host .tower-compose[data-tower-compose] textarea::placeholder {
+  color: #d9d2f0 !important;
+  opacity: 1;
+}

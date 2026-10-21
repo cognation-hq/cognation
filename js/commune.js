@@ -1091,6 +1091,8 @@
       /* Comments thread key: a reshuffled copy keeps its story's thread. */
       var storyKey = post.sourceId || postId;
       article.setAttribute("data-news-story-key", storyKey);
+      /* Real Tower post id for the server report (display ids carry a prefix). */
+      if (post.towerPostId) article.setAttribute("data-tower-post-id", String(post.towerPostId));
       if (post.rating) article.setAttribute("data-news-rating", String(post.rating));
       /* Insert before mounting comments: the Times "Comments" line attaches only to
          stories already inside SIGNAL (news-comments.js wireTimesToggle). */

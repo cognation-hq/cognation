@@ -14893,6 +14893,20 @@ body.cgn-cal-page {
   margin-bottom: 0.82rem;
 }
 
+/* Cream follow-up 2 (Oct 21): 390 dateline. Below 600px the date always takes its
+   own line, and the rule after "Cognation" (which pointed at the wrapped date)
+   is hidden, so no stray dash dangles at the end of the first line. */
+@media (max-width:600px){
+  #panel-signal .paper-dateline{flex-wrap:wrap !important}
+  #panel-signal .paper-dateline > .paper-rule:has(+ .paper-date){display:none !important}
+  #panel-signal .paper-dateline > .paper-date{flex-basis:100% !important;text-align:left !important}
+}
+/* Reported / blocked Times story: hidden for you, collapsed to its report line so
+   the status text stays readable (it used to vanish with the story). */
+#panel-signal [data-news-post][data-news-reported-hidden] > :not([data-news-report]){display:none !important}
+#panel-signal [data-news-post][data-news-reported-hidden] [data-news-report] > :not([data-news-report-status]){display:none !important}
+#panel-signal [data-news-post][data-news-reported-hidden] [data-news-report]{border-top:0 !important;margin-top:0 !important;padding-top:0 !important}
+
 /* Tower header name (Designer follow-up): centred under the avatar and #f7f9ff.
    Scoped to the stacked header (.tower-avatar-stack); the desktop strip layout, where
    the name sits beside the avatar, keeps its left alignment. The 10ch name box stays

@@ -197,6 +197,7 @@
     try {
       if (
         window.CognationContentReport &&
+        !report.serverFiled &&
         item.postId &&
         (item.reason === "harmful" || item.reason === "untruthful" || item.reason === "misrated")
       ) {

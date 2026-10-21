@@ -328,7 +328,7 @@
     line.textContent = POST_FAILED;
     form.insertAdjacentElement("afterend", line);
   }
-  var REPORT_FAILED = "Couldn't report. Try again.";
+  var REPORT_FAILED = "Couldn't send report, try again";
   function showReportError(item) {
     if (!item || item.querySelector("[data-news-comment-report-error]")) return;
     var line = document.createElement("p");

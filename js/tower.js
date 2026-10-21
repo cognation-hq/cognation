@@ -7241,8 +7241,70 @@
       schedulerHtml;
   }
 
+  function visitorSessionRowHtml(sess, api) {
+    var live = api.isLiveNow(sess);
+    var when = new Date(sess.startsAt);
+    var day = when.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    return '<li class="tower-visitor-session' + (live ? " is-live" : "") + '" data-visitor-session="' + escapeHtml(sess.id) + '">' +
+      '<span class="cgn-cal-tag cgn-cal-tag--' + sess.kind + '">' + (sess.kind === "webinar" ? "Webinar" : "Classroom") + "</span>" +
+      (live ? '<span class="cgn-live-pill"><i class="cgn-live-dot" aria-hidden="true"></i>LIVE</span>' : "") +
+      '<span class="tower-visitor-session-title">' + escapeHtml(sess.title) + "</span>" +
+      '<span class="tower-visitor-session-time">' + escapeHtml(day + " · " + api.timeLabel(sess.startsAt) + " · " + api.minutesOf(sess) + " min") + "</span>" +
+      (live ? '<a class="cgn-cal-join" href="#classroom-' + escapeHtml(sess.id) + '">Join</a>' : "") +
+      "</li>";
+  }
+
+  /* Visitor day heading: "Tue, Oct 20" (Cognation Calendar format); "Busy · " only
+     when that day really has a (busy-only) event. */
+  function visitorDayHeading(events, iso) {
+    var api = window.CognationClassroomSessions;
+    var label = api && typeof api.dayDateLabel === "function"
+      ? api.dayDateLabel(iso)
+      : (function () {
+          var d = new Date(String(iso) + "T12:00:00");
+          return isNaN(d.getTime()) ? String(iso || "") : d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+        })();
+    return (eventsForDate(events || [], iso).length ? "Busy · " : "") + label;
+  }
+
+  /* Visitor Calendar (restored from #158): busy blocks only for personal events
+     (busyBlocksOnly), plus this host's public Classroom / Webinar sessions. */
+  function renderVisitorCalendar(root) {
+    var box = root.querySelector("[data-tower-visitor-calendar]");
+    if (!box) return;
+    var p = TowerProfileStore.get();
+    if (!p || isTowerOwner(p)) {
+      box.hidden = true;
+      return;
+    }
+    box.hidden = false;
+    var events = busyBlocksOnly(sharedCalendarEvents(p) || []);
+    var view = getCalendarViewState(root, "visitor");
+    var body = box.querySelector("[data-tower-cal-visitor-body]");
+    if (body) {
+      body.innerHTML =
+        renderTowerMonthGrid(view, events, { gridLabel: "Calendar" }) +
+        '<div class="tower-cal-day-panel"><h5 class="tower-cal-day-heading">' + escapeHtml(visitorDayHeading(events, view.selected)) + "</h5>" +
+        renderDayEventList(events, view.selected, { ownerControls: false, busyOnly: true }) + "</div>";
+    }
+    var sessionsBox = box.querySelector("[data-tower-visitor-sessions]");
+    if (!sessionsBox) return;
+    var api = window.CognationClassroomSessions;
+    var pro = profileIsProfessional(p);
+    var list = pro && api && typeof api.forHost === "function" ? api.forHost(p._profileId || p.id) : [];
+    sessionsBox.hidden = !pro;
+    if (!pro) { sessionsBox.innerHTML = ""; return; }
+    sessionsBox.innerHTML = '<h5 class="tower-visitor-sessions-title">Classroom sessions</h5>' +
+      (list.length
+        ? '<ul class="tower-visitor-session-list" role="list">' + list.map(function (sess) { return visitorSessionRowHtml(sess, api); }).join("") + "</ul>"
+        : '<p class="form-hint tower-cal-empty">No sessions booked yet.</p>');
+  }
+
   function refreshTowerCalendars(root) {
     if (!root) return;
+    try {
+      renderVisitorCalendar(root);
+    } catch (eVis) {}
     try {
       renderPrivateCalendar(root);
     } catch (e) {}
@@ -7295,6 +7357,10 @@
   function initTowerCalendar(root) {
     if (!root || root.__cognationCalendarBound) return;
     root.__cognationCalendarBound = true;
+    /* Public sessions arrive after load: repaint the visitor Calendar. */
+    document.addEventListener("cognation:classroom-sessions-updated", function () {
+      try { renderVisitorCalendar(root); } catch (eSess) {}
+    });
 
     root.addEventListener("click", function (ev) {
       var t = ev.target;
@@ -7310,6 +7376,7 @@
         }
         if ((prev || next).closest("[data-tower-cal-public], [data-tower-widget=\"calendar\"]")) key = "public";
         if ((prev || next).closest("[data-tower-cal-private]")) key = "private";
+        if ((prev || next).closest("[data-tower-cal-visitor]")) key = "visitor";
         var view = getCalendarViewState(root, key);
         if (prev) {
           view.month0 -= 1;
@@ -7331,7 +7398,9 @@
       var dayBtn = t.closest("[data-tower-cal-day]");
       if (dayBtn) {
         var iso = dayBtn.getAttribute("data-tower-cal-day");
-        var key2 = dayBtn.closest("[data-tower-cal-public], [data-tower-widget=\"calendar\"]")
+        var key2 = dayBtn.closest("[data-tower-cal-visitor]")
+          ? "visitor"
+          : dayBtn.closest("[data-tower-cal-public], [data-tower-widget=\"calendar\"]")
           ? "public"
           : "private";
         var view2 = getCalendarViewState(root, key2);

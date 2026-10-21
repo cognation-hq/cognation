@@ -134,8 +134,10 @@ assert.strictEqual(adult.setMode("professional"), "professional");
 assert.strictEqual(adult.getMode(), "professional");
 assert.strictEqual(stores.session.getItem(adult.MODE_KEY), "professional", "mode stored for the session");
 
-var proDeck = adult.sampleDeck(21);
-assert.strictEqual(proDeck.length, 21);
+/* No Professional page is live: no Webinar cards; the other six types fill 1:1. */
+var proDeck = adult.sampleDeck(18);
+assert.strictEqual(proDeck.length, 18);
+assert.ok(proDeck.every(function (c) { return c.type !== "pro-webinar"; }), "no Webinar card while nothing is live");
 var banned = ["dating", "know", "friend", "ad", "classroom", "chatroom", "fact", "wellness", "event", "content"];
 proDeck.forEach(function (c) {
   assert.ok(/^pro-/.test(c.type), "Professional deck only: " + c.type);
@@ -145,7 +147,7 @@ proDeck.forEach(function (c) {
 });
 var counts = {};
 proDeck.forEach(function (c) { counts[c.type] = (counts[c.type] || 0) + 1; });
-api.PRO_ORDER.forEach(function (t) {
+api.PRO_ORDER.filter(function (t) { return t !== "pro-webinar"; }).forEach(function (t) {
   assert.strictEqual(counts[t], 3, "1:1 across Professional types: " + JSON.stringify(counts));
 });
 for (var i = 1; i < proDeck.length; i++) {
@@ -163,7 +165,8 @@ assert.ok(research.some(function (c) { return /public health/.test(c.title); }),
 assert.ok(proDeck.some(function (c) { return c.type === "pro-field" && /nursing/.test(c.title); }), "field update tied to field");
 assert.ok(proDeck.some(function (c) { return c.type === "pro-popculture" && /nursing/.test(c.title); }), "pop-culture tied to field");
 var auction = proDeck.filter(function (c) { return c.type === "pro-auction"; })[0];
-assert.ok(/webinar/i.test(auction.title) && /bot auction/i.test(auction.body) && /starter projects for sale/.test(auction.body), "weekly webinar + bot auction");
+assert.strictEqual(auction.title, "Weekly Cognation bot auction", "auction title has no \"webinar\" (PM 2026-10-20)");
+assert.ok(!/webinar/i.test(auction.title) && !/webinar/i.test(auction.body) && /bot auction/i.test(auction.body) && /starter projects for sale/.test(auction.body), "weekly bot auction");
 var podcasts = adult.buildProfessionalLanes()["pro-podcast"].map(function (c) { return c.title + " " + c.body; }).join(" ");
 assert.ok(/not only Cognation experts/.test(podcasts) && /Ethical/i.test(podcasts) && /async/i.test(podcasts) && /Continuing education/i.test(podcasts), "podcast topics");
 

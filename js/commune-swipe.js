@@ -1,6 +1,8 @@
 /**
  * COMMUNE — paced public swipe deck (Personal featured mix).
  * Featured families rotate 1:1 — Classroom / ad / chat room / dating / content.
+ * Classroom (and Professional Webinar) cards exist only while a Professional page is
+ * live; with none live that family is skipped and the next family fills the slot.
  * Content lane holds fact, wellness, friend-share, public event, people-you-may-know,
  * and Tower live seller / garage-sale listings. Dating stays opt-in + local + age-gated.
  * Ads stay in the 1:1 mix and play at most 3 seconds. Under-13 sees G/PG only.
@@ -92,34 +94,12 @@
     { id: "room-site-insurance", sqlId: "a1000000-0000-4000-8000-000000000010", slug: "insurance", title: "Insurance", topic: "insurance", gate: "interest", interests: ["insurance"] },
   ];
 
-  /* Honest-thin Classroom / webinar cards — life skills for ~18+ (insurance, voting, business). */
-  var CLASSROOM_BODY = "Cognation Classroom — life skills at a human pace.";
-  var CLASSROOM_SESSIONS = [
-    {
-      id: "class-insurance",
-      sqlId: "a2000000-0000-4000-8000-000000000001",
-      title: "Insurance basics",
-      topic: "insurance",
-      body: "What coverage is for, how premiums work, and questions worth asking before you buy.",
-      minAge: 18,
-    },
-    {
-      id: "class-voting",
-      sqlId: "a2000000-0000-4000-8000-000000000002",
-      title: "Voting & civic basics",
-      topic: "voting",
-      body: "How elections reach the ballot, registering where you live, and finding nonpartisan guides.",
-      minAge: 18,
-    },
-    {
-      id: "class-business",
-      sqlId: "a2000000-0000-4000-8000-000000000003",
-      title: "Starting a small business",
-      topic: "business",
-      body: "Sole prop vs LLC in plain language, basic bookkeeping, and when to ask a professional.",
-      minAge: 18,
-    },
-  ];
+  /* Classroom / Webinar cards come ONLY from a Professional Tower page that is live
+     right now (Alexa 2026-10-20 8:20 PM CT). The live signal is
+     window.CognationProLive.livePages(), a server-backed list of live Professional
+     pages. Nothing provides it yet, so nothing is live and these cards do not render.
+     Go live (live-stubs.js) is a browser-only stub and is NOT a live signal. */
+  var CLASSROOM_BODY = "A live classroom on a Professional page.";
 
   var FACTS = [
     { id: "fact-hearts", title: "A public fact", body: "Octopuses have three hearts. Two pump blood through the gills, and one pumps it through the rest of the body. Source: Smithsonian Ocean." },
@@ -163,11 +143,6 @@
   /* The legacy classroom panel. Not the deck's classroom CARD (it also carries
      data-classroom="card"): hiding that card on Back left a blank deck. */
   var CLASSROOM_PANEL_SEL = "[data-classroom]:not([data-commune-card]), #panel-classroom, [data-commune-classroom]";
-  var PRO_WEBINARS = [
-    { id: "pro-webinar-ethics", title: "Ethical collaboration in practice", body: "Credit, consent, and clear roles when people build together." },
-    { id: "pro-webinar-async", title: "Async work that respects time", body: "Written decisions, clean handoffs, and calm response windows." },
-    { id: "pro-webinar-ce", title: "Planning continuing education", body: "Mapping a year of learning to what your field asks you to renew." },
-  ];
   var PRO_PODCASTS = [
     { id: "pro-podcast-leaders", title: "Top industry performers", body: "Talks with leading people across industries, not only Cognation experts." },
     { id: "pro-podcast-ethics", title: "Ethical collaboration", body: "How strong teams share credit and work through disagreement." },
@@ -933,28 +908,67 @@
     return age != null && age >= 18;
   }
 
-  function classroomCard(session) {
+  /** Live Professional pages from the server-backed live signal. Empty when no signal. */
+  function liveProPages() {
+    var api = window.CognationProLive;
+    if (!api || typeof api.livePages !== "function") return [];
+    var rows;
+    try { rows = api.livePages(); } catch (eLive) { return []; }
+    if (!Array.isArray(rows)) return [];
+    return rows.filter(function (row) {
+      return row && row.profileId && row.live === true &&
+        (!row.kind || row.kind === "professional");
+    });
+  }
+
+  function liveTitle(page, fallback) {
+    return String(page.sessionTitle || page.title || "").trim() || fallback;
+  }
+
+  function classroomCard(page) {
+    var name = String(page.displayName || page.handle || "").trim();
     return {
-      id: session.id,
+      id: "class-live-" + page.profileId,
       type: TYPE.CLASSROOM,
-      title: session.title,
-      body: session.body || CLASSROOM_BODY,
-      topic: session.topic,
-      host: "Cognation",
+      title: liveTitle(page, name ? name + " is teaching live" : "Live classroom"),
+      body: String(page.body || "").trim() || CLASSROOM_BODY,
+      topic: String(page.topic || "").trim(),
+      host: name,
+      handle: String(page.handle || "").replace(/^@/, ""),
+      profileId: page.profileId,
       classroom: true,
-      sqlId: session.sqlId || "",
-      minAge: session.minAge || 18,
+      live: true,
+      sqlId: page.roomSqlId || "",
+      minAge: page.minAge || 18,
     };
   }
 
   function classroomCatalog() {
-    return CLASSROOM_SESSIONS.map(classroomCard);
+    return liveProPages().map(classroomCard);
   }
 
   function visibleClassroomSessions() {
     /* No birth month yet: keep the card so Join can offer Add birth month. */
     if (!classroomAllowed() && !liveBirthMissing()) return [];
     return classroomCatalog();
+  }
+
+  function liveWebinarCards() {
+    return liveProPages().map(function (page) {
+      var name = String(page.displayName || page.handle || "").trim();
+      return {
+        id: "pro-webinar-live-" + page.profileId,
+        type: PRO.WEBINAR,
+        title: liveTitle(page, name ? name + " is live" : "Live webinar"),
+        body: String(page.body || "").trim() || "A live webinar on a Professional page.",
+        why: "This Professional page is live right now.",
+        profileId: page.profileId,
+        handle: String(page.handle || "").replace(/^@/, ""),
+        live: true,
+        rating: page.rating || "G",
+        minAge: page.minAge || 0,
+      };
+    });
   }
 
   function youtubeId(url) {
@@ -1640,9 +1654,8 @@
     var fieldWhy = field ? "Matches the field on your profile: " + field : "Add your field to your profile to tune this.";
     var interests = viewerInterestPhrases();
     var lanes = {};
-    lanes[PRO.WEBINAR] = PRO_WEBINARS.map(function (w) {
-      return proPlaceholder(PRO.WEBINAR, w.id, w.title, w.body, "Cognation-hosted. Every Professional deck sees it.");
-    });
+    /* Webinar cards only while a Professional page is live. None live: lane empty. */
+    lanes[PRO.WEBINAR] = liveWebinarCards();
     lanes[PRO.KNOW] = professionalsYouMightKnow();
     lanes[PRO.RESEARCH] = (interests.length ? interests : [""]).map(function (t) {
       return proPlaceholder(PRO.RESEARCH, "pro-research-" + (slug(t) || "general"),
@@ -1650,8 +1663,8 @@
         "Papers matched to " + (t ? "\u201c" + t + "\u201d" : "the interests on your profile") + " show here once a research feed connects.",
         t ? "Matches your interest: " + t : "Add interests to your profile to tune this.");
     });
-    lanes[PRO.AUCTION] = [proPlaceholder(PRO.AUCTION, "pro-auction-weekly", "Weekly Cognation webinar + bot auction",
-      "Each week Cognation hosts a webinar, then a bot auction on starter projects for sale.",
+    lanes[PRO.AUCTION] = [proPlaceholder(PRO.AUCTION, "pro-auction-weekly", "Weekly Cognation bot auction",
+      "Each week Cognation hosts a bot auction on starter projects for sale.",
       "Weekly Cognation event. Same card for everyone 18+.", 18)];
     lanes[PRO.PODCAST] = PRO_PODCASTS.map(function (w) {
       return proPlaceholder(PRO.PODCAST, w.id, w.title, w.body, "Picked by topic: ethics, async work, continuing education.");
@@ -2950,7 +2963,7 @@
 
   function paintClassroom(session) {
     var notesText =
-      "Honest thin session: Cognation hosts short life-skills webinars here (insurance, voting, business). Full curriculum arrives later — this seat is real.";
+      "Live session on this Professional page.";
     if (paintCardView("classroom", {
       title: session && session.title || "Classroom",
       body: (session && session.topic ? "Topic · " + session.topic + " — " : "") + (session && session.body || CLASSROOM_BODY),
@@ -2969,7 +2982,7 @@
     if (body) body.textContent = session.body || CLASSROOM_BODY;
     if (notes) {
       notes.textContent =
-        "Honest thin session: Cognation hosts short life-skills webinars here (insurance, voting, business). Full curriculum arrives later — this seat is real.";
+        "Live session on this Professional page.";
     }
     showClassroom(true);
     state.classroomId = session.id;
@@ -3010,7 +3023,7 @@
     var sessions = classroomCatalog();
     var session = null;
     sessions.forEach(function (item) { if (item.id === sessionId) session = item; });
-    if (!session && sessions.length) session = sessions[0];
+    /* Only the live page that was tapped. A page that went offline opens nothing. */
     if (!session) return false;
     /* Signed in + 18+: a real live classroom (join_chat_room, messages, members). */
     if (state.shell && liveChatEligible() && session.sqlId) {
@@ -3675,6 +3688,7 @@
     wireClassroomCardClick: wireClassroomCardClick,
     closeClassroom: closeClassroom,
     classroomCatalog: classroomCatalog,
+    liveProPages: liveProPages,
     visibleClassroomSessions: visibleClassroomSessions,
     classroomAllowed: classroomAllowed,
     getFollows: getFollows,

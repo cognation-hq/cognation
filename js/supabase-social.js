@@ -76,6 +76,9 @@
       handle: normalizeHandle(profile.handle),
       display_name: String(profile.display_name || "Member").slice(0, 80),
       bio: String(profile.bio || "").slice(0, 280),
+      /* profiles.account_kind / seed_fleet_id (20261002_seedops_account_kind.sql). */
+      account_kind: profile.account_kind ? String(profile.account_kind) : "",
+      seed_fleet_id: profile.seed_fleet_id ? String(profile.seed_fleet_id) : "",
     };
     state.profiles[item.id] = item;
     if (item.handle) state.handles[item.handle] = item.id;
@@ -107,7 +110,7 @@
     );
   }
 
-  var PROFILE_RETURN_COLUMNS = "id,user_id,kind,handle,display_name,bio";
+  var PROFILE_RETURN_COLUMNS = "id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id";
 
   /* Leave Sage (seed-0248, the under-13 test viewer) out of member lists. */
   function u13() {
@@ -124,7 +127,7 @@
     return client()
       .rest("profiles", {
         query:
-          "select=id,user_id,kind,handle,display_name,bio&order=created_at.desc&limit=400" + listFilter(),
+          "select=" + PROFILE_RETURN_COLUMNS + "&order=created_at.desc&limit=400" + listFilter(),
       })
       .then(cacheProfiles);
   }
@@ -135,7 +138,7 @@
     return client()
       .rest("profiles", {
         query:
-          "select=id,user_id,kind,handle,display_name,bio&user_id=eq." +
+          "select=" + PROFILE_RETURN_COLUMNS + "&user_id=eq." +
           encodeURIComponent(me.supabaseUserId),
       })
       .then(function (rows) {
@@ -234,6 +237,14 @@
     var display =
       (author && (author.display_name || author.displayName)) || "Cognation member";
     var handle = author ? normalizeHandle(author.handle) : "";
+    /* Seed/ops badges read these account fields, not the handle. Missing
+       (older cache) stays "" so classify falls back to "real". */
+    var accountKind = String(
+      (author && author.account_kind) || (embedded && embedded.account_kind) || ""
+    ).toLowerCase();
+    var seedFleetId = String(
+      (author && author.seed_fleet_id) || (embedded && embedded.seed_fleet_id) || ""
+    );
     var reactions = reactionsMap(row && row.reactions);
     var hearts = reactions["❤️"] ? reactions["❤️"].length : 0;
     return {
@@ -242,6 +253,10 @@
       authorProfileId: row.author_profile_id,
       authorName: display,
       handle: handle,
+      accountKind: accountKind,
+      isSeed: accountKind === "seed",
+      isOpsBot: accountKind === "ops",
+      seedFleetId: seedFleetId,
       body: row.body || "",
       createdAt: row.created_at,
       attachments: (function () {
@@ -273,7 +288,7 @@
   }
 
   var FEED_COLUMNS =
-    "id,author_profile_id,body,visibility,attachments,created_at,rating,hidden_attachment_indexes,author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,bio,seed_fleet_id),reactions:tower_post_reactions(face,profile_id)";
+    "id,author_profile_id,body,visibility,attachments,created_at,rating,hidden_attachment_indexes,author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id),reactions:tower_post_reactions(face,profile_id)";
   var FEED_TAIL = "&order=created_at.desc&limit=100";
 
   /* The rating column is missing until 20261015_tower_auto_rate.sql runs. */

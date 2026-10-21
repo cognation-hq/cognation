@@ -2818,7 +2818,9 @@
         isSeed: !!post.isSeed,
         isOpsBot: !!post.isOpsBot,
         seedFleetId: post.seedFleetId || "",
-        handle: post.handle || "",
+        /* No handle: the badge follows the account fields (server posts carry
+           them from profiles.account_kind / seed_fleet_id via supabase-social
+           mapPost). */
         id: post.authorProfileId || "",
       }) || "";
     } catch (e) {

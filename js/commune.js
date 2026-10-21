@@ -1215,11 +1215,13 @@
         var seedMeta = {};
         try {
           if (window.CognationSeedOps && window.CognationSeedOps.classify) {
+            /* Account fields only (no handle): server posts carry them
+               from supabase-social mapPost, local SeedOps posts from buildPost. */
             seedMeta = window.CognationSeedOps.classify({
               displayName: author,
-              handle: slug,
               accountKind: p.accountKind,
               isSeed: p.isSeed,
+              isOpsBot: p.isOpsBot,
               seedFleetId: p.seedFleetId,
               id: p.authorProfileId || p.profileId,
             });

@@ -49,10 +49,11 @@ assert.ok(!selected.email, "no client select of profiles.email");
 
 /* PATCH/POST with return=representation must not fall back to select=*. */
 var social = src("js/supabase-social.js");
-assert.ok(/var PROFILE_RETURN_COLUMNS = "id,user_id,kind,handle,display_name,bio";/.test(social));
+/* account_kind / seed_fleet_id added for seed/ops badges by account field (both granted). */
+assert.ok(/var PROFILE_RETURN_COLUMNS = "id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id";/.test(social));
 assert.ok(/method: "PATCH",[\s\S]{0,260}"&select=" \+ PROFILE_RETURN_COLUMNS/.test(social), "profile PATCH selects explicit columns");
 assert.ok(/rest\("profiles", \{\s*method: "POST",\s*query: "select=" \+ PROFILE_RETURN_COLUMNS/.test(social), "profile POST selects explicit columns");
-"id,user_id,kind,handle,display_name,bio".split(",").forEach(function (c) {
+"id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id".split(",").forEach(function (c) {
   assert.ok(granted.indexOf(c) !== -1, "return column " + c + " granted");
 });
 

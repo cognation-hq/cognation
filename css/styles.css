@@ -14916,6 +14916,55 @@ body.cgn-cal-page {
   color: #f7f9ff !important;
 }
 
+/* Designer (Oct 21), after #214.
+   1. Log out on the lilac top bar reads like the tab labels: #1c1630 text, 1px
+      #1c1630 border at 40%, no fill, no text-shadow (was white text on a white
+      18% fill). The lilac ombre is the only top-bar theme (TOWER, SIGNAL, ECHO,
+      PULSE and under the login gate all use it), so this is not scoped further.
+      Hover/focus: full #1c1630 border, still no fill (tab hover is the same ink). */
+.app-topbar-actions .app-logout-btn {
+  color: #1c1630 !important;
+  border: 1px solid rgba(28, 22, 48, 0.4) !important;
+  background: transparent !important;
+  text-shadow: none !important;
+}
+.app-topbar-actions .app-logout-btn:hover,
+.app-topbar-actions .app-logout-btn:focus-visible {
+  color: #1c1630 !important;
+  border-color: #1c1630 !important;
+  background: transparent !important;
+}
+/* 2. Times story hidden for you (reported / blocked): the status line sits in the
+      middle of the story's slot, italic, #1c1630 at 70%. */
+#panel-signal [data-news-post][data-news-reported-hidden] {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+#panel-signal [data-news-post][data-news-reported-hidden] [data-news-report] {
+  width: 100%;
+  display: flex !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+#panel-signal [data-news-post][data-news-reported-hidden] [data-news-report-status] {
+  font-style: italic !important;
+  color: rgba(28, 22, 48, 0.7) !important;
+}
+/* 3. Times "Couldn't send report, try again" (story and comment): full #1c1630,
+      left padding matching the chips above it, no red tint or box. */
+#panel-signal [data-news-report-status][data-news-report-failed] {
+  color: #1c1630 !important;
+  padding-left: 0.5rem !important; /* .news-report-option */
+}
+#panel-signal .news-comment-item [data-news-comment-report-error] {
+  color: #1c1630 !important;
+  background: transparent !important;
+  border: 0 !important;
+  margin: 0.3rem 0 0 !important; /* was 0 1rem 0.5rem (boxed status) */
+  padding: 0 0 0 0.45rem !important; /* .news-comment-item .news-report-option */
+}
+
 /* TOWER Feed contrast (Designer follow-up). TOWER Feed only (.tower-feed[data-tower-feed]
    and the "Send a signal" composer in the same Feed panel):
    - post cards use the site glass rgba(18,16,38,.92) so the existing body text reads

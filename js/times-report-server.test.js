@@ -168,12 +168,14 @@ function testStoryFailureIsHonest() {
     assert.strictEqual(dom.article.hasAttribute("data-news-reported-hidden"), false, "story stays so you can retry");
     assert.strictEqual(dom.menu.hidden, false, "options stay open");
     assert.strictEqual(dom.opts.untruthful.disabled, false, "option can be tried again");
+    assert.ok(dom.status.hasAttribute("data-news-report-failed"), "failure line carries the styling hook");
     mode = "ok";
     click(dom, dom.opts.untruthful);
     return tick();
   }).then(function () {
     assert.strictEqual(calls, 2, "retry sends again");
     assert.strictEqual(dom.status.textContent, "Reported: Untruthful. Hidden for you.", "retry success -> Reported");
+    assert.ok(!dom.status.hasAttribute("data-news-report-failed"), "hook cleared once it is sent");
   });
 }
 

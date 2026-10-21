@@ -136,10 +136,13 @@
       function setOptionsDisabled(on) {
         for (var i = 0; i < options.length; i++) options[i].disabled = on;
       }
-      function say(text) {
+      function say(text, failed) {
         if (!status) return;
         status.hidden = false;
         status.textContent = text;
+        /* Styling hook for the Couldn't-send line (css: Designer, Oct 21). */
+        if (failed) status.setAttribute("data-news-report-failed", "");
+        else status.removeAttribute("data-news-report-failed");
       }
       post.setAttribute("data-news-report-sending", "true");
       setOptionsDisabled(true);
@@ -176,7 +179,7 @@
         post.removeAttribute("data-news-report-sending");
         setOptionsDisabled(false);
         if (menu2) menu2.hidden = false;
-        say(REPORT_FAILED);
+        say(REPORT_FAILED, true);
       });
     });
 

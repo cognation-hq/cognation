@@ -2355,55 +2355,21 @@
 
   window.CognationTowerProfileStore = TowerProfileStore;
 
-  var SEED = [
-    {
-      id: "tower-1",
-      authorName: "Alex Rivera",
-      authorProfileId: "alex-rivera",
-      body: "East wing library late night — brought notes from the zoning packet.",
-      createdAt: "2026-09-15T18:30:00.000Z",
-      attachments: [{ kind: "note", label: "Zoning notes.pdf", name: "Zoning notes.pdf" }],
-      likes: 42,
-    },
-    {
-      id: "tower-2",
-      authorName: "Sam Okonkwo",
-      authorProfileId: "sam-okonkwo",
-      body: "@friendsoffriends Market square this morning. Peach stand line hit the fountain again.",
-      createdAt: "2026-09-15T17:05:00.000Z",
-      attachments: [{ kind: "photo", label: "Square photo", name: "market-square.jpg" }],
-      likes: 128,
-      audience: "friends_of_friends",
-      shareBeyondFriends: true,
-    },
-    {
-      id: "tower-3",
-      authorName: "Jordan Lee",
-      authorProfileId: "jordan-lee",
-      body: "Saturday block party invite — bring a dish if you can.",
-      createdAt: "2026-09-15T15:40:00.000Z",
-      attachments: [{ kind: "document", label: "Party invitation", name: "block-party-invite.pdf" }],
-      likes: 96,
-    },
-    {
-      id: "tower-4",
-      authorName: "Mira Chen",
-      authorProfileId: "mira-chen",
-      body: "Short clip from the river walk mural going up.",
-      createdAt: "2026-09-15T14:10:00.000Z",
-      attachments: [{ kind: "video", label: "Mural clip", name: "mural-walk.mp4" }],
-      likes: 77,
-    },
-    {
-      id: "tower-5",
-      authorName: "Chris Patel",
-      authorProfileId: "chris-patel",
-      body: "Creative study: cyan ink wash of the tower silhouette.",
-      createdAt: "2026-09-15T12:55:00.000Z",
-      attachments: [{ kind: "art", label: "Tower silhouette", name: "tower-ink.png" }],
-      likes: 61,
-    },
-  ];
+  /* The 5 local demo Feed posts (ids tower-1..tower-5: Alex Rivera, Sam Okonkwo,
+     Jordan Lee, Mira Chen, Chris Patel) are retired (Oct 20): they painted in the
+     Times and TOWER Feed as if real. Copies already saved in this browser are
+     dropped on load; anything else stays. */
+  var RETIRED_DEMO_POSTS = {
+    "tower-1": "alex-rivera",
+    "tower-2": "sam-okonkwo",
+    "tower-3": "jordan-lee",
+    "tower-4": "mira-chen",
+    "tower-5": "chris-patel",
+  };
+  function isRetiredDemoPost(post) {
+    return !!(post && post.id && RETIRED_DEMO_POSTS[post.id] &&
+      RETIRED_DEMO_POSTS[post.id] === String(post.authorProfileId || ""));
+  }
 
   function escapeHtml(str) {
     return String(str)
@@ -2569,6 +2535,10 @@
         if (!raw) return null;
         var data = JSON.parse(raw);
         if (!data || !Array.isArray(data.posts)) return null;
+        if (!data.remote && data.posts.some(isRetiredDemoPost)) {
+          data.posts = data.posts.filter(function (post) { return !isRetiredDemoPost(post); });
+          TowerStore.save(data);
+        }
         return data;
       } catch (e) {
         return null;
@@ -2587,10 +2557,7 @@
       if (usingRemoteSocial() && (!data || !data.remote)) {
         return [];
       }
-      if (!data) {
-        data = { version: 1, posts: JSON.parse(JSON.stringify(SEED)) };
-        this.save(data);
-      }
+      if (!data) return [];
       if (clearLegacyReactionSelections(data)) this.save(data);
       return data.posts.slice().sort(function (a, b) {
         return String(b.createdAt).localeCompare(String(a.createdAt));
@@ -2641,9 +2608,7 @@
         return social.togglePostReaction(postId, face);
       }
       var data = this.load();
-      if (!data) {
-        data = { version: 1, posts: JSON.parse(JSON.stringify(SEED)) };
-      }
+      if (!data) return { ok: false, error: "Post not found." };
       var me = "you";
       try {
         var sess = localStorage.getItem("cognation.session.v2");

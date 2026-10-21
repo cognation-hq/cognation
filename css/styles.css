@@ -14778,6 +14778,15 @@ body.cgn-cal-page {
 .tower-visitor-calendar .tower-cal-cell.is-today, .tower-visitor-calendar .tower-cal-cell.is-selected { border-color: rgba(197,166,255,.85); box-shadow: 0 0 0 1px rgba(197,166,255,.45) inset; }
 .tower-visitor-calendar .tower-visitor-cal-link { color: #c5a6ff; }
 
+/* Tower header name (Designer follow-up): centred under the avatar and #f7f9ff.
+   Scoped to the stacked header (.tower-avatar-stack); the desktop strip layout, where
+   the name sits beside the avatar, keeps its left alignment. The 10ch name box stays
+   (stable while loading); only the text inside it is centred. */
+#panel-tower .tower-avatar-stack .tower-profile-name-wrap .tower-profile-name {
+  text-align: center;
+  color: #f7f9ff !important;
+}
+
 /* TOWER Feed contrast (Designer follow-up). TOWER Feed only (.tower-feed[data-tower-feed]
    and the "Send a signal" composer in the same Feed panel):
    - post cards use the site glass rgba(18,16,38,.92) so the existing body text reads

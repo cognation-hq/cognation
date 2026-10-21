@@ -107,6 +107,12 @@ list.children = []; renderFeed({});
 assert.strictEqual(list.children.length, 44, "no badge module: feed still renders");
 win.CognationSeedOpsBadge = saved;
 
-/* No new CSS: the existing global rule styles it. */
-assert.ok(/\.seedops-demo-badge \{/.test(src("css/styles.css")), "existing badge style");
+/* Site-wide contrast fix: dark #4a1d12 text on the peach pill, placed after (and so
+   beating) the global `span { color: var(--cgn-ink) !important }` dark-shell rule. */
+var css = src("css/styles.css");
+assert.ok(/\.seedops-demo-badge \{/.test(css), "existing badge style");
+var inkAt = css.search(/p, a, span, label[^{]*\{\s*color: var\(--cgn-ink\) !important;/);
+var darkAt = css.search(/\.seedops-demo-badge \{\s*color: #4a1d12 !important;\s*\}/);
+assert.ok(inkAt !== -1, "global span ink rule found");
+assert.ok(darkAt > inkAt, "badge dark-text rule sits after the global span rule");
 console.log("tower-seed-demo-badge.test.js ok");

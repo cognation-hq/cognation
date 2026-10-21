@@ -342,6 +342,44 @@
     var line = host.querySelector("[data-news-comment-error]");
     if (line) line.remove();
   }
+  /* Cognation Times (SIGNAL › News): each story's thread starts closed behind one ink
+     text line, "Comments (n)" / "Hide comments". The thread still mounts and loads
+     exactly as before; the line only shows or hides it (CSS keys off the article's
+     data-times-comments-open). Once per story; other surfaces are untouched. */
+  function wireTimesToggle(article, host, storyId) {
+    if (!article.closest || !article.closest("#panel-signal")) return;
+    if (article.querySelector("[data-times-comments-toggle]")) return;
+    timesSeq += 1;
+    if (!host.id) host.id = "times-comments-" + timesSeq + "-" + String(storyId).replace(/[^a-z0-9_-]/gi, "").slice(0, 40);
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "times-comments-toggle";
+    btn.setAttribute("data-times-comments-toggle", "");
+    btn.setAttribute("aria-controls", host.id);
+    btn.setAttribute("aria-expanded", "false");
+    host.parentNode.insertBefore(btn, host);
+    function sync() {
+      var open = article.hasAttribute("data-times-comments-open");
+      var n = host.querySelectorAll(".news-comment-item").length;
+      var text = open ? "Hide comments" : n ? "Comments (" + n + ")" : "Comments";
+      if (btn.textContent !== text) btn.textContent = text;
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      /* Viewers the thread is not shown to (age rule above) get no line either. */
+      btn.hidden = host.hidden;
+    }
+    host.__timesSync = sync;
+    btn.addEventListener("click", function () {
+      if (article.hasAttribute("data-times-comments-open")) article.removeAttribute("data-times-comments-open");
+      else article.setAttribute("data-times-comments-open", "");
+      sync();
+    });
+    if (typeof MutationObserver === "function") {
+      new MutationObserver(sync).observe(host, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
+    }
+    sync();
+  }
+  var timesSeq = 0;
+
   function mount(article, post) {
     if (!article) return null;
     var storyId = (post && post.id) || article.getAttribute(cfg.idAttr) || "";
@@ -358,6 +396,7 @@
       host.setAttribute("data-news-comments", "");
       article.appendChild(host);
     }
+    if (cfg === NEWS) wireTimesToggle(article, host, storyId);
     /* Every mount() redraws this one slot; only the latest call may paint, so a
        slow pull from an earlier call (old session or profile) loses. */
     var token = (host.__renderToken || 0) + 1;
@@ -365,11 +404,13 @@
     if (remoteOn() && sessionAuthor() && !(cfg.under13NoThread && age() < 13)) {
       pullStory(storyId).then(function () {
         if (host.__renderToken === token) renderThread(host, storyId, rating);
+        if (host.__timesSync) host.__timesSync();
       }, function () {
         if (host.__renderToken !== token) return;
         var d = read(); d.byStory[storyId] = []; write(d); renderThread(host, storyId, rating);
       });
     } else renderThread(host, storyId, rating);
+    if (host.__timesSync) host.__timesSync();
     if (!host.__bound) {
       host.__bound = true;
       host.addEventListener("submit", function (ev) {

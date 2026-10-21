@@ -14543,3 +14543,40 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
    keep the label on one line (it was one line with the switch). */
 .app-topbar-actions [data-site-switch][hidden] ~ .app-logout-btn { white-space: nowrap; }
 
+/* Cognation Times: story comments start closed (js/commune.js wireTimesCommentsToggle).
+   One small ink text line in the Times serif opens and closes each thread. */
+#panel-signal .commune-feed-item:not([data-times-comments-open]) .news-story-comments { display: none !important; }
+#panel-signal .times-comments-toggle {
+  appearance: none;
+  display: block;
+  align-self: flex-start;
+  text-align: left !important;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  color: #16120c !important;
+  font-family: "Old Standard TT", Georgia, "Times New Roman", serif !important;
+  font-size: 0.8rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+}
+#panel-signal .times-comments-toggle[hidden] { display: none !important; }
+#panel-signal .times-comments-toggle:focus-visible { outline: 2px solid #16120c; outline-offset: 2px; }
+
+/* Cognation Times layout (Alexa, Oct 20): 1 headliner across the full width, then
+   9 stories in three rows of three; 10 slots at most (TIMES_SLOTS in commune.js).
+   No blank filler boxes when there are fewer stories. Phones (<=720px) stay one column. */
+#panel-signal .commune-feed-item.is-lead { grid-column: 1 / -1; }
+#panel-signal .commune-feed-item.is-lead .commune-feed-body {
+  font-size: 1.35rem !important;
+  line-height: 1.25 !important;
+}
+#panel-signal .times-column-pad { display: none !important; }
+

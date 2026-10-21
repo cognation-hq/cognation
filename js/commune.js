@@ -901,6 +901,8 @@
     var wirePage = 0;
     var wireLoading = false;
     var WIRE_BATCH = 8;
+    /* Cognation Times prints exactly 10 story slots: 1 headliner + 9 (Alexa, Oct 20). */
+    var TIMES_SLOTS = 10;
     var feedObserver = null;
 
     try {
@@ -1262,7 +1264,7 @@
         if (feedEmpty) feedEmpty.hidden = false;
       } else {
         if (feedEmpty) feedEmpty.hidden = true;
-        posts.forEach(function (post, idx) {
+        posts.slice(0, TIMES_SLOTS).forEach(function (post, idx) {
           appendPostEl(post, { lead: idx === 0 });
         });
         /* Fill the last row so the three columns stay the same height. */

@@ -314,6 +314,13 @@
           setStatus("Use a 3–40 character username (letters, numbers, _ or -), then fix any highlighted fields.", true);
           return;
         }
+        var rules = window.CognationHandleRules;
+        var userField = form.querySelector("#login-username");
+        if (rules && userField && rules.isReserved(userField.value)) {
+          markInvalid(userField, true);
+          setStatus(rules.message("Usernames"), true);
+          return;
+        }
         var profile = collectSignupProfile();
         var password = (form.querySelector("#login-password") || {}).value || "";
         var handle = String(profile.username || "")

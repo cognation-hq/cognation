@@ -349,6 +349,9 @@
   function wireTimesToggle(article, host, storyId) {
     if (!article.closest || !article.closest("#panel-signal")) return;
     if (article.querySelector("[data-times-comments-toggle]")) return;
+    /* A redraw of the same edition (Statewide Refresh, signed-in posts landing)
+       rebuilds every story; a thread the reader had open comes back open. */
+    if (timesOpen[storyId]) article.setAttribute("data-times-comments-open", "");
     timesSeq += 1;
     if (!host.id) host.id = "times-comments-" + timesSeq + "-" + String(storyId).replace(/[^a-z0-9_-]/gi, "").slice(0, 40);
     var btn = document.createElement("button");
@@ -369,8 +372,13 @@
     }
     host.__timesSync = sync;
     btn.addEventListener("click", function () {
-      if (article.hasAttribute("data-times-comments-open")) article.removeAttribute("data-times-comments-open");
-      else article.setAttribute("data-times-comments-open", "");
+      if (article.hasAttribute("data-times-comments-open")) {
+        article.removeAttribute("data-times-comments-open");
+        delete timesOpen[storyId];
+      } else {
+        article.setAttribute("data-times-comments-open", "");
+        timesOpen[storyId] = true;
+      }
       sync();
     });
     if (typeof MutationObserver === "function") {
@@ -379,10 +387,15 @@
     sync();
   }
   var timesSeq = 0;
+  /* Story keys whose Times thread is open; cleared when the edition changes. */
+  var timesOpen = {};
+  function resetTimesOpen() { timesOpen = {}; }
 
   function mount(article, post) {
     if (!article) return null;
-    var storyId = (post && post.id) || article.getAttribute(cfg.idAttr) || "";
+    /* data-news-story-key: the story a reshuffled copy came from (commune.js), so
+       a Statewide Refresh keeps the same thread. */
+    var storyId = (post && post.id) || article.getAttribute("data-news-story-key") || article.getAttribute(cfg.idAttr) || "";
     if (!storyId) return null;
     if (cfg.parentCol === "post_id" && !UUID_RE.test(String(storyId))) return null;
     var rating = (post && post.rating) || article.getAttribute("data-news-rating") || "";
@@ -523,6 +536,7 @@
     listForStory: listForStory, addComment: addComment,
     publishComment: publishComment, pullStory: pullStory, authorBadge: authorBadge, reportComment: reportComment,
     toggleReact: toggleReact, mount: mount, mountAll: mountAll, viewerAge: age,
+    resetTimesOpen: resetTimesOpen,
   };
 
   if (typeof document !== "undefined" && document.addEventListener) {

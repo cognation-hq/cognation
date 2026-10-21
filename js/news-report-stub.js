@@ -1,11 +1,19 @@
 /**
  * CGN-009 — NEWS report control (demo).
- * Hooks: [data-news-report], [data-news-report-reason="harmful|untruthful"],
+ * Hooks: [data-news-report], [data-news-report-reason="harmful|untruthful|misrated"],
+ * ("misrated" is the "Not right for my age" option; same reason the server's
+ * report_tower_post already accepts),
  * [data-news-post] + data-post-id. Queues via window.CognationModeration.enqueue.
  * No user bans.
  */
 (function () {
   "use strict";
+
+  var REASON_LABELS = {
+    harmful: "Harmful",
+    untruthful: "Untruthful",
+    misrated: "Not right for my age",
+  };
 
   function closestPost(el) {
     return el && el.closest("[data-news-post], .paper-article, .commune-feed-item");
@@ -72,7 +80,7 @@
       if (!reasonBtn) return;
       ev.preventDefault();
       var reason = reasonBtn.getAttribute("data-news-report-reason");
-      if (reason !== "harmful" && reason !== "untruthful") return;
+      if (!REASON_LABELS[reason]) return;
       var bar2 = reasonBtn.closest("[data-news-report]");
       var post = closestPost(reasonBtn);
       var postId = post && post.getAttribute("data-post-id");
@@ -96,16 +104,14 @@
             body: bodyEl ? bodyEl.textContent.trim().slice(0, 2000) : "",
             createdAt: new Date().toISOString(),
             temporarilyRemoved: true,
+            reporterNote: "User report: " + REASON_LABELS[reason],
           },
         });
       }
       applyHide(post);
       if (status) {
         status.hidden = false;
-        status.textContent =
-          "Reported as " +
-          reason +
-          " · saved in this browser only. Demo / local only.";
+        status.textContent = "Reported: " + REASON_LABELS[reason] + ". Hidden for you.";
       }
     });
 

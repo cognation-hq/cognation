@@ -93,7 +93,7 @@
   function normalizeReport(raw) {
     raw = raw || {};
     var reason = String(raw.reason || raw.reportReason || "").toLowerCase();
-    if (reason !== "harmful" && reason !== "untruthful") {
+    if (reason !== "harmful" && reason !== "untruthful" && reason !== "misrated") {
       reason = reason.indexOf("truth") >= 0 ? "untruthful" : "harmful";
     }
     var id = String(raw.id || "");
@@ -197,8 +197,9 @@
     try {
       if (
         window.CognationContentReport &&
+        !report.serverFiled &&
         item.postId &&
-        (item.reason === "harmful" || item.reason === "untruthful")
+        (item.reason === "harmful" || item.reason === "untruthful" || item.reason === "misrated")
       ) {
         window.CognationContentReport.reportTowerPost({
           postId: item.postId,

@@ -767,6 +767,7 @@
         });
         copy.createdAt = new Date(now - i * 7 * 60 * 1000).toISOString();
         copy.id = (p.id || "ht") + "-" + now.toString(36) + "-" + i;
+        if (p.id) copy.sourceId = p.sourceId || p.id;
         return copy;
       });
     }
@@ -791,6 +792,7 @@
           copy[k] = p[k];
         });
         copy.id = "statewide-refresh-" + Date.now().toString(36) + "-" + i;
+        copy.sourceId = p.sourceId || p.id || "";
         copy.body =
           "@statewide refresh · " +
           (p.body || "").replace(/^@statewide[^\—]*—\s*/, "");
@@ -1078,6 +1080,7 @@
         '<div class="news-report-menu" data-news-report-menu hidden>' +
         '<button type="button" class="news-report-option" data-news-report-reason="harmful">Harmful</button>' +
         '<button type="button" class="news-report-option" data-news-report-reason="untruthful">Untruthful</button>' +
+        '<button type="button" class="news-report-option" data-news-report-reason="misrated">Not right for my age</button>' +
         '<button type="button" class="news-report-option" data-news-report-block>Block</button>' +
         "</div>" +
         '<span class="news-report-status" data-news-report-status hidden role="status"></span>' +
@@ -1085,13 +1088,18 @@
       var postId = post.id || ("news-" + String(post.createdAt || Date.now()) + "-" + Math.random().toString(36).slice(2, 7));
       article.setAttribute("data-news-post", "");
       article.setAttribute("data-post-id", postId);
+      /* Comments thread key: a reshuffled copy keeps its story's thread. */
+      var storyKey = post.sourceId || postId;
+      article.setAttribute("data-news-story-key", storyKey);
+      /* Real Tower post id for the server report (display ids carry a prefix). */
+      if (post.towerPostId) article.setAttribute("data-tower-post-id", String(post.towerPostId));
       if (post.rating) article.setAttribute("data-news-rating", String(post.rating));
       /* Insert before mounting comments: the Times "Comments" line attaches only to
          stories already inside SIGNAL (news-comments.js wireTimesToggle). */
       feedList.appendChild(article);
       try {
         if (window.CognationNewsComments && window.CognationNewsComments.mount) {
-          window.CognationNewsComments.mount(article, { id: postId, rating: post.rating || "" });
+          window.CognationNewsComments.mount(article, { id: storyKey, rating: post.rating || "" });
         }
         if (window.CognationSeedOpsNewsLog && window.CognationSeedOpsNewsLog.onNewsPostRendered) {
           window.CognationSeedOpsNewsLog.onNewsPostRendered(post, editionId, {
@@ -1372,6 +1380,12 @@
 
     function setEdition(id) {
       editionId = EditionStore.setId(id);
+      /* Open comment threads stay open across same-edition redraws only. */
+      try {
+        if (window.CognationNewsComments && window.CognationNewsComments.resetTimesOpen) {
+          window.CognationNewsComments.resetTimesOpen();
+        }
+      } catch (eOpen) {}
       applyEditionChrome();
       var pulled = null;
       if (FeedStore.isCuratedAutopullEdition(editionId)) {

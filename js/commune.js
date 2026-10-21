@@ -968,6 +968,10 @@
     }
 
     var floorUnder13AtRender = null;
+    var towerPlateKeyAtRender = null;
+    function towerPlateKey(posts) {
+      return posts.slice(0, TIMES_SLOTS).map(function (p) { return p.id || ""; }).join("|");
+    }
     function natIntlFloor(posts) {
       return newsNatIntlFloor(posts, editionId);
     }
@@ -1241,6 +1245,7 @@
       if (!feedList) return;
       /* Front page prefers the rated Feed plate (personal and professional). */
       var towerPlate = postsFromTower();
+      towerPlateKeyAtRender = towerPlateKey(towerPlate);
       var posts = towerPlate.length || editionId === "local" || editionId === "statewide"
         ? towerPlate
         : natIntlFloor(FeedStore.listPosts(editionId));
@@ -1508,6 +1513,14 @@
     document.addEventListener("cognation:member-profile-updated", function () {
       if (editionId !== "nationwide" && editionId !== "international") return;
       if (floorUnder13AtRender !== newsViewerUnder13()) renderFeed();
+    });
+    /* Signed-in Feed posts land after first paint (TowerStore.setRemotePosts,
+       SeedOps hydrate): redraw the Times when its plate changed. Prints only
+       what is real; empty and filler behavior stay renderFeed's. */
+    document.addEventListener("cognation:tower-updated", function (e) {
+      var detail = (e && e.detail) || {};
+      if (!detail.remote && !detail.hydrate) return;
+      if (towerPlateKey(postsFromTower()) !== towerPlateKeyAtRender) renderFeed();
     });
   }
 

@@ -2538,6 +2538,17 @@
     return !!(post && post.seedopsTower && !post._remote);
   }
 
+  /* A server post that is not a SeedOps seed/ops post: a member's Feed copied
+     here by setRemotePosts while someone was signed in. Signed out (shared
+     device), those never show and are purged on sign-out; the signed-out Feed
+     is SeedOps content only (seed server posts + local templates). */
+  function isMemberCachePost(post) {
+    if (!post || !post._remote) return false;
+    var kind = String(post.accountKind || "").toLowerCase();
+    if (post.isSeed || post.isOpsBot || kind === "seed" || kind === "ops" || post.seedFleetId) return false;
+    return true;
+  }
+
   var TowerStore = {
     load: function () {
       try {
@@ -2569,7 +2580,9 @@
       }
       if (!data) return [];
       if (clearLegacyReactionSelections(data)) this.save(data);
-      var posts = data.remote && usingRemoteSocial() ? data.posts.filter(function (p) { return !isLocalSeedTemplate(p); }) : data.posts;
+      var posts = usingRemoteSocial()
+        ? (data.remote ? data.posts.filter(function (p) { return !isLocalSeedTemplate(p); }) : data.posts)
+        : data.posts.filter(function (p) { return !isMemberCachePost(p); });
       return posts.slice().sort(function (a, b) {
         return String(b.createdAt).localeCompare(String(a.createdAt));
       });
@@ -2595,6 +2608,22 @@
         if (delta) return delta;
         return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
       });
+    },
+    /* Sign-out: drop the last member's cached Feed posts from this device.
+       SeedOps seed/ops posts and local templates stay. Returns how many went. */
+    clearMemberCache: function () {
+      var data = this.load();
+      if (!data) return 0;
+      var kept = data.posts.filter(function (p) { return !isMemberCachePost(p); });
+      var dropped = data.posts.length - kept.length;
+      if (!dropped) return 0;
+      data.posts = kept;
+      if (!kept.some(function (p) { return p && p._remote; })) data.remote = false;
+      this.save(data);
+      document.dispatchEvent(
+        new CustomEvent("cognation:tower-updated", { detail: { remote: true, signedOut: true } })
+      );
+      return dropped;
     },
     setRemotePosts: function (posts) {
       var data = {
@@ -2693,6 +2722,11 @@
   };
 
   window.CognationTowerStore = TowerStore;
+  /* Signing out in this tab clears the member's Feed cache right away. */
+  document.addEventListener("cognation:session-ended", function () {
+    if (usingRemoteSocial()) return;
+    try { TowerStore.clearMemberCache(); } catch (eClear) {}
+  });
 
   function renderAttachments(list) {
     if (!list || !list.length) return "";

@@ -71,10 +71,12 @@ inCards.forEach(function (c) { assert.ok(listIds.indexOf(c.id.replace(/^market-/
 var earlyWin = boot({ version: 2, posts: [template, serverSale] }, true);
 assert.strictEqual(earlyWin.CognationCommuneSwipe.marketplaceCards().length, 0, "signed in, local-only store: nothing from it in Marketplace");
 
-/* 2. Signed out: unchanged, template sale posts still show (same set as the raw store). */
-var outWin = boot({ version: 2, posts: [template, serverSale, plain] }, false);
-assert.deepStrictEqual(ids(outWin.CognationCommuneSwipe.marketplaceCards()), ["market-seedops-tower-seed-0001-1", "market-srv-sale-1"],
-  "signed out: Marketplace unchanged");
+/* 2. Signed out: template and seed server sales still show. A real member's server
+   sale left in the store from an earlier signed-in session does not (sign-out
+   leak fix: the signed-out Feed is SeedOps content only). */
+var outWin = boot({ version: 2, posts: [template, serverSale, serverSeedSale, plain] }, false);
+assert.deepStrictEqual(ids(outWin.CognationCommuneSwipe.marketplaceCards()), ["market-seedops-tower-seed-0001-1", "market-srv-seed-sale-1"],
+  "signed out: SeedOps sales only, no cached member sale");
 
 /* 3. Source: Marketplace goes through list(); the raw key is read only as a no-tower-module fallback. */
 var swipe = src("js/commune-swipe.js");

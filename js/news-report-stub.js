@@ -49,6 +49,25 @@
         if (menu) menu.hidden = !menu.hidden;
         return;
       }
+      var blockBtn = ev.target && ev.target.closest("[data-news-report-block]");
+      if (blockBtn) {
+        ev.preventDefault();
+        var bPost = closestPost(blockBtn);
+        var bId = bPost && bPost.getAttribute("data-post-id");
+        if (window.CognationModeration && typeof window.CognationModeration.hideContent === "function") {
+          window.CognationModeration.hideContent(bId);
+        }
+        applyHide(bPost);
+        var bBar = blockBtn.closest("[data-news-report]");
+        var bMenu = bBar && bBar.querySelector("[data-news-report-menu]");
+        if (bMenu) bMenu.hidden = true;
+        var bStatus = bBar && bBar.querySelector("[data-news-report-status]");
+        if (bStatus) {
+          bStatus.hidden = false;
+          bStatus.textContent = "Blocked for you.";
+        }
+        return;
+      }
       var reasonBtn = ev.target && ev.target.closest("[data-news-report-reason]");
       if (!reasonBtn) return;
       ev.preventDefault();

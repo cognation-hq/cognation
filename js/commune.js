@@ -1033,7 +1033,7 @@
       article.innerHTML =
         '<header class="commune-feed-meta">' +
         '<span class="commune-social-kind">' +
-        escapeHtml(kind === "social" ? "Social" : kind === "wire" ? "Wire" : "News") +
+        escapeHtml(kind === "social" ? "Social" : kind === "wire" ? "Wire" : "Desk") +
         "</span>" +
         '<span class="commune-feed-author">' +
         authorHtml +
@@ -1071,6 +1071,7 @@
         '<div class="news-report-menu" data-news-report-menu hidden>' +
         '<button type="button" class="news-report-option" data-news-report-reason="harmful">Harmful</button>' +
         '<button type="button" class="news-report-option" data-news-report-reason="untruthful">Untruthful</button>' +
+        '<button type="button" class="news-report-option" data-news-report-block>Block</button>' +
         "</div>" +
         '<span class="news-report-status" data-news-report-status hidden role="status"></span>' +
         "</footer>";
@@ -1234,10 +1235,11 @@
 
     function renderFeed() {
       if (!feedList) return;
-      var posts =
-        editionId === "local" || editionId === "statewide"
-          ? postsFromTower()
-          : natIntlFloor(FeedStore.listPosts(editionId));
+      /* Front page prefers the rated Feed plate (personal and professional). */
+      var towerPlate = postsFromTower();
+      var posts = towerPlate.length || editionId === "local" || editionId === "statewide"
+        ? towerPlate
+        : natIntlFloor(FeedStore.listPosts(editionId));
       floorUnder13AtRender = newsViewerUnder13();
       try {
         if (window.CognationSeedOpsNewsLog && window.CognationSeedOpsNewsLog.onTowerPostsForNews) {
@@ -1263,6 +1265,14 @@
         posts.forEach(function (post, idx) {
           appendPostEl(post, { lead: idx === 0 });
         });
+        /* Fill the last row so the three columns stay the same height. */
+        var spare = (3 - (posts.length % 3)) % 3;
+        for (var pad = 0; pad < spare; pad++) {
+          var blank = document.createElement("div");
+          blank.className = "commune-feed-item times-column-pad";
+          blank.setAttribute("aria-hidden", "true");
+          feedList.appendChild(blank);
+        }
       }
       setEndlessUi(endlessOn);
       if (wireOn) {

@@ -31,6 +31,7 @@
   var INBOUND_KEY = "cognation.commune.dating.inbound.v1";
   var NOTICES_KEY = "cognation.commune.notices.v1";
   var SHARES_KEY = "cognation.commune.friend-shares.v1";
+  var BIDS_KEY = "cognation.commune.market.bids.v1";
   var FADE_LEFT_THRESHOLD = 3;
   var OFF_INTEREST_FRIEND_RATIO = 6;
   var ROOMS_KEY = "cognation.commune.site-rooms.v1";
@@ -48,11 +49,14 @@
     KNOW: "know",
     DATING: "dating",
     CONTENT: "content",
+    MARKET: "marketplace",
+    GROUP: "group",
   };
 
-  /* Alexa lock 2026-10-02: Personal featured mix is 1:1 across five families. */
+  /* Alexa lock 2026-10-02: Personal featured mix is 1:1 across five families.
+     Marketplace rides the content slot. It is not a sixth family. */
   var FEATURED_ORDER = [TYPE.CLASSROOM, TYPE.AD, TYPE.CHAT, TYPE.DATING, TYPE.CONTENT];
-  var CONTENT_SUBTYPES = [TYPE.FACT, TYPE.WELLNESS, TYPE.FRIEND, TYPE.EVENT, TYPE.KNOW, TYPE.CONTENT];
+  var CONTENT_SUBTYPES = [TYPE.MARKET, TYPE.GROUP, TYPE.FACT, TYPE.WELLNESS, TYPE.FRIEND, TYPE.EVENT, TYPE.KNOW, TYPE.CONTENT];
   var AD_MAX_MS = 3000;
   var REPEATABLE = {};
   /* Featured families stay repeatable so a long Personal deck holds true 1:1 rotation. */
@@ -156,6 +160,9 @@
   PRO_MARK[PRO.FIELD] = "Field";
   PRO_MARK[PRO.POP] = "Pop-culture";
   var DEMO_LABEL = "Demo · placeholder";
+  /* The legacy classroom panel. Not the deck's classroom CARD (it also carries
+     data-classroom="card"): hiding that card on Back left a blank deck. */
+  var CLASSROOM_PANEL_SEL = "[data-classroom]:not([data-commune-card]), #panel-classroom, [data-commune-classroom]";
   var PRO_WEBINARS = [
     { id: "pro-webinar-ethics", title: "Ethical collaboration in practice", body: "Credit, consent, and clear roles when people build together." },
     { id: "pro-webinar-async", title: "Async work that respects time", body: "Written decisions, clean handoffs, and calm response windows." },
@@ -320,7 +327,10 @@
           }
           var card = takeFromList(sub, list, null);
           if (!card) continue;
-          cursors._contentRot = (CONTENT_SUBTYPES.indexOf(sub) + 1) % CONTENT_SUBTYPES.length;
+          /* Each #group post is one card; keep this slot until those posts are placed. */
+          if (!(sub === TYPE.GROUP && (cursors[sub] || 0) < list.length)) {
+            cursors._contentRot = (CONTENT_SUBTYPES.indexOf(sub) + 1) % CONTENT_SUBTYPES.length;
+          }
           return card;
         }
         return null;
@@ -1286,6 +1296,73 @@
     return out;
   }
 
+  /* A feed post tagged #market becomes a Marketplace card in the 1:1 content slot. */
+  function marketTagged(text) {
+    return /(^|[^a-z0-9])#market(?![a-z0-9])/i.test(String(text || ""));
+  }
+  function marketCanBid() {
+    var age = getMemberAge();
+    return typeof age === "number" && age >= 16;
+  }
+  function marketPictures(post) {
+    var out = [];
+    (post && Array.isArray(post.attachments) ? post.attachments : []).forEach(function (a) {
+      var url = String((a && (a.dataUrl || a.url || a.src || a.imageUrl)) || "");
+      if (url.indexOf("data:image/") === 0 || /^https?:\/\//.test(url)) out.push(url);
+    });
+    return out;
+  }
+  function marketplaceCards() {
+    var doc = readJson(localStorage, "cognation.tower.posts.v3", null);
+    var posts = doc && Array.isArray(doc.posts) ? doc.posts : [];
+    var out = [];
+    posts.forEach(function (post) {
+      if (!post || !marketTagged((post.body || "") + " " + (post.title || ""))) return;
+      var body = String(post.body || "").replace(/(^|[^a-z0-9])#market(?![a-z0-9])/ig, "$1").replace(/\s+/g, " ").trim();
+      out.push({
+        id: "market-" + (post.id || out.length),
+        type: TYPE.MARKET,
+        title: body.split(/[.!\n]/)[0].slice(0, 80) || "For sale",
+        body: body,
+        fromName: post.authorName || "",
+        handle: String(post.handle || "").replace(/^@/, ""),
+        profileId: post.authorProfileId || "",
+        pictures: marketPictures(post),
+      });
+    });
+    return out;
+  }
+  function marketOptedIn(cardId) {
+    var doc = readJson(localStorage, BIDS_KEY, {});
+    var row = doc[currentProfileId()];
+    return !!(row && row[cardId]);
+  }
+  function optInToBid(cardId) {
+    if (!marketCanBid()) return false;
+    var doc = readJson(localStorage, BIDS_KEY, {});
+    var mine = currentProfileId();
+    if (!doc[mine] || typeof doc[mine] !== "object") doc[mine] = {};
+    doc[mine][cardId] = Date.now();
+    writeJson(localStorage, BIDS_KEY, doc);
+    return true;
+  }
+  function marketCardHtml(card) {
+    var html = "";
+    (card.pictures || []).forEach(function (src) {
+      html += '<img class="commune-market-photo" alt="' + escapeHtml(card.title || "Item") + '" src="' + escapeHtml(src) + '">';
+    });
+    if (html) html = '<div class="commune-market-photos" data-market-photos>' + html + "</div>";
+    if (!marketCanBid()) {
+      return html + '<p class="commune-card-meta" data-market-bid-note>Bidding is for ages 16 and up.</p>';
+    }
+    var opted = marketOptedIn(card.id);
+    return html +
+      '<button type="button" class="btn btn-primary" data-market-bid aria-pressed="' + (opted ? "true" : "false") + '">' +
+      (opted ? "Opted in" : "Bid") + "</button>" +
+      '<p class="commune-card-meta" data-market-bid-note>' +
+      (opted ? "You're opted in to bid. Nothing is charged." : "Opt in only. Nothing is charged.") + "</p>";
+  }
+
   function ageSafeFeaturedCard(card) {
     if (!card) return false;
     if (!isUnder13()) return true;
@@ -1419,6 +1496,12 @@
     return SITE_ROOMS.filter(roomVisible).map(roomCard);
   }
 
+  function groupLane() {
+    var api = window.CognationEchoGroups;
+    var list = api && typeof api.cards === "function" ? api.cards() : [];
+    return Array.isArray(list) ? list : [];
+  }
+
   function buildLanes() {
     var lanes = {};
     lanes[TYPE.CLASSROOM] = visibleClassroomSessions();
@@ -1430,6 +1513,8 @@
     lanes[TYPE.EVENT] = publicEvents();
     lanes[TYPE.KNOW] = peopleYouMayKnow();
     lanes[TYPE.CONTENT] = towerLiveContentCards();
+    lanes[TYPE.MARKET] = marketplaceCards();
+    lanes[TYPE.GROUP] = groupLane();
     Object.keys(lanes).forEach(function (type) {
       lanes[type] = omitPassed((lanes[type] || []).filter(ageSafeFeaturedCard).filter(function (card) {
         /* Repeated lefts fade a topic out of the deck (friend shares handled separately). */
@@ -1489,7 +1574,22 @@
     var field = viewerField();
     if (field && interests.indexOf(field) < 0) interests.unshift(field);
     var out = [];
-    eachProfile(function (rec) {
+    /* Live site: only real professional pages from the server (supabase-social).
+       The local registry (cognation.profiles.v1) holds demo records such as
+       prof-alexa-professional whose handle has no server page, so Open their page
+       landed on the viewer's own Tower. */
+    var social = window.CognationSupabaseSocial;
+    var each = eachProfile;
+    if (liveSignedIn()) {
+      each = function (fn) {
+        var rows = social && typeof social.listProfiles === "function" ? social.listProfiles() || [] : [];
+        rows.forEach(function (row) {
+          if (!row) return;
+          fn({ id: row.id, kind: row.kind, handle: row.handle, displayName: row.display_name, bio: row.bio || "", userId: row.user_id });
+        });
+      };
+    }
+    each(function (rec) {
       if (!rec || rec.kind !== "professional" || mine[String(rec.id)] || isFollowing(rec.id)) return;
       var name = rec.displayName || rec.handle;
       if (!name) return;
@@ -1513,7 +1613,10 @@
       });
     });
     out.sort(function (a, b) { return b.score - a.score; });
-    if (!out.length) {
+    /* Live site: zero real professional pages means no "you might know" card at
+       all (never the fallback). The fallback stays only for the signed-out local
+       preview, unchanged from main. */
+    if (!out.length && !liveSignedIn()) {
       out.push(proPlaceholder(PRO.KNOW, "pro-know-placeholder", "Professionals you might know",
         "Professional pages that match your field show here once real pages connect.",
         "Matched by shared field and interests only.", 13));
@@ -1627,6 +1730,8 @@
       case TYPE.KNOW: return "People you may know";
       case TYPE.DATING: return "Dating";
       case TYPE.CONTENT: return "Content";
+      case TYPE.MARKET: return "Marketplace";
+      case TYPE.GROUP: return "Group";
       default: return "Echo";
     }
   }
@@ -1890,6 +1995,7 @@
       if (card.fromName) html += '<p class="commune-card-meta">' + escapeHtml(card.fromName) + "</p>";
       if (card.videoUrl) html += videoHtml(card.videoUrl);
       if (card.body) html += '<p class="commune-card-body">' + escapeHtml(card.body) + "</p>";
+      if (card.type === TYPE.MARKET) html += marketCardHtml(card);
       if (card.type === TYPE.AD && card.handle) {
         html += '<button type="button" class="btn btn-secondary" data-commune-open-profile>Open their page</button>';
         html += '<p class="commune-card-meta">Book on the calendar, or follow this professional page.</p>';
@@ -1908,6 +2014,7 @@
         html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
         html += '<p class="commune-card-meta">Life skills · ~18+</p>';
       }
+      if (card.liveJoin) html += '<button type="button" class="btn btn-primary" data-live-echo-join>Join</button>';
       if (card.type === TYPE.CONTENT) html += '<span class="commune-card-badge">Live</span>';
       if (card.type === TYPE.AD) html += '<span class="commune-card-badge commune-card-badge--ad">Ad</span>';
     }
@@ -1935,6 +2042,23 @@
       range.addEventListener("input", commit);
       range.addEventListener("change", commit);
     }
+    var bidBtn = el.querySelector("[data-market-bid]");
+    if (bidBtn) bidBtn.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!optInToBid(card.id)) return;
+      bidBtn.textContent = "Opted in";
+      bidBtn.setAttribute("aria-pressed", "true");
+      var note = el.querySelector("[data-market-bid-note]");
+      if (note) note.textContent = "You're opted in to bid. Nothing is charged.";
+    });
+    var joinLive = el.querySelector("[data-live-echo-join]");
+    if (joinLive) joinLive.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      var tab = document.getElementById("tab-tower");
+      if (tab) tab.click();
+      if (window.CognationLive && window.CognationLive.open) window.CognationLive.open();
+    });
     var sim = el.querySelector("[data-commune-enter-sim]");
     if (sim) sim.addEventListener("click", function (ev) { ev.stopPropagation(); openRoom(card.id, true); });
     var enterClass = el.querySelector("[data-commune-enter-classroom]");
@@ -1962,6 +2086,8 @@
       el.setAttribute("data-commune-opens-profile", "");
       wireClassroomCardClick(el, card, function () { openProfessionalPage(card); });
     }
+    var groups = window.CognationEchoGroups;
+    if (groups && typeof groups.bind === "function") groups.bind(el, card);
     if (card.type === TYPE.AD && card.handle) {
       el.addEventListener("click", function (ev) {
         if (ev.target.closest("button, a, input, video, iframe")) return;
@@ -2080,7 +2206,7 @@
   function showSubpanel(kind) {
     /* kind: "" | "room" | "classroom" — hides deck when either panel is open */
     var room = roomEl();
-    var classroom = state.shell && state.shell.querySelector("[data-classroom], #panel-classroom, [data-commune-classroom]");
+    var classroom = state.shell && state.shell.querySelector(CLASSROOM_PANEL_SEL);
     var deck = state.deck;
     var actions = state.shell && state.shell.querySelector(".commune-swipe-actions");
     var on = kind === "classroom";
@@ -2270,8 +2396,8 @@
         escapeHtml(uid) +
         '">Report</button>';
     var blockBtn =
-      '<button type="button" class="news-report-option" data-commune-room-block data-author-user-id="' +
-      escapeHtml(uid) +
+      '<button type="button" class="news-report-option" data-commune-room-block data-message-id="' +
+      escapeHtml(mid) +
       '">Block</button>';
     return (
       '<button type="button" class="commune-room-more" data-commune-room-more aria-haspopup="true" aria-expanded="false" aria-label="More for this message">⋯</button>' +
@@ -2832,7 +2958,7 @@
       state.classroomId = session.id;
       return;
     }
-    var panel = state.shell && state.shell.querySelector("[data-classroom], #panel-classroom, [data-commune-classroom]");
+    var panel = state.shell && state.shell.querySelector(CLASSROOM_PANEL_SEL);
     if (!panel || !session) return;
     var title = panel.querySelector("[data-classroom-title]");
     var topic = panel.querySelector("[data-classroom-topic]");
@@ -2894,7 +3020,7 @@
     }
     if (!state.shell) {
       /* Allow pathway smoke before shell bind: surface still exists in DOM. */
-      var panel = document.querySelector("[data-classroom], #panel-classroom, [data-commune-classroom]");
+      var panel = document.querySelector(CLASSROOM_PANEL_SEL);
       if (!panel) return false;
       state.shell = document.querySelector("[data-commune-shell]") || panel.closest("[data-commune-shell]") || null;
       if (!state.shell) state.shell = panel.parentElement;
@@ -2951,6 +3077,8 @@
 
   function refill() {
     state.cards = sampleDeck(12);
+    var live = window.CognationLive && window.CognationLive.echoCard && window.CognationLive.echoCard();
+    if (live) state.cards.unshift(live);
     state.index = 0;
   }
 
@@ -3420,13 +3548,9 @@
       if (blockBtn && roomPanel.contains(blockBtn)) {
         ev.preventDefault();
         ev.stopPropagation();
-        var blockUid = blockBtn.getAttribute("data-author-user-id");
-        if (!blockUid) return;
-        blockBtn.disabled = true;
-        blockLiveRoomAuthor(blockUid).then(function (res) {
-          if (!res || !res.ok) blockBtn.disabled = false;
-          else blockBtn.textContent = "Blocked";
-        });
+        var blockMid = blockBtn.getAttribute("data-message-id");
+        if (!blockMid) return;
+        hideLiveMessageLocally(blockMid);
         return;
       }
       var reportBtn = ev.target && ev.target.closest("[data-commune-room-report]");
@@ -3458,6 +3582,16 @@
     if (classBack) classBack.addEventListener("click", closeClassroom);
     var form = shell.querySelector("[data-commune-room-compose]");
     if (form) {
+      /* Chatroom + classroom overlay: Enter sends, Shift+Enter adds a new line,
+         never during IME composition. The Send button stays. */
+      var composeInput = form.querySelector("[data-commune-room-input]");
+      if (composeInput) composeInput.addEventListener("keydown", function (e) {
+        if (e.isComposing || e.keyCode === 229) return;
+        if (e.key !== "Enter" || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+        e.preventDefault();
+        if (form.requestSubmit) form.requestSubmit();
+        else form.dispatchEvent(new Event("submit", { cancelable: true }));
+      });
       form.addEventListener("submit", function (ev) {
         ev.preventDefault();
         var input = roomEl() && roomEl().querySelector("[data-commune-room-input]");
@@ -3526,6 +3660,8 @@
       syncDatingVisibility();
       rebuildDeck();
     });
+    document.addEventListener("cognation:tower-updated", function () { rebuildDeck(); });
+    document.addEventListener("cognation:echo-group-notice", function () { renderNotices(); });
     refreshSeedGates();
   }
 
@@ -3553,6 +3689,7 @@
     setDatingBirthAge: setDatingBirthAge,
     roomSwipeIsNext: roomSwipeIsNext,
     openPersonTower: openPersonTower,
+    buildProfessionalLanes: buildProfessionalLanes,
     roomTimeLabel: roomTimeLabel,
     getDatingBirthAge: getDatingBirthAge,
     liveBirthMissing: liveBirthMissing,
@@ -3591,6 +3728,9 @@
     sendPersonalFriendRequest: sendPersonalFriendRequest,
     publicEvents: publicEvents,
     towerLiveContentCards: towerLiveContentCards,
+    marketplaceCards: marketplaceCards,
+    marketCanBid: marketCanBid,
+    optInToBid: optInToBid,
     featuredFamily: featuredFamily,
     getMode: getMode,
     setMode: setMode,

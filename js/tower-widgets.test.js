@@ -1,0 +1,99 @@
+/**
+ * Tower widgets PR: drag handle, social remove, resize, calendar contrast,
+ * Add widget, single Demo badge, layout compaction.
+ * Run: node js/tower-widgets.test.js
+ */
+"use strict";
+var assert = require("assert");
+var fs = require("fs");
+var path = require("path");
+var vm = require("vm");
+var root = path.join(__dirname, "..");
+function src(rel) { return fs.readFileSync(path.join(root, rel), "utf8"); }
+var html = src("index.html"), tower = src("js/tower.js"), css = src("css/styles.css"), badge = src("js/seedops-badge.js");
+var tail = css.slice(css.indexOf("tower-widgets PR"));
+assert.ok(tail.length > 100, "tower-widgets css block present");
+
+function fnSource(name) {
+  var i = tower.indexOf("function " + name + "(");
+  assert.ok(i > 0, name + " exists");
+  var d = 0, j = tower.indexOf("{", i);
+  for (var k = j; k < tower.length; k++) {
+    if (tower[k] === "{") d++;
+    else if (tower[k] === "}" && --d === 0) return tower.slice(i, k + 1);
+  }
+  throw new Error("unbalanced " + name);
+}
+
+/* 1. Drag handle: no circle */
+assert.ok(/border:\s*0/.test(tail) && /border-radius:\s*0/.test(tail) && /background:\s*transparent|background:\s*none/.test(tail), "handle circle off");
+
+/* 2. Social X gone; keyboard and button remove */
+assert.ok(tower.indexOf("data-tower-social-remove") < 0 || /tower-social-chip-remove[\s\S]{0,200}remove\(\)/.test(tower), "no social X created");
+var rs = tower.slice(tower.indexOf("var removeSelectedWidget = function"));
+assert.ok(/ownerOnPublic\(\)/.test(rs.slice(0, 200)), "remove is owner only");
+assert.ok(/socialNetIdFromWidget\(id\)[\s\S]{0,200}removeSocialWidget\(root, socialNet\)/.test(rs), "selected chip removed via keyboard");
+assert.ok(/data-tower-remove-selected/.test(html), "touch Remove button");
+assert.ok(/savePublic\(p\)/.test(fnSource("removeSocialWidget")), "removed link saved so it does not come back");
+
+/* 3. Resize limits */
+assert.ok(/music:\s*\{\s*min:\s*200/.test(tower) && /calendar:\s*\{\s*min:\s*260/.test(tower) && /quote:\s*\{\s*min:\s*140/.test(tower), "resize limits incl. calendar min 260");
+assert.ok(/wPx/.test(fnSource("initWidgetResize")), "resized width saved");
+
+/* 4. Calendar contrast */
+assert.ok(tail.indexOf("rgba(18, 16, 38, 0.92)") > 0 || tail.indexOf("rgba(18,16,38,0.92)") > 0, "calendar panel");
+assert.ok(/#f7f9ff/i.test(tail) && /#d9d2f0/i.test(tail), "calendar text colors");
+assert.ok(/197,\s*166,\s*255/.test(tail), "lilac selected");
+
+/* 5. Add widget + one badge */
+assert.ok(/data-tower-add-widget/.test(html), "Add widget button");
+assert.ok(/syncTowerBadges/.test(badge) && /data-tower-profile-strip/.test(badge), "badge dedupe");
+
+/* 6. Compaction + YouTube chip */
+var ctx = {};
+vm.createContext(ctx);
+vm.runInContext("var COMPACT_MIN_GAP = 160;" + fnSource("boxesOverlap") + ";" + fnSource("planLayoutRepair") + "; this.plan = planLayoutRepair;", ctx);
+var moves = ctx.plan([
+  { id: "avatar", x: 24, y: 24, w: 200, h: 140 },
+  { id: "identity", x: 240, y: 24, w: 300, h: 120 },
+  { id: "followers", x: 24, y: 200, w: 300, h: 130 },
+  { id: "social-youtube", x: 24, y: 180, w: 80, h: 50 },
+  { id: "youtube", x: 24, y: 1010, w: 314, h: 215 },
+  { id: "calendar", x: 600, y: 900, w: 300, h: 300, dragged: true }
+], 1100, 24);
+assert.ok((!moves.avatar || moves.avatar.y === 24) && (!moves.identity || moves.identity.y === 24), "identity row pinned at top");
+assert.ok(moves.youtube && moves.youtube.y < 600, "youtube gap closed");
+var ytY = moves.youtube.y;
+assert.ok(moves["social-youtube"] && moves["social-youtube"].y >= ytY + 215, "chip sits with youtube");
+assert.ok(!moves.calendar || moves.calendar.y >= 900, "dragged widget not compacted");
+
+/* r4: one-time pass on an old layout where every widget is owner-dragged. */
+var allDragged = [
+  { id: "avatar", x: 24, y: 24, w: 200, h: 140, dragged: true },
+  { id: "identity", x: 240, y: 24, w: 300, h: 120, dragged: true },
+  { id: "followers", x: 24, y: 450, w: 300, h: 130, dragged: true },
+  { id: "social-youtube", x: 24, y: 190, w: 80, h: 50, dragged: true },
+  { id: "calendar", x: 600, y: 260, w: 340, h: 340, dragged: true },
+  { id: "youtube", x: 80, y: 1681, w: 314, h: 215, dragged: true }
+];
+var keep = ctx.plan(JSON.parse(JSON.stringify(allDragged)), 1100, 24);
+assert.ok(!keep.youtube, "normal pass still respects owner-dragged marks");
+var once = ctx.plan(JSON.parse(JSON.stringify(allDragged)), 1100, 24, { ignoreDragged: true });
+assert.ok(once.youtube && once.youtube.y < 700, "one-time pass compacts YouTube despite dragged marks: " + JSON.stringify(once.youtube));
+assert.ok((!once.avatar || once.avatar.y === 24) && (!once.identity || once.identity.y === 24), "identity row still pinned");
+assert.ok(once["social-youtube"] && once["social-youtube"].y >= once.youtube.y + 215, "chip under YouTube");
+Object.keys(once).forEach(function (id) {
+  var it = allDragged.filter(function (x) { return x.id === id; })[0];
+  if (id !== "social-youtube" && id !== "avatar" && id !== "identity") assert.ok(once[id].y <= it.y, id + " only moves up on compaction");
+});
+assert.ok(/var oneTime = owner && !layout\._compacted;/.test(tower) && /if \(markNow\) layout\._compacted = 1;/.test(tower), "one-time mark set after the pass");
+var syncSrc = fs.readFileSync(path.join(__dirname, "tower-layout-sync.js"), "utf8");
+assert.ok(/if \(layout\._compacted\) out\._compacted = 1;/.test(syncSrc) && /wid === "_compacted"/.test(syncSrc), "mark persists in the layout row, never applied as a widget");
+
+/* r4: chip label not squeezed, muted logo; titles clear of the drag dots. */
+var cssR4 = fs.readFileSync(path.join(__dirname, "..", "css", "styles.css"), "utf8");
+assert.ok(/\.tower-social-chip-body \.tower-social-btn\.is-logo \{\s*width: auto !important;/.test(cssR4), "chip button sizes to content");
+assert.ok(/\.tower-social-chip-body \.tower-social-btn\.is-logo img \{[\s\S]*?filter:\s*none/.test(cssR4), "logo keeps its brand color");
+assert.ok(/\.tower-social-chip-body \.tower-social-btn\.is-logo img \{[\s\S]*?width:\s*32px/.test(cssR4), "logo a tad bigger");
+assert.ok(/\.tower-sticker--followers \.tower-widget-title,[\s\S]*?\.tower-sticker--calendar \.tower-cal-public-title \{\s*padding-left: calc\(1\.6rem \+ 14px\);/.test(cssR4), "titles nudged 14px right of the dots");
+console.log("tower-widgets.test: ok");

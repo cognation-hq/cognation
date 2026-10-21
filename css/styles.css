@@ -4837,6 +4837,7 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 
 /* ===== TOWER avatar photo ornaments (above/below, not over face) ===== */
 .tower-avatar-stack {
+  --tower-name-size: 28px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -8859,19 +8860,35 @@ body { padding-top: 0 !important; }
   padding: 0 0.15rem;
 }
 
+.tower-follow-row[hidden],
+.tower-follow-btn[hidden],
+body.tower-messages-page [data-tower-follow-row],
+.tower-messages-room [data-tower-follow-row],
+[data-tower-messages] [data-tower-follow-row],
+[data-tower-app][data-tower-side="private"] [data-tower-follow-row] {
+  display: none !important;
+}
+
 .tower-follow-btn {
-  min-width: 7.5rem;
-  min-height: 2.65rem;
-  padding: 0.55rem 1.35rem;
+  min-width: min-content;
+  min-height: 0;
+  width: max-content;
+  padding: 0 0.32em;
   border-radius: 999px;
-  border: 2px solid var(--color-accent);
+  border: 1px solid var(--color-accent);
   background: var(--color-accent);
   color: var(--color-navy);
   font: inherit;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  /* Stay a fraction of the display name so a short name is not under a large pill. */
+  font-size: max(8px, calc(var(--tower-name-size, 28px) * 0.3));
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(244, 164, 196, 0.45);
+  box-shadow: none;
+  flex: 0 0 auto;
+  align-self: center;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
@@ -9012,6 +9029,12 @@ body { padding-top: 0 !important; }
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.commune-market-photos { display: flex; gap: .4rem; overflow: hidden; }
+.commune-market-photo {
+  width: 7.5rem; height: 7.5rem; object-fit: cover; border-radius: 12px;
+  border: 2px solid var(--color-border); background: var(--color-surface-2);
 }
 
 .commune-dating-rate {
@@ -9958,10 +9981,7 @@ body { padding-top: 0 !important; }
   display: none !important;
 }
 .tower-go-live-btn[data-go-live] {
-  position: absolute;
-  left: 50%;
-  bottom: 0.15rem;
-  transform: translateX(-50%);
+  position: static;
   z-index: 8;
   padding: 0.2rem 0.55rem;
   font-size: 0.68rem;
@@ -9981,11 +10001,13 @@ body { padding-top: 0 !important; }
   outline: 2px solid #fff;
 }
 
-.tower-profile-actions .tower-go-live-btn[data-go-live] {
+.tower-profile-edit-dropdown .tower-go-live-btn[data-go-live] {
   position: static;
   left: auto;
   bottom: auto;
   transform: none;
+  display: inline-flex;
+  margin: 0.35rem 0.75rem 0.15rem;
 }
 
 /* Live stage */
@@ -11812,8 +11834,11 @@ body.is-circle-open {
   padding-top: 0;
   overflow-y: auto;
 }
+/* The masthead line should meet this bar. Section padding plus a positive
+   margin left a dark band above TOWER · SIGNAL · ECHO · PULSE. */
 body.is-circle-open #main .tabs-section {
-  margin-top: 0.75rem;
+  margin-top: 0;
+  padding-top: 0;
 }
 body.is-circle-open .app-topbar {
   position: relative;
@@ -12159,7 +12184,7 @@ a.circle-fall-portrait {
   content: "";
 }
 /* TOWER sits in the page flow under the tab row, centered like COMMUNE, above the reaction row. */
-#panel-tower > .tower-header {
+:is(#panel-tower, #panel-signal) > .tower-header {
   position: static;
   z-index: auto;
   margin: 0.15rem 0 0.2rem;
@@ -12169,7 +12194,7 @@ a.circle-fall-portrait {
   border: 0 !important;
   box-shadow: none !important;
 }
-#panel-tower > .tower-header .tower-title {
+:is(#panel-tower, #panel-signal) > .tower-header .tower-title {
   display: block;
   position: static;
   width: 100%;
@@ -12241,17 +12266,15 @@ a.circle-fall-portrait {
   margin: 0;
   padding: 0;
   border-radius: 50%;
-  border: 2px solid rgba(168, 244, 255, 0.38);
-  box-shadow:
-    0 0 22px rgba(197, 166, 255, 0.32),
-    inset 0 0 14px rgba(168, 244, 255, 0.14);
-  background: rgba(16, 19, 48, 0.42);
+  border: 1px solid rgba(214, 218, 232, 0.5);
+  box-shadow: none;
+  background: #070b16;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   pointer-events: none;
-  color: #f7fbff !important;
+  color: transparent !important;
   font-weight: 700;
   font-size: 1rem;
   line-height: 1;
@@ -12259,18 +12282,24 @@ a.circle-fall-portrait {
   text-shadow: 0 2px 10px rgba(6, 10, 30, 0.65);
 }
 .circle-spot.is-filled {
-  border-color: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 8px 18px rgba(8, 12, 32, 0.28);
+  border-color: rgba(220, 224, 238, 0.62);
+  box-shadow: none;
+  background: #070b16;
   background-size: cover;
   background-position: center;
   pointer-events: auto;
   cursor: default;
 }
 .circle-spot.is-empty {
-  /* hollow ghost — cyan/violet halo rim */
-  background:
-    radial-gradient(circle at 50% 40%, rgba(168, 244, 255, 0.12), transparent 62%),
-    rgba(16, 19, 48, 0.42);
+  background: #070b16;
+}
+.circle-spot.has-caption { overflow: visible; }
+.circle-spot-caption {
+  position: absolute; left: 50%; width: 7rem; margin: 0; padding: 0;
+  top: 100%; transform: translate(-50%, -0.28em);
+  text-align: center; font-size: 0.5rem; font-weight: 650; line-height: 1;
+  letter-spacing: 0; color: #f7fbff !important; pointer-events: none;
+  text-shadow: none;
 }
 #panel-commune .commune-swipe-header .commune-swipe-title {
   display: block;
@@ -13062,17 +13091,23 @@ a.site-switch-side:focus-visible {
   box-sizing: border-box;
 }
 /* Half-height media / followers strips on default grid */
+/* A saved link used to clip this card at 112px, so the paste field vanished.
+   Player and link field both stay; a new link swaps the video. */
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--youtube.is-spawned {
-  max-height: 112px;
-  overflow: hidden;
-  padding: 6px 10px;
+  max-height: none;
+  overflow: visible;
+  height: auto;
 }
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--youtube.is-spawned .tower-pro-youtube-screen,
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--youtube.is-spawned [data-tower-pro-youtube-frame],
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--youtube.is-spawned iframe {
-  max-height: 96px;
-  height: 96px;
-  aspect-ratio: auto;
+  max-height: none;
+  height: auto;
+  aspect-ratio: 16 / 9;
+}
+[data-tower-app][data-tower-is-owner="true"] .tower-music[data-music-mode="youtube"] .tower-music-owner,
+[data-tower-app][data-tower-is-owner="true"] .tower-sticker--youtube .tower-pro-youtube-owner {
+  display: flex !important;
 }
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--music.is-spawned .tower-ipod {
   max-height: 72px;
@@ -13538,6 +13573,10 @@ svg.circle-bolt {
 @media (prefers-reduced-motion: reduce) {
   svg.circle-bolt { animation: none; }
 }
+body.is-circle-open .circle-spot.is-filled {
+  pointer-events: auto !important;
+  cursor: pointer;
+}
 
 
 /* LOOK v3.3 — each social/link is its own short chip widget (no LINKS box). */
@@ -13560,6 +13599,7 @@ svg.circle-bolt {
   min-width: 0;
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 .tower-social-chip-body .tower-social-btn {
   display: inline-flex;
@@ -13569,8 +13609,8 @@ svg.circle-bolt {
   max-width: 100%;
 }
 .tower-social-chip-body .tower-social-btn img {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
   object-fit: cover;
 }
@@ -13718,6 +13758,657 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 @media (prefers-reduced-motion: reduce) {
   .commune-room[data-commune-room-overlay], .commune-room[data-commune-room-overlay] * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* ===== tower-widgets PR ===== */
+/* 1. Drag handle: no circle (no border, no fill); the ⋮⋮ dots stay. */
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker-handle,
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker-handle[hidden] {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #e8e4ff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+/* 3. Resize grip (owner, Public side only) on MP3, Calendar and quotes. */
+.tower-widget-resize {
+  display: none;
+}
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-layout--scrapbook:not(.is-phone-stack) .tower-widget-resize {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  z-index: 6;
+  width: 1.4rem;
+  height: 1.4rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #e8e4ff;
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: nwse-resize;
+  touch-action: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker.tower-sticker--calendar[data-sticker-w] {
+  width: var(--sticker-w);
+  min-width: 0;
+  max-width: 100%;
+}
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--quote[data-sticker-w] {
+  width: var(--sticker-w);
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--music[data-sticker-w] > .tower-music {
+  zoom: var(--music-zoom, 1);
+}
+
+/* 4. Calendar contrast (LOOK: design-comps/calendar-contrast 02-visitor-fixed).
+   Dark panel, #f7f9ff / #d9d2f0 type, lilac today/selected; no pale pink, no amber. */
+[data-tower-app] .tower-layout--scrapbook.is-sticker-stage .tower-sticker--calendar {
+  background: rgba(18, 16, 38, 0.92) !important;
+  border-color: rgba(209, 241, 255, 0.28) !important;
+  color: #f7f9ff;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal--public,
+[data-tower-app] .tower-sticker--calendar .tower-cal-day-panel,
+[data-tower-app] .tower-sticker--calendar .tower-cal-scheduler {
+  background: transparent !important;
+  color: #f7f9ff;
+  filter: none;
+  opacity: 1;
+}
+[data-tower-app] .tower-sticker--calendar :is(.tower-cal-public-title, .tower-cal-label, .tower-cal-day-heading, .tower-cal-event-title) {
+  color: #f7f9ff !important;
+  font-family: inherit;
+}
+[data-tower-app] .tower-sticker--calendar :is(.tower-cal-dow, .tower-cal-event-time, .form-hint, p, .tower-cal-empty) {
+  color: #d9d2f0 !important;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-cell {
+  color: #f7f9ff !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-cell:hover,
+[data-tower-app] .tower-sticker--calendar .tower-cal-cell:focus-visible {
+  background: rgba(197, 166, 255, 0.14) !important;
+  border-color: rgba(197, 166, 255, 0.5) !important;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-cell.is-today {
+  border-color: rgba(197, 166, 255, 0.85) !important;
+  font-weight: 700;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-cell.is-selected {
+  background: rgba(197, 166, 255, 0.28) !important;
+  border-color: rgba(197, 166, 255, 0.85) !important;
+  color: #f7f9ff !important;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-cell.has-events .tower-cal-dot {
+  background: rgba(197, 166, 255, 0.95);
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-cell.has-pending .tower-cal-dot {
+  background: #d9d2f0;
+}
+[data-tower-app] .tower-sticker--calendar :is(.tower-cal-nav-btn, .tower-cal-book, .tower-cal-suggest, .btn) {
+  background: rgba(18, 16, 38, 0.6) !important;
+  border: 1px solid rgba(209, 241, 255, 0.28) !important;
+  color: #f7f9ff !important;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-event {
+  background: rgba(18, 16, 38, 0.92) !important;
+  border-color: rgba(209, 241, 255, 0.28) !important;
+  color: #f7f9ff !important;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-event.is-pending {
+  background: rgba(44, 30, 18, 0.92) !important;
+}
+[data-tower-app] .tower-sticker--calendar .tower-cal-scheduler {
+  border-top-color: rgba(209, 241, 255, 0.28) !important;
+}
+/* tower-widgets: inner calendar frame was still the old #c45a5a red line. */
+[data-tower-app] .tower-sticker--calendar :is([data-tower-calendar-personal], .tower-personal-calendar) {
+  background: transparent !important;
+  border-color: rgba(209, 241, 255, 0.28) !important;
+}
+
+/* Logo only, a tad larger than the 22px muted mark, in the brand's own colors. */
+.tower-social-chip-body .tower-social-btn.is-logo {
+  width: auto !important;
+  height: auto !important;
+  border-radius: 0.5rem;
+  overflow: visible;
+  gap: 0;
+  color: var(--cgn-text, #f7f9ff);
+}
+.tower-social-chip-body .tower-social-btn.is-logo img {
+  width: 32px !important;
+  height: 32px !important;
+  flex: 0 0 32px;
+  border-radius: 8px;
+  filter: none;
+  opacity: 1;
+}
+.tower-social-chip-body .tower-social-chip-label {
+  overflow: visible;
+  text-overflow: clip;
+  color: var(--cgn-text, #f7f9ff);
+}
+
+/* r4: Calendar and Followers titles sit ~14px right of the ⋮⋮ drag dots so the
+   handle never covers the first letter (owner, public side). */
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker--followers .tower-widget-title,
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker--calendar .tower-cal-public-title {
+  padding-left: calc(1.6rem + 14px);
+}
+/* postlive149: the Calendar title is a full-width block, so its padded box still
+   sat under the absolutely placed drag dots (15x17px on live) even though the
+   text was clear. Use margin instead so the box itself starts right of the dots.
+   Same text position as r4. Followers gets the same rule (its padded box overlaps
+   too in narrower layouts). */
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker--followers .tower-widget-title,
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker--calendar .tower-cal-public-title {
+  padding-left: 0;
+  margin-left: calc(1.6rem + 14px);
+}
+
+/* postlive149: the avatar-frame resize handle (.tower-avatar-resize) and the
+   display-name resize handle (.tower-name-resize) are real owner controls, but at
+   rest they read as stray ~18px squares at the avatar corner and next to the name.
+   Keep both controls; show them only while the owner hovers, focuses or selects
+   that sticker. */
+[data-tower-app][data-tower-is-owner="true"] .tower-sticker--avatar .tower-avatar-resize,
+[data-tower-app][data-tower-is-owner="true"] .tower-sticker--identity .tower-name-resize {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+[data-tower-app][data-tower-is-owner="true"] .tower-sticker--avatar:is(:hover, :focus-within, .is-widget-selected) .tower-avatar-resize,
+[data-tower-app][data-tower-is-owner="true"] .tower-sticker--identity:is(:hover, :focus-within, .is-widget-selected) .tower-name-resize {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-tower-app] .tower-avatar-resize,
+  [data-tower-app] .tower-name-resize { transition: none; }
+}
+
+/* Go Live: one profile fills a screen in the page flow. Header stays. Page scrolls. */
+[data-tower-app].is-live-open > :not([data-live-stage]) { display: none !important; }
+.tower-live-screen[data-live-stage] {
+  position: static;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  background: #0e1028;
+  color: #f7f9ff;
+}
+.tower-live-screen[data-live-stage][hidden] { display: none !important; }
+.tower-live-screen-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid rgba(220, 246, 255, 0.14);
+}
+.tower-live-share { display: flex; gap: 0.35rem; margin-left: auto; }
+#panel-tower .tower-live-share button {
+  border: 1px solid rgba(220, 246, 255, 0.24) !important;
+  border-radius: 999px;
+  background: rgba(16, 19, 48, 0.6) !important;
+  color: #f7f9ff !important;
+  padding: 0.3rem 0.65rem;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+#panel-tower .tower-live-share button[aria-pressed="true"] { border-color: rgba(183, 246, 255, 0.7) !important; }
+.tower-live-screen-titles { display: flex; flex-direction: column; min-width: 0; }
+#panel-tower .tower-live-screen .tower-live-screen-title { margin: 0; color: #f7f9ff !important; }
+#panel-tower .tower-live-screen .tower-live-screen-kind {
+  margin: 0;
+  color: rgba(185, 191, 224, 0.75) !important;
+  font-size: 0.78rem;
+}
+#panel-tower .tower-live-screen .tower-live-back {
+  flex: none;
+  border: 1px solid rgba(220, 246, 255, 0.24) !important;
+  border-radius: 999px;
+  background: rgba(16, 19, 48, 0.6) !important;
+  color: #f7f9ff !important;
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  cursor: pointer;
+}
+.tower-live-session {
+  position: relative;
+  overflow: hidden;
+  flex: 1 0 auto;
+  min-height: 72vh;
+  margin: 0.75rem 1rem 0.4rem;
+  border: 1px solid rgba(220, 246, 255, 0.14);
+  border-radius: 12px;
+  background: #12142e;
+}
+.tower-live-preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+#panel-tower .tower-live-joins-label,
+#panel-tower .tower-live-chat-label {
+  margin: 0;
+  color: rgba(185, 191, 224, 0.75) !important;
+  font-size: 0.78rem;
+}
+.tower-live-joins,
+.tower-live-room-chat { margin: 0.6rem 1rem 0; }
+.tower-live-room-chat { margin-bottom: 1rem; }
+.tower-live-join-slots {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+#panel-tower .tower-live-join-slot {
+  position: relative;
+  overflow: hidden;
+  min-height: 3.4rem;
+  border: 1px solid rgba(220, 246, 255, 0.24) !important;
+  border-radius: 8px;
+  background: #12142e !important;
+  color: #f7f9ff !important;
+  font: inherit;
+  cursor: pointer;
+}
+#panel-tower .tower-live-join-slot[data-requested="1"] { border-color: rgba(183, 246, 255, 0.7) !important; }
+.tower-live-chat-log {
+  min-height: 5.5rem;
+  margin-top: 0.4rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid rgba(220, 246, 255, 0.14);
+  border-radius: 8px;
+  background: #12142e;
+}
+#panel-tower .tower-live-chat-line { margin: 0 0 0.35rem; color: #f7f9ff !important; }
+.tower-live-chat-form { display: flex; gap: 0.4rem; margin-top: 0.4rem; }
+#panel-tower .tower-live-chat-form input {
+  flex: 1;
+  min-width: 0;
+  color: #f7f9ff !important;
+  background: #12142e !important;
+}
+#panel-tower .tower-live-chat-send {
+  border: 1px solid rgba(220, 246, 255, 0.24) !important;
+  border-radius: 999px;
+  background: rgba(16, 19, 48, 0.6) !important;
+  color: #f7f9ff !important;
+  padding: 0.35rem 0.75rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Tower profile column: picture, add friends, mutual friends, Edit profile, top friends, badges.
+   Go live, the calendar, and events open from Edit profile. */
+#panel-tower .tower-under-photo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  margin-top: 0.35rem;
+  order: 4;
+}
+#panel-tower .tower-avatar-stack > .tower-sticker--identity,
+#panel-tower .tower-sticker--avatar .tower-sticker--identity {
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+  order: 2;
+  grid-column: 1 / -1;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  text-align: center;
+}
+#panel-tower .tower-handle-badge { display: none !important; }
+#panel-tower .tower-under-photo { grid-column: 1 / -1; }
+#panel-tower .tower-avatar-stack > .tower-profile-actions { order: 3; }
+#panel-tower .tower-mutual-friends {
+  margin: 0;
+  font-size: 0.78rem;
+  text-align: center;
+}
+#panel-tower [data-tower-is-owner="false"] [data-tower-add-friends] { display: none !important; }
+#panel-tower [data-tower-private-calendar],
+#panel-tower [data-tower-private-messages],
+#panel-tower [data-tower-public-look] { display: none !important; }
+#panel-tower .tower-edit-entries {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+#panel-tower .tower-edit-entries .tower-sticker--calendar {
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+  width: auto;
+  max-width: 100%;
+}
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid {
+  grid-template-columns: minmax(0, 28rem);
+  justify-content: center;
+}
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker.is-spawned { order: 4; }
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--avatar.is-spawned { order: 0; }
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] {
+  order: 0;
+  flex-direction: column;
+  align-items: center;
+  max-height: none;
+}
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned {
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding-left: 0;
+}
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--avatar.is-spawned .tower-avatar-stack {
+  flex-direction: column;
+  align-items: center;
+}
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-profile-strip] > .tower-sticker--identity.is-spawned {
+  align-items: center;
+  text-align: center;
+  width: 100%;
+}
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--friends.is-spawned { order: 1; }
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--badges.is-spawned { order: 2; }
+
+/* Message envelope: autospawns under mutual friends. A saved drag uses .is-placed. */
+#panel-tower .tower-sticker--envelope {
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  width: auto;
+  margin: 0.15rem 0 0;
+  order: 5;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+#panel-tower .tower-sticker--envelope.is-placed {
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+}
+.tower-envelope-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(209, 241, 255, 0.45);
+  background: rgba(16, 19, 48, 0.72);
+  color: #f7f9ff;
+  text-decoration: none;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+#panel-tower [data-tower-is-owner="true"] .tower-envelope-btn { cursor: grab; }
+.tower-messages-page { margin: 0; min-height: 100vh; background: #101330; color: #f7f9ff; }
+.tower-messages-room { max-width: 40rem; margin: 0 auto; padding: 1.25rem 1rem 2rem; }
+.tower-messages-room-head { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 0.75rem; }
+.tower-messages-room-head a { color: #f7f9ff; }
+.tower-messages-room-head h1 { margin: 0; font-size: 1.4rem; }
+.tower-messages-room .tower-messages { display: grid; grid-template-columns: 11rem 1fr; gap: 0.75rem; min-height: 70vh; }
+.tower-messages-room .tower-conv-list { margin: 0; padding: 0; list-style: none; }
+.tower-messages-room .tower-thread { display: flex; flex-direction: column; min-height: 70vh; border: 1px solid rgba(209, 241, 255, 0.28); border-radius: 1rem; padding: 0.75rem; }
+.tower-messages-room .commune-messages { flex: 1; }
+/* Six-dot handles stay in the markup. Drag the widget itself; no side button. */
+#panel-tower .tower-sticker-handle,
+#panel-tower .tower-sticker-handle[hidden] {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+/* SIGNAL → Cognation Times. From the publication block down: broadsheet, not the NEWS card. */
+#panel-signal .commune-paper {
+  background: #f4efe4 !important;
+  color: #16120c !important;
+  border: 1px solid #16120c !important;
+  border-radius: 0 !important;
+  padding: 0.7rem 1rem 1.25rem !important;
+  box-shadow: none !important;
+}
+#panel-signal .commune-paper,
+#panel-signal .commune-paper * {
+  font-family: "Old Standard TT", Georgia, "Times New Roman", serif !important;
+  color: #16120c !important;
+}
+#panel-signal .paper-eyebrow,
+#panel-signal .paper-subtitle,
+#panel-signal .cgn-deferral,
+#panel-signal .paper-edition-scope,
+#panel-signal .paper-col--left,
+#panel-signal .paper-col--right,
+#panel-signal .paper-section-kicker,
+#panel-signal .paper-dek,
+#panel-signal .commune-ai-note,
+#panel-signal .commune-endless-toggle,
+#panel-signal .commune-social-kind,
+#panel-signal .commune-feed-item.is-wire,
+#panel-signal .commune-feed-sentinel,
+#panel-signal .commune-feed-loading,
+#panel-signal .paper-rule-block,
+#panel-signal .commune-feed-source,
+#panel-signal .news-story-comments,
+#panel-signal .news-report-bar {
+  display: none !important;
+}
+#panel-signal .paper-masthead {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0.1rem 0 0 !important;
+  text-align: center !important;
+}
+#panel-signal .paper-title {
+  margin: 0 0 0.4rem !important;
+  font-family: Oswald, Impact, "Arial Narrow", sans-serif !important;
+  font-size: clamp(3.4rem, 8.6vw, 6.6rem) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.045em !important;
+  line-height: 0.78 !important;
+  text-align: center !important;
+  text-transform: uppercase !important;
+  color: #111 !important;
+  text-shadow: none !important;
+  white-space: nowrap;
+}
+#panel-signal .paper-dateline,
+#panel-signal .paper-volume,
+#panel-signal .paper-price,
+#panel-signal .paper-date {
+  color: #111 !important;
+  font-family: "Special Elite", "Courier New", monospace !important;
+  font-size: 0.72rem !important;
+  letter-spacing: 0.14em !important;
+}
+#panel-signal .paper-dateline {
+  display: flex !important;
+  justify-content: space-between !important;
+  gap: 0.6rem !important;
+  border-block: 4px double #111 !important;
+  margin: 0 !important;
+  padding: 0.28rem 0.2rem !important;
+}
+#panel-signal .paper-rule { background: #111 !important; width: 1.5rem !important; height: 2px !important; }
+#panel-signal .paper-grid,
+#panel-signal .paper-col,
+#panel-signal .paper-section,
+#panel-signal .commune-feed,
+#panel-signal .commune-feed-item,
+#panel-signal .commune-social-card,
+#panel-signal .commune-profile-card,
+#panel-signal .paper-brief {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+#panel-signal .paper-grid { display: block !important; overflow: visible; }
+#panel-signal .commune-feed-list,
+#panel-signal .commune-feed-list.is-endless {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 9.1rem;
+  align-items: stretch;
+  max-height: none !important;
+  overflow: visible !important;
+  margin: 0.85rem 0 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-top: 1px solid #16120c !important;
+  border-left: 1px solid #16120c !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+#panel-signal .commune-feed-item {
+  display: flex !important;
+  flex-direction: column;
+  width: auto !important;
+  height: 9.1rem !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 0.65rem 0.75rem !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-right: 1px solid #16120c !important;
+  border-bottom: 1px solid #16120c !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  text-align: left !important;
+}
+#panel-signal .commune-feed-meta {
+  display: flex !important;
+  justify-content: space-between !important;
+  gap: 0.45rem !important;
+  align-items: baseline !important;
+  font-family: "Special Elite", "Courier New", monospace !important;
+  font-size: 0.68rem !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase;
+  margin: 0 0 0.3rem !important;
+}
+#panel-signal .commune-feed-body,
+#panel-signal .is-lead .commune-feed-body {
+  margin: 0 !important;
+  font-family: "Old Standard TT", Georgia, "Times New Roman", serif !important;
+  font-size: 0.92rem !important;
+  font-weight: 400 !important;
+  line-height: 1.35 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  text-align: left !important;
+}
+@media (max-width: 720px) {
+  #panel-signal .paper-title { white-space: normal; font-size: 2.6rem !important; }
+  #panel-signal .commune-feed-list { grid-template-columns: minmax(0, 1fr) !important; }
+}
+
+/* Tower Personal | Professional matches SIGNAL News | Feed (type, color, place, size). */
+#panel-tower .tower-profile-kind-toggle {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 0.85rem;
+  padding: 0.25rem;
+  background: rgba(16, 19, 48, 0.32);
+  border: 1px solid var(--cgn-border, rgba(185, 238, 255, 0.22));
+  border-radius: 999px;
+  box-shadow: none;
+}
+#panel-tower .tower-kind-btn {
+  appearance: none;
+  margin: 0;
+  border: 1px solid transparent !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  color: var(--cgn-text-muted, rgba(247, 249, 255, 0.7)) !important;
+  font-family: "Oswald", system-ui, sans-serif !important;
+  font-weight: 800 !important;
+  font-size: clamp(0.72rem, 1.6vw, 0.92rem) !important;
+  letter-spacing: 0.06em !important;
+  line-height: 1.1;
+  text-transform: uppercase;
+  text-shadow: none;
+  padding: 0.4rem 0.95rem !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+#panel-tower .tower-kind-btn:hover,
+#panel-tower .tower-kind-btn:focus-visible {
+  color: var(--cgn-text, #f7f9ff) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  outline: none;
+}
+#panel-tower .tower-kind-btn.is-selected,
+#panel-tower .tower-kind-btn[aria-selected="true"] {
+  color: #fff !important;
+  text-shadow: 0 1px 3px rgba(90, 50, 90, 0.4) !important;
+  border-color: transparent !important;
+  background:
+    linear-gradient(
+      105deg,
+      rgba(232, 214, 245, 0.98) 0%,
+      rgba(244, 220, 238, 0.97) 42%,
+      rgba(255, 220, 232, 0.96) 100%
+    ) !important;
+  box-shadow: none !important;
+}
+.commune-card[data-card-type="group"] { overflow: auto; }
+.echo-group-comments { display: grid; gap: 0.35rem; }
+.echo-group-comment { margin: 0; font-size: 0.92rem; }
+.echo-group-comment-name { font-weight: 700; }
+.echo-group-form { display: flex; gap: 0.4rem; }
+.echo-group-form input {
+  flex: 1; min-width: 0; padding: 0.4rem 0.55rem;
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  font: inherit; background: #fff; color: var(--color-heading);
+}
+
+@media (max-width: 640px) {
+  #panel-tower .tower-kind-btn {
+    font-size: 0.65rem !important;
+    padding: 0.35rem 0.75rem !important;
+  }
+  #panel-tower .tower-profile-kind-toggle {
+    gap: 0.22rem;
+    padding: 0.25rem;
+  }
+}
+
 
 /* pulse-background PR: Alexa's PULSE background (refs/alexa-final-2026-10-15.png),
    used as-is with only the five placeholder squares removed. WebP with a JPEG

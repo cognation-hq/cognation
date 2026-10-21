@@ -325,13 +325,16 @@
         body: {
           author_profile_id: profileId,
           body: body.slice(0, 2000),
-          visibility: "friends",
+          visibility: (window.CognationEchoGroups && window.CognationEchoGroups.isGroupPost(body)) ? "public" : "friends",
           attachments: Array.isArray(fields && fields.attachments)
             ? fields.attachments.map(function (attachment) {
-                return {
+                var item = {
                   kind: String(attachment.kind || "document"),
                   label: String(attachment.label || attachment.name || "Attachment").slice(0, 160),
                 };
+                var pic = String((attachment && attachment.dataUrl) || "");
+                if (pic.indexOf("data:image/") === 0 && pic.length < 180000) item.dataUrl = pic;
+                return item;
               })
             : [],
         },
@@ -764,6 +767,13 @@
     getProfile: profileForId,
     getProfileForHandle: profileForHandle,
     getProfileForUser: profileForUser,
+    /* Server profiles loaded this session (others only, no Sage rows). */
+    listProfiles: function () {
+      var me = identity();
+      return Object.keys(state.profiles).map(function (id) { return state.profiles[id]; }).filter(function (p) {
+        return p && (!me || p.user_id !== me.supabaseUserId) && !isSageRow(p);
+      });
+    },
     getMyProfiles: function () {
       return state.myProfiles.slice();
     },

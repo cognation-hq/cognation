@@ -726,6 +726,8 @@
     });
 
     input.addEventListener("keydown", function (e) {
+      /* Enter sends, Shift+Enter is a new line; never send mid IME composition. */
+      if (e.isComposing || e.keyCode === 229) return;
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event("submit", { cancelable: true }));

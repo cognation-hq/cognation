@@ -148,8 +148,45 @@
     return wid.indexOf("social-") === 0 ? wid.slice("social-".length) : "";
   }
 
+  /* Professional page shows the same logo chips as the personal profile
+     (YouTube, X, and the rest), plus any link saved on the pro page itself. */
+  function chipSocialLinks(p) {
+    var own = (p && p.socialLinks && typeof p.socialLinks === "object") ? p.socialLinks : {};
+    var pro = !!(p && (p._profileKind === "professional" || p.kind === "professional"));
+    if (!pro) return own;
+    var extra = null;
+    try {
+      var accounts = window.CognationAccounts;
+      var id = p._profileId || "";
+      var full = accounts && id && accounts.getProfileById ? accounts.getProfileById(id) : null;
+      var user = (full && full.accountUsername) || "";
+      if (!user && typeof getSessionObject === "function" && isTowerOwner(p)) {
+        var session = getSessionObject();
+        user = (session && session.username) || "";
+      }
+      if (accounts && user && accounts.getProfilesForUsername) {
+        var list = accounts.getProfilesForUsername(user) || [];
+        for (var i = 0; i < list.length; i++) {
+          var rec = list[i];
+          if (rec && rec.kind !== "professional" && rec.socialLinks) {
+            extra = rec.socialLinks;
+            break;
+          }
+        }
+      }
+    } catch (eChip) {}
+    var out = {};
+    socialLinkDefs().forEach(function (net) {
+      var a = own[net.id] || "";
+      var b = extra && extra[net.id] ? extra[net.id] : "";
+      out[net.id] = a || b || "";
+    });
+    if (!out.youtube && p.musicUrl && looksLikeYoutubeUrl(p.musicUrl)) out.youtube = String(p.musicUrl).trim();
+    return out;
+  }
+
   function optedInSocialNetIds(p) {
-    var links = (p && p.socialLinks) || {};
+    var links = chipSocialLinks(p);
     var kind = (p && (p._profileKind || p.kind)) || "personal";
     var widgets = (p && p.publicWidgets) || {};
     var out = [];
@@ -314,6 +351,24 @@
     }
   }
 
+  /* Name and the envelope stay in the profile card. A saved drag does not pull them out. */
+  function placeMessageEnvelope(root) {
+    var stack = root && root.querySelector(".tower-avatar-stack");
+    var under = root && root.querySelector("[data-tower-under-photo]");
+    var name = root && root.querySelector('[data-tower-widget="identity"]');
+    var env = root && root.querySelector('[data-tower-widget="envelope"]');
+    var handle = root && root.querySelector("[data-tower-handle-badge]");
+    if (name && stack && !stack.contains(name)) {
+      var actions = stack.querySelector(".tower-profile-actions");
+      if (actions) stack.insertBefore(name, actions);
+      else stack.appendChild(name);
+    }
+    if (handle) handle.hidden = true;
+    if (!under || !env || env.classList.contains("is-dragging")) return;
+    if (env.parentNode !== under) under.appendChild(env);
+    env.classList.remove("is-placed");
+  }
+
   function spawnUnplacedWidgets(root, p) {
     var stage = root && root.querySelector("[data-tower-scrapbook]");
     if (!stage || !stage.classList.contains("is-sticker-stage")) return;
@@ -396,6 +451,7 @@
       }
       spawnCache = gridCache;
       stage.style.minHeight = "";
+      placeMessageEnvelope(root);
       return;
     }
 
@@ -497,6 +553,7 @@
       el.setAttribute("data-sticker-y", String(y));
       el.setAttribute("data-sticker-z", "2");
     });
+    placeMessageEnvelope(root);
     repairLayoutOverlaps(stage, p, layout, spawnIds);
   }
 
@@ -515,7 +572,8 @@
     var iy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
     return ix > 2 && iy > 2;
   }
-  function planLayoutRepair(items, stageW, gap) {
+  function planLayoutRepair(items, stageW, gap, opts) {
+    opts = opts || {};
     /* items: [{id, x, y, w, h, dragged}] in stage px. Returns {id: {x, y}} for moved ones. */
     var order = items.slice().sort(function (a, b) {
       if (!!a.dragged !== !!b.dragged) return a.dragged ? -1 : 1;
@@ -560,10 +618,78 @@
         }
       }
       if (hit || invalid) moves[it.id] = { x: box.x, y: box.y };
+      box.id = it.id;
+      box.dragged = !!it.dragged;
       fixed.push(box);
+    });
+    /* Second pass (r146): compact upward. A widget with a big empty band above it
+       (more than COMPACT_MIN_GAP px, e.g. YouTube parked far down on an old saved
+       layout) moves up to the nearest free spot; the identity row stays pinned.
+       The YouTube link chip is seated right under the YouTube widget. Smaller gaps
+       are kept, and owner-dragged widgets never move up, so a spot the owner
+       chose is not touched. */
+    var rowCount = rowItems.length;
+    var seated = fixed.slice(0, rowCount);
+    var rest = fixed.slice(rowCount).sort(function (a, b) { return a.y - b.y || a.x - b.x; });
+    var chip = null;
+    rest = rest.filter(function (b) {
+      if (b.id === "social-youtube") { chip = b; return false; }
+      return true;
+    });
+    var yt = rest.filter(function (b) { return b.id === "youtube"; })[0] || null;
+    /* YouTube widget not on screen yet (still loading): leave the chip where it is. */
+    /* One-time compaction of an old layout (no _compacted mark yet): every widget
+       in those rows carries an owner-dragged mark, so the marks are ignored on
+       this pass only. The identity row stays pinned (seated above). */
+    if (opts.ignoreDragged) rest.forEach(function (b) { b.dragged = false; });
+    if (chip && !yt) { chip.dragged = true; rest.push(chip); }
+    function freeAt(cand) {
+      return !seated.some(function (f) { return boxesOverlap(cand, f); });
+    }
+    function seat(b, forceY) {
+      var startY = b.y;
+      if (typeof forceY === "number") {
+        var c0 = { x: b.x, y: forceY, w: b.w, h: b.h };
+        if (freeAt(c0)) b.y = forceY;
+        else {
+          var ysF = seated.map(function (f) { return f.y + f.h + gap; }).filter(function (y) { return y >= forceY; }).sort(function (m, n) { return m - n; });
+          for (var k = 0; k < ysF.length; k++) {
+            var cf = { x: b.x, y: ysF[k], w: b.w, h: b.h };
+            if (freeAt(cf)) { b.y = ysF[k]; break; }
+          }
+        }
+      } else if (!b.dragged) {
+        var ups = [gap].concat(seated.map(function (f) { return f.y + f.h + gap; }))
+          .filter(function (y) { return y < b.y; })
+          .sort(function (m, n) { return m - n; });
+        for (var u = 0; u < ups.length; u++) {
+          if (startY - ups[u] <= COMPACT_MIN_GAP) break;
+          var cu = { x: b.x, y: ups[u], w: b.w, h: b.h };
+          if (freeAt(cu)) { b.y = ups[u]; break; }
+        }
+      }
+      if (!freeAt(b)) {
+        var lowest = 0;
+        seated.forEach(function (f) { lowest = Math.max(lowest, f.y + f.h + gap); });
+        b.y = lowest;
+      }
+      seated.push(b);
+      if (b.y !== startY) {
+        var m0 = moves[b.id];
+        moves[b.id] = { x: m0 ? m0.x : b.x, y: b.y };
+      }
+    }
+    rest.forEach(function (b) {
+      seat(b);
+      if (chip && b === yt) {
+        var cx = Math.max(0, Math.min(Math.max(0, stageW - chip.w), yt.x));
+        if (chip.x !== cx) { chip.x = cx; moves[chip.id] = { x: cx, y: chip.y }; }
+        seat(chip, yt.y + yt.h + 8);
+      }
     });
     return moves;
   }
+  var COMPACT_MIN_GAP = 160;
   function repairLayoutOverlaps(stage, p, layout, spawnIds) {
     if (!stage || isPhoneStage(stage) || stage.classList.contains("is-default-grid")) return false;
     var stageW = stage.clientWidth || 0;
@@ -576,9 +702,36 @@
       if (!el.offsetWidth || !el.offsetHeight) return;
       items.push({ id: id, el: el, x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight, dragged: !!(layout && layout[id] && layout[id].dragged === true) });
     });
-    var moves = planLayoutRepair(items, stageW, SPAWN_GAP);
+    /* One-time pass: an owner layout saved before compaction existed. */
+    var owner = !!(p && layout && isTowerOwner(p) && !p._loading);
+    var oneTime = owner && !layout._compacted;
+    var ytEl = stage.querySelector('[data-tower-widget="youtube"]');
+    var ytReady = !ytEl || items.some(function (it) { return it.id === "youtube"; });
+    var planned = planLayoutRepair(items, stageW, SPAWN_GAP, { ignoreDragged: oneTime && ytReady });
+    /* Keep only real moves (more than 1px) so a stable layout is never re-saved. */
+    var moves = {};
+    items.forEach(function (it) {
+      var mv = planned[it.id];
+      if (mv && (Math.abs(mv.x - it.x) >= 1 || Math.abs(mv.y - it.y) >= 1)) moves[it.id] = mv;
+    });
     var ids = Object.keys(moves);
-    if (!ids.length) return false;
+    /* Mark the layout once the one-time pass has run (with YouTube on screen), so
+       later owner drags are respected again. Saved even when nothing moved. */
+    var markNow = oneTime && ytReady;
+    /* Prior positions (#151 _backup), captured before the repair or the _compacted
+       mark rewrites the layout in place. */
+    var priorLayout = null;
+    if (ids.length) {
+      try { priorLayout = layout ? JSON.parse(JSON.stringify(layout)) : null; } catch (eBk) { priorLayout = null; }
+    }
+    if (markNow) layout._compacted = 1;
+    if (!ids.length) {
+      if (markNow) {
+        p.widgetLayout = layout;
+        setTimeout(function () { try { TowerProfileStore.save(p, { geometry: true }); } catch (eMk) {} }, 0);
+      }
+      return false;
+    }
     var bottom = 0;
     items.forEach(function (it) {
       var m = moves[it.id];
@@ -607,12 +760,19 @@
     });
     /* Save once per profile + repaired result, and only for the owner. */
     if (p && layout && isTowerOwner(p) && !p._loading) {
-      var sig = String(p._profileId || "") + "|" + ids.sort().map(function (id) {
+      var sig = String(p._profileId || "") + "|" + (markNow ? "c1|" : "") + ids.sort().map(function (id) {
         return id + ":" + (lay[id] ? lay[id].x + "," + lay[id].yPx : "spawn");
       }).join(";");
       var pid = String(p._profileId || "");
       if (repairSavedSig[pid] !== sig) {
         repairSavedSig[pid] = sig;
+        /* Owner only: keep the last pre-repair copy on the profile (layout JSON
+           _backup in tower_widget_layouts; no SQL). Overwrites the previous copy. */
+        if (priorLayout && Object.keys(priorLayout).length) {
+          var priorPositions = {};
+          Object.keys(priorLayout).forEach(function (k) { if (k !== "_backup") priorPositions[k] = priorLayout[k]; });
+          p.layoutBackup = { at: new Date().toISOString(), layout: priorPositions };
+        }
         p.widgetLayout = lay;
         setTimeout(function () {
           try { TowerProfileStore.save(p, { geometry: true }); } catch (eRep) {}
@@ -732,6 +892,8 @@
   function setStickerWidth(el, w) {
     if (!el || !el.style) return;
     var n = Math.round(parseFloat(w));
+    var wid = el.getAttribute ? el.getAttribute("data-tower-widget") : "";
+    if (n > 0 && RESIZE_LIMITS[wid]) n = clampResizeWidth(wid, n);
     if (n > 0) {
       el.style.setProperty("--sticker-w", n + "px");
       el.setAttribute("data-sticker-w", String(n));
@@ -739,6 +901,110 @@
       el.style.removeProperty("--sticker-w");
       el.removeAttribute("data-sticker-w");
     }
+    /* The MP3 player is a fixed-size drawing: scale it to the chosen width. */
+    if (wid === "music") {
+      if (n > 0) el.style.setProperty("--music-zoom", String(Math.round((n / MUSIC_BASE_W) * 1000) / 1000));
+      else el.style.removeProperty("--music-zoom");
+    }
+  }
+
+  /* Resize limits (px). Calendar keeps a minimum readable size (7 day columns
+     stay legible at 260px). */
+  var MUSIC_BASE_W = 316;
+  var RESIZE_LIMITS = {
+    music: { min: 200, max: 520 },
+    calendar: { min: 260, max: 760 },
+    quote: { min: 140, max: 560 },
+  };
+  function clampResizeWidth(wid, w) {
+    var lim = RESIZE_LIMITS[wid];
+    if (!lim) return w;
+    return Math.max(lim.min, Math.min(lim.max, Math.round(w)));
+  }
+
+  function ensureResizeHandle(el, label) {
+    if (!el || el.querySelector(":scope > [data-tower-widget-resize]")) return;
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "tower-widget-resize";
+    b.setAttribute("data-tower-widget-resize", "");
+    b.setAttribute("aria-label", "Resize " + (label || "widget"));
+    b.tabIndex = -1;
+    b.textContent = "◢";
+    el.appendChild(b);
+  }
+
+  /* Owner-only resize for MP3 (Personal), Calendar and quote stickers. Width is
+     saved as wPx (layout row) or quote.w, so it survives reload. */
+  function initWidgetResize(root) {
+    var stage = root && root.querySelector("[data-tower-scrapbook]");
+    if (!stage || stage.__cognationWidgetResize) return;
+    stage.__cognationWidgetResize = true;
+    stage.addEventListener("pointerdown", function (ev) {
+      var grip = ev.target && ev.target.closest && ev.target.closest("[data-tower-widget-resize]");
+      if (!grip || !stage.contains(grip)) return;
+      var sticker = grip.closest("[data-tower-widget]");
+      if (!sticker) return;
+      var p0 = TowerProfileStore.get();
+      if (!isTowerOwner(p0) || root.getAttribute("data-tower-side") !== "public") return;
+      if (isPhoneStage(stage)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      var wid = sticker.getAttribute("data-tower-widget");
+      if (wid !== "quote") liftDefaultGrid(stage);
+      var startX = ev.clientX;
+      var startW = sticker.offsetWidth || 0;
+      var curW = startW;
+      sticker.classList.add("is-resizing");
+      function onMove(e) {
+        curW = clampResizeWidth(wid, startW + (e.clientX - startX));
+        setStickerWidth(sticker, curW);
+        if (e.cancelable) e.preventDefault();
+      }
+      function onUp() {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        document.removeEventListener("pointercancel", onUp);
+        sticker.classList.remove("is-resizing");
+        var p = TowerProfileStore.get();
+        if (wid === "quote") {
+          var qid = sticker.getAttribute("data-tower-quote-id");
+          p.quoteStickers = getQuoteStickers(p).map(function (q) {
+            if (!q || q.id !== qid) return q;
+            var nq = {};
+            Object.keys(q).forEach(function (k) { nq[k] = q[k]; });
+            nq.w = curW;
+            return nq;
+          });
+          TowerProfileStore.save(p, { geometry: true });
+          return;
+        }
+        var layout = getWidgetLayout(p) || {};
+        freezeSpawnedWidgets(root, layout);
+        sticker.classList.remove("is-spawned");
+        var cur = layout[wid] && typeof layout[wid] === "object" ? layout[wid] : {};
+        layout[wid] = {
+          x: typeof cur.x === "number" ? cur.x : parseFloat(sticker.getAttribute("data-sticker-x") || "0"),
+          y: typeof cur.y === "number" ? cur.y : parseFloat(sticker.getAttribute("data-sticker-y") || "0"),
+          z: typeof cur.z === "number" ? cur.z : parseInt(sticker.getAttribute("data-sticker-z") || "2", 10),
+          tilt: typeof cur.tilt === "number" ? cur.tilt : 0,
+          dragged: true,
+          wPx: curW,
+        };
+        if (typeof cur.yPx === "number") layout[wid].yPx = cur.yPx;
+        else if (typeof sticker.offsetTop === "number") layout[wid].yPx = Math.round(sticker.offsetTop);
+        p.widgetLayout = layout;
+        TowerProfileStore.save(p, { geometry: true });
+        try {
+          var spawnIdsR = {};
+          spawnRowsFor(p).forEach(function (r) { r.forEach(function (w) { spawnIdsR[w] = true; }); });
+          repairLayoutOverlaps(stage, p, getWidgetLayout(p), spawnIdsR);
+        } catch (eRz) {}
+      }
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+      document.addEventListener("pointercancel", onUp);
+    });
   }
 
   /* MP3 is Personal only. On Pro the music widget is not just hidden: its layout
@@ -848,7 +1114,7 @@
     return changed;
   }
 
-  var PUBLIC_WIDGET_IDS = ["identity", "slogan", "social", "music", "badges", "friends", "html", "calendar"];
+  var PUBLIC_WIDGET_IDS = ["identity", "slogan", "social", "music", "badges", "friends", "html", "calendar", "envelope"];
   var DEFAULT_PUBLIC_WIDGETS = {
     identity: true,
     slogan: true,
@@ -858,6 +1124,7 @@
     friends: true,
     html: true,
     calendar: true,
+    envelope: true,
   };
 
   var WIDGET_UNDO_MAX = 12;
@@ -1399,6 +1666,7 @@
         if (typeof pos.wPx === "number" && isFinite(pos.wPx) && pos.wPx > 0) base[id].wPx = pos.wPx;
         if (pos.dragged === true) base[id].dragged = true;
       });
+      if (saved.widgetLayout._compacted) base._compacted = saved.widgetLayout._compacted;
       p.widgetLayout = base;
     }
     if (saved.musicYoutubeWidth != null && !isNaN(parseInt(saved.musicYoutubeWidth, 10))) {
@@ -2427,6 +2695,7 @@
           ? window.CognationAutoRate.rate(body, (fields && fields.attachments) || []).rating
           : "NR",
         likes: 0,
+        visibility: (window.CognationEchoGroups && window.CognationEchoGroups.isGroupPost(body)) ? "public" : "friends",
         handle: (window.CognationTowerProfileStore
           ? normalizeHandle(window.CognationTowerProfileStore.get().handle || "")
           : ""),
@@ -2952,6 +3221,7 @@
       else el.removeAttribute("hidden");
     });
     if (!owner) {
+      if (root.classList) root.classList.remove("is-live-open");
       root.querySelectorAll("[data-live-stage]").forEach(function (el) {
         el.hidden = true;
       });
@@ -2963,8 +3233,8 @@
     var owner = isTowerOwner(TowerProfileStore.get());
     root.setAttribute("data-tower-is-owner", owner ? "true" : "false");
     try { syncViewerMutateUi(root); } catch (eMut) {}
-    if (!owner) side = "public";
-    side = side === "public" ? "public" : "private";
+    /* Connections | Public profile switch is gone. The profile stays on the public page. */
+    side = "public";
     root.setAttribute("data-tower-side", side);
     var privateSide = root.querySelector("[data-tower-private-side]");
     var publicSide = root.querySelector("[data-tower-public-side]");
@@ -3019,15 +3289,8 @@
     if (!root || root.__cognationSideBound) return;
     root.__cognationSideBound = true;
     var owner = isTowerOwner(TowerProfileStore.get());
-    var initial = "public";
-    if (owner) {
-      if (hashRequestsPublicSide()) initial = "public";
-      else initial = readStoredTowerSide() || "public";
-    } else {
-      initial = "public";
-    }
-    applyTowerSide(root, initial, { persist: false });
-    if (owner) writeStoredTowerSide(initial);
+    applyTowerSide(root, "public", { persist: false });
+    if (owner) writeStoredTowerSide("public");
 
     root.querySelectorAll("[data-tower-side-btn]").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -3051,10 +3314,7 @@
     });
 
     document.addEventListener("cognation:session-started", function () {
-      var o = isTowerOwner(TowerProfileStore.get());
-      var side = o ? readStoredTowerSide() || "private" : "public";
-      if (hashRequestsPublicSide()) side = "public";
-      applyTowerSide(root, side);
+      applyTowerSide(root, "public");
       syncPublicUrlFields(root, TowerProfileStore.get());
     });
   }
@@ -3458,6 +3718,8 @@
     stage.querySelectorAll("[data-tower-badge-pin]").forEach(function (el) {
       el.remove();
     });
+    /* Milestone text lives on the Badges sticker. Pins are not a public gallery. */
+    return;
     if (!widgets.badges) return;
 
     var items = collectVisibleBadgePins(p);
@@ -3613,6 +3875,8 @@
       wrap.setAttribute("data-name-size", String(px));
     }
     if (sticker) sticker.style.setProperty("--tower-name-size", px + "px");
+    var stack = root.querySelector(".tower-avatar-stack");
+    if (stack) stack.style.setProperty("--tower-name-size", px + "px");
     var range = root.querySelector("[data-tower-name-size]");
     if (range && document.activeElement !== range) range.value = String(px);
     return px;
@@ -4739,6 +5003,13 @@
     if (!p.socialLinks || typeof p.socialLinks !== "object") p.socialLinks = {};
     p.socialLinks[netId] = "";
     writeSocialLinksLocal(p._profileId, p.socialLinks);
+    /* Update the layout row's public copy first: the next get() re-applies it,
+       which otherwise put the removed link straight back. */
+    try {
+      if (window.CognationTowerLayoutSync && CognationTowerLayoutSync.savePublic) {
+        CognationTowerLayoutSync.savePublic(p);
+      }
+    } catch (eRem0) {}
     if (p.widgetLayout && p.widgetLayout[socialWidgetId(netId)]) {
       delete p.widgetLayout[socialWidgetId(netId)];
     }
@@ -4760,7 +5031,7 @@
     syncEditSocialFields(root, p);
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (!stage) return;
-    var links = (p && p.socialLinks) || {};
+    var links = chipSocialLinks(p);
     var profileKind = (p && (p._profileKind || p.kind)) || "personal";
     var wanted = {};
     optedInSocialNetIds(p).forEach(function (id) { wanted[id] = true; });
@@ -4801,13 +5072,6 @@
         var body = document.createElement("div");
         body.className = "tower-social-chip-body";
         el.appendChild(body);
-        var rm = document.createElement("button");
-        rm.type = "button";
-        rm.className = "tower-social-chip-remove";
-        rm.setAttribute("data-tower-social-remove", net.id);
-        rm.setAttribute("aria-label", "Remove " + net.label);
-        rm.textContent = "×";
-        el.appendChild(rm);
         stage.appendChild(el);
       }
       var quiet = net.quiet || (net.id === "venmo" && profileKind === "professional");
@@ -4829,10 +5093,8 @@
           img.decoding = "async";
           img.loading = "lazy";
           a.appendChild(img);
-          var lab = document.createElement("span");
-          lab.className = "tower-social-chip-label";
-          lab.textContent = net.label;
-          a.appendChild(lab);
+          /* Logo only. A name beside the mark (especially the letter X) reads
+             as a delete control, so no chip paints its site name. */
         } else {
           a.textContent = quiet ? net.label : net.short;
           a.classList.remove("is-logo");
@@ -4843,16 +5105,10 @@
       el.classList.remove("is-widget-off");
     });
 
-    if (!root.__cognationSocialRemoveBound) {
-      root.__cognationSocialRemoveBound = true;
-      root.addEventListener("click", function (ev) {
-        var btn = ev.target && ev.target.closest && ev.target.closest("[data-tower-social-remove]");
-        if (!btn || !root.contains(btn)) return;
-        ev.preventDefault();
-        ev.stopPropagation();
-        removeSocialWidget(root, btn.getAttribute("data-tower-social-remove"));
-      });
-    }
+    /* Old builds left an X button on each chip; drop any still in the DOM. */
+    stage.querySelectorAll(".tower-social-chip-remove").forEach(function (x) {
+      if (x.parentNode) x.parentNode.removeChild(x);
+    });
     syncOwnerStickerHandles(root);
   }
 
@@ -5071,11 +5327,6 @@
     ensureStickersOnStage(stage);
     if (profileIsProfessional(p)) {
       stage.querySelectorAll("[data-tower-friend-pin]").forEach(function (el) { el.remove(); });
-      var friendsWidget = stage.querySelector('[data-tower-widget="friends"]');
-      if (friendsWidget) {
-        friendsWidget.hidden = true;
-        friendsWidget.classList.add("is-widget-off");
-      }
       return;
     }
     if (p) settleArrivalTilts(p);
@@ -5543,9 +5794,7 @@
       publicEl.innerHTML = "";
       var heading = document.createElement("p");
       heading.className = "tower-friends-public-label";
-      heading.textContent = selected.length
-        ? "Top friends"
-        : "Top friends · set on Connections";
+      heading.textContent = "Top friends";
       publicEl.appendChild(heading);
     }
 
@@ -5813,6 +6062,111 @@
     return false;
   }
 
+  var milestoneByProfile = {};
+
+  function appliedMilestoneList(p) {
+    var out = [];
+    var seen = {};
+    function add(id, title) {
+      id = String(id || "");
+      title = String(title || "").trim();
+      if (!id || !title || seen[id]) return;
+      seen[id] = 1;
+      out.push({ id: id, title: title.slice(0, 48) });
+    }
+    var list = (p && p.awardedBadges) || [];
+    if (Array.isArray(list)) {
+      list.forEach(function (b) {
+        if (b && b.kind === "milestone" && b.applied === true) add(b.id, b.title);
+      });
+    }
+    var pid = p && String(p._profileId || p.id || "");
+    var cached = pid && milestoneByProfile[pid];
+    if (Array.isArray(cached)) cached.forEach(function (b) { if (b) add(b.id, b.title); });
+    return out;
+  }
+
+  function loadAppliedMilestones(root, p) {
+    var id = p && String(p._profileId || p.id || "");
+    if (!id || milestoneByProfile[id]) return;
+    var c = window.CognationSupabase;
+    if (!c || typeof c.configured !== "function" || !c.configured() || typeof c.rpc !== "function") return;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) return;
+    milestoneByProfile[id] = "pending";
+    c.rpc("applied_milestones_for_profile", { p_profile_id: id }).then(function (rows) {
+      milestoneByProfile[id] = Array.isArray(rows) ? rows : [];
+      try { applyPublicWidgets(root, TowerProfileStore.get()); } catch (eMs) {}
+    }, function () { milestoneByProfile[id] = []; });
+  }
+
+  function noteLocalMilestone(id, title) {
+    var p = TowerProfileStore.get();
+    if (!p || !isTowerOwner(p)) return;
+    if (!Array.isArray(p.awardedBadges)) p.awardedBadges = [];
+    var found = false;
+    p.awardedBadges.forEach(function (b) {
+      if (!b || b.id !== id) return;
+      b.kind = "milestone";
+      b.applied = true;
+      b.title = title;
+      found = true;
+    });
+    if (!found) p.awardedBadges.push({ id: id, title: title, kind: "milestone", applied: true });
+    var pid = String(p._profileId || p.id || "");
+    if (pid) delete milestoneByProfile[pid];
+    TowerProfileStore.save(p);
+  }
+
+  function bootMilestoneApply(root) {
+    if (!root) return;
+    if (!root.__milestoneListen) {
+      root.__milestoneListen = true;
+      document.addEventListener("cognation:session-started", function () {
+        root.__milestoneBoot = false;
+        bootMilestoneApply(root);
+      });
+    }
+    if (root.__milestoneBoot) return;
+    root.__milestoneBoot = true;
+    var params;
+    try { params = new URLSearchParams(window.location.search || ""); } catch (eQ) { return; }
+    var c = window.CognationSupabase;
+    var live = !!(c && typeof c.configured === "function" && c.configured() && typeof c.rpc === "function");
+    if (!live) return;
+    if (params.get("staff-badge") === "1") {
+      params.delete("staff-badge");
+      try {
+        history.replaceState(null, "", (location.pathname || "/") + (params.toString() ? "?" + params.toString() : "") + (location.hash || ""));
+      } catch (eStaff) {}
+      c.rpc("cognation_is_staff", {}).then(function (yes) {
+        if (yes !== true) return;
+        var email = window.prompt("Email for this one milestone");
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) return;
+        email = String(email).trim();
+        var title = window.prompt("Milestone name");
+        title = String(title || "").trim().slice(0, 48);
+        if (!title) return;
+        c.rpc("staff_award_milestone", { recipient_email: email, title: title }).then(function (id) {
+          if (!id) return;
+          var link = (location.origin || "") + (location.pathname || "/") + "?apply-badge=" + encodeURIComponent(id);
+          var body = "Cognation made you a milestone badge.\n\nApply:\n" + link + "\n";
+          window.location.href = "mailto:" + email + "?subject=" + encodeURIComponent("Your Cognation milestone") + "&body=" + encodeURIComponent(body);
+        }, function () {});
+      }, function () {});
+    }
+    var awardId = params.get("apply-badge");
+    if (!awardId) return;
+    c.rpc("apply_milestone", { award_id: awardId }).then(function (title) {
+      if (!title) return;
+      noteLocalMilestone(awardId, String(title));
+      try {
+        params.delete("apply-badge");
+        history.replaceState(null, "", (location.pathname || "/") + (params.toString() ? "?" + params.toString() : "") + (location.hash || ""));
+      } catch (eHist) {}
+      applyPublicWidgets(root, TowerProfileStore.get());
+    }, function () {});
+  }
+
   function profileHasVisibleBadges(p) {
     var vis = (p && p.badgeVisibility) || {};
     var awarded = (p && p.awardedBadges) || {};
@@ -5867,6 +6221,7 @@
 
   function applyPublicWidgetsInner(root, p) {
     if (p) pruneEmptyPublicWidgetsInProfile(p);
+    loadAppliedMilestones(root, p);
     var widgets = normalizePublicWidgets(p && p.publicWidgets);
     var sloganText = p && typeof p.slogan === "string" ? p.slogan.trim() : "";
     var htmlText = p && typeof p.customHtml === "string" ? p.customHtml.trim() : "";
@@ -5894,12 +6249,18 @@
           else on = true;
         }
       }
-      if (id === "friends" && (!friendIds || !friendIds.length)) on = false;
-      if (id === "badges" && !profileHasVisibleBadges(p)) on = false;
+      /* Default Top friends bar stays off. Badges stay off until this person applies a staff milestone. */
+      if (id === "friends") on = false;
+      var milestones = id === "badges" ? appliedMilestoneList(p) : null;
+      if (id === "badges") on = !!(milestones && milestones.length);
       /* The same Calendar sticker stays on the personal page and the professional page. */
       if (id === "calendar") on = true;
       var el = root.querySelector('[data-tower-widget="' + id + '"]');
       if (!el) return;
+      if (id === "badges") {
+        var badgeLabel = el.querySelector("[data-tower-badges-public]");
+        if (badgeLabel) badgeLabel.textContent = on ? milestones.map(function (b) { return b.title; }).join(" · ") : "Badges";
+      }
       el.hidden = !on;
       el.classList.toggle("is-widget-off", !on);
       if (!on) el.classList.remove("is-widget-selected");
@@ -5955,6 +6316,7 @@
 
   function setPublicWidgetVisible(root, id, on) {
     if (!isTowerOwner(TowerProfileStore.get())) return;
+    if (id === "friends") on = false;
     if (!id || id === "avatar" || id === "feed" || id === "messages") return;
     if (PUBLIC_WIDGET_IDS.indexOf(id) < 0) return;
     var p = TowerProfileStore.get();
@@ -6032,6 +6394,10 @@
       bar.setAttribute("aria-hidden", "false");
       var rotateBtn = bar.querySelector("[data-tower-rotate]");
       if (rotateBtn) rotateBtn.disabled = !(owner && selected);
+      var removeSel = bar.querySelector("[data-tower-remove-selected]");
+      var anySel = stage && stage.querySelector(".is-widget-selected");
+      var selId = anySel ? anySel.getAttribute("data-tower-widget") : "";
+      if (removeSel) removeSel.disabled = !(owner && anySel && selId !== "avatar" && selId !== "friends");
     }
     var scrap = root.querySelector("[data-tower-scrapbook-bar]");
     if (scrap) {
@@ -7371,8 +7737,7 @@
     if (usingRemoteSocial()) {
       var social = remoteSocial();
       profiles = social && social.getMyProfiles ? social.getMyProfiles() : [];
-      var remoteOwner = isTowerOwner(TowerProfileStore.get());
-      toggle.hidden = !remoteOwner;
+      toggle.hidden = false;
       var currentRemoteKind =
         (TowerProfileStore.get() && TowerProfileStore.get()._profileKind) ||
         (session && session.profileKind) ||
@@ -7397,9 +7762,7 @@
     if (user && window.CognationAccounts) {
       profiles = window.CognationAccounts.getProfilesForUsername(user) || [];
     }
-    var owner = isTowerOwner(TowerProfileStore.get());
-    var show = owner && profiles.length > 0;
-    toggle.hidden = !show;
+    toggle.hidden = false;
     var active = TowerProfileStore.get();
     var kind = (active && active._profileKind) || (session && session.profileKind) || "personal";
     toggle.querySelectorAll("[data-tower-profile-kind]").forEach(function (btn) {
@@ -7662,7 +8025,8 @@
     var widgets = Array.prototype.slice.call(stage.querySelectorAll("[data-tower-widget]"));
     widgets.forEach(function (el) {
       var id = el.getAttribute("data-tower-widget");
-      if (id === "feed" || id === "messages") return;
+      /* Calendar stays inside Edit profile, not loose on the page. */
+      if (id === "feed" || id === "messages" || id === "calendar" || id === "identity" || id === "envelope") return;
       if (el.parentNode === stage) return;
       stage.appendChild(el);
     });
@@ -8333,6 +8697,8 @@
       el.style.setProperty("--sticker-tilt", (q.tilt || 0) + "deg");
       el.innerHTML = '<blockquote class="tower-quote-card"></blockquote>';
       el.querySelector(".tower-quote-card").textContent = q.text;
+      if (typeof q.w === "number" && q.w > 0) setStickerWidth(el, q.w);
+      ensureResizeHandle(el, "Quote");
       stage.appendChild(el);
     });
     syncOwnerStickerHandles(root);
@@ -8401,7 +8767,9 @@
     }
     p.quoteStickers = quotes.map(function (q) {
       if (!q || q.id !== id) return q;
-      return { id: q.id, text: text, x: q.x, y: q.y, z: q.z, tilt: q.tilt };
+      var edited = { id: q.id, text: text, x: q.x, y: q.y, z: q.z, tilt: q.tilt };
+      if (typeof q.w === "number") edited.w = q.w;
+      return edited;
     });
     sticker.setAttribute("data-quote-text", text);
     el.textContent = text;
@@ -8457,8 +8825,15 @@
       if (!el || !root.contains(el) || recentDrag(el)) return;
       var isHandle = el.matches("[data-tower-handle-badge]");
       var isName = el.matches("[data-tower-profile-name]");
-      if (isHandle || isName) {
-        /* Professional name is the owner's label — a business or creator name — not the personal name. */
+      if (isName) {
+        if (!ownerPublic()) return;
+        if (el.getAttribute("contenteditable") === "true") return;
+        el.setAttribute("contenteditable", "true");
+        el.setAttribute("spellcheck", "false");
+        try { el.focus(); } catch (eName) {}
+        return;
+      }
+      if (isHandle) {
         if (!ownerPublic()) return;
       } else if (!canEdit()) return;
       if (el.getAttribute("contenteditable") === "true") return;
@@ -8897,6 +9272,7 @@
       var handleHit = ev.target.closest("[data-tower-sticker-handle]");
       if (
         !handleHit &&
+        !ev.target.closest("[data-tower-envelope]") &&
         ev.target.closest("a, button, input, textarea, select, label, summary, iframe, [contenteditable='true'], [data-tower-rotate], [data-tower-avatar-resize], [data-tower-name-resize], [data-tower-emoji-resize], [data-tower-polaroid-resize], [data-tower-youtube-resize]")
       ) {
         return;
@@ -8906,7 +9282,7 @@
         : ev.target.closest("[data-tower-widget]");
       if (!sticker || !stage.contains(sticker)) return;
       var wid = sticker.getAttribute("data-tower-widget");
-      if (wid === "feed" || wid === "messages") return;
+      if (wid === "feed" || wid === "messages" || wid === "identity" || wid === "envelope") return;
       if (sticker.hidden || sticker.classList.contains("is-widget-off")) return;
 
       var rect = stage.getBoundingClientRect();
@@ -8990,7 +9366,7 @@
           var quotes = getQuoteStickers(p);
           p.quoteStickers = quotes.map(function (q) {
             if (q.id !== qid) return q;
-            return {
+            var moved = {
               id: q.id,
               text: q.text,
               x: dropX,
@@ -8998,6 +9374,8 @@
               z: dropZ,
               tilt: dropTilt,
             };
+            if (typeof q.w === "number") moved.w = q.w;
+            return moved;
           });
           TowerProfileStore.save(p, { geometry: true });
         } else {
@@ -9141,9 +9519,18 @@
           return;
         }
         if (ev.key !== "Backspace" && ev.key !== "Delete") return;
+        var selectedKey = stage.querySelector(".is-widget-selected");
+        if (!selectedKey || !stage.contains(selectedKey)) return;
+        ev.preventDefault();
+        removeSelectedWidget();
+      });
+      /* One removal path for Backspace/Delete and the touch "Remove" button.
+         Owner only, Public side only; never runs while typing (the key handler
+         returns early for inputs and contenteditable). */
+      var removeSelectedWidget = function () {
+        if (!ownerOnPublic()) return;
         var selected = stage.querySelector(".is-widget-selected");
         if (!selected || !stage.contains(selected)) return;
-        ev.preventDefault();
 
         /* Individual friend pin */
         var friendId = selected.getAttribute("data-tower-friend-pin");
@@ -9233,6 +9620,14 @@
         if (!id || id === "avatar" || id === "feed" || id === "messages") return;
         clearWidgetSelection(stage);
         syncRotateToolbar(root);
+        /* Social link chip (the X button is gone): clear that link, same as the
+           old X did, so it stays removed after reload. */
+        var socialNet = socialNetIdFromWidget(id);
+        if (socialNet) {
+          removeSocialWidget(root, socialNet);
+          setProfileStatusSafe((selected.getAttribute("data-sticker-label") || "Link") + " link removed. Add it again in Edit profile.", false);
+          return;
+        }
         var label = selected.getAttribute("data-sticker-label") || id;
         if (id === "polaroid") {
           pushWidgetUndo({ type: "shell", id: id, label: label });
@@ -9260,7 +9655,17 @@
           }
         }
         setProfileStatusSafe(label + " removed — Undo to restore.", false);
-      });
+      };
+      root.__cognationRemoveSelected = removeSelectedWidget;
+      var removeBtn = root.querySelector("[data-tower-remove-selected]");
+      if (removeBtn && !removeBtn.__cognationBound) {
+        removeBtn.__cognationBound = true;
+        removeBtn.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          removeSelectedWidget();
+          syncRotateToolbar(root);
+        });
+      }
     }
 
     /* Live Public widgets checkboxes */
@@ -10024,6 +10429,11 @@
     syncOwnerStickerHandles(root);
     renderQuoteStickers(root, p);
     initAddWidgetUi(root);
+    try {
+      ensureResizeHandle(root.querySelector('[data-tower-widget="music"]'), "MP3 player");
+      ensureResizeHandle(root.querySelector('[data-tower-widget="calendar"]'), "Calendar");
+    } catch (eRh) {}
+    initWidgetResize(root);
     syncCollageForm(root, p);
     syncPublicLookForm(root, p);
     var countSel = root.querySelector("[data-tower-friends-count]");
@@ -10062,12 +10472,24 @@
     syncPublicUrlFields(root, p);
     root.setAttribute("data-view-kind", profileIsProfessional(p) ? "professional" : "personal");
     var followBtn = root.querySelector("[data-tower-follow]");
-    if (followBtn && profileIsProfessional(p)) {
-      followBtn.textContent = "Follow";
-      followBtn.setAttribute("aria-label", "Follow this professional page");
-    } else if (followBtn && followBtn.textContent === "Follow") {
-      followBtn.textContent = "Add friend";
-      followBtn.setAttribute("aria-label", "Add this person as a friend");
+    var addFriendsBtn = root.querySelector("[data-tower-add-friends]");
+    if (profileIsProfessional(p)) {
+      if (followBtn && followBtn.textContent !== "Following") followBtn.textContent = "+ follow";
+      if (followBtn) followBtn.setAttribute("aria-label", "Follow this professional page");
+      /* Owner professional page shows this control where Add friends sat. */
+      if (addFriendsBtn) {
+        addFriendsBtn.textContent = "+ follow";
+        addFriendsBtn.setAttribute("aria-label", "Follow this professional page");
+      }
+    } else {
+      if (followBtn && (followBtn.textContent === "Follow" || followBtn.textContent === "+ follow" || followBtn.textContent === "friend")) {
+        followBtn.textContent = "+ friend";
+        followBtn.setAttribute("aria-label", "Add this person as a friend");
+      }
+      if (addFriendsBtn) {
+        addFriendsBtn.textContent = "+ friend";
+        addFriendsBtn.setAttribute("aria-label", "Add this person as a friend");
+      }
     }
     try { syncProfileKindToggle(root); } catch (eKind) {}
     try { syncAddProfileUi(root); } catch (eAdd) {}
@@ -10215,6 +10637,7 @@
     initDensifySections(root);
     initTowerCalendar(root);
     initGoingLive(root);
+    bootMilestoneApply(root);
 
     var profileForm = root.querySelector("[data-tower-profile-form]");
     var avatarFile = root.querySelector("[data-tower-avatar-file]");
@@ -10753,22 +11176,72 @@
       });
     }
 
+    function shrinkMarketPic(file, done) {
+      var reader = new FileReader();
+      reader.onerror = function () { done(""); };
+      reader.onload = function () {
+        var img = new Image();
+        img.onload = function () {
+          var max = 480;
+          var scale = Math.min(1, max / Math.max(img.width || 1, img.height || 1));
+          var canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round((img.width || 1) * scale));
+          canvas.height = Math.max(1, Math.round((img.height || 1) * scale));
+          var ctx = canvas.getContext("2d");
+          var out = "";
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            try { out = canvas.toDataURL("image/jpeg", 0.72); } catch (ePic) { out = ""; }
+          }
+          done(out.indexOf("data:image/") === 0 ? out : "");
+        };
+        img.onerror = function () { done(""); };
+        img.src = String(reader.result || "");
+      };
+      reader.readAsDataURL(file);
+    }
     if (form) {
       form.addEventListener("submit", function (e) {
         e.preventDefault();
-        var attachments = [];
         var files = fileInput && fileInput.files ? Array.prototype.slice.call(fileInput.files) : [];
         var kind = (kindSelect && kindSelect.value) || "photo";
+        var bodyNow = bodyInput ? bodyInput.value : "";
+        var marketPost = /(^|[^a-z0-9])#market(?![a-z0-9])/i.test(bodyNow);
+        if (marketPost && !form.__marketReady) {
+          var pics = files.filter(function (f) {
+            return /^image\//.test(String(f.type || "")) || /\.(png|jpe?g|gif|webp)$/i.test(String(f.name || ""));
+          });
+          if (pics.length) {
+            var left = pics.length;
+            form.__pics = {};
+            pics.forEach(function (f) {
+              shrinkMarketPic(f, function (url) {
+                if (url) form.__pics[f.name] = url;
+                if (--left === 0) {
+                  form.__marketReady = true;
+                  if (form.requestSubmit) form.requestSubmit();
+                  else form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+                }
+              });
+            });
+            return;
+          }
+        }
+        var savedPics = form.__pics || {};
+        form.__marketReady = false;
+        form.__pics = null;
+        var attachments = [];
         files.forEach(function (f) {
-          attachments.push({
+          var row = {
             kind: kind,
             label: f.name,
             name: f.name,
-            /* Demo only — we store metadata, not binary blobs */
             demoMeta: true,
             size: f.size,
             type: f.type || "",
-          });
+          };
+          if (savedPics[f.name]) row.dataUrl = savedPics[f.name];
+          attachments.push(row);
         });
         if (usingRemoteSocial()) {
           var social = remoteSocial();
@@ -11134,6 +11607,9 @@
   }
 
   function stopCircleFall() {
+    if (window.CognationPulseMutual && typeof window.CognationPulseMutual.stop === "function") {
+      window.CognationPulseMutual.stop();
+    }
     if (circleFallState) {
       if (circleFallState.raf) cancelAnimationFrame(circleFallState.raf);
       if (circleFallState.refreshTimer) clearInterval(circleFallState.refreshTimer);
@@ -11245,41 +11721,26 @@
     var i;
     for (i = 0; i < steps; i++) {
       var turn = i / steps;
-      var wobble = Math.sin(i * 0.77 + 0.4) * 0.6 + Math.sin(i * 1.83 + 1.1) * 0.3;
-      var p = circleProjectRadius(turn * 360, CIRCLE_RING_R + wobble * 8);
+      var ang = turn * Math.PI * 2;
+      var p = circleProjectRadius(turn * 360, CIRCLE_RING_R);
       var depth = p.s / CIRCLE_SCALE;
       var flicker = 0.8 + 0.2 * Math.sin(i * 1.35);
-      glowAt(p.x, p.y, 34 * depth, circleGlowColor(turn), 0.06 * flicker);
+      glowAt(p.x, p.y, 32 * depth, circleGlowColor(turn), 0.06 * flicker);
     }
     ring.appendChild(canvas);
     paintCircleBolt(ring);
   }
 
-  /* PULSE lightning bolt restored from 9d88e68 (last bolt look, Oct 1).
-     ead52bb swapped it for a 0.06-alpha blurred canvas glow that reads as
-     nothing on the #61 indigo background, so the bolt looked missing. */
+  /* One smooth tilted oval. No wave, so the light stays an even ribbon. */
   function circleBoltSegments(radius, wobble, seed, baseWidth) {
-    var steps = 144;
-    var chunk = 6;
-    var segs = [];
-    var start;
-    for (start = 0; start < steps; start += chunk) {
-      var cmds = [];
-      var depthSum = 0;
-      var count = 0;
-      var end = Math.min(steps, start + chunk);
-      var i;
-      for (i = start; i <= end; i++) {
-        var n = Math.sin(i * 0.73 + seed) * 0.58 + Math.sin(i * 1.91 + seed * 1.4) * 0.42;
-        if (i === 0 || i === steps) n = 0;
-        var p = circleProjectRadius((i / steps) * 360, radius + n * wobble);
-        cmds.push((i === start ? "M" : "L") + p.x.toFixed(1) + " " + p.y.toFixed(1));
-        depthSum += p.s / CIRCLE_SCALE;
-        count++;
-      }
-      segs.push({ d: cmds.join(" "), width: Math.max(0.7, baseWidth * (depthSum / count)) });
+    var steps = 140;
+    var cmds = [];
+    var i;
+    for (i = 0; i <= steps; i++) {
+      var p = circleProjectRadius((i / steps) * 360, radius);
+      cmds.push((i ? "L" : "M") + p.x.toFixed(1) + " " + p.y.toFixed(1));
     }
-    return segs;
+    return [{ d: cmds.join(" "), width: baseWidth }];
   }
 
   function circleBranchPath(angleDeg, radius, length, seed) {
@@ -11341,7 +11802,7 @@
       return filter;
     }
     defs.appendChild(glowFilter("pulse-bolt-glow", 18, 7, false));
-    defs.appendChild(glowFilter("pulse-bolt-core", 3.2, 1.1, false));
+    defs.appendChild(glowFilter("pulse-bolt-core", 3.5, 1.2, false));
     svg.appendChild(defs);
     function addBolt(parent, d, color, width, opacity) {
       var path = document.createElementNS(ns, "path");
@@ -11363,16 +11824,12 @@
       { color: "#3ecbff", opacity: 0.85 },
       { color: "#ff4ad8", opacity: 0.8 }
     ];
-    circleBoltSegments(CIRCLE_RING_R, 18, 1.2, 8).forEach(function (seg, index) {
-      var shift = Math.sin(index * 0.65) * 0.5 + 0.5;
-      var shift2 = Math.cos(index * 0.4) * 0.5 + 0.5;
-      var weights = [0.35 + 0.65 * shift, 0.3 + 0.55 * (1 - shift), 0.3 + 0.6 * shift2];
-      colors.forEach(function (ink, inkIndex) {
-        addBolt(halo, seg.d, ink.color, seg.width * 1.2, 0.28 + 0.5 * weights[inkIndex]);
-      });
-      addBolt(core, seg.d, "#e9f7ff", Math.max(0.9, seg.width * 0.16), 0.7);
-    });
-    var forks = [22, 64, 98, 146, 188, 228, 274, 332];
+    var wave = circleBoltSegments(CIRCLE_RING_R, 14, 0.4, 12)[0];
+    addBolt(halo, wave.d, colors[0].color, 36, 0.42);
+    addBolt(halo, wave.d, colors[1].color, 18, 0.7);
+    addBolt(halo, wave.d, colors[2].color, 10, 0.5);
+    addBolt(core, wave.d, "#e9f7ff", 4.5, 0.55);
+    var forks = [];
     forks.forEach(function (angle, index) {
       var outward = index % 2 === 0;
       var t = angle * Math.PI / 180;
@@ -11684,11 +12141,25 @@
         spot.classList.add("is-filled");
         spot.classList.remove("is-empty");
         spot.textContent = String(person.name).trim().charAt(0).toUpperCase() || "?";
-        spot.setAttribute("aria-label", person.name);
+        spot.setAttribute("aria-label", person.activity ? person.name + ". " + person.activity : person.name);
         if (person.userId) spot.setAttribute("data-circle-person", person.userId);
-        /* Real friend photo (profiles.photo_url); no photo or a bad URL keeps the letter. */
+        /* Tower picture: server photo_url, else that profile's Tower avatar. */
         var photoApi = window.CognationProfilePhoto;
         if (person.photoUrl && photoApi && typeof photoApi.applyPhoto === "function") photoApi.applyPhoto(spot, person.photoUrl);
+        else paintFriendPicture(spot, { id: person.handle || person.userId, name: person.name }, i);
+        if (person.handle) {
+          var handle = String(person.handle);
+          spot.setAttribute("data-circle-handle", handle);
+          spot.addEventListener("click", openCircleProfile(handle));
+        }
+        if (person.activity) {
+          spot.classList.add("has-caption");
+          var caption = document.createElement("span");
+          caption.className = "circle-spot-caption";
+          caption.setAttribute("data-circle-caption", "");
+          caption.textContent = person.activity;
+          spot.appendChild(caption);
+        }
       } else {
         spot.classList.add("is-empty");
         spot.classList.remove("is-filled");
@@ -11732,12 +12203,32 @@
     if (pinCircleSpotsToBackground(spots)) return;
     var shift = ((performance.now() - circleFallState.ringStarted) / 28000) * CIRCLE_SPOTS.length;
     var i;
+    var front = 0;
+    var frontScale = -1;
     for (i = 0; i < spots.length; i++) {
       var pos = circleSpotAt(i + shift);
+      var depth = pos.s / CIRCLE_SCALE;
+      var scale = 0.8 + Math.max(0, depth - 0.68) * 0.4;
+      var size = 5.6;
+      spots[i].style.width = size.toFixed(2) + "rem";
+      spots[i].style.height = size.toFixed(2) + "rem";
       spots[i].style.transform =
-        "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + pos.y.toFixed(1) + "px) scale(" + pos.s.toFixed(3) + ")";
+        "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + pos.y.toFixed(1) + "px) scale(" + scale.toFixed(3) + ")";
       spots[i].style.zIndex = String(Math.round(pos.s * 100));
+      if (scale > frontScale) { frontScale = scale; front = i; }
     }
+    for (i = 0; i < spots.length; i++) {
+      var cap = spots[i].querySelector("[data-circle-caption]");
+      if (cap) cap.hidden = i !== front;
+    }
+  }
+
+  function openCircleProfile(handle) {
+    return function () {
+      if (!handle) return;
+      if (window.CognationTowerOpenProfile) window.CognationTowerOpenProfile(handle);
+      try { stopCircleFall(); } catch (eStop) {}
+    };
   }
 
   function fillCircleSpots(people) {
@@ -11884,6 +12375,9 @@
     var circlePage = document.querySelector("[data-circle-page]") || layer;
     if (window.CognationCircleRelations && typeof window.CognationCircleRelations.mount === "function") {
       window.CognationCircleRelations.mount(circlePage);
+    }
+    if (window.CognationPulseMutual && typeof window.CognationPulseMutual.mount === "function") {
+      window.CognationPulseMutual.mount();
     }
     /* PULSE falling friends restored (removed by #49 early return). Every
        server friend's Tower circle falls BEHIND the halo ring; tap opens Tower. */
@@ -12094,9 +12588,7 @@
       }
     }
     document.querySelectorAll("[data-tower-app]").forEach(function (root) {
-      var side = readStoredTowerSide() || "public";
-      if (hashRequestsPublicSide()) side = "public";
-      applyTowerSide(root, side);
+      applyTowerSide(root, "public");
       renderProfileChrome(root);
       syncProfileKindToggle(root);
       syncAddProfileUi(root);
@@ -12140,6 +12632,22 @@
   window.CognationTowerProfilePublicUrl = function (profile) {
     return profilePublicUrl(profile);
   };
+
+  document.addEventListener("click", function (ev) {
+    var hit = ev.target && ev.target.closest && ev.target.closest("[data-tower-add-friends], [data-tower-open-events]");
+    if (!hit) return;
+    if (hit.hasAttribute("data-tower-add-friends")) {
+      var search = document.getElementById("people-search-input");
+      if (search) search.focus();
+      return;
+    }
+    var signal = document.getElementById("tab-signal");
+    if (signal) signal.click();
+    var feed = document.querySelector("[data-signal-pane-btn='feed']");
+    if (feed) feed.click();
+    var drop = document.querySelector("[data-tower-event-dropdown]");
+    if (drop) drop.open = true;
+  });
 
   function boot() {
     document.querySelectorAll("[data-tower-app]").forEach(initTower);

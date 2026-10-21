@@ -14469,12 +14469,18 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   mask-image: radial-gradient(ellipse 50% 50% at 51% 44%, transparent 58%, #000 76%, #000 90%, transparent 100%);
   transform-origin: 51% 44%;
   will-change: transform;
-  animation: pulse-strand-drift 16s ease-in-out infinite alternate;
+  animation: pulse-strand-drift 12s ease-in-out infinite;
 }
+/* cgn-strands-1280: wide screens. The image is drawn at k 0.954 here (0.31 on
+   phones), so a 3-5px shift was under a strand's own width and barely changed a
+   pixel (0.30% of the view in 4s vs 1.01% at 390), and the 16s alternate eased
+   to a near stop at each end (0.006% at the turnaround). Same four-point loop as
+   phones (no still turnaround), translate doubled; rotate/scale as phones. */
 @keyframes pulse-strand-drift {
-  0% { transform: translate3d(-4px, 1px, 0) rotate(-0.35deg) scale(1.004); }
-  50% { transform: translate3d(3px, -2px, 0) rotate(0.2deg) scale(1.012); }
-  100% { transform: translate3d(5px, 2px, 0) rotate(0.4deg) scale(0.998); }
+  0%, 100% { transform: translate3d(-6px, 3px, 0) rotate(-0.3deg) scale(1.003); }
+  25% { transform: translate3d(5px, -3px, 0) rotate(0.15deg) scale(1.009); }
+  50% { transform: translate3d(8px, 3px, 0) rotate(0.33deg) scale(0.998); }
+  75% { transform: translate3d(-2px, 5px, 0) rotate(-0.08deg) scale(1.006); }
 }
 /* Painted lightning + bolt stay on (still-here list), toned down and blended
    so they sit with the image strands instead of doubling them. */

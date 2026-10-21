@@ -116,6 +116,7 @@
           name: p.display_name || p.handle,
           handle: p.handle,
           kind: professional ? "professional" : "friend",
+          accountKind: p.account_kind ? String(p.account_kind).toLowerCase() : "",
           remote: true
         };
       });
@@ -156,11 +157,14 @@
       row.setAttribute("role", "option");
       row.setAttribute("data-result-kind", p.kind);
       row.setAttribute("data-result-handle", p.handle);
+      if (p.id) row.setAttribute("data-profile-id", String(p.id));
+      if (p.accountKind) row.setAttribute("data-account-kind", p.accountKind);
       row.innerHTML =
         '<span class="people-search-meta">' +
+        '<span class="people-search-name-line" data-seedops-badge-slot>' +
         '<span class="people-search-name">' +
         escapeHtml(p.name) +
-        "</span>" +
+        "</span></span>" +
         '<span class="people-search-handle">@' +
         escapeHtml(p.handle) +
         "</span>" +
@@ -174,6 +178,11 @@
       });
       box.appendChild(row);
     });
+    /* Demo · seed / Ops · demo pill on seed and ops rows (js/seedops-badge.js). */
+    var badges = window.CognationSeedOpsBadge;
+    if (badges && typeof badges.syncPeopleSearch === "function") {
+      try { badges.syncPeopleSearch(); } catch (eBadge) {}
+    }
   }
 
   function inputClear(root) {

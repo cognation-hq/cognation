@@ -800,7 +800,7 @@
       if (!feedList) return;
       feedList.innerHTML = "";
       wirePage = 0;
-      posts.forEach(function (post, idx) {
+      posts.slice(0, TIMES_SLOTS).forEach(function (post, idx) {
         appendPostEl(post, { lead: idx === 0 });
       });
       setEndlessUi(endlessOn);
@@ -1264,11 +1264,12 @@
         if (feedEmpty) feedEmpty.hidden = false;
       } else {
         if (feedEmpty) feedEmpty.hidden = true;
-        posts.slice(0, TIMES_SLOTS).forEach(function (post, idx) {
+        var printed = posts.slice(0, TIMES_SLOTS);
+        printed.forEach(function (post, idx) {
           appendPostEl(post, { lead: idx === 0 });
         });
         /* Fill the last row so the three columns stay the same height. */
-        var spare = (3 - (posts.length % 3)) % 3;
+        var spare = (3 - (printed.length % 3)) % 3;
         for (var pad = 0; pad < spare; pad++) {
           var blank = document.createElement("div");
           blank.className = "commune-feed-item times-column-pad";

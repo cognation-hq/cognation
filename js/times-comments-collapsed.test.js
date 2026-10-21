@@ -87,16 +87,57 @@ assert.ok(!/yellow|#ff[cd]|#fe[0-9a-f]{4}/i.test(rule), "no yellow");
 assert.ok(/data-news-report-toggle>Report</.test(commune), "Report unchanged");
 /* Exactly 10 story slots: 1 headliner across the full width + 9 in rows of three. */
 assert.ok(/var TIMES_SLOTS = 10;/.test(commune), "hard cap constant is 10");
-assert.ok(/posts\.slice\(0, TIMES_SLOTS\)\.forEach\(function \(post, idx\) \{\s*appendPostEl\(post, \{ lead: idx === 0 \}\);/.test(commune), "front page renders at most TIMES_SLOTS stories, first is the headliner");
+assert.ok(/var printed = posts\.slice\(0, TIMES_SLOTS\);\s*printed\.forEach\(function \(post, idx\) \{\s*appendPostEl\(post, \{ lead: idx === 0 \}\);/.test(commune), "front page renders at most TIMES_SLOTS stories, first is the headliner");
+assert.ok(/var spare = \(3 - \(printed\.length % 3\)\) % 3;/.test(commune), "filler loop counts the capped list");
 assert.ok(/#panel-signal \.commune-feed-item\.is-lead \{ grid-column: 1 \/ -1; \}/.test(css), "headliner spans the full width");
 assert.ok(/#panel-signal \.commune-feed-item\.is-lead \.commune-feed-body \{\s*font-size: 1\.35rem !important;/.test(css), "headliner is bigger");
 assert.ok(/#panel-signal \.times-column-pad \{ display: none !important; \}/.test(css), "no blank filler boxes");
-var cap = commune.slice(commune.indexOf("function renderFeed()"));
-var slotsSrc = cap.slice(0, cap.indexOf("setEndlessUi(endlessOn);"));
-var posts = []; for (var i = 0; i < 14; i++) posts.push({ id: "p" + i });
-var rendered = [];
-new Function("posts", "TIMES_SLOTS", "appendPostEl", /posts\.slice\(0, TIMES_SLOTS\)[\s\S]*?\n\s*\}\);/.exec(slotsSrc)[0])(posts, 10, function (p, o) { rendered.push([p.id, o.lead]); });
-assert.strictEqual(rendered.length, 10, "14 candidates print 10");
-assert.deepStrictEqual(rendered[0], ["p0", true], "the top story is the headliner");
-assert.ok(rendered.slice(1).every(function (r) { return r[1] === false; }), "nine regular stories");
+
+function fnSource(name) {
+  var start = commune.indexOf("function " + name + "(");
+  assert.ok(start > 0, name + " exists");
+  var depth = 0, i = commune.indexOf("{", start);
+  for (; i < commune.length; i++) {
+    if (commune[i] === "{") depth++;
+    else if (commune[i] === "}" && --depth === 0) break;
+  }
+  return commune.slice(start, i + 1);
+}
+function fourteen(prefix) { var out = []; for (var i = 0; i < 14; i++) out.push({ id: prefix + i, body: "b" + i }); return out; }
+
+/* renderFeed printing block: 14 candidates print 10, filler counted on the 10. */
+var feedSrc = fnSource("renderFeed");
+var block = /var printed = posts\.slice\(0, TIMES_SLOTS\);[\s\S]*?var spare = [^;]*;/.exec(feedSrc)[0];
+function printFeed(posts) {
+  var rendered = [];
+  var spare = new Function("posts", "TIMES_SLOTS", "appendPostEl", block + "\nreturn spare;")(posts, 10, function (p, o) { rendered.push([p.id, o.lead]); });
+  return { rendered: rendered, spare: spare };
+}
+var front = printFeed(fourteen("p"));
+assert.strictEqual(front.rendered.length, 10, "14 candidates print 10");
+assert.deepStrictEqual(front.rendered[0], ["p0", true], "the top story is the headliner");
+assert.ok(front.rendered.slice(1).every(function (r) { return r[1] === false; }), "nine regular stories");
+assert.strictEqual(front.spare, 2, "filler is computed from the 10 printed, not the 14 candidates");
+
+/* Refresh, Nationwide / International: applyRefreshedPosts stores 14 and re-renders -> 10 out. */
+var state = { byEdition: {} };
+var refreshed = null;
+var applyRefreshed = new Function("FeedStore", "editionId", "renderFeed", "setStatus", "feedStatus",
+  fnSource("applyRefreshedPosts") + "\nreturn applyRefreshedPosts;")(
+  { getState: function () { return state; }, save: function () {} }, "national",
+  function () { refreshed = printFeed(state.byEdition.national.posts); }, function () {}, null);
+applyRefreshed(fourteen("n"), "Live hot topics loaded.");
+assert.strictEqual(state.byEdition.national.posts.length, 14, "the stored plate itself is unchanged");
+assert.strictEqual(refreshed.rendered.length, 10, "refresh (Nationwide / International): 14 in, 10 out");
+
+/* Refresh, Statewide: refreshStatewidePlate prints directly -> 10 out. */
+var statewideOut = [];
+var refreshStatewide = new Function("hotTopicCursor", "postsFromTower", "feedList", "appendPostEl", "setEndlessUi", "bindEndlessObserver", "setStatus", "feedStatus", "endlessOn", "TIMES_SLOTS",
+  "var wirePage = 0;\n" + fnSource("refreshStatewidePlate") + "\nreturn refreshStatewidePlate;")(
+  {}, function () { return fourteen("s"); }, { innerHTML: "" }, function (p, o) { statewideOut.push([p.id, o.lead]); },
+  function () {}, function () {}, function () {}, null, false, 10);
+refreshStatewide();
+assert.strictEqual(statewideOut.length, 10, "refresh (Statewide): 14 in, 10 out");
+assert.strictEqual(statewideOut[0][1], true, "statewide refresh keeps a headliner");
+assert.ok(/posts\.slice\(0, TIMES_SLOTS\)\.forEach\(function \(post, idx\) \{\s*appendPostEl/.test(fnSource("refreshStatewidePlate")), "statewide refresh uses TIMES_SLOTS");
 console.log("times-comments-collapsed.test.js ok");

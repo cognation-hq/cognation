@@ -1663,7 +1663,7 @@
         "Papers matched to " + (t ? "\u201c" + t + "\u201d" : "the interests on your profile") + " show here once a research feed connects.",
         t ? "Matches your interest: " + t : "Add interests to your profile to tune this.");
     });
-    lanes[PRO.AUCTION] = [proPlaceholder(PRO.AUCTION, "pro-auction-weekly", "Weekly Cognation webinar + bot auction",
+    lanes[PRO.AUCTION] = [proPlaceholder(PRO.AUCTION, "pro-auction-weekly", "Weekly Cognation bot auction",
       "Each week Cognation hosts a webinar, then a bot auction on starter projects for sale.",
       "Weekly Cognation event. Same card for everyone 18+.", 18)];
     lanes[PRO.PODCAST] = PRO_PODCASTS.map(function (w) {

@@ -165,7 +165,8 @@ assert.ok(research.some(function (c) { return /public health/.test(c.title); }),
 assert.ok(proDeck.some(function (c) { return c.type === "pro-field" && /nursing/.test(c.title); }), "field update tied to field");
 assert.ok(proDeck.some(function (c) { return c.type === "pro-popculture" && /nursing/.test(c.title); }), "pop-culture tied to field");
 var auction = proDeck.filter(function (c) { return c.type === "pro-auction"; })[0];
-assert.ok(/webinar/i.test(auction.title) && /bot auction/i.test(auction.body) && /starter projects for sale/.test(auction.body), "weekly webinar + bot auction");
+assert.strictEqual(auction.title, "Weekly Cognation bot auction", "auction title has no \"webinar\" (PM 2026-10-20)");
+assert.ok(!/webinar/i.test(auction.title) && /bot auction/i.test(auction.body) && /starter projects for sale/.test(auction.body), "weekly bot auction");
 var podcasts = adult.buildProfessionalLanes()["pro-podcast"].map(function (c) { return c.title + " " + c.body; }).join(" ");
 assert.ok(/not only Cognation experts/.test(podcasts) && /Ethical/i.test(podcasts) && /async/i.test(podcasts) && /Continuing education/i.test(podcasts), "podcast topics");
 

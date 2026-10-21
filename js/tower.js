@@ -12185,6 +12185,15 @@
   function pinCircleSpotsToBackground(spots) {
     var layer = document.querySelector("[data-circle-fall][data-pulse-bg]");
     if (!layer) return false;
+    /* Phones: shrink the image so its strands (image x 58..1181, 576px right of the
+       ring centre) stay at least 8px inside the panel. Desktop keeps its CSS scale. */
+    var phone = window.matchMedia && window.matchMedia("(max-width: 600px)").matches;
+    layer.style.removeProperty("--pulse-bg-k");
+    if (phone && layer.clientWidth > 0) {
+      var cssK = parseFloat(getComputedStyle(layer).getPropertyValue("--pulse-bg-k")) || 0.31;
+      var fitK = (layer.clientWidth / 2 - 8) / 576;
+      if (fitK < cssK) layer.style.setProperty("--pulse-bg-k", fitK.toFixed(4));
+    }
     var k = parseFloat(getComputedStyle(layer).getPropertyValue("--pulse-bg-k")) || 0.954;
     var grow = Math.max(k, 0.55);
     for (var i = 0; i < spots.length; i++) {

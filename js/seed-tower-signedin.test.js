@@ -119,8 +119,8 @@ assert.ok(/select=id,kind,handle,display_name,user_id,account_kind,seed_fleet_id
 })();
 var swipe = src("js/commune-swipe.js");
 assert.ok(/userId: row\.user_id,\s*accountKind: String\(row\.account_kind \|\| ""\)\.toLowerCase\(\), seedFleetId: String\(row\.seed_fleet_id \|\| ""\)/.test(swipe), "professionals-you-might-know cards carry account fields");
-var badgeSrc = fnSource(src("js/seedops-badge.js"), "syncPeopleSearch");
-assert.ok(/CognationSupabaseSocial\.getProfile\(id\)/.test(badgeSrc), "people search badge reads the server profile row");
+var badgeSrc = fnSource(src("js/seedops-badge.js"), "peopleSearchRecord");
+assert.ok(/social\.getProfile\(id\)/.test(badgeSrc) && /peopleSearchRecord\(id, handle\)/.test(fnSource(src("js/seedops-badge.js"), "syncPeopleSearch")), "people search badge reads the server profile row");
 
 Promise.all([
   openTower(UUID.viewer, UUID.seed).then(function (r) {

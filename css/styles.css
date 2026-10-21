@@ -4400,6 +4400,13 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   min-width: 0;
 }
 
+/* Name + Demo pill on one line (seedops-badge.js badges seed / ops rows here). */
+.people-search-name-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .people-search-name {
   font-weight: 700;
   color: var(--color-heading);

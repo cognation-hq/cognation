@@ -90,26 +90,50 @@
     });
   }
 
+  /* Record for a search result: local registry, then the server profile cache
+     (account_kind / seed_fleet_id), by id then handle. */
+  function peopleSearchRecord(id, handle) {
+    var rec = null;
+    if (window.CognationAccounts) {
+      if (id) rec = window.CognationAccounts.getProfileById(id);
+      if (!rec && handle && window.CognationAccounts.getProfileByHandle) {
+        rec = window.CognationAccounts.getProfileByHandle(handle);
+      }
+    }
+    /* Signed in: server profile cache carries account_kind / seed_fleet_id. */
+    var social = window.CognationSupabaseSocial;
+    if (!rec && id && social && typeof social.getProfile === "function") {
+      var row = social.getProfile(id);
+      if (row && row.account_kind) rec = row;
+    }
+    if (!rec && handle && social && typeof social.getProfileForHandle === "function") {
+      var byHandle = social.getProfileForHandle(handle);
+      if (byHandle && byHandle.account_kind) rec = byHandle;
+    }
+    return rec;
+  }
+
   function syncPeopleSearch() {
     document.querySelectorAll("[data-people-search-results] li, .people-search-results li").forEach(function (li) {
       var id = li.getAttribute("data-profile-id") || li.getAttribute("data-friend-id") || "";
       var handle = li.getAttribute("data-handle") || "";
-      var rec = null;
-      if (window.CognationAccounts) {
-        if (id) rec = window.CognationAccounts.getProfileById(id);
-        if (!rec && handle && window.CognationAccounts.getProfileByHandle) {
-          rec = window.CognationAccounts.getProfileByHandle(handle);
-        }
-      }
-      /* Signed in: server profile cache carries account_kind / seed_fleet_id. */
-      if (!rec && id && window.CognationSupabaseSocial && typeof window.CognationSupabaseSocial.getProfile === "function") {
-        var row = window.CognationSupabaseSocial.getProfile(id);
-        if (row && row.account_kind) rec = row;
-      }
+      var rec = peopleSearchRecord(id, handle);
       if (!rec && (li.textContent || "").indexOf("seed-") >= 0) {
         rec = { accountKind: "seed", isSeed: true };
       }
       var host = li.querySelector("[data-seedops-badge-slot]") || li;
+      ensureBadge(host, rec);
+    });
+    /* people-search.js renders each result as button.people-search-row. Badge it
+       by the account's own field (account_kind), not by handle text. */
+    document.querySelectorAll("[data-people-search-results] .people-search-row, .people-search-results .people-search-row").forEach(function (row) {
+      if (row.tagName && String(row.tagName).toLowerCase() === "li") return;
+      var id = row.getAttribute("data-profile-id") || "";
+      var handle = String(row.getAttribute("data-result-handle") || "").replace(/^@/, "");
+      var rec = peopleSearchRecord(id, handle);
+      var kind = row.getAttribute("data-account-kind");
+      if (!rec && kind) rec = { accountKind: kind };
+      var host = row.querySelector("[data-seedops-badge-slot]") || row;
       ensureBadge(host, rec);
     });
   }
@@ -126,6 +150,7 @@
     ensureBadge: ensureBadge,
     syncAll: syncAll,
     syncTowerBadges: syncTowerBadges,
+    syncPeopleSearch: syncPeopleSearch,
   };
 
   function boot() {

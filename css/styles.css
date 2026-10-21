@@ -11830,8 +11830,11 @@ body.is-circle-open {
   padding-top: 0;
   overflow-y: auto;
 }
+/* The masthead line should meet this bar. Section padding plus a positive
+   margin left a dark band above TOWER · SIGNAL · ECHO · PULSE. */
 body.is-circle-open #main .tabs-section {
-  margin-top: 0.75rem;
+  margin-top: 0;
+  padding-top: 0;
 }
 body.is-circle-open .app-topbar {
   position: relative;

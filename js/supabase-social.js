@@ -48,14 +48,14 @@
     document.dispatchEvent(new CustomEvent(name, { detail: detail || {} }));
   }
 
-  /* "seed-" / "ops-" handles are SeedOps-only (js/handle-reserved.js). */
+  /* "seed-" / "seed_" / "ops-" / "ops_" handles are SeedOps-only (js/handle-reserved.js). */
   function reservedHandle(value) {
     var rules = window.CognationHandleRules;
-    return rules ? rules.isReserved(value) : /^(seed|ops)-/.test(normalizeHandle(value));
+    return rules ? rules.isReserved(value) : /^(seed|ops)[-_]/.test(normalizeHandle(value));
   }
   function reservedHandleMessage(noun) {
     var rules = window.CognationHandleRules;
-    return rules ? rules.message(noun) : noun + " can't start with \"seed-\" or \"ops-\". Please pick a different one.";
+    return rules ? rules.message(noun) : noun + " can't start with \"seed-\", \"seed_\", \"ops-\" or \"ops_\". Please pick a different one.";
   }
 
   function normalizeHandle(value) {

@@ -67,13 +67,14 @@ var rulesCtx = { window: {} };
 vm.createContext(rulesCtx);
 vm.runInContext(rulesSrc, rulesCtx);
 var R = rulesCtx.window.CognationHandleRules;
-["seed-sam", "SEED-sam", "Seed-0001", "@ops-mod", "  Ops-Wire ", "@@seed-x", "ops-"].forEach(function (h) {
+["seed-sam", "SEED-sam", "Seed-0001", "@ops-mod", "  Ops-Wire ", "@@seed-x", "ops-", "seed_sam", "SEED_sam", "@Ops_mod", " ops_ ", "Seed_0001"].forEach(function (h) {
   assert.strictEqual(R.isReserved(h), true, h + " is reserved");
 });
-["sam", "seeds", "seed", "seed_sam", "seedling", "sam-seed", "op-s", "opsy", "myops-x", "", null].forEach(function (h) {
+["sam", "seeds", "seed", "seedling", "sam-seed", "sam_seed", "seed.sam", "seeds_x", "op-s", "op_s", "opsy", "ops", "myops-x", "my_ops_x", "", null].forEach(function (h) {
   assert.strictEqual(R.isReserved(h), false, String(h) + " is allowed");
 });
-assert.ok(/can't start with "seed-" or "ops-"/.test(R.message("Usernames")) && /^Usernames /.test(R.message("Usernames")), "plain message");
+assert.strictEqual(R.message("Usernames"), "Usernames can't start with \"seed-\", \"seed_\", \"ops-\" or \"ops_\". Those are saved for Cognation's own accounts. Please pick a different one.", "exact signup copy");
+assert.strictEqual(R.message("Handles"), "Handles can't start with \"seed-\", \"seed_\", \"ops-\" or \"ops_\". Those are saved for Cognation's own accounts. Please pick a different one.", "exact handle-edit copy");
 
 /* ---- 2. signup ------------------------------------------------------------------ */
 function bootSignup(username) {
@@ -119,17 +120,20 @@ function bootSignup(username) {
 }
 
 var checks = [];
-["Seed-sam", "OPS-helper", "@seed-x"].forEach(function (name) {
+["Seed-sam", "OPS-helper", "@seed-x", "Seed_sam", "ops_helper"].forEach(function (name) {
   checks.push(bootSignup(name).then(function (r) {
     assert.deepStrictEqual(r.calls.slice(), [], name + ": signup stops before any request");
     assert.strictEqual(r.status.hidden, false, name + ": status shown");
     assert.ok(r.status.classList.contains("is-error"), name + ": status is an error");
-    assert.ok(/^Usernames can't start with "seed-" or "ops-"/.test(r.status.textContent), name + ": plain message (" + r.status.textContent + ")");
+    assert.ok(/^Usernames can't start with "seed-", "seed_", "ops-" or "ops_"\. /.test(r.status.textContent), name + ": plain message (" + r.status.textContent + ")");
     assert.strictEqual(r.user.getAttribute("aria-invalid"), "true", name + ": username field marked");
   }));
 });
 checks.push(bootSignup("sam-seed").then(function (r) {
   assert.strictEqual(r.calls.join(","), "checkEmailBlocked,signUp:sam-seed", "normal usernames still sign up");
+}));
+checks.push(bootSignup("seeds_fan").then(function (r) {
+  assert.strictEqual(r.calls.join(","), "checkEmailBlocked,signUp:seeds_fan", "seeds_ (not seed_) still signs up");
 }));
 
 /* ---- 3. Tower inline handle edit ------------------------------------------------ */
@@ -159,8 +163,11 @@ function bootInline(startHandle, typed) {
 var bad = bootInline("sam", "@Seed-sam");
 assert.strictEqual(bad.saved.length, 0, "inline edit to seed- is not saved");
 assert.strictEqual(bad.badge.textContent, "@sam", "badge reverts to the old handle");
-assert.ok(bad.status && /^Handles can't start with "seed-" or "ops-"/.test(bad.status.textContent), "plain message under the handle");
+assert.ok(bad.status && /^Handles can't start with "seed-", "seed_", "ops-" or "ops_"\. /.test(bad.status.textContent), "plain message under the handle");
 assert.strictEqual(bootInline("sam", "OPS-sam").saved.length, 0, "inline edit to ops- is not saved");
+assert.strictEqual(bootInline("sam", "Seed_sam").saved.length, 0, "inline edit to seed_ is not saved");
+assert.strictEqual(bootInline("sam", "@ops_sam").saved.length, 0, "inline edit to ops_ is not saved");
+assert.strictEqual(bootInline("sam", "sam_seed").saved.join(), "sam_seed", "underscore elsewhere still saves");
 var good = bootInline("sam", "sam-two");
 assert.strictEqual(good.saved.join(), "sam-two", "a normal handle still saves");
 assert.ok(!good.status, "no error for a normal handle");
@@ -191,7 +198,7 @@ function bootSocial(rowHandle) {
 }
 function rejects(p, label) {
   return p.then(function () { assert.fail(label + " should reject"); }, function (e) {
-    assert.ok(/can't start with "seed-" or "ops-"/.test(e.message), label + ": plain error (" + e.message + ")");
+    assert.ok(/can't start with "seed-", "seed_", "ops-" or "ops_"\. /.test(e.message), label + ": plain error (" + e.message + ")");
   });
 }
 (function () {
@@ -207,6 +214,14 @@ function rejects(p, label) {
   checks.push(s3.ctx.updateCurrentProfile({ handle: "seed-0001-sasha", displayName: "Sasha B" }).then(function () {
     assert.strictEqual(s3.sent.join(), "PATCH:", "a seed account keeping its handle can still save other fields");
   }));
+  var s5 = bootSocial("sam");
+  checks.push(rejects(s5.ctx.updateCurrentProfile({ handle: "SEED_sam" }), "PATCH to seed_").then(function () {
+    assert.strictEqual(s5.sent.length, 0, "no PATCH sent for seed_");
+  }));
+  var s6 = bootSocial("sam");
+  checks.push(rejects(s6.ctx.createProfessionalProfile({ handle: "ops_studio" }), "POST ops_ page").then(function () {
+    assert.strictEqual(s6.sent.length, 0, "no POST sent for ops_");
+  }));
   var s4 = bootSocial("sam");
   checks.push(s4.ctx.createProfessionalProfile({ handle: "sam-pro" }).then(function () {
     assert.strictEqual(s4.sent.join(), "POST:sam-pro", "normal professional page still created");
@@ -220,15 +235,87 @@ assert.ok(/<script src="js\/handle-reserved\.js" defer><\/script>/.test(src("ind
 });
 assert.ok(/handle: "seed-" \+ slugify\(name\) \+ "-" \+ nnn/.test(src("scripts/seedops-bind-auth.mjs")), "SeedOps still names seeds seed-…");
 
+/* Fallbacks (used only if js/handle-reserved.js failed to load) match the rule. */
+assert.ok(/\/\^\(seed\|ops\)\[-_\]\/\.test\(normalizeHandle\(next\)\)/.test(tower), "tower fallback pattern widened");
+assert.ok(/\/\^\(seed\|ops\)\[-_\]\/\.test\(normalizeHandle\(value\)\)/.test(social), "supabase-social fallback pattern widened");
+assert.ok(!/\(seed\|ops\)-\//.test(tower + social + rulesSrc), "no old seed-/ops- only pattern left on the client");
+
 /* ---- 6. server backstop SQL (written for Alexa to run; never run here) ----------- */
 var sqlPath = path.join(root, "supabase/migrations/20261020_reserved_handle_prefix.sql");
 assert.ok(fs.existsSync(sqlPath), "server SQL is in the PR");
 var sql = fs.readFileSync(sqlPath, "utf8");
 assert.ok(/NOT auto-run/.test(sql), "SQL says it is not auto-run");
-assert.ok(/before insert or update of handle on public\.profiles/.test(sql) && /new\.handle ~\* '\^\(seed\|ops\)-'/.test(sql), "profiles trigger, case-insensitive");
+assert.ok(/before insert or update of handle on public\.profiles/.test(sql) && /new\.handle ~\* '\^\(seed\|ops\)\[-_\]'/.test(sql), "profiles trigger, case-insensitive");
 assert.ok(/jwt_role not in \('anon', 'authenticated'\)/.test(sql), "only browser roles are blocked (service_role / postgres SeedOps paths pass)");
 assert.ok(/tg_op = 'INSERT' or new\.handle is distinct from old\.handle/.test(sql), "unchanged handles are not blocked");
-assert.ok(/session_user = 'supabase_auth_admin'/.test(sql) && /raw_app_meta_data ->> 'seedops'/.test(sql), "signup trigger exempts SeedOps admin creation");
+assert.ok(/supplied_handle ~\* '\^\(seed\|ops\)\[-_\]'\s+and session_user = 'supabase_auth_admin' then/.test(sql), "signup trigger blocks seed-/seed_/ops-/ops_ for supabase_auth_admin inserts");
+assert.ok(!/raw_app_meta_data/.test(sql), "no app_metadata.seedops exemption (bind-auth creates with a neutral handle instead)");
+assert.ok(!/\(seed\|ops\)-'/.test(sql), "no old seed-/ops- only pattern left in SQL");
+
+/* ---- 7. bind-auth: neutral handle on create, seed handle set by the service_role PATCH --- */
+checks.push(import(require("url").pathToFileURL(path.join(root, "scripts/seedops-bind-auth.mjs")).href).then(function (m) {
+  var realFetch = global.fetch;
+  function run(existingStatus, stampOk) {
+    var log = [];
+    global.fetch = function (url, init) {
+      var u = String(url).replace("https://example.invalid", "");
+      var body = init && init.body ? JSON.parse(init.body) : null;
+      log.push({ method: init.method, path: u.split("?")[0], query: u.split("?")[1] || "", body: body });
+      function res(status, json) { return Promise.resolve({ ok: status < 300, status: status, text: function () { return Promise.resolve(JSON.stringify(json)); } }); }
+      if (init.method === "GET" && /\/auth\/v1\/admin\/users\//.test(u)) return existingStatus === 200 ? res(200, { id: "x" }) : res(404, { code: 404 });
+      if (/\/auth\/v1\/admin\/users/.test(u)) return res(200, { id: "x" });
+      if (init.method === "GET" && /\/rest\/v1\/profiles/.test(u)) return res(200, [{ id: "prof-1" }]);
+      if (init.method === "PATCH" && /\/rest\/v1\/profiles/.test(u)) return stampOk ? res(200, [{ id: "prof-1" }]) : res(500, { message: "boom" });
+      return res(404, {});
+    };
+    return { log: log };
+  }
+  var seed = m.seedSpec(41), ops = m.opsSpec(m.OPS_BOTS[0]);
+  assert.ok(/^seed-[a-z]+-0042$/.test(seed.handle) && ops.handle === "ops-curator", "fleet handles unchanged");
+  [seed, ops].forEach(function (spec) {
+    var n = m.neutralAuthHandle(spec);
+    assert.ok(/^fleet_[0-9a-f]{12}$/.test(n), spec.fleetId + ": neutral handle shape (" + n + ")");
+    assert.strictEqual(R.isReserved(n), false, spec.fleetId + ": neutral handle is not reserved");
+  });
+  var seq = Promise.resolve();
+  [seed, ops].forEach(function (spec) {
+    seq = seq.then(function () {
+      var t = run(404, true);
+      return m.bindOne("https://example.invalid", "test-key", spec, "test-password-123", { createMissing: true }).then(function (r) {
+        var create = t.log.filter(function (c) { return c.method === "POST" && c.path === "/auth/v1/admin/users"; });
+        var patchIdx = t.log.findIndex(function (c) { return c.method === "PATCH" && c.path === "/rest/v1/profiles"; });
+        var createIdx = t.log.indexOf(create[0]);
+        assert.strictEqual(create.length, 1, spec.fleetId + ": creates the auth user once");
+        assert.strictEqual(create[0].body.user_metadata.handle, m.neutralAuthHandle(spec), spec.fleetId + ": created with the neutral handle");
+        assert.ok(!R.isReserved(create[0].body.user_metadata.handle), spec.fleetId + ": no reserved handle reaches the signup trigger");
+        assert.strictEqual(create[0].body.id, spec.userId, spec.fleetId + ": deterministic id kept");
+        assert.strictEqual(create[0].body.app_metadata.seed_fleet_id, spec.fleetId, spec.fleetId + ": seedops app_metadata kept");
+        assert.ok(patchIdx > createIdx, spec.fleetId + ": handle PATCH runs after the create");
+        assert.strictEqual(t.log[patchIdx].body.handle, spec.handle, spec.fleetId + ": PATCH sets the seed-/ops- handle");
+        assert.strictEqual(r.action, "created");
+        assert.strictEqual(r.ok, true, spec.fleetId + ": ok");
+      });
+    });
+  });
+  seq = seq.then(function () {
+    var t = run(200, true);
+    return m.bindOne("https://example.invalid", "test-key", seed, "test-password-123", { createMissing: true }).then(function (r) {
+      assert.ok(!t.log.some(function (c) { return c.method === "POST"; }), "existing user: no create");
+      assert.strictEqual(r.action, "updated");
+      assert.strictEqual(t.log.filter(function (c) { return c.method === "PATCH"; })[0].body.handle, seed.handle, "existing user: PATCH still sets the fleet handle");
+    });
+  }).then(function () {
+    run(404, false);
+    return m.bindOne("https://example.invalid", "test-key", seed, "test-password-123", { createMissing: true }).then(function (r) {
+      assert.strictEqual(r.ok, false, "a failed handle PATCH after create is reported as a failure");
+    });
+  });
+  return seq.then(function () { global.fetch = realFetch; }, function (e) { global.fetch = realFetch; throw e; });
+}));
+var bindSrc = src("scripts/seedops-bind-auth.mjs");
+assert.ok(/import\.meta\.url === pathToFileURL\(process\.argv\[1\]\)\.href/.test(bindSrc), "bind-auth runs main() only as a script");
+assert.ok(bindSrc.indexOf("authPayload(spec, password, neutralAuthHandle(spec))") > 0, "create path passes the neutral handle");
+
 assert.ok(/insert into public\.profiles \(user_id, kind, handle, display_name\)/.test(sql) && /'member_' \|\| replace/.test(sql), "signup trigger keeps its insert and member_ fallback");
 
 Promise.all(checks).then(function () { console.log("handle-reserved-prefix.test.js ok"); }, function (e) { console.error(e); process.exit(1); });

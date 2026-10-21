@@ -1,4 +1,4 @@
-/* Handles that start with "seed-" or "ops-" belong to Cognation's own SeedOps
+/* Handles that start with "seed-", "seed_", "ops-" or "ops_" belong to Cognation's own SeedOps
    accounts (fleet seeds and ops bots). Real members cannot pick them at signup
    or when they change a handle. SeedOps creates its accounts on the server
    (supabase/migrations/20261002_seedops_provision_wave.sql,
@@ -7,7 +7,7 @@
 (function (root) {
   "use strict";
 
-  var RESERVED = /^(seed|ops)-/;
+  var RESERVED = /^(seed|ops)[-_]/;
 
   function clean(raw) {
     return String(raw == null ? "" : raw).trim().replace(/^@+/, "").toLowerCase();
@@ -19,7 +19,7 @@
 
   function message(noun) {
     var word = noun || "Usernames";
-    return word + " can't start with \"seed-\" or \"ops-\". Those are saved for Cognation's own accounts. Please pick a different one.";
+    return word + " can't start with \"seed-\", \"seed_\", \"ops-\" or \"ops_\". Those are saved for Cognation's own accounts. Please pick a different one.";
   }
 
   root.CognationHandleRules = { isReserved: isReserved, message: message };

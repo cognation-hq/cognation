@@ -8750,15 +8750,15 @@
     TowerProfileStore.save(p);
   }
 
-  /* Real members cannot take a "seed-" / "ops-" handle (js/handle-reserved.js). */
+  /* Real members cannot take a "seed-" / "seed_" / "ops-" / "ops_" handle (js/handle-reserved.js). */
   function reservedHandleChange(next) {
     var rules = window.CognationHandleRules;
-    return rules ? rules.isReserved(next) : /^(seed|ops)-/.test(normalizeHandle(next));
+    return rules ? rules.isReserved(next) : /^(seed|ops)[-_]/.test(normalizeHandle(next));
   }
 
   function reservedHandleMessage() {
     var rules = window.CognationHandleRules;
-    return rules ? rules.message("Handles") : "Handles can't start with \"seed-\" or \"ops-\". Please pick a different one.";
+    return rules ? rules.message("Handles") : "Handles can't start with \"seed-\", \"seed_\", \"ops-\" or \"ops_\". Please pick a different one.";
   }
 
   /* Plain status line under the handle badge; reuses .commune-status styles. */

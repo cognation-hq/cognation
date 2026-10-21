@@ -4837,6 +4837,7 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 
 /* ===== TOWER avatar photo ornaments (above/below, not over face) ===== */
 .tower-avatar-stack {
+  --tower-name-size: 28px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -8872,19 +8873,22 @@ body.tower-messages-page [data-tower-follow-row],
   min-width: min-content;
   min-height: 0;
   width: max-content;
-  padding: 0.08rem 0.38rem;
+  padding: 0 0.32em;
   border-radius: 999px;
   border: 1px solid var(--color-accent);
   background: var(--color-accent);
   color: var(--color-navy);
   font: inherit;
-  font-size: 0.68rem;
-  font-weight: 700;
-  line-height: 1.15;
+  /* Stay a fraction of the display name so a short name is not under a large pill. */
+  font-size: max(8px, calc(var(--tower-name-size, 28px) * 0.3));
+  font-weight: 650;
+  line-height: 1;
   letter-spacing: 0;
   white-space: nowrap;
   cursor: pointer;
   box-shadow: none;
+  flex: 0 0 auto;
+  align-self: center;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 

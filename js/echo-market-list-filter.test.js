@@ -56,7 +56,7 @@ var template = { id: "seedops-tower-seed-0001-1", seedopsTower: true, isSeed: tr
 var serverSale = { id: "srv-sale-1", _remote: true, authorName: "Dana", handle: "dana", authorProfileId: "srv-real-1",
   body: "Blue mug for sale #market", createdAt: "2026-10-20T19:00:00.000Z", rating: "G" };
 var serverSeedSale = { id: "srv-seed-sale-1", _remote: true, seedopsTower: true, isSeed: true, authorName: "Sasha",
-  body: "Lamp, works #market", createdAt: "2026-10-20T17:00:00.000Z", rating: "G" };
+  body: "Lamp, works #market", createdAt: "2026-10-20T17:00:00.000Z", rating: "G", visibility: "public" }; /* signed out: public seed post (PM #209 ruling) */
 var plain = { id: "srv-plain-1", _remote: true, authorName: "Dana", body: "Market square this morning.", createdAt: "2026-10-20T16:00:00.000Z", rating: "G" };
 
 /* 1. Signed in, a remote store still holding a local template copy: Marketplace drops it. */

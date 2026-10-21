@@ -76,7 +76,12 @@ var memberPosts = [
   { id: "tp-dana-1", _remote: true, authorProfileId: "p-dana", authorName: "Dana", handle: "dana", accountKind: "real", body: "Private: back from the clinic.", createdAt: "2026-10-21T13:00:00.000Z", rating: "G" },
   { id: "tp-dana-2", _remote: true, authorProfileId: "p-dana", authorName: "Dana", handle: "dana", body: "Dinner at mine Friday.", createdAt: "2026-10-21T13:30:00.000Z", rating: "G" },
 ];
-var seedServer = { id: "tp-seed-0", _remote: true, isSeed: true, accountKind: "seed", seedFleetId: "seed-0002", authorName: "Sam", body: "Coffee?", createdAt: "2026-10-21T11:00:00.000Z", rating: "G" };
+var seedServer = { id: "tp-seed-0", _remote: true, isSeed: true, accountKind: "seed", seedFleetId: "seed-0002", authorName: "Sam", body: "Coffee?", createdAt: "2026-10-21T11:00:00.000Z", rating: "G", visibility: "public" };
+/* PM ruling on #209 (2026-10-21): a seed's / ops account's friends-only post is not part of the signed-out set. */
+var seedFriendsOnly = { id: "tp-seed-fo", _remote: true, isSeed: true, accountKind: "seed", seedFleetId: "seed-0004", authorName: "Rae", body: "Friends only: moving house.", createdAt: "2026-10-21T11:30:00.000Z", rating: "G", visibility: "friends" };
+var opsFriendsOnly = { id: "tp-ops-fo", _remote: true, isOpsBot: true, accountKind: "ops", authorName: "Ops", body: "Ops friends-only note.", createdAt: "2026-10-21T11:40:00.000Z", rating: "G", visibility: "friends" };
+var seedNoVis = { id: "tp-seed-nv", _remote: true, isSeed: true, accountKind: "seed", seedFleetId: "seed-0005", authorName: "Kai", body: "No visibility stored.", createdAt: "2026-10-21T11:50:00.000Z", rating: "G" };
+var opsPublic = { id: "tp-ops-pub", _remote: true, isOpsBot: true, accountKind: "ops", authorName: "Ops", body: "Ops public note.", createdAt: "2026-10-21T11:45:00.000Z", rating: "G", visibility: "public" };
 var template = { id: "seedops-tower-seed-0003-1", seedopsTower: true, isSeed: true, accountKind: "seed", seedFleetId: "seed-0003", authorName: "Lee", body: "Rain again.", createdAt: "2026-10-21T10:00:00.000Z", rating: "G" };
 
 var results = [];
@@ -140,6 +145,44 @@ async.push(["sign-out in the same tab re-hydrates immediately", function () {
     assert.ok(t.calls.indexOf("profiles") >= 0, "hydrate ran on sign-out");
     var list = ids(t.win.CognationTowerStore.list());
     assert.ok(list.indexOf("tp-seed-1") >= 0 && list.indexOf("tp-dana") < 0, "signed-out Feed: seed post back, member posts gone (" + list + ")");
+  });
+}]);
+
+/* 6. Seed / ops friends-only posts never linger signed out (same tab, store + overlay). */
+check("sign-out drops seed and ops friends-only posts; public seed/ops posts stay", function () {
+  var t = boot({ signedIn: true, sessionSeed: {} });
+  t.storage.setItem("cognation.seedops.tower.posts.v1", JSON.stringify({ version: 1, posts: [seedServer, seedFriendsOnly, template] }));
+  t.win.CognationTowerStore.setRemotePosts(memberPosts.concat([seedServer, seedFriendsOnly, opsFriendsOnly, opsPublic, seedNoVis]));
+  assert.ok(ids(t.win.CognationTowerStore.list()).indexOf("tp-seed-fo") >= 0, "signed in: the seed's friends-only post shows to a friend");
+  t.signOut();
+  assert.strictEqual(ids(t.win.CognationTowerStore.list()), "tp-ops-pub,tp-seed-0", "signed out: public seed/ops posts only");
+  var raw = String(t.storage.getItem(TOWER_KEY) || "");
+  assert.ok(raw.indexOf("tp-seed-fo") < 0 && raw.indexOf("moving house") < 0 && raw.indexOf("tp-ops-fo") < 0 && raw.indexOf("tp-seed-nv") < 0, "friends-only seed/ops posts gone from localStorage");
+  var ov = JSON.parse(t.storage.getItem("cognation.seedops.tower.posts.v1"));
+  assert.strictEqual(ids(ov.posts), "seedops-tower-seed-0003-1,tp-seed-0", "overlay keeps public seed rows + templates only");
+});
+
+/* 7. Reload with a stale store holding a seed friends-only post: hidden signed out. */
+check("reload: signed-out list() hides seed/ops friends-only posts, keeps public seed posts + templates", function () {
+  var ls = memoryStorage(); ls.setItem(TOWER_KEY, JSON.stringify({ version: 2, remote: true, posts: memberPosts.concat([seedServer, seedFriendsOnly, opsFriendsOnly, seedNoVis, template]) }));
+  var t = boot({ signedIn: false, localStorage: ls });
+  assert.strictEqual(ids(t.win.CognationTowerStore.list()), "seedops-tower-seed-0003-1,tp-seed-0");
+  var t2 = boot({ signedIn: true, localStorage: ls });
+  assert.ok(ids(t2.win.CognationTowerStore.list()).indexOf("tp-seed-fo") >= 0, "signed in: unchanged (server already decided who sees it)");
+});
+
+/* 8. Normal signed-out load unchanged: 40 public seed server posts + templates all show. */
+async.push(["normal signed-out load: all 40 public seed posts kept", function () {
+  var t = boot({ signedIn: false, sessionSeed: {} });
+  var rows = [];
+  for (var i = 0; i < 40; i++) rows.push({ id: "tp-pub-" + i, _remote: true, seeded: true, isSeed: true, seedFleetId: "seed-" + String(i + 1).padStart(4, "0"), authorName: "S" + i, body: "post " + i, createdAt: "2026-10-21T0" + (i % 10) + ":00:00.000Z", rating: "G", visibility: "public" });
+  t.win.CognationTowerStore.setRemotePosts(rows.concat([template]));
+  assert.strictEqual(t.win.CognationTowerStore.list().length, 41, "40 seed posts + the local template");
+  t.signOut();
+  assert.strictEqual(t.win.CognationTowerStore.list().length, 41, "sign-out drops none of them");
+  /* sign-out re-hydrates (anon read returns public rows): that seed post lands and shows */
+  return flush().then(flush).then(function () {
+    assert.ok(ids(t.win.CognationTowerStore.list()).indexOf("tp-seed-1") >= 0, "hydrated public seed post shows signed out");
   });
 }]);
 

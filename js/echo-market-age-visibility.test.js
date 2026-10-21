@@ -57,7 +57,7 @@ var posts = [
   { id: "g", authorName: "Sam", handle: "sam", body: "Blue mug for sale #market", createdAt: "2026-10-20T19:00:00.000Z", rating: "G" },
   { id: "r18", authorName: "Dana", handle: "dana", body: "Wine glasses, set of six, 18+ only #market", createdAt: "2026-10-20T18:00:00.000Z", rating: "R" },
   { id: "a21", authorName: "Lee", handle: "lee", body: "Homebrew beer kit, 21+ #market", createdAt: "2026-10-20T17:00:00.000Z", rating: "PG-13" },
-  { id: "srv-ma", _remote: true, isSeed: true, accountKind: "seed", seedFleetId: "seed-0042", authorName: "Rae", handle: "rae", authorProfileId: "srv-rae", body: "Vintage decanter set #market", createdAt: "2026-10-20T16:00:00.000Z", rating: "MA" },
+  { id: "srv-ma", _remote: true, isSeed: true, accountKind: "seed", seedFleetId: "seed-0042", authorName: "Rae", handle: "rae", authorProfileId: "srv-rae", body: "Vintage decanter set #market", createdAt: "2026-10-20T16:00:00.000Z", rating: "MA", visibility: "public" }, /* public seed post (PM #209 ruling) */
   { id: "seedops-tower-seed-0001-1", seedopsTower: true, isSeed: true, accountKind: "seed", authorName: "Jess", body: "Old bike, good tyres #market", createdAt: "2026-10-20T15:00:00.000Z", rating: "G" },
 ];
 function cardsFor(age) { return boot({ version: 2, posts: posts }, false, age).CognationCommuneSwipe.marketplaceCards(); }

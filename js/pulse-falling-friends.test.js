@@ -94,6 +94,56 @@ var rm = spec.slice(spec.indexOf("@media (prefers-reduced-motion: reduce)"));
 assert.ok(/a\.pulse-fall-circle \{ animation: none !important; transform: none !important; \}/.test(rm), "reduced motion: falling circles still");
 assert.ok(/::after \{ animation: none !important; transform: none !important; \}/.test(rm), "reduced motion: strands still");
 
+/* Designer r3: halo frame names sit below the photo (Oswald 12px, 11px on phones,
+   light shadow) and the band the circles avoid includes them. */
+var r3 = spec.slice(spec.indexOf("Halo frame names (Designer r3)"));
+var r3cap = r3.slice(0, r3.indexOf("}") + 1);
+assert.ok(/font-family: "Oswald"/.test(r3cap), "names in Oswald");
+assert.ok(/--pulse-name-px: 12px/.test(r3cap) && /font-size: calc\(var\(--pulse-name-px\) \/ var\(--pulse-spot-s, 1\)\)/.test(r3cap), "12px on screen, undoing the frame scale");
+assert.ok(/max-width: 600px\) \{\s*\.circle-fall\[data-pulse-bg\] \.circle-spot-caption \{ --pulse-name-px: 11px; \}/.test(r3), "11px on phones");
+assert.ok(/top: calc\(100% \+ 6px \/ var\(--pulse-spot-s, 1\)\)/.test(r3cap) && /transform: translateX\(-50%\);/.test(r3cap) && !/-0\.28em/.test(r3cap), "name fully below the photo (6px gap), no overlap");
+assert.ok(/text-shadow: 0 calc\(1px[^;]*rgba\(6, 10, 30, 0\.55\)/.test(r3cap), "light shadow");
+var towerSrc = fs.readFileSync(path.join(__dirname, "tower.js"), "utf8");
+assert.ok(/setProperty\("--pulse-spot-s", \(sq\.s \* grow\)\.toFixed\(3\)\)/.test(towerSrc), "frames publish their scale for the names");
+
+function styleStub() {
+  var st = { transform: "" , _p: {} };
+  st.setProperty = function (k, v) { this._p[k] = String(v); };
+  st.getPropertyValue = function (k) { return this._p[k] || ""; };
+  st.removeProperty = function (k) { delete this._p[k]; };
+  return st;
+}
+function phoneLayer(w, h, spots) {
+  var L = new El("div"); L.clientWidth = w; L.clientHeight = h; L.style = styleStub();
+  L.querySelectorAll = function () { return spots || []; };
+  return L;
+}
+global.getComputedStyle = function () { return { getPropertyValue: function (k) { return k === "--pulse-bg-k" ? "0.292" : ""; } }; };
+/* caption below the photo is part of the blocked band */
+var capEl = { offsetTop: 76, offsetHeight: 26 };
+var spotEl = { offsetHeight: 70.4, style: { transform: "translate(-50%, -50%) translate(3.5px,42.6px) scale(0.770)" }, querySelector: function () { return capEl; } };
+var bL = phoneLayer(390, 844, [spotEl]);
+var bb = api.blockedBand(bL);
+var cy0 = 844 * 0.48;
+assert.ok(Math.abs(bb.bottom - (cy0 + 42.6 - 70.4 * 0.77 / 2 + (76 + 26) * 0.77)) < 0.01, "band bottom = caption bottom (gap included), scaled with the frame");
+/* 390: group lifted to the vertical centre of the panel; circles stay below the halo */
+var cL = phoneLayer(390, 844, [spotEl]);
+api.render(cL, friends(30), { width: 390, height: 844, center: true, avoid: function () { return api.blockedBand(cL); } });
+var ry = cL.style.getPropertyValue("--pulse-ring-y");
+assert.ok(/^[\d.]+px$/.test(ry) && parseFloat(ry) < cy0, "390: ring lifted (" + ry + ")");
+var band2 = api.blockedBand(cL);
+var cs2 = circles(cL);
+var bottom2 = Math.max.apply(null, cs2.map(function (e) { return parseFloat(e.style.top) + parseFloat(e.style.width); }));
+assert.ok(cs2.every(function (e) { return parseFloat(e.style.top) >= band2.bottom; }), "390: circles clear of ring + frames after the lift");
+assert.ok(Math.abs(band2.top - (844 - bottom2)) <= 2, "390: top space " + band2.top.toFixed(1) + " ~ bottom space " + (844 - bottom2).toFixed(1));
+/* 1280: unchanged, ring stays at 48% */
+var dL = phoneLayer(1280, 900, []);
+dL.style.setProperty("--pulse-ring-y", "100px");
+api.render(dL, friends(30), { width: 1280, height: 900, center: true, avoid: function () { return api.blockedBand(dL); } });
+assert.strictEqual(dL.style.getPropertyValue("--pulse-ring-y"), "", "1280: no lift, ring at 48%");
+delete global.getComputedStyle;
+assert.ok(/top: var\(--pulse-ring-y, 48%\)/.test(cssAll) && /top: calc\(var\(--pulse-ring-y, 48%\) - 262px \* var\(--pulse-bg-k\)\)/.test(cssAll), "frames and image follow the lifted ring centre");
+
 /* Empty: quiet real empty */
 layer = new El("div");
 var stack = api.render(layer, [], {});

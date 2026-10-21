@@ -12341,6 +12341,8 @@
       if (!sq) continue;
       spots[i].style.transform = "translate(-50%, -50%) translate(" + (sq.x * k).toFixed(1) + "px," + (sq.y * k).toFixed(1) + "px) scale(" + (sq.s * grow).toFixed(3) + ")";
       spots[i].style.zIndex = String(Math.round(sq.s * 100));
+      /* names under the frames divide by this so they land at true screen px */
+      spots[i].style.setProperty("--pulse-spot-s", (sq.s * grow).toFixed(3));
     }
     return true;
   }

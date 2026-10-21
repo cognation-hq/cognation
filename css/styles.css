@@ -11915,7 +11915,7 @@ a.circle-fall-portrait {
 .circle-ring-spin {
   position: absolute;
   left: 50%;
-  top: 48%;
+  top: var(--pulse-ring-y, 48%);
   width: 0;
   height: 0;
 }
@@ -14446,7 +14446,7 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   position: absolute;
   /* ring centre in the image is (605, 262); pin it to the ring centre (50%, 48%) */
   left: calc(50% - 605px * var(--pulse-bg-k));
-  top: calc(48% - 262px * var(--pulse-bg-k));
+  top: calc(var(--pulse-ring-y, 48%) - 262px * var(--pulse-bg-k));
   width: var(--pulse-bg-w);
   height: var(--pulse-bg-h);
   background-image: url("../assets/pulse/pulse-bg-1190.jpg");
@@ -14542,14 +14542,14 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 @media (max-width: 600px) {
   .circle-fall[data-pulse-bg] {
     background:
-      radial-gradient(min(calc(786px * var(--pulse-bg-k)), calc(50vw - 16px)) calc(290px * var(--pulse-bg-k)) at 50% 48%, rgba(168, 244, 255, 0.16), transparent 100%),
-      radial-gradient(min(calc(786px * var(--pulse-bg-k)), calc(50vw - 16px)) calc(290px * var(--pulse-bg-k)) at 50% 48%, rgba(197, 166, 255, 0.2), transparent 100%),
+      radial-gradient(min(calc(786px * var(--pulse-bg-k)), calc(50vw - 16px)) calc(290px * var(--pulse-bg-k)) at 50% var(--pulse-ring-y, 48%), rgba(168, 244, 255, 0.16), transparent 100%),
+      radial-gradient(min(calc(786px * var(--pulse-bg-k)), calc(50vw - 16px)) calc(290px * var(--pulse-bg-k)) at 50% var(--pulse-ring-y, 48%), rgba(197, 166, 255, 0.2), transparent 100%),
       #1b1545;
   }
   .circle-fall[data-pulse-bg] .circle-ring::before {
     background:
-      radial-gradient(min(calc(786px * var(--pulse-bg-k)), calc(50vw - 16px)) calc(290px * var(--pulse-bg-k)) at 50% 48%, rgba(168, 244, 255, 0.16), transparent 100%),
-      radial-gradient(min(calc(786px * var(--pulse-bg-k)), calc(50vw - 16px)) calc(290px * var(--pulse-bg-k)) at 50% 48%, rgba(197, 166, 255, 0.2), transparent 100%);
+      radial-gradient(min(calc(786px * var(--pulse-bg-k)), calc(50vw - 16px)) calc(290px * var(--pulse-bg-k)) at 50% var(--pulse-ring-y, 48%), rgba(168, 244, 255, 0.16), transparent 100%),
+      radial-gradient(min(calc(786px * var(--pulse-bg-k)), calc(50vw - 16px)) calc(290px * var(--pulse-bg-k)) at 50% var(--pulse-ring-y, 48%), rgba(197, 166, 255, 0.2), transparent 100%);
   }
 }
 
@@ -14572,14 +14572,24 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   from { transform: translateY(0) scale(1); }
   to { transform: translateY(-3px) scale(1.06); }
 }
-/* Halo frame names: plain name under each frame, readable on the image. */
+/* Halo frame names (Designer r3): name only, Oswald 12px (11px on phones), set
+   fully below the photo with a 6px gap, light shadow so it reads on the halo.
+   Each frame is scaled (--pulse-spot-s, set in js/tower.js), so sizes are divided
+   by that scale to land at true screen px. */
 .circle-fall[data-pulse-bg] .circle-spot-caption {
-  font-size: 0.72rem;
-  text-shadow: 0 1px 3px rgba(6, 10, 30, 0.9);
+  --pulse-name-px: 12px;
+  top: calc(100% + 6px / var(--pulse-spot-s, 1));
+  transform: translateX(-50%);
+  font-family: "Oswald", system-ui, sans-serif;
+  font-size: calc(var(--pulse-name-px) / var(--pulse-spot-s, 1));
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  text-shadow: 0 calc(1px / var(--pulse-spot-s, 1)) calc(2px / var(--pulse-spot-s, 1)) rgba(6, 10, 30, 0.55);
 }
 @media (max-width: 600px) {
-  /* frames are scaled ~0.63 on phones; this lands the name near 11px */
-  .circle-fall[data-pulse-bg] .circle-spot-caption { font-size: 1.1rem; }
+  .circle-fall[data-pulse-bg] .circle-spot-caption { --pulse-name-px: 11px; }
   /* Strands drift visibly at 390 (live check: 0.2% of pixels changed in 4s vs
      0.7-0.8% at 1280). Phones loop through four drift points instead of easing
      back and forth, so no 4s stretch ever sits still at a turnaround. */

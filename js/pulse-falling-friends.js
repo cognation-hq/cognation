@@ -320,13 +320,42 @@
 
   function num(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
 
+  /* Ring centre (layer px): --pulse-ring-y when set (phones lift the group), else 48%. */
+  function ringY(layer, H) {
+    var v = "";
+    try { v = String(layer.style && layer.style.getPropertyValue ? layer.style.getPropertyValue("--pulse-ring-y") : "").trim(); } catch (e) {}
+    var px = /^(-?[\d.]+)px$/.exec(v);
+    return px ? num(px[1]) : H * 0.48;
+  }
+
+  /* Phones (Designer r3): lift the ring so the halo + falling circles group sits
+     vertically centred in the panel. Only lifts (never pushes the ring down), only
+     when every circle fits below the halo. Desktop keeps the ring at 48%. */
+  function centerGroup(layer, count, w, h, opts) {
+    if (!layer || !layer.style || !layer.style.removeProperty) return 0;
+    layer.style.removeProperty("--pulse-ring-y");
+    if (!(w > 0 && w <= 600) || !(h > 0) || !count) return 0;
+    var band = blockedBand(layer);
+    if (!band) return 0;
+    var L = layoutOutside(count, w, h, band, { topLimit: opts && opts.topLimit });
+    var bottom = band.bottom;
+    for (var i = 0; i < L.slots.length; i++) {
+      if (L.slots[i].y < band.top) return 0; /* circles above the halo: leave as is */
+      bottom = Math.max(bottom, L.slots[i].y + L.size);
+    }
+    var lift = band.top - (h - (bottom - band.top)) / 2;
+    if (!(lift > 1)) return 0;
+    layer.style.setProperty("--pulse-ring-y", (h * 0.48 - lift).toFixed(1) + "px");
+    return lift;
+  }
+
   /* Vertical band (layer px) covered by the ring image and the five frames + captions.
      Read from layout values (offset sizes + the pinned transform), so the ring's
      build animation (scale 0.82 -> 1) never skews the measurement. */
   function blockedBand(layer) {
     if (!layer) return null;
     var H = layer.clientHeight || 0;
-    var cy = H * 0.48;
+    var cy = ringY(layer, H);
     var k = 0;
     try { k = num(root.getComputedStyle(layer).getPropertyValue("--pulse-bg-k")); } catch (e) {}
     if (!k) k = 0.954;
@@ -341,9 +370,10 @@
       var half = (sp.offsetHeight || 0) * s / 2;
       var y = cy + num(m[2]);
       var cap = sp.querySelector ? sp.querySelector("[data-circle-caption]") : null;
-      var capH = cap ? (cap.offsetHeight || 0) * s : 0;
+      /* names sit below the photo (offsetTop includes the gap), scaled with the frame */
+      var capBottom = cap ? ((cap.offsetTop || sp.offsetHeight || 0) + (cap.offsetHeight || 0)) * s : 0;
       top = Math.min(top, y - half);
-      bottom = Math.max(bottom, y + half + capH);
+      bottom = Math.max(bottom, y + half, y - half + capBottom);
     }
     return { top: Math.max(0, top), bottom: Math.min(H, bottom) };
   }
@@ -403,6 +433,7 @@
     layer.setAttribute("data-circle-count", String(friends.length));
     if (!friends.length) {
       /* Quiet real empty: no circles, no demo friends, no filler copy. */
+      if (opts.center && layer.style && layer.style.removeProperty) layer.style.removeProperty("--pulse-ring-y");
       stack.setAttribute("data-pulse-empty", "");
       stack.setAttribute("aria-label", "No friends on PULSE yet");
       layer.insertBefore(stack, layer.firstChild);
@@ -413,6 +444,7 @@
     var vw = root && root.innerWidth ? root.innerWidth : 0;
     if (vw && (!w || vw < w)) w = vw; /* never wider than the screen */
     var h = opts.height || layer.clientHeight || 0;
+    if (opts.center) centerGroup(layer, friends.length, w, h, opts);
     var band = opts.band || (typeof opts.avoid === "function" ? opts.avoid() : null);
     var L = layoutOutside(friends.length, w, h, band, { topLimit: opts.topLimit });
     var inner = document.createElement("div");
@@ -492,7 +524,7 @@
 
   function placeFalling(layer, list, opts) {
     var o = Object.assign({}, opts);
-    if (!o.band && typeof o.avoid !== "function") o.avoid = function () { return blockedBand(layer); };
+    if (!o.band && typeof o.avoid !== "function") { o.avoid = function () { return blockedBand(layer); }; o.center = true; }
     return render(layer, list, o);
   }
 
@@ -531,6 +563,7 @@
     rank: rank,
     haloSpots: haloSpots,
     blockedBand: blockedBand,
+    centerGroup: centerGroup,
     layoutOutside: layoutOutside,
     render: render,
     letterFor: letterFor,

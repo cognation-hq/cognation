@@ -14535,3 +14535,12 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
       radial-gradient(min(calc(786px * var(--pulse-bg-k)), calc(50vw - 16px)) calc(290px * var(--pulse-bg-k)) at 50% 48%, rgba(197, 166, 255, 0.2), transparent 100%);
   }
 }
+
+/* COGNATION | WAYMAKERS switch is hidden (index.html `hidden`) until Waymakers has a
+   full design. .site-switch sets display: inline-flex, so honour [hidden] here.
+   Only the top-bar switch; the SIGNAL / ECHO pipe switches reuse .site-switch and stay. */
+.app-topbar-actions [data-site-switch][hidden] { display: none !important; }
+/* Without the switch the actions column can get narrower than "Log out" on phones;
+   keep the label on one line (it was one line with the switch). */
+.app-topbar-actions [data-site-switch][hidden] ~ .app-logout-btn { white-space: nowrap; }
+

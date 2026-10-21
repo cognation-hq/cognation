@@ -1081,6 +1081,9 @@
       article.setAttribute("data-news-post", "");
       article.setAttribute("data-post-id", postId);
       if (post.rating) article.setAttribute("data-news-rating", String(post.rating));
+      /* Insert before mounting comments: the Times "Comments" line attaches only to
+         stories already inside SIGNAL (news-comments.js wireTimesToggle). */
+      feedList.appendChild(article);
       try {
         if (window.CognationNewsComments && window.CognationNewsComments.mount) {
           window.CognationNewsComments.mount(article, { id: postId, rating: post.rating || "" });
@@ -1099,7 +1102,6 @@
           if (authorEl) window.CognationSeedOpsBadge.ensureBadge(authorEl, post);
         }
       } catch (eSeedRender) {}
-      feedList.appendChild(article);
     }
 
     function setEndlessUi(on) {

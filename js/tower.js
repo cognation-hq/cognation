@@ -3168,10 +3168,17 @@
     var p = TowerProfileStore.get();
     var owner = isTowerOwner(p);
     root.setAttribute("data-tower-is-owner", owner ? "true" : "false");
-    /* Your own Tower never shows Add friend / Message. */
+    /* Your own Tower never shows Add friend / Follow / Message: not the visitor
+       row, and not the "+ friend" / "+ follow" pill under your photo either
+       (Personal or Pro). Visitors never see that pill (CSS), so it stays as is. */
     if (owner) {
       root.querySelectorAll("[data-tower-follow-row]").forEach(function (row) { row.hidden = true; });
     }
+    root.querySelectorAll("[data-tower-add-friends]").forEach(function (el) {
+      el.hidden = owner;
+      if (owner) el.setAttribute("hidden", "");
+      else el.removeAttribute("hidden");
+    });
     if (!owner) {
       root.querySelectorAll("[contenteditable='true']").forEach(function (el) {
         el.removeAttribute("contenteditable");

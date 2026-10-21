@@ -14094,6 +14094,8 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   text-align: center;
 }
 #panel-tower [data-tower-is-owner="false"] [data-tower-add-friends] { display: none !important; }
+/* Your own Tower: no "+ friend" / "+ follow" pill under your photo. */
+[data-tower-app][data-tower-is-owner="true"] [data-tower-add-friends] { display: none !important; }
 #panel-tower [data-tower-private-calendar],
 #panel-tower [data-tower-private-messages],
 #panel-tower [data-tower-public-look] { display: none !important; }

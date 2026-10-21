@@ -760,6 +760,13 @@
       });
   }
 
+  /* Sign-out: forget the member's Feed held in memory (shared devices). The
+     Tower store copy is cleared by tower.js on the same event. */
+  document.addEventListener("cognation:session-ended", function () {
+    if (active()) return;
+    state.feed = [];
+  });
+
   var sawSessionStart = false;
   document.addEventListener("cognation:session-started", function () {
     sawSessionStart = true;

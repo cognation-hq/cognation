@@ -338,7 +338,6 @@
                   </div>
                   <div class="tower-live-share">
                     <button type="button" data-live-share-signal aria-pressed="false">Share to Signal</button>
-                    <button type="button" data-live-share-echo aria-pressed="false">Share to Echo</button>
                   </div>
                 </div>
                 <div class="tower-live-session" data-live-session></div>
@@ -519,11 +518,20 @@
                         <button type="button" class="tower-follow-btn" data-tower-add-friends aria-label="Add this person as a friend">+ friend</button>
                         <p class="tower-mutual-friends" data-tower-mutual-friends>Mutual friends</p>
                         <button type="button" class="tower-go-live-btn" data-go-live aria-label="Go live">Go live</button>
+                        <p class="tower-golive-status" data-classroom-golive-status role="status" aria-live="polite" hidden></p>
                         <div class="tower-sticker tower-sticker--envelope" data-tower-widget="envelope" data-sticker-label="Messages">
                           <a class="tower-envelope-btn" href="messages.html" data-tower-envelope draggable="false" aria-label="Messages">✉</a>
                         </div>
                       </div>
                       </div>
+                      <section class="tower-visitor-calendar" data-tower-visitor-calendar hidden aria-label="Calendar">
+                        <h4 class="tower-cal-public-title">Calendar</h4>
+                        <div class="tower-visitor-sessions" data-tower-visitor-sessions hidden></div>
+                        <div class="tower-cal tower-cal--public" data-tower-cal-visitor data-calendar-busy="true">
+                          <div data-tower-cal-visitor-body></div>
+                        </div>
+                        <a class="tower-visitor-cal-link" href="/calendar.html">Cognation Calendar ›</a>
+                      </section>
                       <div class="tower-profile-edit" data-tower-profile-edit>
                         <button type="button" class="btn btn-secondary tower-edit-profile-btn" data-tower-edit-profile aria-expanded="false" aria-haspopup="true" aria-controls="tower-profile-edit-panel">
                           Edit profile
@@ -607,6 +615,10 @@
                               <div data-tower-cal-public-body></div>
                             </div>
                           </div>
+                        </details>
+                        <details class="tower-edit-entry" data-tower-edit-sessions hidden>
+                          <summary>Classroom sessions</summary>
+                          <div class="tower-sessions-owner" data-tower-sessions-owner></div>
                         </details>
                         <button type="button" class="btn btn-secondary" data-tower-open-events>Events</button>
                         <a class="btn btn-secondary" href="/blocked.html">Block list</a>
@@ -1320,6 +1332,8 @@
   <script src="js/commune-messages.js" defer></script>
   <script src="js/dating-flag.js" defer></script>
   <script src="js/echo-group.js" defer></script>
+  <script src="js/classroom-sessions.js" defer></script>
+  <script src="js/tower-classroom-sessions.js" defer></script>
   <script src="js/commune-swipe.js" defer></script>
   <script src="js/seedops-commune-alive.js" defer></script>
   <script src="js/seedops-dating-hydrate.js" defer></script>

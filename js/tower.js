@@ -7254,6 +7254,19 @@
       "</li>";
   }
 
+  /* Visitor day heading: "Tue, Oct 20" (Cognation Calendar format); "Busy · " only
+     when that day really has a (busy-only) event. */
+  function visitorDayHeading(events, iso) {
+    var api = window.CognationClassroomSessions;
+    var label = api && typeof api.dayDateLabel === "function"
+      ? api.dayDateLabel(iso)
+      : (function () {
+          var d = new Date(String(iso) + "T12:00:00");
+          return isNaN(d.getTime()) ? String(iso || "") : d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+        })();
+    return (eventsForDate(events || [], iso).length ? "Busy · " : "") + label;
+  }
+
   /* Visitor Calendar (restored from #158): busy blocks only for personal events
      (busyBlocksOnly), plus this host's public Classroom / Webinar sessions. */
   function renderVisitorCalendar(root) {
@@ -7271,7 +7284,7 @@
     if (body) {
       body.innerHTML =
         renderTowerMonthGrid(view, events, { gridLabel: "Calendar" }) +
-        '<div class="tower-cal-day-panel"><h5 class="tower-cal-day-heading">Busy · ' + escapeHtml(view.selected) + "</h5>" +
+        '<div class="tower-cal-day-panel"><h5 class="tower-cal-day-heading">' + escapeHtml(visitorDayHeading(events, view.selected)) + "</h5>" +
         renderDayEventList(events, view.selected, { ownerControls: false, busyOnly: true }) + "</div>";
     }
     var sessionsBox = box.querySelector("[data-tower-visitor-sessions]");

@@ -264,12 +264,92 @@ function loadAll(opts) {
   ["classroom sessions public read", "classroom sessions host reads own", "classroom sessions host books", "classroom sessions host updates"].forEach(function (n) {
     assert.ok(sql.indexOf('create policy "' + n + '"') !== -1, "policy " + n);
   });
-  assert.ok(/status in \('scheduled', 'live'\)/.test(sql), "public read: scheduled + live");
+  assert.ok(/cognation_classroom_session_status\(status, ends_at\) in \('scheduled', 'live'\)/.test(sql), "public read: scheduled + live (stale live counts as ended)");
   assert.ok(/with check \(status = 'scheduled' and public\.cognation_owns_pro_profile/.test(sql), "book as scheduled, own Pro page only");
   assert.ok(/p\.kind = 'professional'/.test(sql) && /classroom_session_already_live/.test(sql), "go-live: Professional page, one at a time");
   assert.ok(!/calendar_events|calendarEvents/.test(sql), "personal events are not in the table");
   var css = src("css/styles.css");
   var tail = css.slice(css.indexOf("Classroom sessions + public Cognation Calendar"));
   assert.ok(!/#ED9300|yellow/i.test(tail), "no yellow / amber in the new styles");
+
+  /* ---- Designer nits (#194): visitor day heading + live card JOIN spacing -------- */
+  var tsrc = src("js/tower.js");
+  function sliceFn(name) {
+    var i = tsrc.indexOf("function " + name + "(");
+    assert.ok(i !== -1, name + " exists");
+    var depth = 0, j = tsrc.indexOf("{", i);
+    for (var k = j; k < tsrc.length; k++) {
+      if (tsrc[k] === "{") depth++;
+      else if (tsrc[k] === "}" && --depth === 0) return tsrc.slice(i, k + 1);
+    }
+  }
+  var csApi = { dayDateLabel: function (key) {
+    var d = new Date(String(key) + "T12:00:00");
+    return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  } };
+  var headingBox = { window: { CognationClassroomSessions: csApi } };
+  vm.runInNewContext(sliceFn("eventsForDate") + "\n" + sliceFn("visitorDayHeading") + "\nthis.h = visitorDayHeading;", headingBox);
+  var oct20 = csApi.dayDateLabel("2026-10-20");
+  assert.strictEqual(oct20, "Tue, Oct 20", "Cognation Calendar date format");
+  assert.strictEqual(headingBox.h([], "2026-10-20"), "Tue, Oct 20", "no event: no Busy, readable date");
+  assert.strictEqual(headingBox.h([{ date: "2026-10-21", busy: true }], "2026-10-20"), "Tue, Oct 20", "event on another day: no Busy");
+  assert.strictEqual(headingBox.h([{ date: "2026-10-20", busy: true }], "2026-10-20"), "Busy · Tue, Oct 20", "event that day: Busy");
+  assert.ok(!/2026-10-20/.test(headingBox.h([{ date: "2026-10-20" }], "2026-10-20")), "never the raw ISO date");
+  headingBox.window.CognationClassroomSessions = null;
+  assert.strictEqual(headingBox.h([], "2026-10-20"), "Tue, Oct 20", "same format without the sessions module");
+  var visSrc = sliceFn("renderVisitorCalendar");
+  assert.ok(/visitorDayHeading\(events, view\.selected\)/.test(visSrc) && !/"Busy · " \+ escapeHtml\(view\.selected\)/.test(visSrc), "visitor heading uses the helper");
+  var realCs = loadAll({});
+  assert.strictEqual(realCs.api.dayDateLabel("2026-10-20"), "Tue, Oct 20", "shared helper in classroom-sessions.js");
+  var joinRule = tail.match(/\.commune-card--live-session \.commune-live-join \{[^}]*\}/);
+  assert.ok(joinRule && /margin-top: 8px !important/.test(joinRule[0]) && !/margin-top: auto/.test(joinRule[0]), "JOIN sits 8px margin + 8px gap (~16px) under Open seats");
+  assert.ok(/\.commune-card--live-session \{[^}]*gap: 0\.5rem/.test(tail), "card gap .5rem");
+  assert.ok(/\.commune-card--live-session \.commune-live-foot \{ margin-top: auto !important; \}/.test(tail), "spare space goes above the foot line, not above JOIN");
+
+  /* ---- PM SQL ruling (#194): auto-stop, go-live window, time lock ---------------- */
+  var sql2 = src("supabase/migrations/20261020_classroom_sessions.sql");
+  var flat = sql2.replace(/--[^\n]*/g, "").replace(/\s+/g, " ");
+  // (a) 60-minute auto-stop is real in the DB, no cron.
+  assert.ok(/create or replace function public\.cognation_classroom_session_status\(p_status text, p_ends_at timestamptz\)/.test(flat), "(a) effective-status helper");
+  assert.ok(/when p_status = 'live' and now\(\) > p_ends_at \+ interval '60 minutes' then 'ended'/.test(flat), "(a) live + now() > ends_at + 60 min counts as ended");
+  var readPol = flat.slice(flat.indexOf('create policy "classroom sessions public read"'), flat.indexOf('drop policy if exists "classroom sessions host reads own"'));
+  assert.ok(/using \( public\.cognation_classroom_session_status\(status, ends_at\) in \('scheduled', 'live'\)/.test(readPol), "(a) public read treats stale live as ended");
+  assert.ok(!/using \( status in/.test(readPol), "(a) public read no longer trusts raw status");
+  var guard = flat.slice(flat.indexOf("create or replace function public.classroom_sessions_guard()"), flat.indexOf("drop trigger if exists classroom_sessions_guard"));
+  assert.ok(/update public\.classroom_sessions s set status = 'ended' where s\.host_profile_id = new\.host_profile_id and s\.status = 'live' and s\.id <> new\.id and now\(\) > s\.ends_at \+ interval '60 minutes';/.test(guard), "(a) go live first ends this host's stale live rows");
+  var endIdx = guard.indexOf("set status = 'ended'"), liveIdx = guard.indexOf("classroom_session_already_live");
+  assert.ok(endIdx !== -1 && endIdx < liveIdx, "(a) stale rows ended before the one-live check");
+  assert.ok(/public\.cognation_classroom_session_status\(s\.status, s\.ends_at\) = 'live' \) then raise exception 'classroom_session_already_live'/.test(guard), "(a) one-live-per-host ignores stale rows");
+  assert.ok(!/cron|pg_cron|schedule\(/i.test(flat), "(a) no cron or scheduler");
+  // (b) go-live window.
+  assert.ok(/if now\(\) < new\.starts_at - interval '30 minutes' or now\(\) > new\.ends_at then raise exception 'classroom_session_outside_window';/.test(guard), "(b) scheduled -> live only 30 min before start through end");
+  assert.ok(guard.indexOf("classroom_session_outside_window") > guard.indexOf("if new.status = 'live' and (tg_op = 'INSERT' or old.status <> 'live')"), "(b) window applies on the move to live");
+  // (c) times lock.
+  assert.ok(/if \(old\.status <> 'scheduled' or new\.status <> 'scheduled'\) and \(new\.starts_at <> old\.starts_at or new\.ends_at <> old\.ends_at\) then raise exception 'classroom_session_times_locked';/.test(guard), "(c) starts_at / ends_at locked once not scheduled");
+  // Client mirrors the same rules.
+  var cl = loadAll({}).api;
+  var T0 = Date.UTC(2026, 9, 21, 15, 0);
+  var P1 = "11111111-2222-4333-8444-555555555555";
+  var sch = { id: "s1", hostProfileId: P1, status: "scheduled", startsAt: T0, endsAt: T0 + 3600000 };
+  assert.strictEqual(cl.GO_LIVE_EARLY_MS, 30 * 60000);
+  assert.ok(!cl.withinGoLiveWindow(sch, T0 - 31 * 60000), "(b) client: 31 min early is closed");
+  assert.ok(cl.withinGoLiveWindow(sch, T0 - 30 * 60000), "(b) client: 30 min early opens");
+  assert.ok(cl.withinGoLiveWindow(sch, T0 + 3600000), "(b) client: open through ends_at");
+  assert.ok(!cl.withinGoLiveWindow(sch, T0 + 3600001), "(b) client: closed after ends_at");
+  assert.strictEqual(cl.sessionToGoLive([sch], T0 + 3600001), null, "(b) client: Go live won't pick a session past its end");
+  var liveRow = { id: "s0", hostProfileId: P1, status: "live", startsAt: T0 - 3 * 3600000, endsAt: T0 - 2 * 3600000 };
+  assert.strictEqual(cl.effectiveStatus(liveRow, T0 - 2 * 3600000 + 59 * 60000), "live", "(a) client: inside 60 min still live");
+  assert.strictEqual(cl.effectiveStatus(liveRow, T0), "ended", "(a) client: past ends_at + 60 min is ended");
+  var ownerView = { userId: "u1", signedIn: true };
+  var proPage = { id: P1, kind: "professional", userId: "u1", user_id: "u1" };
+  assert.ok(cl.ownsProPage(ownerView, proPage), "fixture owner owns the Pro page");
+  {
+    assert.ok(cl.canGoLive(ownerView, proPage, sch, [liveRow], T0), "(a) client: stale live row does not block Go live");
+    assert.ok(!cl.canGoLive(ownerView, proPage, sch, [Object.assign({}, liveRow, { endsAt: T0 + 600000 })], T0), "(a) client: a real live row blocks");
+    assert.ok(!cl.canGoLive(ownerView, proPage, sch, [], T0 - 45 * 60000), "(b) client: too early");
+  }
+  var clSrc = src("js/classroom-sessions.js");
+  assert.ok(/body: \{ status: status \}/.test(clSrc), "(c) client never patches times on a status change");
+  assert.ok(/outside_window/.test(clSrc) && /times_locked/.test(clSrc), "server errors mapped to plain messages");
   console.log("classroom-sessions ok");
 })().catch(function (e) { console.error(e); process.exit(1); });

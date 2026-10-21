@@ -17,9 +17,13 @@
 --      - Hosts related by a block (either way) are hidden.
 --      - Rating floor: under-13 viewers see G / PG only (cognation_viewer_can_see).
 --   3. Helper public.cognation_owns_pro_profile(uuid): caller owns that Professional page.
+--      Helper public.cognation_classroom_session_status(text, timestamptz): the effective status.
+--      60-minute auto-stop, no cron or scheduler: a row with status 'live' and
+--      now() > ends_at + 60 minutes counts as 'ended' everywhere (read policy + trigger).
 --   4. Policies on classroom_sessions:
 --      - "classroom sessions public read"   (select, anon + authenticated): scheduled or live rows
---        that pass the visibility helper. Ended rows are not public.
+--        that pass the visibility helper. Ended rows are not public, and a stale live row
+--        (now() > ends_at + 60 min) counts as ended, so it is never exposed as live.
 --      - "classroom sessions host reads own" (select, authenticated): the host reads all of their rows.
 --      - "classroom sessions host books"     (insert, authenticated): only for a Professional page the
 --        caller owns, and only as status 'scheduled'.
@@ -30,18 +34,27 @@
 --      - host_profile_id and created_at never change after booking.
 --      - Status only moves forward: scheduled -> live, scheduled -> ended, live -> ended.
 --      - Go live only on a Professional page, and one live session per host at a time.
+--        Stale live rows (now() > ends_at + 60 min) do not count toward that limit, and
+--        going live first sets that host's stale live rows to 'ended'.
+--      - scheduled -> live only from 30 minutes before starts_at through ends_at
+--        (classroom_session_outside_window).
+--      - starts_at and ends_at are locked once the row is not 'scheduled', including in the
+--        same update that moves it off 'scheduled' (classroom_session_times_locked).
 --
 -- VERIFY AFTER
 --   select has_table_privilege('anon','public.classroom_sessions','select');   -- true
 --   select has_table_privilege('anon','public.classroom_sessions','insert');   -- false
 --   select count(*) from pg_policies where tablename = 'classroom_sessions';  -- 4
 --   select has_function_privilege('anon','public.cognation_classroom_session_visible(uuid,text)','execute'); -- true
+--   select public.cognation_classroom_session_status('live', now() - interval '61 minutes');  -- ended
+--   select public.cognation_classroom_session_status('live', now() - interval '59 minutes');  -- live
 --
 -- ROLLBACK
 --   drop table if exists public.classroom_sessions;   -- drops its policies and trigger
 --   drop function if exists public.classroom_sessions_guard();
 --   drop function if exists public.cognation_classroom_session_visible(uuid, text);
 --   drop function if exists public.cognation_owns_pro_profile(uuid);
+--   drop function if exists public.cognation_classroom_session_status(text, timestamptz);
 
 -- 1. Table ---------------------------------------------------------------------
 create table if not exists public.classroom_sessions (
@@ -121,12 +134,29 @@ $$;
 revoke all on function public.cognation_owns_pro_profile(uuid) from public, anon;
 grant execute on function public.cognation_owns_pro_profile(uuid) to authenticated;
 
+-- 3b. Effective status (60-minute auto-stop, evaluated at read / write time) -------
+-- A 'live' row whose ends_at is more than 60 minutes ago counts as 'ended'. Nothing has to
+-- run on a timer: the read policy and the guard trigger both go through this helper.
+create or replace function public.cognation_classroom_session_status(p_status text, p_ends_at timestamptz)
+returns text
+language sql
+stable
+set search_path = public
+as $$
+  select case
+    when p_status = 'live' and now() > p_ends_at + interval '60 minutes' then 'ended'
+    else p_status
+  end;
+$$;
+revoke all on function public.cognation_classroom_session_status(text, timestamptz) from public;
+grant execute on function public.cognation_classroom_session_status(text, timestamptz) to anon, authenticated;
+
 -- 4. Policies -------------------------------------------------------------------
 drop policy if exists "classroom sessions public read" on public.classroom_sessions;
 create policy "classroom sessions public read"
 on public.classroom_sessions for select to anon, authenticated
 using (
-  status in ('scheduled', 'live')
+  public.cognation_classroom_session_status(status, ends_at) in ('scheduled', 'live')
   and public.cognation_classroom_session_visible(host_profile_id, rating)
 );
 
@@ -157,6 +187,11 @@ begin
     if new.host_profile_id <> old.host_profile_id or new.created_at <> old.created_at then
       raise exception 'classroom_session_locked';
     end if;
+    -- Times are locked once the row is not 'scheduled' (also when this update moves it off).
+    if (old.status <> 'scheduled' or new.status <> 'scheduled')
+       and (new.starts_at <> old.starts_at or new.ends_at <> old.ends_at) then
+      raise exception 'classroom_session_times_locked';
+    end if;
     if new.status <> old.status and not (
       (old.status = 'scheduled' and new.status in ('live', 'ended'))
       or (old.status = 'live' and new.status = 'ended')
@@ -168,9 +203,22 @@ begin
     if not exists (select 1 from public.profiles p where p.id = new.host_profile_id and p.kind = 'professional') then
       raise exception 'classroom_session_not_professional';
     end if;
+    -- Go live window: 30 minutes before starts_at through ends_at.
+    if now() < new.starts_at - interval '30 minutes' or now() > new.ends_at then
+      raise exception 'classroom_session_outside_window';
+    end if;
+    -- 60-minute auto-stop: end this host's stale live rows first (live -> ended is allowed,
+    -- times are untouched), then count only live rows that are not stale.
+    update public.classroom_sessions s
+       set status = 'ended'
+     where s.host_profile_id = new.host_profile_id
+       and s.status = 'live'
+       and s.id <> new.id
+       and now() > s.ends_at + interval '60 minutes';
     if exists (
       select 1 from public.classroom_sessions s
-      where s.host_profile_id = new.host_profile_id and s.status = 'live' and s.id <> new.id
+      where s.host_profile_id = new.host_profile_id and s.id <> new.id
+        and public.cognation_classroom_session_status(s.status, s.ends_at) = 'live'
     ) then
       raise exception 'classroom_session_already_live';
     end if;
@@ -185,4 +233,4 @@ before insert or update on public.classroom_sessions
 for each row execute function public.classroom_sessions_guard();
 
 comment on table public.classroom_sessions is
-  'Classroom / Webinar sessions booked from Professional pages. Public read: scheduled + live only. Personal calendar events never live here.';
+  'Classroom / Webinar sessions booked from Professional pages. Public read: scheduled + live only (a live row more than 60 minutes past ends_at counts as ended). Personal calendar events never live here.';

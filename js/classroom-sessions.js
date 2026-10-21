@@ -23,6 +23,8 @@
   /* A live row whose host never pressed End stops counting as live this long after
      its booked end time, so a forgotten session can't sit on ECHO forever. */
   var LIVE_GRACE_MS = 60 * 60 * 1000;
+  /* Mirrors classroom_sessions_guard: scheduled -> live only from 30 min before starts_at through ends_at. */
+  var GO_LIVE_EARLY_MS = 30 * 60 * 1000;
   var REFRESH_MS = 60 * 1000;
   var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   var HOST_COLUMNS = "id,handle,display_name,kind,account_kind,photo_url,user_id";
@@ -110,6 +112,19 @@
     return t < s.endsAt + LIVE_GRACE_MS;
   }
 
+  /* Mirrors cognation_classroom_session_status: a live row more than 60 min past ends_at is ended. */
+  function effectiveStatus(s, at) {
+    if (!s) return "";
+    if (s.status === "live" && !isLiveNow(s, at)) return "ended";
+    return s.status;
+  }
+
+  function withinGoLiveWindow(s, at) {
+    if (!s) return false;
+    var t = at == null ? now() : at;
+    return t >= s.startsAt - GO_LIVE_EARLY_MS && t <= s.endsAt;
+  }
+
   function isUpcoming(s, at) {
     if (!s || s.status !== "scheduled") return false;
     var t = at == null ? now() : at;
@@ -175,6 +190,13 @@
     return d.getFullYear() + "-" + (m < 10 ? "0" : "") + m + "-" + (day < 10 ? "0" : "") + day;
   }
 
+  /** "YYYY-MM-DD" -> "Tue, Oct 20" (the Cognation Calendar date format). */
+  function dayDateLabel(key) {
+    var d = new Date(String(key) + "T12:00:00");
+    if (isNaN(d.getTime())) return String(key || "");
+    return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  }
+
   /** Group agenda rows by local day: [{ key, label, date, rows }]. */
   function groupByDay(rows, at) {
     at = at == null ? now() : at;
@@ -189,7 +211,7 @@
         var label = key === today ? "Today" : key === tomorrow ? "Tomorrow"
           : d.toLocaleDateString(undefined, { weekday: "long" });
         var date = key === today || key === tomorrow
-          ? d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
+          ? dayDateLabel(key)
           : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
         index[key] = { key: key, label: label, date: date, rows: [] };
         out.push(index[key]);
@@ -224,10 +246,12 @@
     return !!owner && owner === viewer.userId && UUID_RE.test(String(profile.id || ""));
   }
   function canSchedule(viewer, profile) { return ownsProPage(viewer, profile); }
-  function canGoLive(viewer, profile, s, rows) {
+  function canGoLive(viewer, profile, s, rows, at) {
     if (!ownsProPage(viewer, profile) || !s || s.status !== "scheduled") return false;
     if (s.hostProfileId !== String(profile.id)) return false;
-    return !(rows || []).some(function (r) { return r && r.hostProfileId === s.hostProfileId && r.status === "live" && r.id !== s.id; });
+    if (!withinGoLiveWindow(s, at)) return false;
+    /* Stale live rows (past ends_at + 60 min) do not block; the server ends them first. */
+    return !(rows || []).some(function (r) { return r && r.hostProfileId === s.hostProfileId && r.id !== s.id && effectiveStatus(r, at) === "live"; });
   }
   function canEnd(viewer, profile, s) {
     return !!(ownsProPage(viewer, profile) && s && s.status === "live" && s.hostProfileId === String(profile.id));
@@ -386,6 +410,8 @@
     }, function (err) {
       var msg = String((err && err.message) || "");
       if (/already_live/.test(msg)) throw new Error("You already have a live session. End it first.");
+      if (/outside_window/.test(msg)) throw new Error("Go live opens 30 minutes before the session starts.");
+      if (/times_locked/.test(msg)) throw new Error("Times can't change once a session has gone live or ended.");
       throw new Error("Could not update the session. Try again.");
     });
   }
@@ -419,7 +445,7 @@
   function sessionToGoLive(rows, at) {
     at = at == null ? now() : at;
     return sortByStart((rows || []).filter(function (s) {
-      return s && s.status === "scheduled" && s.endsAt > at && s.startsAt <= at + 30 * 60000;
+      return s && s.status === "scheduled" && withinGoLiveWindow(s, at);
     }))[0] || null;
   }
 
@@ -534,12 +560,16 @@
     KINDS: KINDS,
     LENGTHS: LENGTHS,
     LIVE_GRACE_MS: LIVE_GRACE_MS,
+    GO_LIVE_EARLY_MS: GO_LIVE_EARLY_MS,
+    effectiveStatus: effectiveStatus,
+    withinGoLiveWindow: withinGoLiveWindow,
     normalizeRow: normalizeRow,
     isLiveNow: isLiveNow,
     isUpcoming: isUpcoming,
     visibleToViewer: visibleToViewer,
     publicAgenda: publicAgenda,
     groupByDay: groupByDay,
+    dayDateLabel: dayDateLabel,
     minutesOf: minutesOf,
     timeLabel: timeLabel,
     zoneLabel: zoneLabel,

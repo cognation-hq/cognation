@@ -8873,14 +8873,15 @@ body.tower-messages-page [data-tower-follow-row],
   min-width: min-content;
   min-height: 0;
   width: max-content;
-  padding: 0 0.32em;
+  /* ~28px tall, ~10px sides at the 12px floor; em so it grows with the scaled size. */
+  padding: 0.5em 0.83em;
   border-radius: 999px;
   border: 1px solid var(--color-accent);
   background: var(--color-accent);
   color: var(--color-navy);
   font: inherit;
-  /* Stay a fraction of the display name so a short name is not under a large pill. */
-  font-size: max(8px, calc(var(--tower-name-size, 28px) * 0.3));
+  /* A fraction of the display name (#186), never below a readable 12px. */
+  font-size: max(12px, calc(var(--tower-name-size, 28px) * 0.3));
   font-weight: 650;
   line-height: 1;
   letter-spacing: 0;
@@ -14777,6 +14778,15 @@ body.cgn-cal-page {
 .tower-visitor-calendar .tower-cal-cell { background: rgba(18,16,38,.92); color: #f7f9ff; border-color: rgba(209,241,255,.28); }
 .tower-visitor-calendar .tower-cal-cell.is-today, .tower-visitor-calendar .tower-cal-cell.is-selected { border-color: rgba(197,166,255,.85); box-shadow: 0 0 0 1px rgba(197,166,255,.45) inset; }
 .tower-visitor-calendar .tower-visitor-cal-link { color: #c5a6ff; }
+
+/* Tower header name (Designer follow-up): centred under the avatar and #f7f9ff.
+   Scoped to the stacked header (.tower-avatar-stack); the desktop strip layout, where
+   the name sits beside the avatar, keeps its left alignment. The 10ch name box stays
+   (stable while loading); only the text inside it is centred. */
+#panel-tower .tower-avatar-stack .tower-profile-name-wrap .tower-profile-name {
+  text-align: center;
+  color: #f7f9ff !important;
+}
 
 /* TOWER Feed contrast (Designer follow-up). TOWER Feed only (.tower-feed[data-tower-feed]
    and the "Send a signal" composer in the same Feed panel):

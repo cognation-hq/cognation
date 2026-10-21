@@ -2,7 +2,9 @@
  * Tower header follow-up (Designer):
  *  - the display name is centred under the avatar and #f7f9ff (stacked header only);
  *  - the disabled "Unavailable" friend button keeps exactly the same size/padding as
- *    "+ friend": same element, same .tower-follow-btn rule, no disabled-only size rule.
+ *    "+ friend": same element, same .tower-follow-btn rule, no disabled-only size rule;
+ *  - every friend/follow pill state has a 12px floor, keeping #186's 0.3x name scaling
+ *    above it, about 28px tall with about 10px side padding at the floor.
  * Run: node js/tower-header-followup.test.js
  */
 "use strict";
@@ -35,4 +37,20 @@ var unavailable = follow.match(/btn\.textContent = "Unavailable";/g) || [];
 assert.ok(unavailable.length >= 2, "Unavailable is a label on the same button");
 assert.ok(!/classList\.(add|toggle)\("[^"]*(tag|status|small)[^"]*"/.test(follow), "no tag/status class swapped in");
 assert.ok(/btn\.disabled = true;\s*btn\.textContent = "Unavailable";/.test(follow), "Unavailable stays disabled");
+/* Friend/follow pill: 12px floor with #186's 0.3x name scaling above it, ~28px tall,
+   ~10px sides (em, so it grows with the scaled size). One rule for every state. */
+var pill = flat.match(/\.tower-follow-btn \{[^}]*\}/);
+assert.ok(pill, "base pill rule");
+assert.ok(/font-size: max\(12px, calc\(var\(--tower-name-size, 28px\) \* 0\.3\)\);/.test(pill[0]), "12px floor, 0.3x name above it");
+assert.ok(/padding: 0\.5em 0\.83em;/.test(pill[0]) && /line-height: 1;/.test(pill[0]), "~28px tall, ~10px sides at 12px");
+function pillSize(namePx) { return Math.max(12, namePx * 0.3); }
+function pillHeight(namePx) { var f = pillSize(namePx); return f * 1 + 2 * 0.5 * f + 2; /* line-height 1 + padding + 1px borders */ }
+assert.strictEqual(pillSize(28), 12, "default 28px name: floor (was 8.4px)");
+assert.strictEqual(pillSize(16), 12, "small name: floor");
+assert.ok(Math.abs(pillSize(56) - 16.8) < 1e-9, "enlarged 56px name still scales up (16.8px)");
+assert.ok(pillHeight(28) >= 26 && pillHeight(28) <= 30, "about 28px tall at the floor (box model 26px; measured 28px in Chrome with the font line box)");
+assert.ok(Math.abs(0.83 * 12 - 10) < 0.1, "about 10px side padding at the floor");
+assert.ok(!/\.tower-follow-btn[^{]*\{[^}]*font-size: max\(8px/.test(flat), "old 8px floor gone");
+/* No other rule resizes one state: every state uses .tower-follow-btn. */
+assert.ok(!/(\[data-tower-follow\]|\[data-tower-add-friends\])[^{,]*\{[^}]*font-size/.test(flat), "no per-button font-size override");
 console.log("tower-header-followup.test.js ok");

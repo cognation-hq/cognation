@@ -8873,14 +8873,15 @@ body.tower-messages-page [data-tower-follow-row],
   min-width: min-content;
   min-height: 0;
   width: max-content;
-  padding: 0 0.32em;
+  /* ~28px tall, ~10px sides at the 12px floor; em so it grows with the scaled size. */
+  padding: 0.5em 0.83em;
   border-radius: 999px;
   border: 1px solid var(--color-accent);
   background: var(--color-accent);
   color: var(--color-navy);
   font: inherit;
-  /* Stay a fraction of the display name so a short name is not under a large pill. */
-  font-size: max(8px, calc(var(--tower-name-size, 28px) * 0.3));
+  /* A fraction of the display name (#186), never below a readable 12px. */
+  font-size: max(12px, calc(var(--tower-name-size, 28px) * 0.3));
   font-weight: 650;
   line-height: 1;
   letter-spacing: 0;

@@ -167,6 +167,10 @@
       session.profileKind = profile.kind === "professional" ? "professional" : "personal";
       session.profileHandle = profile.handle || "";
       session.profileDisplayName = profile.displayName || "";
+      /* The friend gate's viewer record (seedops-friend-gate viewerRecord) reads
+         these when the viewer has no local registry record. */
+      if (profile.accountKind) session.accountKind = String(profile.accountKind).toLowerCase();
+      if (profile.seedFleetId) session.seedFleetId = String(profile.seedFleetId);
     }
     return session;
   }
@@ -213,13 +217,16 @@
       handle: profile.handle,
       displayName: profile.display_name || profile.displayName || "",
       userId: profile.user_id || "",
+      /* Seed/ops come from profiles.account_kind / seed_fleet_id, not the handle. */
+      accountKind: String(profile.account_kind || profile.accountKind || "").toLowerCase(),
+      seedFleetId: String(profile.seed_fleet_id || profile.seedFleetId || ""),
     };
   }
 
   function loadSupabaseProfiles(user) {
     if (!window.CognationSupabase || !user || !user.id) return Promise.resolve([]);
     return window.CognationSupabase.rest("profiles", {
-      query: "select=id,kind,handle,display_name,user_id&user_id=eq." + encodeURIComponent(user.id),
+      query: "select=id,kind,handle,display_name,user_id,account_kind,seed_fleet_id&user_id=eq." + encodeURIComponent(user.id),
     }).then(function (profiles) {
       return Array.isArray(profiles) ? profiles.map(mapSupabaseProfile) : [];
     });
@@ -514,6 +521,8 @@
     session.profileKind = row.kind === "professional" ? "professional" : "personal";
     session.profileHandle = row.handle || "";
     session.profileDisplayName = row.display_name || "";
+    if (row.account_kind) session.accountKind = String(row.account_kind).toLowerCase();
+    if (row.seed_fleet_id) session.seedFleetId = String(row.seed_fleet_id);
     writeLocalSession(session);
     return true;
   }

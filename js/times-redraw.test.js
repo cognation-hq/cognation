@@ -88,7 +88,7 @@ function applyRefreshedPosts(posts, note) {
     function () { renderFeed(state.byEdition[env.editionId].posts); }, function () {}, null)(posts, note);
 }
 var refreshStatewidePlate = new Function("hotTopicCursor", "postsFromTower", "feedList", "appendPostEl", "setEndlessUi", "bindEndlessObserver", "setStatus", "feedStatus", "endlessOn", "TIMES_SLOTS",
-  "var wirePage = 0;\n" + fnSource("refreshStatewidePlate") + "\nreturn refreshStatewidePlate;")(
+  "var wirePage = 0;\nfunction syncFeedEmpty() {}\n" + fnSource("refreshStatewidePlate") + "\nreturn refreshStatewidePlate;")(
   {}, function () { return stories("s", 14); }, feedList, appendPostEl, function () {}, function () {}, function () {}, null, false, 10);
 
 function stories(prefix, n) { var out = []; for (var i = 0; i < n; i++) out.push({ id: prefix + i, authorName: "A" + i, body: "b" + i, createdAt: "2026-10-20T12:00:00Z" }); return out; }

@@ -805,6 +805,7 @@
       });
       setEndlessUi(endlessOn);
       if (endlessOn) bindEndlessObserver();
+      syncFeedEmpty();
       setStatus(
         feedStatus,
         "Statewide hot topics reshuffled from most-liked Tower hits.",
@@ -1108,6 +1109,13 @@
       } catch (eSeedRender) {}
     }
 
+    /* Empty-paper line: shown whenever the Times has no visible story. Wire
+       filler is display:none in SIGNAL, so it does not count. */
+    function syncFeedEmpty() {
+      if (!feedEmpty || !feedList) return;
+      feedEmpty.hidden = !!feedList.querySelector("[data-news-post]:not(.is-wire)");
+    }
+
     function setEndlessUi(on) {
       endlessOn = !!on;
       if (feedList) feedList.classList.toggle("is-endless", endlessOn);
@@ -1126,7 +1134,7 @@
         appendPostEl(makeWirePost(start + i));
       }
       wirePage += 1;
-      if (feedEmpty) feedEmpty.hidden = true;
+      syncFeedEmpty();
       wireLoading = false;
       if (feedList) feedList.setAttribute("aria-busy", "false");
       if (feedLoading) feedLoading.hidden = true;
@@ -1292,6 +1300,7 @@
         feedObserver.disconnect();
         feedObserver = null;
       }
+      syncFeedEmpty();
       if (briefLatest) {
         if (posts.length) {
           var latest = posts[0];

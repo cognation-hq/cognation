@@ -1339,9 +1339,20 @@
     });
     return out;
   }
-  function marketplaceCards() {
+  /* Tower posts for Marketplace. Goes through the tower module's list() so it gets the
+     same filters as the TOWER Feed (#199: local SeedOps template posts never show
+     signed in). Raw store read only if the tower module isn't loaded. */
+  function marketSourcePosts() {
+    var store = window.CognationTowerStore;
+    if (store && typeof store.list === "function") {
+      var list = store.list();
+      return Array.isArray(list) ? list : [];
+    }
     var doc = readJson(localStorage, "cognation.tower.posts.v3", null);
-    var posts = doc && Array.isArray(doc.posts) ? doc.posts : [];
+    return doc && Array.isArray(doc.posts) ? doc.posts : [];
+  }
+  function marketplaceCards() {
+    var posts = marketSourcePosts();
     var out = [];
     posts.forEach(function (post) {
       if (!post || !marketTagged((post.body || "") + " " + (post.title || ""))) return;

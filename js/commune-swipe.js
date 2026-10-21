@@ -1664,7 +1664,7 @@
         t ? "Matches your interest: " + t : "Add interests to your profile to tune this.");
     });
     lanes[PRO.AUCTION] = [proPlaceholder(PRO.AUCTION, "pro-auction-weekly", "Weekly Cognation bot auction",
-      "Each week Cognation hosts a webinar, then a bot auction on starter projects for sale.",
+      "Each week Cognation hosts a bot auction on starter projects for sale.",
       "Weekly Cognation event. Same card for everyone 18+.", 18)];
     lanes[PRO.PODCAST] = PRO_PODCASTS.map(function (w) {
       return proPlaceholder(PRO.PODCAST, w.id, w.title, w.body, "Picked by topic: ethics, async work, continuing education.");

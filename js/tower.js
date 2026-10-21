@@ -2806,6 +2806,26 @@
     return document.querySelector(sel);
   }
 
+  /* Seed / ops authors carry the shared SeedOps Demo badge (js/seedops-badge.js),
+     same markup as the Times byline. Judged by the author, not the post's
+     `seeded` flag, so real members never get it. */
+  function towerPostSeedBadge(post) {
+    var api = window.CognationSeedOpsBadge;
+    if (!post || !api || typeof api.badgeHtml !== "function") return "";
+    try {
+      return api.badgeHtml({
+        accountKind: post.accountKind || "",
+        isSeed: !!post.isSeed,
+        isOpsBot: !!post.isOpsBot,
+        seedFleetId: post.seedFleetId || "",
+        handle: post.handle || "",
+        id: post.authorProfileId || "",
+      }) || "";
+    } catch (e) {
+      return "";
+    }
+  }
+
   function renderFeed(root) {
     var list = towerFeedQuery(root, "[data-tower-feed]");
     if (!list) return;
@@ -2824,6 +2844,7 @@
         '<header class="tower-post-meta">' +
         '<span class="tower-author">' +
         escapeHtml(post.authorName || "Neighbor") +
+        towerPostSeedBadge(post) +
         "</span>" +
         '<time datetime="' +
         escapeHtml(post.createdAt) +

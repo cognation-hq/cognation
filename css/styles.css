@@ -12496,6 +12496,12 @@ a.circle-fall-portrait {
   white-space: nowrap;
 }
 
+/* Beats the global `span { color: var(--cgn-ink) !important }` (dark-shell ink) so the
+   Demo text stays dark on its peach pill site-wide. Must stay below that rule. */
+.seedops-demo-badge {
+  color: #4a1d12 !important;
+}
+
 .seedops-demo-badge[data-account-kind="ops"] {
   color: #1e293b;
   background: #e2e8f0;

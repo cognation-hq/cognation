@@ -4,7 +4,7 @@
  * photo opens that friend's Tower). Falling circles: the friends they engage
  * with LEAST, least first, up to 30, so they can reconnect or unfriend.
  * Engagement is per viewer and counts PUBLIC Cognation activity only, read
- * from Supabase: reactions on each other's Tower posts, @-tags in Tower posts
+ * from Supabase: reactions on each other's PUBLIC Tower posts, @-tags in public Tower posts
  * and News comments, and reactions on each other's News comments.
  * Direct messages and chat rooms are never read and never count.
  * Falling circles sit outside the ring and the five frames, smaller and
@@ -184,6 +184,7 @@
     var postAuthor = {};
     (data.posts || []).forEach(function (p) {
       if (!p || !p.id) return;
+      if (p.visibility && p.visibility !== "public") return; /* public Tower posts only */
       var side = who(p.author_profile_id);
       postAuthor[p.id] = side;
       tags(side, p.body);
@@ -241,11 +242,11 @@
     return out;
   }
 
-  function readAll(client, table, select, filterKey, ids, size, newestFirst) {
+  function readAll(client, table, select, filterKey, ids, size, newestFirst, extra) {
     if (!ids.length) return Promise.resolve([]);
     return Promise.all(chunks(ids, size || 50).map(function (part) {
       return client.rest(table, {
-        query: "select=" + select + "&" + filterKey + "=in.(" + part.join(",") + ")" +
+        query: "select=" + select + "&" + filterKey + "=in.(" + part.join(",") + ")" + (extra ? "&" + extra : "") +
           (newestFirst ? "&order=created_at.desc" : "") + "&limit=" + PAGE,
       }).then(function (r) { return Array.isArray(r) ? r : []; });
     })).then(function (parts) { return [].concat.apply([], parts); });
@@ -278,7 +279,8 @@
       return promise.then(null, function () { gaps.push(name); return []; });
     }
     var data = { profileOwner: profileOwner, handlesByUser: handlesByUser, viewerHandles: viewerHandles };
-    var postsP = soft("tower_posts", readAll(client, "tower_posts", "id,author_profile_id,body", "author_profile_id", people, 50, true));
+    /* PUBLIC Tower posts only (PM 2026-10-21): friends-only posts never count. */
+    var postsP = soft("tower_posts", readAll(client, "tower_posts", "id,author_profile_id,body,visibility", "author_profile_id", people, 50, true, "visibility=eq.public"));
     var commentsP = soft("news_story_comments", readAll(client, "news_story_comments", "id,author_profile_id,body", "author_profile_id", people, 50, true));
     return Promise.all([postsP, commentsP]).then(function (r) {
       data.posts = r[0];

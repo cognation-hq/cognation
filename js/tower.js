@@ -12521,10 +12521,9 @@
       window.addEventListener("resize", function () { if (circleFallState) placeCircleSpots(); });
     }
     circleFallState.raf = requestAnimationFrame(frameShell);
-    var circlePage = document.querySelector("[data-circle-page]") || layer;
-    if (window.CognationCircleRelations && typeof window.CognationCircleRelations.mount === "function") {
-      window.CognationCircleRelations.mount(circlePage);
-    }
+    /* PM 2026-10-21 (Alexa's spec: PULSE shows your own friends only): the
+       "X and Y became friends." pairs list (CognationCircleRelations.mount) is no
+       longer mounted on PULSE. js/circle-saved-relations.js stays, unused here. */
     /* Alexa final spec 2026-10-20: the five halo frames are the viewer's MOST engaged
        friends and the falling circles are the LEAST engaged (js/pulse-falling-friends.js
        fills both from public Supabase activity). The pulse_mutual_introductions
@@ -12698,10 +12697,7 @@
     refresh: function () {
       var layer = document.querySelector("[data-circle-fall]");
       if (layer) paintCircleRingShell(layer, []);
-      var page = document.querySelector("[data-circle-page]");
-      if (page && window.CognationCircleRelations && typeof window.CognationCircleRelations.mount === "function") {
-        window.CognationCircleRelations.mount(page);
-      }
+      /* no pairs list on PULSE (PM 2026-10-21) */
       return [];
     }
   };

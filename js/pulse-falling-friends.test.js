@@ -140,6 +140,9 @@ api.loadFriends(null, "").then(function (r) {
   var start = tower.slice(tower.indexOf("function startCircleFall()"));
   start = start.slice(0, start.indexOf("    return;\n"));
   assert.ok(!/CognationPulseMutual\.mount\(/.test(start), "halo frames come from engagement, not the mutual-activity fill");
+  assert.ok(!/CognationCircleRelations\.mount\(/.test(start), "no 'X and Y became friends.' pairs list on PULSE");
+  var api2 = tower.slice(tower.indexOf("window.CognationCircleFall = {"), tower.indexOf("window.CognationTowerOpenOwn"));
+  assert.ok(!/CognationCircleRelations\.mount\(/.test(api2), "refresh does not bring the pairs list back");
   var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
   assert.ok(html.indexOf("js/pulse-falling-friends.js") > 0 && html.indexOf("js/pulse-falling-friends.js") < html.indexOf("js/tower.js"), "script loads before tower.js");
   console.log("pulse-falling-friends.test.js: OK");

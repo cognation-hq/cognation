@@ -134,8 +134,10 @@ assert.strictEqual(adult.setMode("professional"), "professional");
 assert.strictEqual(adult.getMode(), "professional");
 assert.strictEqual(stores.session.getItem(adult.MODE_KEY), "professional", "mode stored for the session");
 
-var proDeck = adult.sampleDeck(21);
-assert.strictEqual(proDeck.length, 21);
+/* No Professional page is live: no Webinar cards; the other six types fill 1:1. */
+var proDeck = adult.sampleDeck(18);
+assert.strictEqual(proDeck.length, 18);
+assert.ok(proDeck.every(function (c) { return c.type !== "pro-webinar"; }), "no Webinar card while nothing is live");
 var banned = ["dating", "know", "friend", "ad", "classroom", "chatroom", "fact", "wellness", "event", "content"];
 proDeck.forEach(function (c) {
   assert.ok(/^pro-/.test(c.type), "Professional deck only: " + c.type);
@@ -145,7 +147,7 @@ proDeck.forEach(function (c) {
 });
 var counts = {};
 proDeck.forEach(function (c) { counts[c.type] = (counts[c.type] || 0) + 1; });
-api.PRO_ORDER.forEach(function (t) {
+api.PRO_ORDER.filter(function (t) { return t !== "pro-webinar"; }).forEach(function (t) {
   assert.strictEqual(counts[t], 3, "1:1 across Professional types: " + JSON.stringify(counts));
 });
 for (var i = 1; i < proDeck.length; i++) {

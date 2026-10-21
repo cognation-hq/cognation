@@ -6614,10 +6614,14 @@
     return normalized;
   }
 
+  /* Old builds seeded four sample events (ids cal-demo-1..4)
+     into every new calendar. They were never the owner's; drop them on read. */
+  var SAMPLE_CALENDAR_ID = /^cal-demo-[1-4]$/;
+
   function normalizeCalendarEventsList(list) {
     if (!Array.isArray(list)) return [];
     return list.map(normalizeCalendarEvent).filter(function (e) {
-      return e && /^\d{4}-\d{2}-\d{2}$/.test(e.date);
+      return e && !SAMPLE_CALENDAR_ID.test(String(e.id || "")) && /^\d{4}-\d{2}-\d{2}$/.test(e.date);
     });
   }
 
@@ -6631,46 +6635,8 @@
       p.calendarEvents = normalizeCalendarEventsList(p.calendarEvents);
       return false;
     }
-    var today = towerCalTodayIso();
-    p.calendarEvents = normalizeCalendarEventsList([
-      {
-        id: "cal-demo-1",
-        title: "Coffee with Jordan",
-        date: towerCalAddDaysIso(today, 2),
-        time: "10:00",
-        notes: "Neighborhood café",
-        status: "accepted",
-        source: "owner",
-      },
-      {
-        id: "cal-demo-2",
-        title: "Block scrapbook night",
-        date: towerCalAddDaysIso(today, 7),
-        time: "18:30",
-        notes: "Bring stickers + scissors",
-        status: "accepted",
-        source: "owner",
-      },
-      {
-        id: "cal-demo-3",
-        title: "Hang with Mira",
-        date: towerCalAddDaysIso(today, 4),
-        time: "15:00",
-        notes: "Requested via public calendar",
-        status: "pending",
-        source: "friend",
-        requesterName: "Mira Chen",
-      },
-      {
-        id: "cal-demo-4",
-        title: "Farmers market",
-        date: towerCalAddDaysIso(today, 11),
-        time: "09:00",
-        notes: "",
-        status: "accepted",
-        source: "owner",
-      },
-    ]);
+    /* No sample events: a new calendar starts empty (real data only). */
+    p.calendarEvents = [];
     return true;
   }
 

@@ -8737,6 +8737,36 @@
     TowerProfileStore.save(p);
   }
 
+  /* Real members cannot take a "seed-" / "ops-" handle (js/handle-reserved.js). */
+  function reservedHandleChange(next) {
+    var rules = window.CognationHandleRules;
+    return rules ? rules.isReserved(next) : /^(seed|ops)-/.test(normalizeHandle(next));
+  }
+
+  function reservedHandleMessage() {
+    var rules = window.CognationHandleRules;
+    return rules ? rules.message("Handles") : "Handles can't start with \"seed-\" or \"ops-\". Please pick a different one.";
+  }
+
+  /* Plain status line under the handle badge; reuses .commune-status styles. */
+  function showHandleStatus(badge, msg) {
+    if (!badge || !badge.parentNode) return;
+    var st = badge.parentNode.querySelector("[data-tower-handle-status]");
+    if (!msg) {
+      if (st) st.remove();
+      return;
+    }
+    if (!st) {
+      st = document.createElement("p");
+      st.className = "commune-status is-error";
+      st.setAttribute("data-tower-handle-status", "");
+      st.setAttribute("role", "status");
+      st.setAttribute("aria-live", "polite");
+      badge.insertAdjacentElement("afterend", st);
+    }
+    st.textContent = msg;
+  }
+
   function commitInlineHandle(root, el) {
     if (!isTowerOwner(TowerProfileStore.get())) return;
     var p = TowerProfileStore.get();
@@ -8746,6 +8776,12 @@
       el.textContent = prev ? "@" + prev : "@";
       return;
     }
+    if (next !== prev && reservedHandleChange(next)) {
+      el.textContent = prev ? "@" + prev : "@";
+      showHandleStatus(el, reservedHandleMessage());
+      return;
+    }
+    showHandleStatus(el, "");
     if (window.CognationAccounts && typeof window.CognationAccounts.getProfileByHandle === "function") {
       var clash = window.CognationAccounts.getProfileByHandle(next);
       if (clash && clash.id !== p._profileId) {
@@ -10689,7 +10725,12 @@
           nameSizeIn ? nameSizeIn.value : p.displayNameSize
         );
         var handleInputSave = root.querySelector("[data-tower-handle]");
-        p.handle = normalizeHandle(handleInputSave ? handleInputSave.value : p.handle);
+        var handleNext = normalizeHandle(handleInputSave ? handleInputSave.value : p.handle);
+        if (handleNext !== normalizeHandle(p.handle) && reservedHandleChange(handleNext)) {
+          setProfileStatus(reservedHandleMessage(), true);
+          return;
+        }
+        p.handle = handleNext;
         p.socialLinks = p.socialLinks || {};
         socialLinkDefs().forEach(function (net) {
           var input = root.querySelector('[data-tower-social="' + net.id + '"]');

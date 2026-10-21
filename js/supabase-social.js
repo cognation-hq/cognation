@@ -48,6 +48,16 @@
     document.dispatchEvent(new CustomEvent(name, { detail: detail || {} }));
   }
 
+  /* "seed-" / "ops-" handles are SeedOps-only (js/handle-reserved.js). */
+  function reservedHandle(value) {
+    var rules = window.CognationHandleRules;
+    return rules ? rules.isReserved(value) : /^(seed|ops)-/.test(normalizeHandle(value));
+  }
+  function reservedHandleMessage(noun) {
+    var rules = window.CognationHandleRules;
+    return rules ? rules.message(noun) : noun + " can't start with \"seed-\" or \"ops-\". Please pick a different one.";
+  }
+
   function normalizeHandle(value) {
     return String(value || "")
       .trim()
@@ -429,6 +439,9 @@
     Object.keys(changes).forEach(function (key) {
       if (changes[key] === row[key]) delete changes[key];
     });
+    if (changes.handle && reservedHandle(changes.handle)) {
+      return Promise.reject(new Error(reservedHandleMessage("Handles")));
+    }
     if (!Object.keys(changes).length) return Promise.resolve(row);
     return client()
       .rest("profiles", {
@@ -451,6 +464,7 @@
     if (!me) return Promise.reject(new Error("Sign in before creating a professional page."));
     var base = normalizeHandle(fields && fields.handle);
     if (!base) base = "member-" + me.supabaseUserId.slice(0, 8);
+    if (reservedHandle(base)) return Promise.reject(new Error(reservedHandleMessage("Handles")));
     return client()
       .rest("profiles", {
         method: "POST",

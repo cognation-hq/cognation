@@ -29,7 +29,7 @@ assert.ok(/PULSE_BG_SQUARES/.test(tower) && /pinCircleSpotsToBackground\(spots\)
 assert.ok(/\.circle-fall\[data-pulse-bg\] svg\.circle-bolt \{ display: none; \}/.test(tail), "lightning + bolt hidden on PULSE (r4)");
 assert.ok(/\.circle-ring::before \{[\s\S]*?rgba\(168, 244, 255, 0\.16\)[\s\S]*?rgba\(197, 166, 255, 0\.2\)/.test(tail), "halo blended over the image");
 var r6 = css.slice(css.indexOf("pulse-background r6"));
-assert.ok(/max-width: 600px[\s\S]*radial-gradient\(min\(calc\(786px \* var\(--pulse-bg-k\)\), calc\(50vw - 16px\)\) calc\(290px \* var\(--pulse-bg-k\)\) at 50% 48%/.test(r6), "phone halo is a ring-shaped oval, capped at the panel");
+assert.ok(/max-width: 600px[\s\S]*radial-gradient\(min\(calc\(786px \* var\(--pulse-bg-k\)\), calc\(50vw - 16px\)\) calc\(290px \* var\(--pulse-bg-k\)\) at 50% var\(--pulse-ring-y, 48%\)/.test(r6), "phone halo is a ring-shaped oval, capped at the panel");
 assert.ok(/\.circle-ring::before \{[\s\S]*?786px/.test(r6), "phone ring glow uses the same oval");
 assert.ok(/fitK = \(layer\.clientWidth \/ 2 - 8\) \/ 576/.test(tower) && /matchMedia\("\(max-width: 600px\)"\)/.test(tower), "phones shrink the image so the strands stay inside the panel");
 console.log("pulse-background.test: ok");

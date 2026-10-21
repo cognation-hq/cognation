@@ -97,4 +97,17 @@ assert.ok(!/\.signal-subtab[^{]*\{[^}]*1c1630/.test(css), "SIGNAL subtabs untouc
 /* Lilac ombre bar itself unchanged. */
 assert.ok(/\.app-topbar,\s*\.tabs\.tabs--chrome:has\(#panel-signal:not\(\[hidden\]\)\) \.app-topbar,[\s\S]*?rgba\(232, 214, 245, 0\.98\) 0%,\s*rgba\(244, 220, 238, 0\.97\) 42%,\s*rgba\(255, 220, 232, 0\.96\) 100%/.test(css), "lilac ombre bar unchanged");
 
+/* Alexa (Oct 20): keep the current lilac tab bar, never a #1c1630 bar. No rule that styles the
+   bar itself (.app-topbar / .tabs--chrome, not its children) may set a #1c1630 background. */
+(function () {
+  var r = /([^{}]+)\{([^{}]*)\}/g, mm;
+  while ((mm = r.exec(css))) {
+    var sels = mm[1].replace(/\/\*[\s\S]*?\*\//g, " ").split(",");
+    var barSel = sels.some(function (x) { return /(\.app-topbar|\.tabs--chrome[^ ]*)\s*$/.test(x.trim()); });
+    if (!barSel) continue;
+    var bg = (mm[2].match(/(?:^|[;\s])background(?:-color|-image)?\s*:\s*([^;]+)/g) || []).join(" ");
+    assert.ok(!/#1c1630|rgba?\(\s*28\s*,\s*22\s*,\s*48/i.test(bg), "tab bar background must not be #1c1630: " + mm[1].trim());
+  }
+})();
+
 console.log("topbar-dark-letters.test.js: OK");

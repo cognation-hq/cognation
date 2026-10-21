@@ -83,10 +83,12 @@ while ((m = re.exec(css))) {
   assert.ok(!/(^|[;\s])color\s*:/.test(m[2]), "later rule recolors top-row tabs: " + sel.trim());
 }
 
-/* Out of scope: COGNATION | WAYMAKERS switch, Log out, and the #64 sub-switch rules stay white. */
+/* Out of scope: COGNATION | WAYMAKERS switch and the #64 sub-switch rules stay white. */
 assert.strictEqual(decl(last(".site-switch-side.is-active, .site-switch-side[aria-current=\"page\"]").body, "color"), "#fff", "COGNATION | WAYMAKERS active stays white");
-assert.strictEqual(decl(last(".app-topbar-actions .app-logout-btn").body, "color"), "#fff", "Log out stays white");
-var pipe = css.slice(css.indexOf("/* ===== Shared pipe-switch sides"));
+/* Designer (Oct 21, after #214): Log out now reads like the tabs: #1c1630 text, 1px #1c1630 @ 40%, no fill. */
+assert.strictEqual(decl(last(".app-topbar-actions .app-logout-btn").body, "color"), DARK, "Log out text is the tab ink");
+/* The #64 block itself (it ends where the legal-pages rules start); later blocks may use the ink. */
+var pipe = css.slice(css.indexOf("/* ===== Shared pipe-switch sides"), css.indexOf("/* Legal pages (/terms, /privacy) */"));
 assert.ok(pipe.length > 100 && pipe.indexOf(DARK) === -1, "#64 scoped sub-switch block untouched by the dark lock");
 assert.ok(!/\.site-switch[^{]*\{[^}]*1c1630/.test(css), "no site-switch rule uses the dark lock color");
 assert.ok(!/\.tower-kind-btn[^{]*\{[^}]*1c1630/.test(css), "Tower kind buttons untouched");

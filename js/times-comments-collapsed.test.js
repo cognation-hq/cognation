@@ -133,7 +133,7 @@ assert.strictEqual(refreshed.rendered.length, 10, "refresh (Nationwide / Interna
 /* Refresh, Statewide: refreshStatewidePlate prints directly -> 10 out. */
 var statewideOut = [];
 var refreshStatewide = new Function("hotTopicCursor", "postsFromTower", "feedList", "appendPostEl", "setEndlessUi", "bindEndlessObserver", "setStatus", "feedStatus", "endlessOn", "TIMES_SLOTS",
-  "var wirePage = 0;\n" + fnSource("refreshStatewidePlate") + "\nreturn refreshStatewidePlate;")(
+  "var wirePage = 0;\nfunction syncFeedEmpty() {}\n" + fnSource("refreshStatewidePlate") + "\nreturn refreshStatewidePlate;")(
   {}, function () { return fourteen("s"); }, { innerHTML: "" }, function (p, o) { statewideOut.push([p.id, o.lead]); },
   function () {}, function () {}, function () {}, null, false, 10);
 refreshStatewide();

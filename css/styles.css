@@ -15621,6 +15621,34 @@ body.cgn-cal-page {
   padding-left: 0;
 }
 
+/* Designer (Oct 22): owner-only music player link field ("Paste a YouTube link"
+   under the Personal music player) uses the same glass input as Search followers
+   and the Pro YouTube link field: dark glass, 1px lilac border, light text and
+   placeholder, Search followers' font size and padding (0.82rem, 0.28rem 0.45rem)
+   and so its height, full card width. The look buttons keep their 18.5rem row. */
+#panel-tower .tower-sticker--music .tower-music-owner {
+  width: 100%;
+  max-width: none;
+}
+#panel-tower .tower-sticker--music .tower-music-owner .tower-music-looks {
+  width: 18.5rem;
+  max-width: 100%;
+}
+#panel-tower .tower-sticker--music .tower-music-owner .tower-music-url-label input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(18, 16, 38, 0.92) !important;
+  color: #f7f9ff !important;
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  font-size: 0.82rem;
+  padding: 0.28rem 0.45rem;
+}
+#panel-tower .tower-sticker--music .tower-music-owner .tower-music-url-label input::placeholder {
+  color: #d9d2f0 !important;
+  opacity: 1;
+}
+
 /* Edit profile title + Pro setup notice (Designer, Oct 22).
    (a) The "Edit profile" sheet title fell back to a serif face. Body sans at
        weight 600, the same fix as the SIGNAL Feed timestamp. */
@@ -15666,30 +15694,3 @@ body.cgn-cal-page {
 }
 
 
-/* Designer (Oct 22): owner-only music player link field ("Paste a YouTube link"
-   under the Personal music player) uses the same glass input as Search followers
-   and the Pro YouTube link field: dark glass, 1px lilac border, light text and
-   placeholder, Search followers' font size and padding (0.82rem, 0.28rem 0.45rem)
-   and so its height, full card width. The look buttons keep their 18.5rem row. */
-#panel-tower .tower-sticker--music .tower-music-owner {
-  width: 100%;
-  max-width: none;
-}
-#panel-tower .tower-sticker--music .tower-music-owner .tower-music-looks {
-  width: 18.5rem;
-  max-width: 100%;
-}
-#panel-tower .tower-sticker--music .tower-music-owner .tower-music-url-label input {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  background: rgba(18, 16, 38, 0.92) !important;
-  color: #f7f9ff !important;
-  border: 1px solid rgba(217, 210, 240, 0.4) !important;
-  font-size: 0.82rem;
-  padding: 0.28rem 0.45rem;
-}
-#panel-tower .tower-sticker--music .tower-music-owner .tower-music-url-label input::placeholder {
-  color: #d9d2f0 !important;
-  opacity: 1;
-}

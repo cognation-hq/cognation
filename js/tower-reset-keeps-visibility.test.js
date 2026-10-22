@@ -119,7 +119,13 @@ function el(tag) {
 var box = el("div"), list = el("div"), status = el("p");
 box.querySelector = function (q) { return q === "[data-tower-hidden-widgets-list]" ? list : null; };
 list.parent = box;
-var hctx = { saves: 0, owner: true, box: box, status: status, applied: 0 };
+var timers = [];
+var hctx = {
+  saves: 0, owner: true, box: box, status: status, applied: 0,
+  setTimeout: function (fn, ms) { timers.push({ fn: fn, ms: ms, live: true }); return timers.length; },
+  clearTimeout: function (t) { if (timers[t - 1]) timers[t - 1].live = false; },
+};
+function runTimers() { timers.forEach(function (t) { if (t.live) { t.live = false; t.fn(); } }); }
 vm.createContext(hctx);
 var hStart = tower.indexOf("var RESTORABLE_HIDDEN_WIDGETS =");
 vm.runInContext([
@@ -127,7 +133,7 @@ vm.runInContext([
   "var DEFAULT_PUBLIC_WIDGETS = " + blockFrom(tower.indexOf("{", tower.indexOf("var DEFAULT_PUBLIC_WIDGETS ="))) + ";",
   fnSrc("normalizePublicWidgets"),
   tower.slice(hStart, tower.indexOf("];", hStart) + 2),
-  fnSrc("hiddenWidgetRestorable"), fnSrc("hiddenWidgetsToShow"), fnSrc("renderHiddenWidgetsList"), fnSrc("setPublicWidgetVisible"),
+  fnSrc("hiddenWidgetRestorable"), fnSrc("hiddenWidgetsToShow"), "var HIDDEN_WIDGET_NOTICE_MS = 4000;", fnSrc("clearHiddenWidgetNotice"), fnSrc("renderHiddenWidgetsList"), fnSrc("setPublicWidgetVisible"),
   "var document = { createElement: function (t) { return mk(t); } };",
   "var profile = { slogan: 'Hi there', customHtml: '', publicWidgets: { identity: false, slogan: false, envelope: true, html: false, music: false, badges: false, calendar: true, social: false, friends: false } };",
   "var TowerProfileStore = { get: function () { return profile; }, save: function () { saves++; return true; } };",
@@ -148,7 +154,7 @@ var ids = list.children.map(function (r) { return r.children[1].getAttribute("da
 assert.strictEqual(ids.join(","), "identity,slogan", "lists hidden Name and Quote/slogan (html is empty; music/badges/calendar/social/friends are not flag-hidden)");
 assert.strictEqual(box.hidden, false, "section shows when something is hidden");
 assert.strictEqual(hctx.saves, 0, "render never saves");
-/* Show flips only that flag. */
+/* Show flips only that flag; the notice takes that row's place. */
 var before = JSON.parse(JSON.stringify(hctx.profile.publicWidgets));
 var showBtn = list.children[1].children[1];
 box.listeners.click({ target: showBtn, preventDefault: function () {} });
@@ -158,17 +164,64 @@ Object.keys(before).forEach(function (k) {
   if (k === "slogan") assert.strictEqual(after[k], true, "slogan turned on");
   else assert.strictEqual(after[k], before[k], k + " unchanged by Show");
 });
-assert.strictEqual(status.textContent, "Quote / slogan is showing again.", "status line");
+function kids() { return list.children.map(function (c) { return c.className; }).join(","); }
+assert.strictEqual(kids(), "tower-hidden-widget-row,tower-hidden-widget-notice", "notice sits where the Quote / slogan row was");
+var notice = list.children[1];
+assert.strictEqual(notice.tagName, "p");
+assert.strictEqual(notice.textContent, "Quote / slogan is showing again.", "notice copy");
+assert.strictEqual(notice.getAttribute("role"), "status");
+assert.strictEqual(status.textContent, "", "not written to the commune-status line under Add a professional page");
+assert.strictEqual(box.hidden, false);
+assert.strictEqual(timers.filter(function (t) { return t.live; }).length, 1, "one clear timer");
+assert.strictEqual(timers[timers.length - 1].ms, 4000, "clears after 4s");
+runTimers();
+assert.strictEqual(kids(), "tower-hidden-widget-row", "notice gone after 4s; Name row stays");
+assert.strictEqual(box.hidden, false, "section stays while Name is still hidden");
+assert.strictEqual(hctx.saves, 1, "clearing the notice never saves");
 /* Non-owner click does nothing. */
 hctx.owner = false;
 box.listeners.click({ target: list.children[0].children[1], preventDefault: function () {} });
 assert.strictEqual(hctx.saves, 1, "no save for a non-owner click");
 assert.strictEqual(hctx.profile.publicWidgets.identity, false, "identity still hidden");
-/* Nothing hidden: section hides entirely. */
 hctx.owner = true;
+/* Last hidden widget: the notice shows in its place, then the whole section hides. */
+box.listeners.click({ target: list.children[0].children[1], preventDefault: function () {} });
+assert.strictEqual(hctx.saves, 2, "Show Name saves once");
+assert.strictEqual(hctx.profile.publicWidgets.identity, true);
+assert.strictEqual(kids(), "tower-hidden-widget-notice", "only the notice is left");
+assert.strictEqual(list.children[0].textContent, "Name is showing again.");
+assert.strictEqual(box.hidden, false, "section stays up for the notice");
+runTimers();
+assert.strictEqual(list.children.length, 0);
+assert.strictEqual(box.hidden, true, "last widget shown: section hides after the notice");
+/* Edit profile close clears the notice early. */
+hctx.profile.publicWidgets.envelope = false;
+hctx.renderHiddenWidgetsList(hctx.root, hctx.profile);
+box.listeners.click({ target: list.children[0].children[1], preventDefault: function () {} });
+assert.strictEqual(kids(), "tower-hidden-widget-notice");
+hctx.clearHiddenWidgetNotice(hctx.root);
+assert.strictEqual(list.children.length, 0, "close clears the notice");
+assert.strictEqual(box.hidden, true, "and hides the now-empty section");
+assert.strictEqual(timers.filter(function (t) { return t.live; }).length, 0, "its timer is cancelled");
+var setOpenAt = tower.indexOf("function setOpen(open) {");
+assert.ok(/\} else \{[\s\S]*clearHiddenWidgetNotice\(root\);[\s\S]*panel\.hidden = true;/.test(blockFrom(setOpenAt)), "Edit profile close calls clearHiddenWidgetNotice");
+/* Nothing hidden: section hides entirely; render still never writes. */
+var savesNow = hctx.saves;
 hctx.profile.publicWidgets = { identity: true, slogan: true, envelope: true, html: false };
 hctx.renderHiddenWidgetsList(hctx.root, hctx.profile);
 assert.strictEqual(box.hidden, true, "nothing hidden = no section");
-assert.strictEqual(hctx.saves, 1, "still no write from render");
+assert.strictEqual(hctx.saves, savesNow, "still no write from render");
+
+/* 5. Styles: #237 dark glass notice; Edit profile status line loses the brown accent-dim tint. */
+var css = fs.readFileSync(path.join(__dirname, "..", "css", "styles.css"), "utf8");
+var noticeRule = /\.tower-hidden-widget-notice \{([^}]*)\}/.exec(css);
+assert.ok(noticeRule, "notice rule");
+[/background: rgba\(18, 16, 38, 0\.92\)/, /-webkit-backdrop-filter: blur\(12px\)/, /[^-]backdrop-filter: blur\(12px\)/, /border: 1px solid rgba\(217, 210, 240, 0\.4\)/,
+ /color: #f7f9ff/, /font-size: 14px/, /border-radius: 8px/, /padding: 10px 12px/].forEach(function (re) {
+  assert.ok(re.test(noticeRule[1]), "notice style " + re);
+});
+var statusRule = /\.tower-profile-edit-dropdown \.commune-status\[data-tower-profile-status\]:not\(\.is-error\) \{([^}]*)\}/.exec(css);
+assert.ok(statusRule && /background: rgba\(18, 16, 38, 0\.92\)/.test(statusRule[1]), "Edit profile status line is dark glass");
+assert.ok(/\.commune-status \{[^}]*background: var\(--color-accent-dim\)/.test(css), "site-wide .commune-status unchanged");
 
 console.log("tower-reset-keeps-visibility: ok");

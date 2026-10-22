@@ -6664,14 +6664,42 @@
     });
   }
 
+  /* After Show: a dark glass notice ("<Name> is showing again.") sits in the
+     section where that row was, for ~4s or until Edit profile closes. If it was
+     the last hidden widget, the section hides once the notice clears. */
+  var HIDDEN_WIDGET_NOTICE_MS = 4000;
+
+  function clearHiddenWidgetNotice(root) {
+    var box = root && root.querySelector("[data-tower-hidden-widgets]");
+    if (!box || !box.__towerShowNotice) return;
+    if (box.__towerShowNotice.timer) clearTimeout(box.__towerShowNotice.timer);
+    box.__towerShowNotice = null;
+    renderHiddenWidgetsList(root, TowerProfileStore.get());
+  }
+
   function renderHiddenWidgetsList(root, p) {
     var box = root && root.querySelector("[data-tower-hidden-widgets]");
     if (!box) return;
     var list = box.querySelector("[data-tower-hidden-widgets-list]");
     if (!list) return;
     var items = hiddenWidgetsToShow(p);
+    var notice = box.__towerShowNotice || null;
+    if (notice && (!p || !isTowerOwner(p))) notice = null;
+    if (notice) {
+      items = items.filter(function (w) { return w.id !== notice.id; });
+    }
     list.innerHTML = "";
-    items.forEach(function (w) {
+    function addNotice() {
+      var n = document.createElement("p");
+      n.className = "tower-hidden-widget-notice";
+      n.setAttribute("role", "status");
+      n.setAttribute("aria-live", "polite");
+      n.setAttribute("data-tower-hidden-widget-notice", notice.id);
+      n.textContent = notice.label + " is showing again.";
+      list.appendChild(n);
+    }
+    items.forEach(function (w, i) {
+      if (notice && i === notice.index) addNotice();
       var row = document.createElement("div");
       row.className = "tower-hidden-widget-row";
       var name = document.createElement("span");
@@ -6687,8 +6715,9 @@
       row.appendChild(btn);
       list.appendChild(row);
     });
-    /* Nothing hidden: the whole section stays out of the way. */
-    box.hidden = !items.length;
+    if (notice && notice.index >= items.length) addNotice();
+    /* Nothing hidden (and no notice): the whole section stays out of the way. */
+    box.hidden = !items.length && !notice;
     if (!box.__cognationShowBound) {
       box.__cognationShowBound = true;
       box.addEventListener("click", function (ev) {
@@ -6697,16 +6726,25 @@
         ev.preventDefault();
         var id = b.getAttribute("data-tower-show-widget");
         if (!hiddenWidgetRestorable(id)) return;
-        if (!isTowerOwner(TowerProfileStore.get())) return;
-        setPublicWidgetVisible(root, id, true);
-        var label = id;
-        RESTORABLE_HIDDEN_WIDGETS.forEach(function (w) { if (w.id === id) label = w.label; });
-        var st = root.querySelector("[data-tower-profile-status]");
-        if (st) {
-          st.hidden = false;
-          st.textContent = label + " is showing again.";
-          st.classList.remove("is-error");
+        var cur = TowerProfileStore.get();
+        if (!isTowerOwner(cur)) return;
+        var shown = hiddenWidgetsToShow(cur);
+        if (box.__towerShowNotice) {
+          var prevId = box.__towerShowNotice.id;
+          shown = shown.filter(function (w) { return w.id !== prevId; });
+          if (box.__towerShowNotice.timer) clearTimeout(box.__towerShowNotice.timer);
         }
+        var index = 0;
+        var label = id;
+        shown.forEach(function (w, i) { if (w.id === id) { index = i; label = w.label; } });
+        box.__towerShowNotice = {
+          id: id,
+          label: label,
+          index: index,
+          timer: setTimeout(function () { clearHiddenWidgetNotice(root); }, HIDDEN_WIDGET_NOTICE_MS),
+        };
+        setPublicWidgetVisible(root, id, true);
+        renderHiddenWidgetsList(root, TowerProfileStore.get());
       });
     }
   }
@@ -10669,6 +10707,8 @@
           root.__cognationProSetupJustCreated = false;
           try { syncAddProfileUi(root); } catch (eSetup) {}
         }
+        /* The Show hidden widgets notice is spent once Edit profile closes. */
+        try { clearHiddenWidgetNotice(root); } catch (eNotice) {}
         panel.hidden = true;
         returnPanelHome();
         wrap.classList.remove("is-open");

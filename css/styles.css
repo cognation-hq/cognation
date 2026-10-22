@@ -15702,6 +15702,35 @@ body.cgn-cal-page {
   line-height: 1.2;
 }
 
+/* Show hidden widgets notice (Designer LOOK on #244): the #237 dark glass
+   notice, in the section where the shown row was. */
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-hidden-widget-notice {
+  margin: 0 !important;
+  padding: 10px 12px !important;
+  background: rgba(18, 16, 38, 0.92) !important;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  color: #f7f9ff !important;
+  font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif);
+  font-size: 14px !important;
+  line-height: 1.35 !important;
+}
+/* Edit profile's own status line ([data-tower-profile-status]: Save, Remove
+   lines) took the site-wide .commune-status accent-dim tint, which reads brown on the
+   dark sheet. Same dark glass here only; .commune-status elsewhere is unchanged. */
+#panel-tower .tower-profile-edit-dropdown .commune-status[data-tower-profile-status]:not(.is-error) {
+  background: rgba(18, 16, 38, 0.92) !important;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  color: #f7f9ff !important;
+}
+
 /* TOWER Feed contrast (Designer follow-up). TOWER Feed only (.tower-feed[data-tower-feed]
    and the "Send a signal" composer in the same Feed panel):
    - post cards use the site glass rgba(18,16,38,.92) so the existing body text reads

@@ -15441,6 +15441,25 @@ body.cgn-cal-page {
   }
 }
 
+/* Edit profile title + Pro setup notice (Designer, Oct 22).
+   (a) The "Edit profile" sheet title fell back to a serif face. Body sans at
+       weight 600, the same fix as the SIGNAL Feed timestamp. */
+#panel-tower .tower-profile-edit-sheet-title {
+  font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif) !important;
+  font-weight: 600 !important;
+  font-style: normal;
+  letter-spacing: normal;
+}
+/* (b) "Your professional page is set up." (shown once, right after the first
+   Pro setup): dark glass notice, white text, 1px lilac border. No brown. */
+#panel-tower .tower-add-profile-row .commune-status.tower-pro-setup-notice {
+  margin: 0;
+  background: rgba(18, 16, 38, 0.92) !important;
+  color: #f7f9ff !important;
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  box-shadow: none !important;
+}
+
 /* TOWER Feed contrast (Designer follow-up). TOWER Feed only (.tower-feed[data-tower-feed]
    and the "Send a signal" composer in the same Feed panel):
    - post cards use the site glass rgba(18,16,38,.92) so the existing body text reads

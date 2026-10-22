@@ -41,5 +41,6 @@ assert.ok(/\.news-report-option \{[^}]*padding: 0\.2rem 0\.5rem;/.test(css) && /
 assert.ok(!/#ed9300|#f5a623|#ffb000|gold|amber|yellow|248, 113, 113|#c45a5a/i.test(block), "no yellow, no red");
 
 var stub = fs.readFileSync(path.join(__dirname, "news-report-stub.js"), "utf8");
-assert.ok(/say\(REPORT_FAILED, true\)/.test(stub) && /setAttribute\("data-news-report-failed"/.test(stub), "stub marks the failure line");
+// The failure line now goes through failureText(err), which falls back to REPORT_FAILED for unknown errors.
+assert.ok(/say\(failureText\(err\), true\)/.test(stub) && /REFUSALS\[code\] : REPORT_FAILED/.test(stub) && /setAttribute\("data-news-report-failed"/.test(stub), "stub marks the failure line");
 console.log("logout-pill-times-status.test.js ok");

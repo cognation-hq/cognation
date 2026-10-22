@@ -1093,6 +1093,7 @@
       article.setAttribute("data-news-story-key", storyKey);
       /* Real Tower post id for the server report (display ids carry a prefix). */
       if (post.towerPostId) article.setAttribute("data-tower-post-id", String(post.towerPostId));
+      if (post.authorProfileId) article.setAttribute("data-author-profile-id", String(post.authorProfileId));
       if (post.rating) article.setAttribute("data-news-rating", String(post.rating));
       /* Insert before mounting comments: the Times "Comments" line attaches only to
          stories already inside SIGNAL (news-comments.js wireTimesToggle). */
@@ -1249,6 +1250,9 @@
           seeded: true,
           fromTower: true,
           towerPostId: p.id,
+          /* Author's profile id: the Times Report spots the reader's own post
+             (the server refuses those with cannot_report_own). */
+          authorProfileId: p.authorProfileId || "",
           accountKind: seedMeta.accountKind || p.accountKind || "",
           isSeed: !!(seedMeta.isSeed || p.isSeed),
           seedFleetId: p.seedFleetId || "",

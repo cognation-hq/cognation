@@ -94,8 +94,8 @@
   var SPAWN_ROWS = {
     /* LOOK v3.3: each social/link is its own widget. __socials__ expands to opted-in
        chips (pairs on desktop). No grouped LINKS box. */
-    personal: [["avatar"], ["identity"], ["slogan"], ["music"], ["friends"], ["__socials__"], ["badges", "calendar"], ["polaroid", "html"], ["instax"]],
-    professional: [["avatar"], ["identity"], ["slogan"], ["youtube"], ["__socials__"], ["badges"], ["followers", "calendar"], ["html"]],
+    personal: [["avatar"], ["identity"], ["slogan"], ["visitor-calendar"], ["music"], ["friends"], ["__socials__"], ["badges", "calendar"], ["polaroid", "html"], ["instax"]],
+    professional: [["avatar"], ["identity"], ["slogan"], ["visitor-calendar"], ["youtube"], ["__socials__"], ["badges"], ["followers", "calendar"], ["html"]],
   };
   /* Factory seeds that were never a user's choice. An entry equal to one of these
      is treated as unplaced, so old overlapping defaults get a real spawn spot. */
@@ -104,6 +104,11 @@
     { avatar: [4, 4], identity: [4, 26], slogan: [28, 18], social: [4, 26], music: [4, 34], badges: [4, 44], friends: [4, 56], html: [28, 4] },
     { identity: [4, 18] },
   ];
+  /* Calendar card (visitors): its own widget, one full row directly under the bio
+     card in every default layout (Personal and Professional). The owner's own
+     Calendar stays in Edit profile; this card is hidden on the owner's view. It
+     is never dragged or saved, so a saved layout never holds a spot for it. */
+  var VISITOR_CALENDAR_ID = "visitor-calendar";
   var spawnCache = {};
   /* Avatar, name and slogan read as one profile card: a tight gap between them. */
   var PROFILE_STACK = { avatar: true, identity: true, slogan: true };
@@ -414,6 +419,7 @@
           var el = stage.querySelector('[data-tower-widget="' + id + '"]');
           if (!el || el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
           if (el.classList.contains("is-dragging")) return;
+          if (id === VISITOR_CALENDAR_ID) el.style.removeProperty("--visitor-cal-w");
           el.classList.add("is-spawned");
           el.classList.toggle("is-spawn-full", row.length === 1);
           el.classList.toggle("is-spawn-half", row.length > 1);
@@ -461,10 +467,24 @@
     var sizes = {};
     var occupied = [];
     var colW = phone ? stageW - 32 : (stageW - 48 - SPAWN_GAP) / 2;
+    var avatarEl = stage.querySelector('[data-tower-widget="avatar"]');
+    var calSeat = null;
     stage.querySelectorAll("[data-tower-widget]").forEach(function (el) {
       if (el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
       var id = el.getAttribute("data-tower-widget");
       el.classList.remove("is-spawn-full", "is-spawn-half", "is-grid-friend-pin");
+      if (id === VISITOR_CALENDAR_ID) {
+        /* Same width as the bio card. When the bio card has a saved spot, seat
+           the calendar right under it (below); otherwise it packs in its row. */
+        el.classList.add("is-spawned");
+        var aw = avatarEl && avatarEl.parentNode === stage && !avatarEl.hidden ? avatarEl.offsetWidth : 0;
+        if (aw) el.style.setProperty("--visitor-cal-w", aw + "px");
+        else el.style.removeProperty("--visitor-cal-w");
+        el.style.setProperty("--spawn-max-w", Math.floor(aw || colW) + "px");
+        if (aw && isPlacedPos(layout, "avatar")) calSeat = el;
+        else sizes[id] = { w: el.offsetWidth || 0, h: el.offsetHeight || 0 };
+        return;
+      }
       if (spawnIds[id] && !isPlacedPos(layout, id) && !el.classList.contains("is-dragging")) {
         var full = rows.some(function (r) { return r.length === 1 && r[0] === id; });
         el.classList.add("is-spawned");
@@ -523,7 +543,21 @@
       rows.forEach(function (r, i) { if (r.indexOf("music") >= 0) mi = i; });
       rows.splice(mi >= 0 ? mi + 1 : rows.length, 0, ["__friendpins"]);
     }
+    var calPos = null;
+    if (calSeat) {
+      calPos = {
+        x: avatarEl.offsetLeft,
+        y: avatarEl.offsetTop + avatarEl.offsetHeight + SPAWN_GAP,
+        w: calSeat.offsetWidth || 0,
+        h: calSeat.offsetHeight || 0,
+      };
+      occupied.push({ x: calPos.x, y: calPos.y, w: calPos.w, h: calPos.h });
+    }
     var placed = packSpawn(rows, sizes, occupied, stageW, phone);
+    if (calPos) {
+      placed[VISITOR_CALENDAR_ID] = { x: calPos.x, y: calPos.y };
+      placed.__bottom = Math.max(placed.__bottom, calPos.y + calPos.h + (phone ? 16 : 24));
+    }
     var stageH = Math.max(stage.clientHeight || 0, placed.__bottom);
     if (placed.__bottom > (stage.clientHeight || 0)) stage.style.minHeight = Math.ceil(placed.__bottom) + "px";
     spawnCache = {};
@@ -7396,8 +7430,10 @@
     var box = root.querySelector("[data-tower-visitor-calendar]");
     if (!box) return;
     var p = TowerProfileStore.get();
+    var wasHidden = box.hidden;
     if (!p || isTowerOwner(p)) {
       box.hidden = true;
+      if (!wasHidden) respawnVisitorCalendar(root, p);
       return;
     }
     box.hidden = false;
@@ -7416,11 +7452,20 @@
     var pro = profileIsProfessional(p);
     var list = pro && api && typeof api.forHost === "function" ? api.forHost(p._profileId || p.id) : [];
     sessionsBox.hidden = !pro;
-    if (!pro) { sessionsBox.innerHTML = ""; return; }
-    sessionsBox.innerHTML = '<h5 class="tower-visitor-sessions-title">Classroom sessions</h5>' +
-      (list.length
-        ? '<ul class="tower-visitor-session-list" role="list">' + list.map(function (sess) { return visitorSessionRowHtml(sess, api); }).join("") + "</ul>"
-        : '<p class="form-hint tower-cal-empty">No sessions booked yet.</p>');
+    if (!pro) sessionsBox.innerHTML = "";
+    else {
+      sessionsBox.innerHTML = '<h5 class="tower-visitor-sessions-title">Classroom sessions</h5>' +
+        (list.length
+          ? '<ul class="tower-visitor-session-list" role="list">' + list.map(function (sess) { return visitorSessionRowHtml(sess, api); }).join("") + "</ul>"
+          : '<p class="form-hint tower-cal-empty">No sessions booked yet.</p>');
+    }
+    /* The card just appeared (or changed height on a sessions list): give it its
+       spot under the bio card. */
+    if (wasHidden) respawnVisitorCalendar(root, p);
+  }
+
+  function respawnVisitorCalendar(root, p) {
+    try { spawnUnplacedWidgets(root, p); } catch (eSpawn) {}
   }
 
   function refreshTowerCalendars(root) {

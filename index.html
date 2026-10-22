@@ -524,14 +524,6 @@
                         </div>
                       </div>
                       </div>
-                      <section class="tower-visitor-calendar" data-tower-visitor-calendar hidden aria-label="Calendar">
-                        <h4 class="tower-cal-public-title">Calendar</h4>
-                        <div class="tower-visitor-sessions" data-tower-visitor-sessions hidden></div>
-                        <div class="tower-cal tower-cal--public" data-tower-cal-visitor data-calendar-busy="true">
-                          <div data-tower-cal-visitor-body></div>
-                        </div>
-                        <a class="tower-visitor-cal-link" href="/calendar.html">Cognation Calendar ›</a>
-                      </section>
                       <div class="tower-profile-edit" data-tower-profile-edit>
                         <button type="button" class="btn btn-secondary tower-edit-profile-btn" data-tower-edit-profile aria-expanded="false" aria-haspopup="true" aria-controls="tower-profile-edit-panel">
                           Edit profile
@@ -625,7 +617,16 @@
                       </div>
                         </div>
                       </div>
-                      </div><div class="tower-sticker tower-sticker--slogan" data-tower-widget="slogan" data-sticker-label="Quote / slogan" hidden><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Quote / slogan sticker" tabindex="-1" hidden>⋮⋮</button><blockquote class="tower-slogan-card" data-tower-slogan-display></blockquote>
+                      </div><!-- Calendar: its own card under the bio card (visitors only; owner keeps Edit profile > Calendar). -->
+                      <section class="tower-sticker tower-sticker--visitor-calendar tower-visitor-calendar" data-tower-widget="visitor-calendar" data-sticker-label="Calendar" data-tower-visitor-calendar hidden aria-label="Calendar">
+                        <h4 class="tower-cal-public-title">Calendar</h4>
+                        <div class="tower-visitor-sessions" data-tower-visitor-sessions hidden></div>
+                        <div class="tower-cal tower-cal--public" data-tower-cal-visitor data-calendar-busy="true">
+                          <div data-tower-cal-visitor-body></div>
+                        </div>
+                        <a class="tower-visitor-cal-link" href="/calendar.html">Cognation Calendar ›</a>
+                      </section>
+                      <div class="tower-sticker tower-sticker--slogan" data-tower-widget="slogan" data-sticker-label="Quote / slogan" hidden><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Quote / slogan sticker" tabindex="-1" hidden>⋮⋮</button><blockquote class="tower-slogan-card" data-tower-slogan-display></blockquote>
                       </div><!-- Per-network social widgets (v3.3); no grouped LINKS box. -->
                       <div class="tower-sticker tower-sticker--music" data-tower-widget="music" data-sticker-label="Music"><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Music sticker" tabindex="-1" hidden>⋮⋮</button><div class="tower-music" data-tower-music data-music-skin="classic" hidden>
                         <audio data-tower-audio preload="metadata" playsinline></audio>

@@ -5062,10 +5062,25 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
     opacity: 0;
     transform: translate(-50%, 8px);
     transition: opacity 160ms ease, transform 160ms ease;
-    pointer-events: none;
+    pointer-events: none !important;
+  }
+  /* Never blocks a tap: neither the notice nor anything inside it. */
+  #panel-tower [data-tower-app] > .tower-hidden-widget-notice.tower-stage-notice * {
+    pointer-events: none !important;
   }
   #panel-tower [data-tower-app] > .tower-hidden-widget-notice.tower-stage-notice.is-in {
     opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  /* When the bottom band would sit over Mutual friends, Go live or the Messages
+     envelope, tower.js puts it at the top (below the tab bar when on screen),
+     same look; it slides in from above. */
+  #panel-tower [data-tower-app] > .tower-hidden-widget-notice.tower-stage-notice.is-top {
+    top: var(--tower-stage-notice-top, calc(16px + env(safe-area-inset-top)));
+    bottom: auto;
+    transform: translate(-50%, -8px);
+  }
+  #panel-tower [data-tower-app] > .tower-hidden-widget-notice.tower-stage-notice.is-top.is-in {
     transform: translate(-50%, 0);
   }
 }
@@ -5073,6 +5088,9 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   #panel-tower [data-tower-app] > .tower-hidden-widget-notice.tower-stage-notice {
     transition: none;
     opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  #panel-tower [data-tower-app] > .tower-hidden-widget-notice.tower-stage-notice.is-top {
     transform: translate(-50%, 0);
   }
 }

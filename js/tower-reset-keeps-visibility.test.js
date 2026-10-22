@@ -135,7 +135,7 @@ vm.runInContext([
   tower.slice(hStart, tower.indexOf("];", hStart) + 2),
   constSrc("OWNER_REMOVABLE_WIDGET_IDS"), fnSrc("ownerShownKey"), fnSrc("widgetRemovedByOwner"),
   "function isProTower() { return false; } function appliedMilestoneList() { return []; } function initTowerMusic() {}",
-  fnSrc("hiddenWidgetRestorable"), fnSrc("hiddenWidgetsToShow"), "var HIDDEN_WIDGET_NOTICE_MS = 4000;", fnSrc("clearHiddenWidgetNotice"), fnSrc("renderHiddenWidgetsList"), fnSrc("setPublicWidgetVisible"),
+  fnSrc("hiddenWidgetRestorable"), fnSrc("hiddenWidgetsToShow"), "var HIDDEN_WIDGET_NOTICE_MS = 4000;", fnSrc("clearHiddenWidgetNotice"), fnSrc("clearStaleRemovalStatus"), fnSrc("renderHiddenWidgetsList"), fnSrc("setPublicWidgetVisible"),
   "var document = { createElement: function (t) { return mk(t); } };",
   "var profile = { slogan: 'Hi there', customHtml: '', publicWidgets: { identity: false, slogan: false, envelope: true, html: false, music: false, badges: false, calendar: true, social: false, friends: false } };",
   "var TowerProfileStore = { get: function () { return profile; }, save: function () { saves++; return true; } };",

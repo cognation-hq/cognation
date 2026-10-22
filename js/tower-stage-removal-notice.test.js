@@ -92,6 +92,8 @@ assert.ok(desk && !/position/.test(desk[1]), "768 and up: unchanged, in the tool
 function el() {
   var cls = {};
   return { hidden: true, textContent: "", offsetWidth: 0, parentNode: null,
+    style: { setProperty: function () {}, removeProperty: function () {} },
+    getBoundingClientRect: function () { return { top: 0, bottom: 40, height: 40, width: 200 }; },
     classList: { add: function (c) { cls[c] = 1; }, remove: function (c) { delete cls[c]; }, contains: function (c) { return !!cls[c]; } } };
 }
 var ctx = { saves: 0, timers: [], cleared: [], owner: true, narrow: false, reduce: false };
@@ -106,6 +108,11 @@ vm.runInContext([
   "function isTowerOwner(p) { return !!(p && p.owner); }",
   "var TowerProfileStore = { get: function () { return { owner: owner }; }, save: function () { saves++; return true; } };",
   fnSrc("stageNoticeNarrow"), fnSrc("stageNoticeAnimates"), fnSrc("placeStageRemovalNotice"), fnSrc("clearStageRemovalNotice"), fnSrc("showStageRemovalNotice"),
+  /* Follow-up: below 768 the band is picked as it shows (bottom unless it would cover controls). */
+  "var STAGE_NOTICE_EDGE = 16;",
+  "var STAGE_NOTICE_CLEAR_SELECTORS = [];",
+  "var document = { querySelector: function () { return null; } };",
+  fnSrc("stageNoticeBandsClash"), fnSrc("pickStageNoticeBand"),
 ].join("\n"), ctx);
 var notice = el(), panel = el();
 function host(name) { return { name: name, appendChild: function (c) { c.parentNode = this; } }; }
@@ -114,6 +121,7 @@ notice.parentNode = bar;
 ctx.root = {
   name: "app",
   appendChild: function (c) { c.parentNode = this; },
+  querySelectorAll: function () { return []; },
   querySelector: function (sel) {
     if (sel === "[data-tower-stage-notice]") return notice;
     if (sel === "[data-tower-profile-edit-panel]") return panel;

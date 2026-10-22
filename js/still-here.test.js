@@ -255,7 +255,7 @@ assert.ok(/dragStarted = true;\s*\n\s*if \(liftDefaultGrid\(stage\)\)/.test(down
 assert.ok(/if \(!dragStarted\) \{[^}]*return;/.test(down), "no save when the pointer never dragged");
 assert.ok(/freezeSpawnedWidgets\(root, layout\)/.test(down) && /TowerProfileStore\.save\(p, \{ geometry: true \}\)/.test(down), "drop freezes others and saves geometry");
 assert.ok(/stage\.querySelectorAll\("\[data-tower-widget\]\.is-spawned"\)/.test(grab("  function freezeSpawnedWidgets", "  /* Old scrapbook")) && /liftDefaultGrid\(stage\);/.test(grab("  function freezeSpawnedWidgets", "  /* Old scrapbook")), "freeze pins from on-screen spots");
-assert.ok(/if \(opts\.geometry && window\.CognationTowerLayoutSync\) window\.CognationTowerLayoutSync\.save\(data\)/.test(tower), "account layout saved only on a geometry edit (never on open)");
+assert.ok(/if \(window\.CognationTowerLayoutSync && liveSignedInForTower\(\)\) \{\s*if \(opts\.geometry\) window\.CognationTowerLayoutSync\.save\(data\);\s*else if \(window\.CognationTowerLayoutSync\.saveWidgetsIfChanged\) window\.CognationTowerLayoutSync\.saveWidgetsIfChanged\(data\);/.test(tower), "account layout: positions on a geometry edit, added widgets only when they change (never on open), signed-in only");
 assert.ok(/!signInConfigured && window\.CognationAccounts/.test(tower), "demo profile id only in local preview, never with sign-in configured");
 
 })();

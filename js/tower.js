@@ -2250,7 +2250,13 @@
       writeScrapbookLayout(data, { keepLayout: !opts.geometry });
       /* Account layout row is written only on a real geometry edit (drag end,
          rotate, resize). Opening the Tower must never POST a layout. */
-      if (opts.geometry && window.CognationTowerLayoutSync) window.CognationTowerLayoutSync.save(data);
+      /* Signed-in owner only (this save already returned for anyone else):
+         drag end uploads positions + added widgets; an add / remove / switch
+         uploads the added widgets when they changed. localStorage is a cache. */
+      if (window.CognationTowerLayoutSync && liveSignedInForTower()) {
+        if (opts.geometry) window.CognationTowerLayoutSync.save(data);
+        else if (window.CognationTowerLayoutSync.saveWidgetsIfChanged) window.CognationTowerLayoutSync.saveWidgetsIfChanged(data);
+      }
       var id = data._profileId || resolveActiveProfileId();
       /* A drop only changes x/y. Never PATCH the profile: that reload paints
          the remote row, which has no sticker coordinates, and the widget

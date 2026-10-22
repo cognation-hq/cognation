@@ -6,6 +6,11 @@
  *
  * layout._public (optional): { musicUrl, socialLinks } — Pro YouTube + Venmo /
  * Pay for services / Buy ads / social URLs that must survive a fresh browser.
+ * layout._widgets (optional, Oct 22): the owner's added widgets and switches —
+ * { quoteStickers, emojiStickers, friendPinLayout, badgePinLayout,
+ *   publicWidgets, badgeVisibility }. Saved for a signed-in owner on add,
+ * remove, switch and drag end. When a row has it, it wins over the copy in
+ * localStorage, which is only a cache.
  * Keys starting with "_" are never treated as sticker coordinates.
  */
 (function (root) {
@@ -16,6 +21,14 @@
   var publicCache = {}; /* profileId -> { musicUrl, socialLinks } */
   var pending = {};
   var saveTimers = {};
+  var widgetsSeen = {}; /* profileId -> signature of the widgets last loaded or saved */
+
+  var MAX_QUOTES = 12;
+  var MAX_QUOTE_TEXT = 400;
+  var MAX_EMOJI = 24;
+  var MAX_PINS = 40;
+  var MAX_SWITCHES = 40;
+  var KEY_RE = /^[A-Za-z0-9_.:-]{1,64}$/;
 
   function client() {
     var c = root.CognationSupabase;
@@ -41,6 +54,85 @@
     };
   }
 
+  function cleanPos(pos, zDefault) {
+    if (!pos || typeof pos !== "object") return null;
+    var x = num(pos.x, NaN);
+    var y = num(pos.y, NaN);
+    if (!isFinite(x) || !isFinite(y)) return null;
+    return { x: x, y: y, z: num(pos.z, zDefault), tilt: num(pos.tilt, 0) };
+  }
+
+  function cleanPinMap(raw, zDefault) {
+    var out = {};
+    if (!raw || typeof raw !== "object") return out;
+    Object.keys(raw).filter(function (k) { return KEY_RE.test(k); }).slice(0, MAX_PINS).forEach(function (k) {
+      var pos = cleanPos(raw[k], zDefault);
+      if (pos) out[k] = pos;
+    });
+    return out;
+  }
+
+  function cleanSwitches(raw) {
+    var out = {};
+    if (!raw || typeof raw !== "object") return out;
+    Object.keys(raw).filter(function (k) { return KEY_RE.test(k); }).slice(0, MAX_SWITCHES).forEach(function (k) {
+      out[k] = raw[k] !== false;
+    });
+    return out;
+  }
+
+  /** Added widgets + switches, capped: 12 quotes of 400 characters, 24 emoji, 40 pins. */
+  function cleanWidgets(raw) {
+    var src = raw && typeof raw === "object" ? raw : {};
+    var quotes = [];
+    (Array.isArray(src.quoteStickers) ? src.quoteStickers : []).forEach(function (q) {
+      if (quotes.length >= MAX_QUOTES || !q || typeof q !== "object") return;
+      var id = String(q.id || "");
+      var text = String(q.text || "").trim().slice(0, MAX_QUOTE_TEXT);
+      if (!KEY_RE.test(id) || !text) return;
+      var entry = { id: id, text: text, x: num(q.x, 40), y: num(q.y, 40), z: num(q.z, 10), tilt: num(q.tilt, 0) };
+      if (typeof q.w === "number" && isFinite(q.w) && q.w > 0) entry.w = Math.round(Math.max(80, Math.min(4000, q.w)));
+      quotes.push(entry);
+    });
+    var emoji = [];
+    (Array.isArray(src.emojiStickers) ? src.emojiStickers : []).forEach(function (e) {
+      if (emoji.length >= MAX_EMOJI || !e || typeof e !== "object") return;
+      var id = String(e.id || "");
+      if (!KEY_RE.test(id)) return;
+      var entry = { id: id };
+      if (e.glyph) entry.glyph = String(e.glyph).slice(0, 16);
+      if (e.size != null && isFinite(num(e.size, NaN))) entry.size = num(e.size, 0);
+      emoji.push(entry);
+    });
+    return {
+      quoteStickers: quotes,
+      emojiStickers: emoji,
+      friendPinLayout: cleanPinMap(src.friendPinLayout, 12),
+      badgePinLayout: cleanPinMap(src.badgePinLayout, 14),
+      publicWidgets: cleanSwitches(src.publicWidgets),
+      badgeVisibility: cleanSwitches(src.badgeVisibility),
+    };
+  }
+
+  /* What an add / remove / switch changes. Pin positions are left out: they
+     change on drag end (a geometry save, which uploads anyway) and when the
+     page fills in default pin spots, which must never upload on open. */
+  function offKeys(map) {
+    return Object.keys(map || {}).filter(function (k) { return map[k] === false; }).sort();
+  }
+
+  function widgetsSignature(p) {
+    var w = cleanWidgets(p);
+    return JSON.stringify({
+      q: w.quoteStickers.map(function (q) { return [q.id, q.text]; }),
+      e: w.emojiStickers.map(function (e) { return [e.id, e.size == null ? null : e.size]; }),
+      /* Only the switches that are off: the page fills in "on" defaults and
+         drops keys a face doesn't use (Pro has no music), which is not an edit. */
+      pw: offKeys(w.publicWidgets),
+      bv: offKeys(w.badgeVisibility),
+    });
+  }
+
   function clean(layout) {
     var out = {};
     if (!layout || typeof layout !== "object") return out;
@@ -61,6 +153,9 @@
     if (layout._public && typeof layout._public === "object") {
       out._public = cleanPublic(layout._public);
     }
+    if (layout._widgets && typeof layout._widgets === "object") {
+      out._widgets = cleanWidgets(layout._widgets);
+    }
     /* One-time compaction done (old layouts). */
     if (layout._compacted) out._compacted = 1;
     if (layout._backup && typeof layout._backup === "object") {
@@ -77,6 +172,7 @@
     var inner = Object.assign({}, b.layout);
     delete inner._public;
     delete inner._backup;
+    delete inner._widgets;
     var positions = clean(inner);
     if (!Object.keys(positions).length) return null;
     var at = String(b.at || "");
@@ -122,6 +218,26 @@
     }
   }
 
+  function copy(v) {
+    return JSON.parse(JSON.stringify(v));
+  }
+
+  /* The server row wins over the localStorage cache for added widgets and switches. */
+  function applyWidgetsToProfile(p, w) {
+    if (!p || !w) return;
+    p.quoteStickers = copy(w.quoteStickers || []);
+    p.emojiStickers = copy(w.emojiStickers || []);
+    p.friendPinLayout = copy(w.friendPinLayout || {});
+    p.badgePinLayout = copy(w.badgePinLayout || {});
+    if (w.publicWidgets && Object.keys(w.publicWidgets).length) {
+      if (!p.publicWidgets || typeof p.publicWidgets !== "object") p.publicWidgets = {};
+      Object.keys(w.publicWidgets).forEach(function (k) { p.publicWidgets[k] = w.publicWidgets[k]; });
+    }
+    if (w.badgeVisibility && Object.keys(w.badgeVisibility).length) {
+      p.badgeVisibility = copy(w.badgeVisibility);
+    }
+  }
+
   /** Called from the profile read path. Mutates p.widgetLayout when a DB row exists. */
   function apply(p) {
     var id = profileId(p);
@@ -150,14 +266,27 @@
       });
       p.widgetLayout = base;
     }
+    if (saved && saved._widgets) applyWidgetsToProfile(p, saved._widgets);
     var pub = (saved && saved._public) || publicCache[id];
     if (pub) applyPublicToProfile(p, pub);
+    widgetsSeen[id] = widgetsSignature(p);
     return p;
+  }
+
+  /* Writes go out only with a signed-in Supabase session (RLS also limits
+     them to the profile's owner). Signed-out pages never try. */
+  function signedIn(c) {
+    try {
+      var s = c && typeof c.getSession === "function" ? c.getSession() : null;
+      return !!(s && s.access_token);
+    } catch (e) {
+      return false;
+    }
   }
 
   function upsert(id, layout) {
     var c = client();
-    if (!id || !c) return false;
+    if (!id || !c || !signedIn(c)) return false;
     cache[id] = layout;
     if (layout && layout._public) publicCache[id] = layout._public;
     root.clearTimeout(saveTimers[id]);
@@ -175,8 +304,10 @@
   /** Called from the owner-only geometry save path. Debounced upsert. */
   function save(p) {
     var id = profileId(p);
-    if (!id || !p.widgetLayout || typeof p.widgetLayout !== "object") return false;
-    var layout = clean(p.widgetLayout);
+    if (!id) return false;
+    /* No built-in positions yet (only an added Quote, say) still uploads. */
+    var layout = clean(p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : {});
+    delete layout._widgets;
     var prevPub = publicCache[id] || (cache[id] && cache[id]._public) || null;
     if (prevPub) layout._public = cleanPublic(prevPub);
     if (p.musicUrl || (p.socialLinks && typeof p.socialLinks === "object")) {
@@ -188,8 +319,39 @@
     /* Keep the last pre-repair copy (new one from the repair, else the saved one). */
     var bk = cleanBackup(p.layoutBackup) || (cache[id] && cache[id]._backup) || null;
     if (bk) layout._backup = bk;
-    if (!Object.keys(layout).length) return false;
-    return upsert(id, layout);
+    /* Added widgets go up even when no built-in widget has a position yet. */
+    layout._widgets = cleanWidgets(p);
+    var ok = upsert(id, layout);
+    if (ok) widgetsSeen[id] = widgetsSignature(p);
+    return ok;
+  }
+
+  /**
+   * Owner add / remove / switch (not a drag). Uploads only when the widgets
+   * differ from what was last loaded or saved for this profile, so opening the
+   * Tower never posts. Positions come from the saved row, never the spawn grid.
+   */
+  function saveWidgetsIfChanged(p) {
+    var id = profileId(p);
+    if (!id) return false;
+    var sig = widgetsSignature(p);
+    if (!Object.prototype.hasOwnProperty.call(widgetsSeen, id)) {
+      widgetsSeen[id] = sig;
+      return false;
+    }
+    if (widgetsSeen[id] === sig) return false;
+    /* Not loaded yet: never overwrite a row we have not read. */
+    if (!Object.prototype.hasOwnProperty.call(cache, id)) {
+      load(id);
+      return false;
+    }
+    var base = clean(cache[id] && typeof cache[id] === "object" ? cache[id] : {});
+    var prevPub = publicCache[id] || base._public || null;
+    if (prevPub) base._public = cleanPublic(prevPub);
+    base._widgets = cleanWidgets(p);
+    var ok = upsert(id, base);
+    if (ok) widgetsSeen[id] = sig;
+    return ok;
   }
 
   /**
@@ -211,6 +373,10 @@
     apply: apply,
     save: save,
     savePublic: savePublic,
+    saveWidgetsIfChanged: saveWidgetsIfChanged,
+    _cleanWidgets: cleanWidgets,
+    _widgetsSignature: widgetsSignature,
+    _widgetsSeen: widgetsSeen,
     _cache: cache,
     _publicCache: publicCache,
     _clean: clean,

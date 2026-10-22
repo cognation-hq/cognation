@@ -12861,13 +12861,16 @@ a.site-switch-side:focus-visible {
   margin: 0.9rem 0 0;
   padding: 0;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.5rem;
+  min-width: 0;
 }
 .commune-pro-know-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
+  min-width: 0;
 }
 .commune-pro-know-open,
 .commune-pro-know-name {
@@ -12886,12 +12889,106 @@ a.site-switch-side:focus-visible {
 }
 .commune-pro-know-open {
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
+/* Designer v2: #ED9300 ring (existing --color-accent) on hover or keyboard focus. */
 .commune-pro-know-open:hover,
 .commune-pro-know-open:focus-visible {
-  border-color: rgba(183, 246, 255, 0.7);
-  background: rgba(155, 235, 255, 0.12);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent);
+  background: rgba(232, 214, 245, 0.12);
   outline: none;
+}
+.commune-pro-know-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.commune-pro-know-person {
+  display: block;
+}
+/* Job title (only when the row has one): its own line, one line max. */
+.commune-pro-know-title {
+  display: block;
+  max-width: 100%;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.3;
+  color: #d9d2f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+}
+@media (max-width: 390px) {
+  .commune-pro-know-title { font-size: 13px; }
+}
+.commune-pro-know-chevron {
+  flex: 0 0 auto;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: #d9d2f0;
+  opacity: 0.6;
+}
+/* The panel-wide #panel-commune text colors are !important; these two keep #d9d2f0. */
+#panel-commune .commune-pro-know-title,
+#panel-commune .commune-pro-know-chevron {
+  color: #d9d2f0 !important;
+}
+#panel-commune .commune-pro-know-open:hover,
+#panel-commune .commune-pro-know-open:focus-visible {
+  border-color: var(--color-accent) !important;
+}
+/* Designer v2: the people card hugs its rows with 20px padding (no fixed-height slab). */
+.commune-swipe-stage:has(.commune-card[data-card-type="pro-know"]),
+.commune-swipe-deck:has(.commune-card[data-card-type="pro-know"]) {
+  min-height: 0;
+}
+#panel-commune .commune-card[data-card-type="pro-know"] {
+  position: relative;
+  inset: auto;
+  padding: 20px;
+}
+/* Designer v2 deck end: centered note; Pass / Keep and the status line hide. */
+.commune-swipe-end {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  text-align: center;
+  padding: 0 1rem;
+}
+.commune-swipe-end .commune-swipe-empty {
+  margin: 0;
+}
+.commune-swipe-end .commune-swipe-end-title {
+  color: #f7f9ff;
+  font-size: 16px;
+  font-weight: 600;
+}
+.commune-swipe-end .commune-swipe-end-sub {
+  margin: 0;
+  color: #d9d2f0;
+  font-size: 14px;
+}
+#panel-commune .commune-swipe-end .commune-swipe-end-title {
+  color: #f7f9ff !important;
+  font-size: 16px !important;
+}
+#panel-commune .commune-swipe-end .commune-swipe-end-sub {
+  color: #d9d2f0 !important;
+  font-size: 14px !important;
+}
+.is-deck-end .commune-swipe-actions,
+.is-deck-end [data-commune-swipe-status] {
+  display: none !important;
 }
 
 

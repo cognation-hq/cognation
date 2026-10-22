@@ -1,7 +1,7 @@
 /**
  * ECHO Professional: the real "Professionals you might know" card (Alexa 2026-10-22 CT).
  * - 11:48 "maybe a people you may know professional card": real Pro pages only; no card when none.
- * - 11:49 "this persons name - job title software eng": each row is "Name · Job title", or the
+ * - 11:49 "this persons name - job title software eng": each row shows the name, then the job title on its own line (Designer v2), or the
  *   name only when the page has no job title (never invented; profiles has no job title column today).
  * - 11:49 "maybe 3 people you might know on one card": up to 3 rows, each opens that Pro page.
  * Never seed pages for real viewers, never the viewer's own pages, never personal friends.
@@ -91,8 +91,10 @@ assert.strictEqual(card.length, 1, "one people card");
 var rows = card[0].people;
 assert.strictEqual(rows.length, 2, "two real matches: two rows, not padded");
 var html = a.api.renderCard(card[0]).innerHTML;
-assert.ok(html.indexOf(">Jordan \u00b7 Software Engineer</button>") >= 0, "name · job title");
-assert.ok(html.indexOf(">Riley</button>") >= 0, "no job title: name only");
+/* Designer v2: name and job title on two lines; "Name · Job title" stays the accessible name. */
+assert.ok(html.indexOf('aria-label="Jordan \u00b7 Software Engineer"') >= 0, "name · job title");
+assert.ok(/<span class="commune-pro-know-person">Jordan<\/span><span class="commune-pro-know-title"[^>]*>Software Engineer<\/span>/.test(html), "title on its own line");
+assert.ok(html.indexOf('aria-label="Riley"') >= 0 && /<span class="commune-pro-know-person">Riley<\/span><\/span>/.test(html), "no job title: name only");
 assert.ok(!/Riley \u00b7/.test(html), "no invented title");
 assert.ok(html.indexOf("Software engineering team") < 0, "bio/headline is never used as a job title");
 assert.ok(!/Demo \u00b7|data-account-kind=/.test(html), "real pages carry no Demo badge");

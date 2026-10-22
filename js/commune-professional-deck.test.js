@@ -161,7 +161,7 @@ var lanes0 = adult.buildProfessionalLanes();
 var know = proDeck.filter(function (c) { return c.type === "pro-know"; });
 assert.strictEqual(know.length, 1, "one people card");
 assert.strictEqual(know[0].people.map(function (r) { return r.profileId; }).join(","), "clinic,lab", "professional pages only, best match first");
-assert.ok(/public health/.test(know[0].why), "why line names the shared interest");
+assert.strictEqual(know[0].why, "Matched to your field and interests.", "why line (Designer v2)");
 
 var podcasts = lanes0["pro-podcast"].map(function (c) { return c.title + " " + c.body; }).join(" ");
 assert.ok(/not only Cognation experts/.test(podcasts) && /Ethical/i.test(podcasts) && /async/i.test(podcasts) && /Continuing education/i.test(podcasts), "podcast topics");

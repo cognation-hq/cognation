@@ -1709,13 +1709,13 @@
     /* One card, up to 3 people (Alexa 2026-10-22 11:49 AM CT: "maybe 3 people you might
        know on one card"). Fewer real matches: fewer rows. Never padded. */
     var rows = people.slice(0, PRO_KNOW_MAX);
-    var top = rows[0];
     return [{
       id: "pro-know-" + rows.map(function (r) { return r.profileId; }).join("-"),
       type: PRO.KNOW,
       title: "Professionals you might know",
       people: rows,
-      why: top.shared ? "Shares your interest: " + top.shared : "Professional pages you don't follow yet.",
+      /* Designer v2 (2026-10-22): one fixed why-line; the heading stays the type mark. */
+      why: "Matched to your field and interests.",
       rating: "G",
       minAge: 13,
       keepOnly: true,
@@ -1735,6 +1735,19 @@
 
   function proKnowRowLabel(row) {
     return row.jobTitle ? row.name + " \u00b7 " + row.jobTitle : row.name;
+  }
+
+  /* Designer v2: the name on its own line, then the job title (only when the row has
+     one, from profiles.job_title, #236) on a second line, one line max with an ellipsis.
+     Rows without a title stay one line. The full "Name · Title" is the accessible name. */
+  function proKnowRowInnerHtml(row) {
+    var html = '<span class="commune-pro-know-text">' +
+      '<span class="commune-pro-know-person">' + escapeHtml(row.name) + "</span>";
+    if (row.jobTitle) {
+      html += '<span class="commune-pro-know-title" data-pro-know-title title="' + escapeHtml(row.jobTitle) + '">' +
+        escapeHtml(row.jobTitle) + "</span>";
+    }
+    return html + "</span>";
   }
 
   function professionalCardAllowed(card) {
@@ -2103,9 +2116,10 @@
           html += '<li class="commune-pro-know-row">';
           if (row.handle) {
             html += '<button type="button" class="commune-pro-know-open" data-pro-know-open="' + i + '" data-pro-know-handle="' +
-              escapeHtml(row.handle) + '">' + escapeHtml(proKnowRowLabel(row)) + "</button>";
+              escapeHtml(row.handle) + '" aria-label="' + escapeHtml(proKnowRowLabel(row)) + '">' + proKnowRowInnerHtml(row) +
+              '<span class="commune-pro-know-chevron" aria-hidden="true">\u203a</span></button>';
           } else {
-            html += '<span class="commune-pro-know-name">' + escapeHtml(proKnowRowLabel(row)) + "</span>";
+            html += '<span class="commune-pro-know-name">' + proKnowRowInnerHtml(row) + "</span>";
           }
           html += badgeRow + "</li>";
         });
@@ -3259,20 +3273,28 @@
     }
     if (!card) {
       var roomsOpen = ensureSiteRooms().length;
+      /* Designer v2: deck end is a centered two-line note; Pass / Keep and the status
+         line ("Passed …") hide until a card is back (is-deck-end on the shell). */
+      if (state.shell) state.shell.classList.add("is-deck-end");
+      setStatus("");
       var empty =
-        '<p class="commune-swipe-empty">You\'re caught up.</p>' +
+        '<div class="commune-swipe-end" data-commune-deck-end>' +
+        '<p class="commune-swipe-empty commune-swipe-end-title">You\'re caught up.</p>' +
+        '<p class="commune-swipe-end-sub">New cards show up as people share.</p>' +
         (liveBirthMissing()
           ? '<p class="commune-swipe-empty commune-swipe-empty--rooms" data-commune-birth-needed>Chat rooms (13+) and classrooms (18+) need your birth year and month. Only the month and year are saved.</p>' +
             '<p class="commune-swipe-empty"><button type="button" class="btn btn-primary" data-commune-add-birth>Add birth month</button></p>'
           : roomsOpen
             ? ''
-            : '<p class="commune-swipe-empty commune-swipe-empty--rooms">No chat rooms match your age and interests yet. Update age or interests in your profile, then come back.</p>');
+            : '<p class="commune-swipe-empty commune-swipe-empty--rooms">No chat rooms match your age and interests yet. Update age or interests in your profile, then come back.</p>') +
+        "</div>";
       state.deck.innerHTML = empty;
       var addBirth = state.deck.querySelector("[data-commune-add-birth]");
       if (addBirth) addBirth.addEventListener("click", openBirthPrompt);
       syncActionLabels();
       return;
     }
+    if (state.shell) state.shell.classList.remove("is-deck-end");
     var el = renderCard(card);
     state.deck.appendChild(el);
     bindCard(el, card);

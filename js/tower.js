@@ -9995,7 +9995,9 @@
      before the re-render; afterwards, if the page is now too short to stay there,
      hold the stage's height by exactly the missing amount (blank space at the
      stage's foot, nothing else moves), then restore scrollY. The hold goes with
-     the next stage layout (Show, Reset layout, resize, reload). Display only. */
+     the next stage layout (Show, Reset layout, resize, reload). Display only.
+     Every width: no breakpoint check here or in keepTowerScrollAround, so the
+     hold (and the blank space at the stage's foot) is the same at 1280 as at 390. */
   function holdTowerScroll(root, x, y) {
     if (typeof window === "undefined" || typeof document === "undefined") return;
     var doc = document.documentElement;

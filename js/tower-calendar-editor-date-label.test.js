@@ -67,8 +67,12 @@ assert.ok(/type="date" required value="' \+\s*escapeHtml\(formDate\)/.test(priv)
 /* Oswald headers, scoped to Edit profile > Calendar, no new font loaded. */
 var rule = /#panel-tower \[data-tower-edit-calendar\] :is\(\.tower-cal-label, \.tower-cal-dow\) \{\s*font-family: "Oswald", system-ui, sans-serif !important;\s*\}/;
 assert.ok(rule.test(css), "Oswald on the month label and weekday row");
-var bodyRule = /#panel-tower \[data-tower-edit-calendar\] :is\(\.tower-cal-public-title, \.tower-cal-day-heading\) \{\s*font-weight: 600 !important;\s*\}/;
-assert.ok(bodyRule.test(css), "title and day heading: body sans at 600");
+var bodyRule = /#panel-tower \[data-tower-edit-calendar\] :is\(\.tower-cal-public-title, \.tower-cal-day-heading\) \{\s*font-weight: 680 !important;\s*\}/;
+assert.ok(bodyRule.test(css), "title and day heading: body sans at 680, matching the visitor Calendar card");
+/* The visitor card is the reference: its rules never name a weight here. */
+(css.match(/\.tower-visitor-calendar[^{]*\{[^}]*\}/g) || []).forEach(function (r) {
+  assert.ok(!/font-weight/.test(r), "visitor Calendar card weight untouched: " + r);
+});
 var editRules = css.match(/#panel-tower \[data-tower-edit-calendar\][^{]*\{[^}]*\}/g) || [];
 editRules.forEach(function (r) {
   if (/tower-cal-public-title|tower-cal-day-heading/.test(r)) assert.ok(!/Oswald|font-family/.test(r), "title and day heading keep the body sans: " + r);

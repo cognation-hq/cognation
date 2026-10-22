@@ -15124,12 +15124,14 @@ body.cgn-cal-page {
 .tower-visitor-calendar :is(.tower-cal-month, .tower-cal-label, .tower-cal-day-heading) { color: #f7f9ff !important; font-family: "Oswald", system-ui, sans-serif; }
 /* Edit profile > Calendar (owner): the month label and weekday row in Oswald,
    the site's header family (already loaded; no new font). The "Calendar" title
-   and the day heading stay in the body sans at 600. */
+   and the day heading stay in the body sans, at 680 to match the visitor
+   Calendar card (Designer, 2026-10-22). The visitor card is the reference and
+   is not changed here. */
 #panel-tower [data-tower-edit-calendar] :is(.tower-cal-label, .tower-cal-dow) {
   font-family: "Oswald", system-ui, sans-serif !important;
 }
 #panel-tower [data-tower-edit-calendar] :is(.tower-cal-public-title, .tower-cal-day-heading) {
-  font-weight: 600 !important;
+  font-weight: 680 !important;
 }
 .tower-visitor-calendar .tower-cal-cell { background: rgba(18,16,38,.92); color: #f7f9ff; border-color: rgba(209,241,255,.28); }
 .tower-visitor-calendar .tower-cal-cell.is-today, .tower-visitor-calendar .tower-cal-cell.is-selected { border-color: rgba(197,166,255,.85); box-shadow: 0 0 0 1px rgba(197,166,255,.45) inset; }

@@ -13678,6 +13678,69 @@ body.is-circle-open .circle-spot.is-filled {
   padding-left: 2.2rem;
 }
 
+/* Venmo / Pay for services / Buy ads (Pro): one card, stacked pills, 12px gap
+   (Designer spec, PM confirmed). Same width each: 240px on the website, the full
+   card width minus 16px each side on a phone. Orange ring on hover/focus only. */
+.tower-layout--scrapbook .tower-sticker--pay-links,
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--pay-links.is-spawned {
+  padding: 16px;
+  box-sizing: border-box;
+  /* Same card chrome as the default-grid widgets, also on a saved layout. */
+  background: rgba(16, 19, 48, 0.42);
+  border: 1px solid rgba(209, 241, 255, 0.28);
+  border-radius: 1rem;
+}
+.tower-pay-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.tower-pay-links .tower-pay-pill {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 240px;
+  max-width: 100%;
+  min-height: 44px;
+  height: auto;
+  margin: 0;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: rgba(18, 16, 38, 0.92);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(217, 210, 240, 0.4);
+  color: #f7f9ff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-decoration: none;
+  outline: none;
+  box-shadow: none;
+}
+.tower-pay-links .tower-pay-pill:hover,
+.tower-pay-links .tower-pay-pill:focus-visible {
+  color: #f7f9ff;
+  border-color: rgba(217, 210, 240, 0.4);
+  box-shadow: 0 0 0 2px #ED9300;
+}
+.tower-layout--scrapbook.is-phone-stack .tower-pay-links .tower-pay-pill {
+  width: 100%;
+}
+@media (max-width: 767px) {
+  .tower-pay-links .tower-pay-pill { width: 100%; }
+}
+/* The panel-wide accent link colour (!important) would turn the text cyan. */
+#panel-tower .tower-pay-links .tower-pay-pill,
+#panel-tower .tower-pay-links .tower-pay-pill:hover,
+#panel-tower .tower-pay-links .tower-pay-pill:focus-visible {
+  color: #f7f9ff !important;
+}
+
 /* Tower "Message" action next to Add friend (another member's personal page). */
 .tower-follow-row .tower-message-btn { margin-left: 0.5rem; }
 .tower-follow-row .tower-message-status { margin: 0.35rem 0 0; flex-basis: 100%; }

@@ -143,6 +143,15 @@
     return "social-" + String(netId || "");
   }
 
+  /* Pro money links (Venmo, Pay for services, Buy ads): one card, stacked pills
+     (Designer spec). Each link is still its own saved field; only the widget on
+     the page is one group. Personal keeps Venmo as its own logo chip. */
+  var PAY_LINKS_ID = "pay-links";
+  var PAY_LINK_NETS = ["venmo", "services", "ads"];
+  function isPayLinkNet(netId, p) {
+    return isProTower(p) && PAY_LINK_NETS.indexOf(String(netId || "")) >= 0;
+  }
+
   function socialNetIdFromWidget(wid) {
     wid = String(wid || "");
     return wid.indexOf("social-") === 0 ? wid.slice("social-".length) : "";
@@ -205,11 +214,15 @@
     var out = [];
     (rows || []).forEach(function (row) {
       if (row.length === 1 && row[0] === "__socials__") {
-        var ids = optedInSocialNetIds(p).map(socialWidgetId);
+        var opted = optedInSocialNetIds(p);
+        var pay = opted.filter(function (id) { return isPayLinkNet(id, p); });
+        var ids = opted.filter(function (id) { return pay.indexOf(id) < 0; }).map(socialWidgetId);
         var i;
         for (i = 0; i < ids.length; i += 2) {
           out.push(ids.slice(i, i + 2));
         }
+        /* Venmo / Pay for services / Buy ads: one full-width card after the chips. */
+        if (pay.length) out.push([PAY_LINKS_ID]);
         return;
       }
       out.push(row.slice());
@@ -232,6 +245,22 @@
       if (!p.widgetLayout[wid]) p.widgetLayout[wid] = old;
     }
     delete p.widgetLayout.social;
+  }
+
+  /* A saved layout from before the pay-links card: the card takes the spot of the
+     first Venmo / Pay / Buy ads chip the owner placed. The old keys stay as they
+     are (nothing is deleted), so no saved position is lost. */
+  function seedPayLinksLayout(p) {
+    if (!p || !isProTower(p) || !p.widgetLayout || typeof p.widgetLayout !== "object") return;
+    var layout = p.widgetLayout;
+    if (layout[PAY_LINKS_ID]) return;
+    for (var i = 0; i < PAY_LINK_NETS.length; i++) {
+      var old = layout[socialWidgetId(PAY_LINK_NETS[i])];
+      if (old && typeof old === "object" && isPlacedPos(layout, socialWidgetId(PAY_LINK_NETS[i]))) {
+        layout[PAY_LINKS_ID] = JSON.parse(JSON.stringify(old));
+        return;
+      }
+    }
   }
 
   function rectsOverlap(a, b, gap) {
@@ -429,7 +458,15 @@
           gridCache[id] = { x: 0, y: 0, z: 2, tilt: 0 };
         });
       });
-      ordered.forEach(function (el) { stage.appendChild(el); });
+      /* Re-append only when the order changed: moving a node drops keyboard focus,
+         so a re-render used to knock focus off any link in the grid (Tab to a pay
+         link, and focus jumped back to the page). Same final order as before. */
+      var kids = stage.children;
+      var tailOk = kids.length >= ordered.length;
+      for (var oi = 0; tailOk && oi < ordered.length; oi++) {
+        if (kids[kids.length - ordered.length + oi] !== ordered[oi]) tailOk = false;
+      }
+      if (!tailOk) ordered.forEach(function (el) { stage.appendChild(el); });
       ensureProfileStrip(stage, p);
       /* Friend pins: in default grid they sit inside the Top Friends card flow via CSS;
          clear absolute spawn marks so they do not float over the grid. */
@@ -5151,6 +5188,7 @@
   function renderSocialLinks(root, p) {
     if (!root) return;
     migrateGroupedSocialLayout(p);
+    seedPayLinksLayout(p);
     syncEditSocialFields(root, p);
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (!stage) return;
@@ -5167,13 +5205,14 @@
       var wid = el.getAttribute("data-tower-widget") || "";
       var netId = socialNetIdFromWidget(wid);
       if (!netId) return;
-      if (!wanted[netId]) {
+      if (!wanted[netId] || isPayLinkNet(netId, p)) {
         if (el.parentNode) el.parentNode.removeChild(el);
       }
     });
 
     socialLinkDefs().forEach(function (net) {
       if (!wanted[net.id]) return;
+      if (isPayLinkNet(net.id, p)) return; /* drawn in the pay-links card below */
       var wid = socialWidgetId(net.id);
       var href = socialHref(net.id, links[net.id]);
       var el = stage.querySelector('[data-tower-widget="' + wid + '"]');
@@ -5228,11 +5267,70 @@
       el.classList.remove("is-widget-off");
     });
 
+    renderPayLinks(stage, p, links, wanted);
+
     /* Old builds left an X button on each chip; drop any still in the DOM. */
     stage.querySelectorAll(".tower-social-chip-remove").forEach(function (x) {
       if (x.parentNode) x.parentNode.removeChild(x);
     });
     syncOwnerStickerHandles(root);
+  }
+
+  /* One card, one group: Venmo, Pay for services, Buy ads as stacked pills (12px
+     gap). Each opens the owner's own saved link in a new tab; a link that is not
+     set is not shown, and with none set there is no card. Cognation takes no
+     payment here: plain outbound links only. */
+  function renderPayLinks(stage, p, links, wanted) {
+    var nets = isProTower(p)
+      ? socialLinkDefs().filter(function (net) { return wanted[net.id] && isPayLinkNet(net.id, p) && socialHref(net.id, links[net.id]); })
+      : [];
+    var el = stage.querySelector('[data-tower-widget="' + PAY_LINKS_ID + '"]');
+    if (!nets.length) {
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+      return;
+    }
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "tower-sticker tower-sticker--pay-links";
+      el.setAttribute("data-tower-widget", PAY_LINKS_ID);
+      el.setAttribute("data-sticker-label", "Venmo & Buy ads");
+      var handle = document.createElement("button");
+      handle.type = "button";
+      handle.className = "tower-sticker-handle";
+      handle.setAttribute("data-tower-sticker-handle", "");
+      handle.setAttribute("aria-label", "Move Venmo & Buy ads sticker");
+      handle.tabIndex = -1;
+      handle.hidden = true;
+      handle.textContent = "⋮⋮";
+      el.appendChild(handle);
+      var group = document.createElement("div");
+      group.className = "tower-pay-links";
+      group.setAttribute("role", "group");
+      group.setAttribute("aria-label", "Pay and ads links");
+      group.setAttribute("data-tower-pay-links", "");
+      el.appendChild(group);
+      stage.appendChild(el);
+    }
+    var box = el.querySelector("[data-tower-pay-links]");
+    el.hidden = false;
+    el.classList.remove("is-widget-off");
+    /* Same links as last time: leave the pills alone, so a re-render does not
+       drop keyboard focus or a hover ring. */
+    var sig = nets.map(function (net) { return net.id + "=" + socialHref(net.id, links[net.id]); }).join("|");
+    if (box.getAttribute("data-pay-sig") === sig && box.children.length === nets.length) return;
+    box.setAttribute("data-pay-sig", sig);
+    box.innerHTML = "";
+    nets.forEach(function (net) {
+      var a = document.createElement("a");
+      a.className = "tower-social-btn tower-pay-pill tower-social-btn--" + net.id;
+      a.setAttribute("data-tower-pay-link", net.id);
+      a.href = socialHref(net.id, links[net.id]);
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = net.label;
+      a.setAttribute("aria-label", "Open " + net.label + " (opens in a new tab)");
+      box.appendChild(a);
+    });
   }
 
   function getFriendPinLayout(p) {
@@ -9973,6 +10071,11 @@
         syncRotateToolbar(root);
         /* Social link chip (the X button is gone): clear that link, same as the
            old X did, so it stays removed after reload. */
+        /* Pay-links card holds several links: each is cleared in Edit profile. */
+        if (id === PAY_LINKS_ID) {
+          setProfileStatusSafe("Venmo, Pay for services and Buy ads links are set in Edit profile.", false);
+          return;
+        }
         var socialNet = socialNetIdFromWidget(id);
         if (socialNet) {
           removeSocialWidget(root, socialNet);

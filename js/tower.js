@@ -1379,6 +1379,85 @@
     return String(slug || "").trim().replace(/^@/, "");
   }
 
+  /* The signed-in viewer's own profiles, from the server (getMyProfiles) only.
+     Never the viewed page, never a cached handle from another account. */
+  function viewerOwnProfiles() {
+    var social = remoteSocial();
+    if (!social || typeof social.getMyProfiles !== "function") return [];
+    var mine = social.getMyProfiles() || [];
+    return Array.isArray(mine) ? mine.filter(function (row) { return row && row.id; }) : [];
+  }
+
+  /* Own profile row for this kind ("personal" | "professional"). Null when the
+     viewer has no page of that kind: no Pro page means no Pro link. */
+  function viewerOwnProfileOfKind(kind) {
+    var mine = viewerOwnProfiles();
+    for (var i = 0; i < mine.length; i++) {
+      if (String(mine[i].kind || "") === String(kind || "")) return mine[i];
+    }
+    return null;
+  }
+
+  /* True when a #tower-profile-{slug} names one of the viewer's own pages.
+     Live sessions trust getMyProfiles only; before it loads, the session's own
+     active id/handle counts (it is replaced once the list arrives). */
+  function slugIsViewerOwn(slug) {
+    slug = String(slug || "").trim().replace(/^@/, "");
+    if (!slug) return false;
+    var norm = normalizeHandle(slug);
+    var mine = viewerOwnProfiles();
+    if (mine.length) {
+      for (var i = 0; i < mine.length; i++) {
+        if (String(mine[i].id) === slug || normalizeHandle(mine[i].handle || "") === norm) return true;
+      }
+      return false;
+    }
+    var s = getSessionObject();
+    if (!s) return false;
+    if (s.activeProfileId && String(s.activeProfileId) === slug) return true;
+    return !!(s.profileHandle && normalizeHandle(s.profileHandle) === norm);
+  }
+
+  /* A session whose active profile is not one of the viewer's own (a stale id
+     left from another account or a test) is reset to the viewer's own page. */
+  function dropForeignActiveProfile() {
+    var s = getSessionObject();
+    var mine = viewerOwnProfiles();
+    if (!s || s.source !== "supabase" || !mine.length) return false;
+    var active = String(s.activeProfileId || "");
+    for (var i = 0; i < mine.length; i++) {
+      if (String(mine[i].id) === active) {
+        if (s.profileHandle && normalizeHandle(s.profileHandle) === normalizeHandle(mine[i].handle || "")) return false;
+        break;
+      }
+    }
+    var keep = null;
+    for (var j = 0; j < mine.length; j++) {
+      if (String(mine[j].id) === active) keep = mine[j];
+    }
+    keep = keep || mine.filter(function (r) { return r.kind === "personal"; })[0] || mine[0];
+    var social = remoteSocial();
+    if (social && typeof social.setActiveProfile === "function") social.setActiveProfile(keep);
+    return true;
+  }
+
+  /* Tapping TOWER or PULSE yourself means your own space: drop a left-over
+     #tower-profile-* that names someone else's page. */
+  function clearForeignTowerHash() {
+    var slug = towerProfileSlug();
+    if (!slug || slugIsViewerOwn(slug)) return false;
+    try {
+      if (window.history && typeof window.history.replaceState === "function") {
+        window.history.replaceState(null, "", (location.pathname || "/") + (location.search || ""));
+      } else {
+        location.hash = "";
+      }
+    } catch (eClear) {
+      try { location.hash = ""; } catch (e2) {}
+    }
+    return true;
+  }
+
   /* Live Supabase session (not the local demo). */
   function liveSignedInForTower() {
     var s = getSessionObject();
@@ -1404,7 +1483,7 @@
          Add friend on your own page, and drags never saved. */
       var sessLive = getSessionObject();
       var slugNorm = normalizeHandle(slug);
-      if (sessLive && sessLive.activeProfileId &&
+      if (sessLive && sessLive.activeProfileId && slugIsViewerOwn(slug) &&
           (String(sessLive.activeProfileId) === slug ||
            (sessLive.profileHandle && normalizeHandle(sessLive.profileHandle) === slugNorm))) {
         return String(sessLive.activeProfileId);
@@ -1538,10 +1617,8 @@
     }
     add(p && (p._profileId || p.id));
     add(p && p.handle);
-    try {
-      var hash = String(location.hash || "").replace(/^#/, "");
-      if (hash.indexOf("tower-profile-") === 0) add(decodeURIComponent(hash.slice("tower-profile-".length)));
-    } catch (eHash) {}
+    /* The URL hash is not a key: a left-over #tower-profile-* must not read or
+       save this page's layout under another page's key. */
     if (!keys.length) keys.push("default");
     return keys;
   }
@@ -3247,8 +3324,29 @@
     });
   }
 
+  /* Share/copy link: live sessions link only to one of the viewer's own pages
+     (getMyProfiles). The viewed page's handle is never used; no own page of
+     that kind means no link. */
+  function viewerShareProfile(profile) {
+    var s = getSessionObject();
+    if (!s || s.source !== "supabase") return profile;
+    var mine = viewerOwnProfiles();
+    var id = String((profile && (profile._profileId || profile.id)) || "");
+    for (var i = 0; i < mine.length; i++) {
+      if (id && String(mine[i].id) === id) return { _profileId: mine[i].id, handle: mine[i].handle };
+    }
+    var kind = profile && profile._profileKind === "professional" ? "professional" : "personal";
+    var own = viewerOwnProfileOfKind(kind);
+    return own ? { _profileId: own.id, handle: own.handle } : null;
+  }
+
+  function viewerShareUrl(profile) {
+    var share = viewerShareProfile(profile);
+    return share ? profilePublicUrl(share) : "";
+  }
+
   function syncPublicUrlFields(root, profile) {
-    var url = profilePublicUrl(profile);
+    var url = viewerShareUrl(profile);
     root.querySelectorAll("[data-tower-public-url], [data-tower-public-url-preview]").forEach(function (el) {
       if (document.activeElement !== el) el.value = url;
     });
@@ -3471,8 +3569,9 @@
     root.__cognationPublicUrlBound = true;
     root.querySelectorAll("[data-tower-copy-public-url]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var url = profilePublicUrl(TowerProfileStore.get());
+        var url = viewerShareUrl(TowerProfileStore.get());
         syncPublicUrlFields(root, TowerProfileStore.get());
+        if (!url) return;
         function ok() {
           var prev = btn.textContent;
           btn.textContent = "Copied";
@@ -5482,7 +5581,7 @@
         pin = document.createElement("a");
         pin.className = "tower-friend-pin";
         pin.setAttribute("data-tower-friend-pin", id);
-        pin.href = profileHash ? ("#" + profileHash) : (location.hash || "#");
+        pin.href = profileHash ? ("#" + profileHash) : "#";
         pin.setAttribute("aria-label", friend.name + " tower profile");
         var av = document.createElement("span");
         av.className = "tower-friend-pin-avatar";
@@ -5504,7 +5603,7 @@
         pin.href = "#" + profileHash;
         pin.removeAttribute("data-tower-friend-stay");
       } else {
-        pin.href = location.hash && String(location.hash).indexOf("#tower-profile-") === 0 ? location.hash : "#";
+        pin.href = "#";
         pin.setAttribute("data-tower-friend-stay", "true");
       }
       pin.setAttribute("aria-label", friend.name + " tower profile");
@@ -12935,33 +13034,10 @@
 
   /* Return to the signed-in account's own Tower (clears a friend deep-link). */
   window.CognationTowerOpenOwn = function () {
-    var session = getSessionObject();
-    var social = remoteSocial();
-    var ownHandle = session && session.profileHandle
-      ? normalizeHandle(session.profileHandle)
-      : "";
-    if (!ownHandle && social && typeof social.getMyProfiles === "function") {
-      var mine = social.getMyProfiles() || [];
-      var active = session && session.activeProfileId ? String(session.activeProfileId) : "";
-      var hit = null;
-      for (var i = 0; i < mine.length; i++) {
-        if (active && String(mine[i].id) === active) { hit = mine[i]; break; }
-      }
-      if (!hit) hit = mine[0];
-      if (hit && hit.handle) ownHandle = normalizeHandle(hit.handle);
-    }
-    var slug = normalizeHandle(towerProfileSlug());
-    if (slug && ownHandle && slug !== ownHandle) {
-      try {
-        if (window.history && typeof window.history.replaceState === "function") {
-          window.history.replaceState(null, "", (location.pathname || "/") + (location.search || ""));
-        } else {
-          location.hash = ownHandle ? "tower-profile-" + ownHandle : "";
-        }
-      } catch (eClear) {
-        try { location.hash = ownHandle ? "tower-profile-" + ownHandle : ""; } catch (e2) {}
-      }
-    }
+    /* Own page comes from getMyProfiles; a stale session id/handle (another
+       account's page) is reset, and a #tower-profile-* that is not ours goes. */
+    dropForeignActiveProfile();
+    clearForeignTowerHash();
     document.querySelectorAll("[data-tower-app]").forEach(function (root) {
       applyTowerSide(root, "public");
       renderProfileChrome(root);
@@ -12971,6 +13047,8 @@
     document.dispatchEvent(new CustomEvent("cognation:tower-view-changed"));
     return true;
   };
+
+  window.CognationTowerClearForeignHash = clearForeignTowerHash;
 
   window.CognationTowerOpenProfile = function (handle) {
     handle = String(handle || "").trim().replace(/^@/, "");

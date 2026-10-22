@@ -449,6 +449,7 @@
           if (!el || el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
           if (el.classList.contains("is-dragging")) return;
           if (id === VISITOR_CALENDAR_ID) el.style.removeProperty("--visitor-cal-w");
+          if (id === "youtube") el.style.removeProperty("--yt-col-w");
           el.classList.add("is-spawned");
           el.classList.toggle("is-spawn-full", row.length === 1);
           el.classList.toggle("is-spawn-half", row.length > 1);
@@ -510,6 +511,10 @@
       if (el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
       var id = el.getAttribute("data-tower-widget");
       el.classList.remove("is-spawn-full", "is-spawn-half", "is-grid-friend-pin");
+      /* YouTube (#234/#235 width:100% + 16:9 inside): a free-layout card is
+         absolutely placed and shrink-to-fit, so a % width collapsed it to its
+         padding (21.5x16.8 live). Give it its column width; CSS reads this. */
+      if (id === "youtube") el.style.setProperty("--yt-col-w", Math.floor(colW) + "px");
       if (id === VISITOR_CALENDAR_ID) {
         /* Same width as the bio card. When the bio card has a saved spot, seat
            the calendar right under it (below); otherwise it packs in its row. */
@@ -893,6 +898,7 @@
     var spots = [];
     stage.querySelectorAll("[data-tower-widget]").forEach(function (el) {
       if (el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
+      if (isAddedSticker(el)) return;
       var r = el.getBoundingClientRect();
       spots.push({ el: el, left: r.left - sr.left, top: r.top - sr.top, w: r.width, half: el.classList.contains("is-spawn-half") });
     });
@@ -1096,6 +1102,15 @@
     return changed;
   }
 
+  /* A Quote keeps its own spot in quoteStickers. Every Quote shares the widget
+     id "quote", so pinning one into the widget layout wrote a stray layout.quote
+     from the on-screen spot (#223). Emoji stay: each has its own layout key. */
+  function isAddedSticker(el) {
+    if (!el || !el.getAttribute) return false;
+    if (el.getAttribute("data-tower-quote-id") != null) return true;
+    return !!(el.classList && el.classList.contains("tower-sticker--quote"));
+  }
+
   /* Before saving any layout, pin every on-screen spawned widget where it is now,
      so moving one widget never makes the others jump. */
   function freezeSpawnedWidgets(root, layout) {
@@ -1107,6 +1122,7 @@
     stage.querySelectorAll("[data-tower-widget].is-spawned").forEach(function (el) {
       var id = el.getAttribute("data-tower-widget");
       if (!id || el.hidden || el.classList.contains("is-widget-off")) return;
+      if (isAddedSticker(el)) return;
       if (isPlacedPos(layout, id)) return;
       layout[id] = {
         x: parseFloat(el.getAttribute("data-sticker-x") || "0"),
@@ -1212,7 +1228,49 @@
         out[id] = defaultOn;
       }
     });
+    /* Owner-only Instax camera switch (#223): not a public widget, but an
+       explicit on/off is kept so "camera removed" survives reload (it rides in
+       the layout row's _widgets.publicWidgets). No key = on. */
+    if (raw && typeof raw === "object" && typeof raw.instax === "boolean") out.instax = raw.instax;
+    /* Owner's Remove on Music, Badges and Calendar: "shown.<id>": false (see
+       OWNER_REMOVABLE_WIDGET_IDS). Kept as saved; no key = shown. */
+    ["music", "badges", "calendar"].forEach(function (id) {
+      var k = "shown." + id;
+      if (raw && typeof raw === "object" && typeof raw[k] === "boolean") out[k] = raw[k];
+    });
     return out;
+  }
+
+  /* Remove on Music, Badges and Calendar (Oct 22). Their old flags can't tell
+     "the owner hid it" from "it's empty": the page turns music and badges off
+     by itself when they have nothing to show, and that copy is saved with the
+     next edit. So the owner's Remove has its own switch, "shown.<id>", in the
+     same publicWidgets map (it rides in the layout row's _widgets). Only
+     Remove sets it off; only Show in Edit profile (or Undo) turns it back on.
+     Nothing on load writes it, and the old music/badges/calendar flags are
+     left as they are and no longer hide these three. No key = shown.
+     Calendar: Remove hides the visitors' Calendar card; the Calendar sticker
+     in Edit profile > Calendar stays, since owners manage sessions and
+     bookings there. */
+  var OWNER_REMOVABLE_WIDGET_IDS = ["music", "badges", "calendar"];
+
+  function ownerShownKey(id) {
+    return "shown." + id;
+  }
+
+  function widgetRemovedByOwner(p, id) {
+    if (OWNER_REMOVABLE_WIDGET_IDS.indexOf(id) < 0) return false;
+    var raw = p && p.publicWidgets && typeof p.publicWidgets === "object" ? p.publicWidgets : null;
+    return !!raw && raw[ownerShownKey(id)] === false;
+  }
+
+  function instaxRemoved(p) {
+    return !!(p && p.publicWidgets && typeof p.publicWidgets === "object" && p.publicWidgets.instax === false);
+  }
+
+  function setInstaxSwitch(p, on) {
+    p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
+    p.publicWidgets.instax = !!on;
   }
 
   var TOWER_SIDE_KEY = "cognation.tower.side";
@@ -4859,9 +4917,10 @@
     });
   }
 
-  function showMusicSticker(root, on) {
+  function showMusicSticker(root, on, p) {
     var musicSticker = root.querySelector('[data-tower-widget="music"]');
     if (!musicSticker) return;
+    if (on && widgetRemovedByOwner(p || TowerProfileStore.get(), "music")) on = false;
     musicSticker.hidden = !on;
     musicSticker.classList.toggle("is-widget-off", !on);
     if (!on) musicSticker.classList.remove("is-widget-selected");
@@ -4951,6 +5010,17 @@
       return;
     }
     showYoutubeSticker(root, false);
+    if (widgetRemovedByOwner(p, "music")) {
+      /* The owner removed Music: no player for anyone until Show. */
+      clearYoutubeEmbed(root);
+      clearTowerAudio(audio);
+      hideMusicSkins(root);
+      wrap.hidden = true;
+      wrap.removeAttribute("data-music-mode");
+      showMusicSticker(root, false, p);
+      if (proBox) proBox.hidden = true;
+      return;
+    }
     if (proBox) {
       proBox.hidden = true;
       proBox.classList.remove("has-video");
@@ -4968,7 +5038,7 @@
       if (ownerPublic && (skin === "none" || (!personal && !url))) {
         wrap.hidden = false;
         wrap.setAttribute("data-music-mode", "none");
-        showMusicSticker(root, true);
+        showMusicSticker(root, true, p);
         return;
       }
       wrap.hidden = true;
@@ -4977,7 +5047,7 @@
       return;
     }
 
-    showMusicSticker(root, true);
+    showMusicSticker(root, true, p);
     if (!url) {
       var keptOnScreen = savedPinkVideoId();
       if (keptOnScreen && skin === "classic") {
@@ -6603,11 +6673,154 @@
     return p;
   }
 
+  /* Edit profile > "Show hidden widgets" (#242 follow-up). Lists the widgets an
+     owner hid with Remove that the page really hides by their publicWidgets
+     flag and that have something to show. Music, Badges and Calendar are
+     listed by their own "shown.<id>" switch (set only by Remove), not by
+     their old content-driven flags. Social follows the links and Friends
+     stays off, so they are not listed. Rendering never writes: only an
+     owner's Show click saves, and it turns on that one flag. */
+  var RESTORABLE_HIDDEN_WIDGETS = [
+    { id: "identity", label: "Name" },
+    { id: "slogan", label: "Quote / slogan" },
+    { id: "envelope", label: "Messages" },
+    { id: "html", label: "Custom HTML" },
+    { id: "music", label: "Music" },
+    { id: "badges", label: "Badges" },
+    { id: "calendar", label: "Calendar" },
+  ];
+
+  function hiddenWidgetRestorable(id) {
+    for (var i = 0; i < RESTORABLE_HIDDEN_WIDGETS.length; i++) {
+      if (RESTORABLE_HIDDEN_WIDGETS[i].id === id) return true;
+    }
+    return false;
+  }
+
+  function hiddenWidgetsToShow(p) {
+    if (!p || !isTowerOwner(p)) return [];
+    var raw = p.publicWidgets && typeof p.publicWidgets === "object" ? p.publicWidgets : {};
+    return RESTORABLE_HIDDEN_WIDGETS.filter(function (w) {
+      if (OWNER_REMOVABLE_WIDGET_IDS.indexOf(w.id) >= 0) {
+        if (!widgetRemovedByOwner(p, w.id)) return false;
+        /* Professional pages have no music player; Badges needs an applied milestone. */
+        if (w.id === "music") return !isProTower(p);
+        if (w.id === "badges") return appliedMilestoneList(p).length > 0;
+        return true;
+      }
+      if (raw[w.id] !== false) return false;
+      if (w.id === "slogan") return !!(typeof p.slogan === "string" && p.slogan.trim());
+      if (w.id === "html") return !!(typeof p.customHtml === "string" && p.customHtml.trim());
+      return true;
+    });
+  }
+
+  /* After Show: a dark glass notice ("<Name> is showing again.") sits in the
+     section where that row was, for ~4s or until Edit profile closes. If it was
+     the last hidden widget, the section hides once the notice clears. */
+  var HIDDEN_WIDGET_NOTICE_MS = 4000;
+
+  /* After Show, the Edit profile status box no longer says "<Name> removed…":
+     the removal line is cleared (the "<Name> is showing again." notice in Show
+     hidden widgets is the confirmation). Any other status line is left alone. */
+  function clearStaleRemovalStatus(root) {
+    var el = root && root.querySelector("[data-tower-profile-status]");
+    if (!el || !el.__towerRemovalLine) return;
+    if (el.textContent === el.__towerRemovalLine) {
+      el.textContent = "";
+      el.hidden = true;
+      el.classList.remove("is-error");
+    }
+    el.__towerRemovalLine = "";
+  }
+
+  function clearHiddenWidgetNotice(root) {
+    var box = root && root.querySelector("[data-tower-hidden-widgets]");
+    if (!box || !box.__towerShowNotice) return;
+    if (box.__towerShowNotice.timer) clearTimeout(box.__towerShowNotice.timer);
+    box.__towerShowNotice = null;
+    renderHiddenWidgetsList(root, TowerProfileStore.get());
+  }
+
+  function renderHiddenWidgetsList(root, p) {
+    var box = root && root.querySelector("[data-tower-hidden-widgets]");
+    if (!box) return;
+    var list = box.querySelector("[data-tower-hidden-widgets-list]");
+    if (!list) return;
+    var items = hiddenWidgetsToShow(p);
+    var notice = box.__towerShowNotice || null;
+    if (notice && (!p || !isTowerOwner(p))) notice = null;
+    if (notice) {
+      items = items.filter(function (w) { return w.id !== notice.id; });
+    }
+    list.innerHTML = "";
+    function addNotice() {
+      var n = document.createElement("p");
+      n.className = "tower-hidden-widget-notice";
+      n.setAttribute("role", "status");
+      n.setAttribute("aria-live", "polite");
+      n.setAttribute("data-tower-hidden-widget-notice", notice.id);
+      n.textContent = notice.label + " is showing again.";
+      list.appendChild(n);
+    }
+    items.forEach(function (w, i) {
+      if (notice && i === notice.index) addNotice();
+      var row = document.createElement("div");
+      row.className = "tower-hidden-widget-row";
+      var name = document.createElement("span");
+      name.className = "tower-hidden-widget-name";
+      name.textContent = w.label;
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-secondary tower-hidden-widget-show";
+      btn.setAttribute("data-tower-show-widget", w.id);
+      btn.setAttribute("aria-label", "Show " + w.label);
+      btn.textContent = "Show";
+      row.appendChild(name);
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+    if (notice && notice.index >= items.length) addNotice();
+    /* Nothing hidden (and no notice): the whole section stays out of the way. */
+    box.hidden = !items.length && !notice;
+    if (!box.__cognationShowBound) {
+      box.__cognationShowBound = true;
+      box.addEventListener("click", function (ev) {
+        var b = ev.target && ev.target.closest ? ev.target.closest("[data-tower-show-widget]") : null;
+        if (!b || !box.contains(b)) return;
+        ev.preventDefault();
+        var id = b.getAttribute("data-tower-show-widget");
+        if (!hiddenWidgetRestorable(id)) return;
+        var cur = TowerProfileStore.get();
+        if (!isTowerOwner(cur)) return;
+        var shown = hiddenWidgetsToShow(cur);
+        if (box.__towerShowNotice) {
+          var prevId = box.__towerShowNotice.id;
+          shown = shown.filter(function (w) { return w.id !== prevId; });
+          if (box.__towerShowNotice.timer) clearTimeout(box.__towerShowNotice.timer);
+        }
+        var index = 0;
+        var label = id;
+        shown.forEach(function (w, i) { if (w.id === id) { index = i; label = w.label; } });
+        box.__towerShowNotice = {
+          id: id,
+          label: label,
+          index: index,
+          timer: setTimeout(function () { clearHiddenWidgetNotice(root); }, HIDDEN_WIDGET_NOTICE_MS),
+        };
+        setPublicWidgetVisible(root, id, true);
+        clearStaleRemovalStatus(root);
+        renderHiddenWidgetsList(root, TowerProfileStore.get());
+      });
+    }
+  }
+
   function applyPublicWidgets(root, p) {
     try { renderSocialLinks(root, p); } catch (eSoc) {}
     applyPublicWidgetsInner(root, p);
     /* Visibility changed: give newly shown, unplaced widgets their spawn spot. */
     spawnUnplacedWidgets(root, p);
+    try { renderHiddenWidgetsList(root, p); } catch (eHidden) {}
     bindSpawnResize(root);
   }
 
@@ -6659,6 +6872,11 @@
       if (id === "badges") on = !!(milestones && milestones.length);
       /* The same Calendar sticker stays on the personal page and the professional page. */
       if (id === "calendar") on = true;
+      /* The owner removed it: hidden for the owner and visitors, whatever its
+         content. Calendar is the exception here: its sticker is what Edit
+         profile > Calendar shows the owner (sessions, bookings), so it stays;
+         a removed Calendar hides the visitors' Calendar card instead. */
+      if (id !== "calendar" && widgetRemovedByOwner(p, id)) on = false;
       var el = root.querySelector('[data-tower-widget="' + id + '"]');
       if (!el) return;
       if (id === "badges") {
@@ -6670,6 +6888,8 @@
       if (!on) el.classList.remove("is-widget-selected");
     });
     showYoutubeSticker(root, !!p && p._profileKind === "professional");
+    var visitorCal = root.querySelector("[data-tower-visitor-calendar]");
+    if (visitorCal && widgetRemovedByOwner(p, "calendar")) visitorCal.hidden = true;
     var avatar = root.querySelector('[data-tower-widget="avatar"]');
     if (avatar) {
       avatar.hidden = false;
@@ -6688,7 +6908,7 @@
         }
       });
       stage.querySelectorAll("[data-tower-badge-pin]").forEach(function (pin) {
-        if (!widgets.badges) {
+        if (!widgets.badges || widgetRemovedByOwner(p, "badges")) {
           pin.hidden = true;
           pin.classList.add("is-widget-off");
         } else {
@@ -6725,10 +6945,14 @@
     if (PUBLIC_WIDGET_IDS.indexOf(id) < 0) return;
     var p = TowerProfileStore.get();
     p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
-    p.publicWidgets[id] = !!on;
+    /* Music, Badges and Calendar: Remove / Show flip only the owner's own switch. */
+    if (OWNER_REMOVABLE_WIDGET_IDS.indexOf(id) >= 0) p.publicWidgets[ownerShownKey(id)] = !!on;
+    else p.publicWidgets[id] = !!on;
     TowerProfileStore.save(p);
     applyPublicWidgets(root, p);
     syncPublicWidgetsForm(root, p);
+    /* The player stops when removed and is rebuilt when shown again. */
+    if (id === "music") initTowerMusic(root, p);
     if (id === "friends") {
       if (on) renderFriendPins(root, p);
       else {
@@ -6860,6 +7084,20 @@
     }
     var wid = el.getAttribute("data-tower-widget");
     if (!wid || wid === "feed" || wid === "messages") return;
+    /* A Quote's tilt lives on its own quoteStickers entry, never under the
+       shared "quote" layout key (#223). */
+    var tiltQuoteId = el.getAttribute("data-tower-quote-id");
+    if (wid === "quote" && tiltQuoteId) {
+      p.quoteStickers = getQuoteStickers(p).map(function (q) {
+        if (!q || q.id !== tiltQuoteId) return q;
+        var nq = {};
+        Object.keys(q).forEach(function (k) { nq[k] = q[k]; });
+        nq.tilt = tilt;
+        return nq;
+      });
+      TowerProfileStore.save(p, { geometry: true });
+      return;
+    }
     var layout = freezeSpawnedWidgets(el.closest ? el.closest("[data-tower-app]") || document : document, getWidgetLayout(p) || {});
     var prev = layout[wid] || {};
     layout[wid] = {
@@ -7478,7 +7716,7 @@
           escapeHtml(opts.picked) +
           '">Book</button>'
         : "") +
-      '<p class="commune-status" data-tower-cal-book-status' +
+      '<p class="commune-status' + (opts.bookError ? " is-error" : "") + '" data-tower-cal-book-status' +
       (opts.bookStatus ? "" : " hidden") +
       ' role="status" aria-live="polite">' +
       escapeHtml(opts.bookStatus || "") +
@@ -7492,6 +7730,21 @@
   /* "Suggested hangouts" are fixed times (HANGOUT_SLOTS), not real saved data:
      hidden until owners publish real open times on the server. */
   var HANGOUT_SUGGESTIONS_LIVE = false;
+
+  /* Status boxes in Edit profile show a plain line; raw error text is logged only. */
+  function friendlyBookingError(err) {
+    var raw = String((err && err.message) || "");
+    if (/sign in/i.test(raw)) return "Sign in to book a time.";
+    if (/can't take/i.test(raw)) return "This calendar can't take bookings yet.";
+    return "Couldn't send the request. Try again.";
+  }
+
+  function friendlyAddProfileError(err) {
+    var raw = String((err && err.message) || err || "");
+    if (/sign in/i.test(raw)) return "Sign in to add a page.";
+    if (/handle/i.test(raw)) return "That page handle isn't available. Change your handle and try again.";
+    return "Couldn't create your professional page. Try again.";
+  }
 
   /* Visitor books an open time: one hangout request to the Tower owner, saved on the server. */
   function requestHangoutOnServer(profileId, iso, time) {
@@ -7594,6 +7847,21 @@
     }
   }
 
+  /* Owner's Calendar day heading (Edit profile > Calendar): "Thu, Oct 22".
+     Display only: the stored date stays YYYY-MM-DD. The parts are read as a
+     local calendar date (never new Date("YYYY-MM-DD"), which is UTC midnight
+     and can land on the day before west of UTC). Anything else comes back as is. */
+  function formatCalendarDayLabel(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso == null ? "" : iso));
+    if (!m) return String(iso == null ? "" : iso);
+    var y = Number(m[1]), mo = Number(m[2]) - 1, d = Number(m[3]);
+    var date = new Date(y, mo, d, 12, 0, 0, 0);
+    if (isNaN(date.getTime()) || date.getFullYear() !== y || date.getMonth() !== mo || date.getDate() !== d) {
+      return String(iso);
+    }
+    return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  }
+
   function renderPublicCalendar(root) {
     var body = root.querySelector("[data-tower-cal-public-body]");
     if (!body) return;
@@ -7617,6 +7885,7 @@
           visitor: !owner,
           picked: owner ? "" : view.pickedTime || "",
           bookStatus: owner ? "" : view.bookStatus || "",
+          bookError: owner ? false : !!view.bookError,
         })
       : "";
     /* No-fake rule: the slots are fixed clock times, not saved Supabase data. */
@@ -7637,8 +7906,8 @@
       renderTowerMonthGrid(view, events, { gridLabel: "Calendar" }) +
       '<div class="tower-cal-day-panel">' +
       '<h5 class="tower-cal-day-heading">' +
-      (owner ? "On " : "Busy · ") +
-      escapeHtml(selected) +
+      (owner ? "" : "Busy · ") +
+      escapeHtml(owner ? formatCalendarDayLabel(selected) : selected) +
       "</h5>" +
       renderDayEventList(events, selected, { ownerControls: owner, busyOnly: !owner }) +
       "</div>" +
@@ -7679,6 +7948,12 @@
     var p = TowerProfileStore.get();
     var wasHidden = box.hidden;
     if (!p || isTowerOwner(p)) {
+      box.hidden = true;
+      if (!wasHidden) respawnVisitorCalendar(root, p);
+      return;
+    }
+    /* The owner removed Calendar: visitors don't get this card until Show. */
+    if (widgetRemovedByOwner(p, "calendar")) {
       box.hidden = true;
       if (!wasHidden) respawnVisitorCalendar(root, p);
       return;
@@ -7827,6 +8102,7 @@
           view2.schedulerOpen = true;
           view2.pickedTime = "";
           view2.bookStatus = "";
+          view2.bookError = false;
         } else {
           var privHost = root.querySelector("[data-tower-cal-private]");
           if (privHost && !privHost.getAttribute("data-editing-id")) {
@@ -7914,6 +8190,7 @@
           viewS.schedulerOpen = true;
           viewS.pickedTime = slotTime;
           viewS.bookStatus = "";
+          viewS.bookError = false;
           ev.preventDefault();
           refreshTowerCalendars(root);
           return;
@@ -7948,6 +8225,7 @@
         if (!/^\d{2}:\d{2}$/.test(bookTime) || !/^\d{4}-\d{2}-\d{2}$/.test(bookIso)) return;
         if (!HANGOUT_BOOKING_LIVE) {
           /* Owner inbox not shipped yet: say so honestly, send nothing. */
+          viewB.bookError = false;
           viewB.bookStatus = "Booking is coming soon.";
           refreshTowerCalendars(root);
           return;
@@ -7958,12 +8236,14 @@
           function () {
             viewB.pickedTime = "";
             viewB.bookStatus = "Request sent.";
+            viewB.bookError = false;
             refreshTowerCalendars(root);
           },
           function (err) {
-            viewB.bookStatus = (err && err.message && /Sign in|can't take/.test(err.message))
-              ? err.message
-              : "Couldn't send the request. Try again.";
+            /* Raw error text goes to the console only; the box shows a fixed line. */
+            try { console.warn("[tower] hangout request failed", err); } catch (eLog) {}
+            viewB.bookStatus = friendlyBookingError(err);
+            viewB.bookError = true;
             refreshTowerCalendars(root);
           }
         );
@@ -8424,10 +8704,9 @@
             applyTowerSide(root, "public");
           })
           .catch(function (error) {
-            setSt(
-              (error && error.message) || "Could not create a professional page.",
-              true
-            );
+            /* Raw error text goes to the console only; the box shows a fixed line. */
+            try { console.error("[tower] add professional page failed", error); } catch (eLog) {}
+            setSt(friendlyAddProfileError(error), true);
           })
           .finally(function () {
             btn.disabled = false;
@@ -8449,7 +8728,8 @@
       }
       var gate = window.CognationAccounts.canAddProfileForPhone(phone);
       if (!gate.ok) {
-        setSt(gate.reason, true);
+        try { console.warn("[tower] add page blocked", gate.reason); } catch (eLog) {}
+        setSt("This phone number already has a Personal and a Professional page.", true);
         return;
       }
       var kind = btn.getAttribute("data-add-kind") || "professional";
@@ -8462,7 +8742,8 @@
         displayName: kind === "professional" ? "Alexa J Thomas" : "Alexa",
       });
       if (!result.ok) {
-        setSt(result.error || "Could not create profile.", true);
+        try { console.warn("[tower] add page failed", result.error); } catch (eLog) {}
+        setSt(/taken/i.test(String(result.error || "")) ? "That page handle is already taken." : "Couldn't create the page. Try again.", true);
         return;
       }
       setSt((kind === "professional" ? "Professional" : "Personal") + " page created.", false);
@@ -8607,7 +8888,7 @@
       cam.classList.add("is-widget-off");
     }
     function showCam() {
-      if (!owner) {
+      if (!owner || instaxRemoved(p)) {
         hideCam();
         return;
       }
@@ -9194,6 +9475,9 @@
       el.innerHTML = '<blockquote class="tower-quote-card"></blockquote>';
       el.querySelector(".tower-quote-card").textContent = q.text;
       if (typeof q.w === "number" && q.w > 0) setStickerWidth(el, q.w);
+      /* The saved spot: every clear-check starts from here, so a check run while
+         neighbours were still loading never sticks (#223). */
+      el.__cognationQuoteSpot = { x: q.x, yCss: yAt.css, yPct: yAt.pct };
       ensureResizeHandle(el, "Quote");
       stage.appendChild(el);
     });
@@ -9270,9 +9554,20 @@
 
   function keepQuotesClear(stage) {
     if (!stage) return;
+    /* Render only: every viewer (owner and visitor) shows the Quote at its
+       saved x / y / yPx. No per-viewer nudge and no save from here: the old
+       display-only nudge put the owner at 71.5 and visitors at 53.19 (#223).
+       Quotes are moved off widgets only when the owner drops them
+       (keepQuoteClear in the drop branch), and that drop is what gets saved. */
     stage.querySelectorAll(".tower-sticker--quote").forEach(function (el) {
       if (el.classList.contains("is-dragging")) return;
-      keepQuoteClear(stage, el);
+      var spot = el.__cognationQuoteSpot;
+      if (!spot) return;
+      el.style.setProperty("--sticker-x", spot.x + "%");
+      el.style.setProperty("--sticker-y", spot.yCss);
+      el.setAttribute("data-sticker-x", String(spot.x));
+      el.setAttribute("data-sticker-y", String(spot.yPct));
+      el.removeAttribute("data-sticker-y-px");
     });
   }
 
@@ -9602,6 +9897,184 @@
     }
   }
 
+  /* Remove with Edit profile closed (PM, Oct 22): the removal line also shows as
+     a short dark glass notice for ~4s; a new removal replaces it. 768px and up it
+     sits at the end of the owner-only toolbar above the stage. Below 768px it is
+     a fixed notice at the bottom of the viewport (Designer LOOK on #247), so the
+     stage and toolbar never move; it fades and slides in/out over 160ms (no
+     motion under prefers-reduced-motion). With Edit profile open, only the Edit
+     profile status line shows it (never both). Visitors never see it: the
+     toolbar is owner-only. Display only; nothing is saved. */
+  var STAGE_REMOVAL_NOTICE_MS = 4000;
+  var STAGE_REMOVAL_NOTICE_FADE_MS = 160;
+
+  function stageNoticeNarrow() {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia("(max-width: 767.98px)").matches;
+  }
+
+  function stageNoticeAnimates() {
+    if (!stageNoticeNarrow()) return false;
+    return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  /* Below 768 the notice is position: fixed. The public side's backdrop-filter
+     would make it the containing block (fixed to the page section, not the
+     viewport), so while it shows on a narrow screen the notice sits directly
+     in the Tower app root; it goes back to the end of the toolbar when it clears. */
+  function placeStageRemovalNotice(root, n, narrow) {
+    if (!n.__towerHome) {
+      n.__towerHome = n.parentNode;
+      /* Crossing 768 while it shows: put it straight back in the toolbar. */
+      try {
+        window.matchMedia("(max-width: 767.98px)").addEventListener("change", function () {
+          if (!n.hidden) clearStageRemovalNotice(root, true);
+        });
+      } catch (eMq) {}
+    }
+    var target = narrow ? root : n.__towerHome;
+    if (!narrow && n.classList) {
+      n.classList.remove("is-top");
+      if (n.style) n.style.removeProperty("--tower-stage-notice-top");
+    }
+    if (target && n.parentNode !== target && target.appendChild) target.appendChild(n);
+  }
+
+  function clearStageRemovalNotice(root, instant) {
+    var n = root && root.querySelector("[data-tower-stage-notice]");
+    if (!n) return;
+    if (n.__towerTimer) clearTimeout(n.__towerTimer);
+    n.__towerTimer = null;
+    if (n.__towerFadeTimer) clearTimeout(n.__towerFadeTimer);
+    n.__towerFadeTimer = null;
+    if (n.classList) n.classList.remove("is-in");
+    if (!instant && !n.hidden && stageNoticeAnimates()) {
+      n.__towerFadeTimer = setTimeout(function () {
+        n.__towerFadeTimer = null;
+        n.textContent = "";
+        n.hidden = true;
+        placeStageRemovalNotice(root, n, false);
+      }, STAGE_REMOVAL_NOTICE_FADE_MS);
+      return;
+    }
+    n.textContent = "";
+    n.hidden = true;
+    placeStageRemovalNotice(root, n, false);
+  }
+
+  function showStageRemovalNotice(root, msg) {
+    var n = root && root.querySelector("[data-tower-stage-notice]");
+    if (!n) return;
+    var panel = root.querySelector("[data-tower-profile-edit-panel]");
+    var editOpen = !!(panel && !panel.hidden);
+    if (!msg || editOpen || !isTowerOwner(TowerProfileStore.get())) {
+      clearStageRemovalNotice(root, true);
+      return;
+    }
+    if (n.__towerTimer) clearTimeout(n.__towerTimer);
+    if (n.__towerFadeTimer) clearTimeout(n.__towerFadeTimer);
+    n.__towerFadeTimer = null;
+    var wasShown = !n.hidden && n.classList && n.classList.contains("is-in");
+    placeStageRemovalNotice(root, n, stageNoticeNarrow());
+    n.textContent = msg;
+    n.hidden = false;
+    if (!wasShown && stageNoticeNarrow()) pickStageNoticeBand(root, n);
+    if (n.classList && !wasShown) {
+      /* One frame at the start state, then .is-in runs the 160ms fade/slide. */
+      if (typeof requestAnimationFrame === "function" && stageNoticeAnimates()) {
+        void n.offsetWidth;
+        requestAnimationFrame(function () { if (!n.hidden) n.classList.add("is-in"); });
+      } else {
+        n.classList.add("is-in");
+      }
+    }
+    n.__towerTimer = setTimeout(function () { clearStageRemovalNotice(root); }, STAGE_REMOVAL_NOTICE_MS);
+  }
+
+  /* Remove used to jump the page (SeedOps live check: scrollY 851 -> 185 at 390).
+     The removed widget leaves the stage, the stage and the page get shorter, and
+     when the viewer is within that height of the page bottom the browser clamps
+     scrollY to the new, shorter page. Keep the scroll position: note scrollY
+     before the re-render; afterwards, if the page is now too short to stay there,
+     hold the stage's height by exactly the missing amount (blank space at the
+     stage's foot, nothing else moves), then restore scrollY. The hold goes with
+     the next stage layout (Show, Reset layout, resize, reload). Display only.
+     Every width: no breakpoint check here or in keepTowerScrollAround, so the
+     hold (and the blank space at the stage's foot) is the same at 1280 as at 390. */
+  function holdTowerScroll(root, x, y) {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+    var doc = document.documentElement;
+    var stage = root && root.querySelector ? root.querySelector("[data-tower-scrapbook]") : null;
+    var missing = y + (window.innerHeight || 0) - (doc ? doc.scrollHeight : 0);
+    if (missing > 0 && stage && stage.getBoundingClientRect) {
+      stage.style.minHeight = Math.ceil(stage.getBoundingClientRect().height + missing) + "px";
+    }
+    var now = window.pageYOffset || 0;
+    /* "instant": the page uses smooth scrolling; the restore must land before the
+       next paint so the viewer never sees the page move. */
+    if (Math.abs(now - y) > 0.5 && typeof window.scrollTo === "function") {
+      window.scrollTo({ left: x, top: y, behavior: "instant" });
+    }
+  }
+
+  function keepTowerScrollAround(root, run) {
+    var x = typeof window !== "undefined" ? window.pageXOffset || 0 : 0;
+    var y = typeof window !== "undefined" ? window.pageYOffset || 0 : 0;
+    try {
+      run();
+    } finally {
+      holdTowerScroll(root, x, y);
+      /* Late re-renders (player teardown, spawn) settle within a frame; only
+         undo a clamp, never a scroll the viewer made since. */
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(function () {
+          if ((window.pageYOffset || 0) < y - 0.5) holdTowerScroll(root, x, y);
+        });
+      }
+    }
+  }
+
+  /* Below 768 (follow-up to #247): the bottom band can sit over the Mutual
+     friends, Go live and Messages envelope controls in the profile card. When it
+     would, the notice shows at the top of the viewport instead (below the tab
+     bar when that is on screen). Picked once as it shows, so it never jumps; it
+     ignores taps either way (pointer-events: none on it and its children). */
+  var STAGE_NOTICE_EDGE = 16;
+  var STAGE_NOTICE_CLEAR_SELECTORS = ["[data-tower-mutual-friends]", "[data-go-live]", "[data-tower-envelope]"];
+
+  function stageNoticeBandsClash(band, rects) {
+    return rects.some(function (r) { return r.bottom > band.top && r.top < band.bottom; });
+  }
+
+  function pickStageNoticeBand(root, n) {
+    n.classList.remove("is-top");
+    if (n.style) n.style.removeProperty("--tower-stage-notice-top");
+    var vh = window.innerHeight || 0;
+    var h = n.getBoundingClientRect().height || 0;
+    var rects = [];
+    STAGE_NOTICE_CLEAR_SELECTORS.forEach(function (sel) {
+      Array.prototype.forEach.call(root.querySelectorAll(sel), function (el) {
+        if (el.hidden || (el.closest && el.closest("[hidden]"))) return;
+        var r = el.getBoundingClientRect();
+        if (!r.width || !r.height || r.bottom <= 0 || r.top >= vh) return;
+        rects.push(r);
+      });
+    });
+    var bottomBand = { top: vh - STAGE_NOTICE_EDGE - h, bottom: vh - STAGE_NOTICE_EDGE };
+    if (!stageNoticeBandsClash(bottomBand, rects)) return "bottom";
+    var top = STAGE_NOTICE_EDGE;
+    var tabs = document.querySelector(".app-topbar");
+    if (tabs) {
+      var tr = tabs.getBoundingClientRect();
+      if (tr.bottom > 0 && tr.top < vh) top = Math.max(top, Math.ceil(tr.bottom) + 8);
+    }
+    var topBand = { top: top, bottom: top + h };
+    if (stageNoticeBandsClash(topBand, rects)) return "bottom";
+    n.style.setProperty("--tower-stage-notice-top", top + "px");
+    n.classList.add("is-top");
+    return "top";
+  }
+
   function setProfileStatusOn(root, msg, isError) {
     var el = root.querySelector("[data-tower-profile-status]");
     if (!el) return;
@@ -9623,11 +10096,15 @@
     var undoBtn = root.querySelector("[data-tower-undo-widget]");
     if (!root.__cognationWidgetUndo) root.__cognationWidgetUndo = [];
 
-    function setProfileStatusSafe(msg, isError) {
+    function setProfileStatusSafe(msg, isError, removal) {
+      /* removal: a Remove line; also shown near the stage when Edit profile is closed. */
+      if (removal) showStageRemovalNotice(root, msg);
       var el = root.querySelector("[data-tower-profile-status]");
       if (!el) return;
       el.hidden = !msg;
       el.textContent = msg || "";
+      /* Remembered so Show can clear a stale removal line (and nothing else). */
+      el.__towerRemovalLine = removal && msg ? String(msg) : "";
       el.classList.toggle("is-error", !!isError);
     }
 
@@ -9662,6 +10139,16 @@
       if (entry.type === "widget") {
         setPublicWidgetVisible(root, entry.id, true);
         setProfileStatusSafe("Restored " + (entry.label || entry.id) + ".", false);
+        return;
+      }
+      if (entry.type === "instax") {
+        var pCamUndo = TowerProfileStore.get();
+        if (!isTowerOwner(pCamUndo)) return;
+        setInstaxSwitch(pCamUndo, true);
+        TowerProfileStore.save(pCamUndo);
+        ensurePersonalPolaroid(root, pCamUndo);
+        applyWidgetLayout(root, pCamUndo);
+        setProfileStatusSafe("Restored Camera.", false);
         return;
       }
       if (entry.type === "emoji") {
@@ -9764,7 +10251,13 @@
         p.widgetLayout = {};
         if (p.widgetLayout && p.widgetLayout.feed) delete p.widgetLayout.feed;
         if (p.widgetLayout && p.widgetLayout.messages) delete p.widgetLayout.messages;
-        p.publicWidgets = JSON.parse(JSON.stringify(DEFAULT_PUBLIC_WIDGETS));
+        /* Reset restores positions and the camera only. It keeps the owner's
+           other visibility choices (social, music, badges, friends, html, ...):
+           copying the defaults over them turned hidden widgets back on with no
+           owner toggle to turn them off again (#242 follow-up).
+           Explicit camera "on" so a browser holding an old "camera off" copy
+           follows the reset (#223). */
+        setInstaxSwitch(p, true);
         p.polaroidRemoved = false;
         p.removedFriendPinIds = [];
         p.featuredFriendIds = [];
@@ -9778,7 +10271,7 @@
         syncOwnerStickerHandles(root);
         root.__cognationWidgetUndo = [];
         syncUndoButton();
-        setProfileStatusSafe("Layout reset — public widgets restored.", false);
+        setProfileStatusSafe("Layout reset.", false);
       });
     }
 
@@ -10034,6 +10527,11 @@
             };
             if (typeof qYpx === "number" && isFinite(qYpx)) moved.yPx = Math.round(qYpx);
             if (typeof q.w === "number") moved.w = q.w;
+            sticker.__cognationQuoteSpot = {
+              x: moved.x,
+              yCss: typeof moved.yPx === "number" ? moved.yPx + "px" : moved.y + "%",
+              yPct: moved.y,
+            };
             return moved;
           });
           TowerProfileStore.save(p, { geometry: true });
@@ -10184,7 +10682,7 @@
         var selectedKey = stage.querySelector(".is-widget-selected");
         if (!selectedKey || !stage.contains(selectedKey)) return;
         ev.preventDefault();
-        removeSelectedWidget();
+        removeSelectedKeepingScroll();
       });
       /* One removal path for Backspace/Delete and the touch "Remove" button.
          Owner only, Public side only; never runs while typing (the key handler
@@ -10208,7 +10706,7 @@
           fp = TowerProfileStore.get();
           renderFriendsPicker(root, fp);
           renderFriendPins(root, fp);
-          setProfileStatusSafe("Friend pin removed — Undo to restore.", false);
+          setProfileStatusSafe("Friend pin removed. Reset layout to restore.", false, true);
           return;
         }
 
@@ -10218,7 +10716,7 @@
           clearWidgetSelection(stage);
           pushWidgetUndo({ type: "badge", id: badgeId });
           setBadgeVisibility(root, badgeId, false);
-          setProfileStatusSafe("Badge pin removed — Undo to restore.", false);
+          setProfileStatusSafe("Badge pin removed.", false, true);
           return;
         }
 
@@ -10255,7 +10753,7 @@
           });
           TowerProfileStore.save(pEmoji);
           renderEmojiStickers(root, TowerProfileStore.get());
-          setProfileStatusSafe("Emoji removed — Undo to restore.", false);
+          setProfileStatusSafe("Emoji removed.", false, true);
           return;
         }
 
@@ -10273,7 +10771,7 @@
           };
           pushWidgetUndo({ type: "quote", id: quoteId || selected.id, layout: qLayout });
           removeQuoteSticker(root, quoteId || selected.getAttribute("data-tower-quote-id"));
-          setProfileStatusSafe("Quote removed — Undo to restore.", false);
+          setProfileStatusSafe("Quote removed.", false, true);
           return;
         }
 
@@ -10292,7 +10790,7 @@
         var socialNet = socialNetIdFromWidget(id);
         if (socialNet) {
           removeSocialWidget(root, socialNet);
-          setProfileStatusSafe((selected.getAttribute("data-sticker-label") || "Link") + " link removed. Add it again in Edit profile.", false);
+          setProfileStatusSafe((selected.getAttribute("data-sticker-label") || "Link") + " link removed. Add it again in Edit profile.", false, true);
           return;
         }
         var label = selected.getAttribute("data-sticker-label") || id;
@@ -10303,7 +10801,19 @@
           var pPol = TowerProfileStore.get();
           pPol.polaroidRemoved = true;
           TowerProfileStore.save(pPol);
-          setProfileStatusSafe(label + " removed — Reset layout to restore.", false);
+          setProfileStatusSafe(label + " removed. Reset layout to restore.", false, true);
+          return;
+        }
+        if (id === "instax") {
+          /* Owner-only camera (#223): save "off" in the layout row so it stays
+             removed after reload and in other browsers. Reset layout turns it back on. */
+          pushWidgetUndo({ type: "instax", id: id, label: label });
+          selected.hidden = true;
+          selected.classList.add("is-widget-off");
+          var pCam = TowerProfileStore.get();
+          setInstaxSwitch(pCam, false);
+          TowerProfileStore.save(pCam);
+          setProfileStatusSafe("Camera removed. Reset layout to restore.", false, true);
           return;
         }
         if (id === "friends") return;
@@ -10321,15 +10831,23 @@
             TowerProfileStore.save(pShell);
           }
         }
-        setProfileStatusSafe(label + " removed — Undo to restore.", false);
+        setProfileStatusSafe(
+          hiddenWidgetRestorable(id) ? label + " removed. Show it again in Edit profile." : label + " removed.",
+          false,
+          true
+        );
       };
-      root.__cognationRemoveSelected = removeSelectedWidget;
+      /* Remove keeps the page where it was (scroll position). */
+      var removeSelectedKeepingScroll = function () {
+        keepTowerScrollAround(root, removeSelectedWidget);
+      };
+      root.__cognationRemoveSelected = removeSelectedKeepingScroll;
       var removeBtn = root.querySelector("[data-tower-remove-selected]");
       if (removeBtn && !removeBtn.__cognationBound) {
         removeBtn.__cognationBound = true;
         removeBtn.addEventListener("click", function (ev) {
           ev.preventDefault();
-          removeSelectedWidget();
+          removeSelectedKeepingScroll();
           syncRotateToolbar(root);
         });
       }
@@ -10491,6 +11009,8 @@
         btn.setAttribute("aria-expanded", "true");
         var avatarSticker = wrap.closest('[data-tower-widget="avatar"]');
         if (avatarSticker) avatarSticker.classList.add("is-edit-open");
+        /* Never both: the Edit profile status line takes over from the stage notice. */
+        try { clearStageRemovalNotice(root, true); } catch (eStage) {}
       } else {
         /* Closing without Save still commits typed social URLs so circle buttons stick. */
         try { flushSocialFieldsFromForm(root); } catch (eFlush) {}
@@ -10499,6 +11019,8 @@
           root.__cognationProSetupJustCreated = false;
           try { syncAddProfileUi(root); } catch (eSetup) {}
         }
+        /* The Show hidden widgets notice is spent once Edit profile closes. */
+        try { clearHiddenWidgetNotice(root); } catch (eNotice) {}
         panel.hidden = true;
         returnPanelHome();
         wrap.classList.remove("is-open");
@@ -11423,7 +11945,13 @@
         /* keep widgetLayout as last dragged */
         if (!p.widgetLayout) p.widgetLayout = {};
         if (root.querySelector("[data-tower-public-widget]")) {
+          var keepInstax = p.publicWidgets && typeof p.publicWidgets.instax === "boolean" ? p.publicWidgets.instax : null;
+          var keepShown = normalizePublicWidgets(p.publicWidgets);
           p.publicWidgets = readPublicWidgetsFromForm(root);
+          if (keepInstax !== null) p.publicWidgets.instax = keepInstax;
+          OWNER_REMOVABLE_WIDGET_IDS.forEach(function (wid) {
+            if (ownerShownKey(wid) in keepShown) p.publicWidgets[ownerShownKey(wid)] = keepShown[ownerShownKey(wid)];
+          });
         }
         p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
         p.publicWidgets.social = profileHasSocialLinks(p);

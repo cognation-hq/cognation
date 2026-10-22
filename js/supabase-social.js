@@ -1000,6 +1000,7 @@
     memberResults: memberResults,
     effectiveAccountKind: effectiveAccountKind,
     ownerIsFleet: ownerIsFleet,
+    effectiveFleetId: effectiveFleetId,
     openProfile: openProfile,
     getProfile: profileForId,
     getProfileForHandle: profileForHandle,

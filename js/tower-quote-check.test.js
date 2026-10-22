@@ -136,7 +136,7 @@ function page(withHelpers) {
   assert.ok(/data-tower-widget/.test(clamp) && /isPhoneStage/.test(clamp), "blocks every widget; phones stack");
   var render = fnSrc("renderQuoteStickers");
   assert.ok(/stickerYFromLayout\(q, stageH\)/.test(render), "restored the same way");
-  assert.ok(/watchQuotesClear\(stage\)/.test(render), "clamped on every render");
+  assert.ok(/watchQuotesClear\(stage\)/.test(render), "saved spot re-applied on every render");
 })();
 
 /* 8. One glass style for every quote (owner, visitor, as added, after reload). */

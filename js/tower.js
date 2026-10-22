@@ -181,7 +181,9 @@
       var b = extra && extra[net.id] ? extra[net.id] : "";
       out[net.id] = a || b || "";
     });
-    if (!out.youtube && p.musicUrl && looksLikeYoutubeUrl(p.musicUrl)) out.youtube = String(p.musicUrl).trim();
+    /* The YouTube video box (musicUrl) is the YouTube widget on Pro. It no
+       longer also makes a YouTube logo chip: that copy could not be removed
+       (it came back from musicUrl) and sat as a lone red logo under the video. */
     return out;
   }
 

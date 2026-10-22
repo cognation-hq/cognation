@@ -1217,7 +1217,20 @@
         out[id] = defaultOn;
       }
     });
+    /* Owner-only Instax camera switch (#223): not a public widget, but an
+       explicit on/off is kept so "camera removed" survives reload (it rides in
+       the layout row's _widgets.publicWidgets). No key = on. */
+    if (raw && typeof raw === "object" && typeof raw.instax === "boolean") out.instax = raw.instax;
     return out;
+  }
+
+  function instaxRemoved(p) {
+    return !!(p && p.publicWidgets && typeof p.publicWidgets === "object" && p.publicWidgets.instax === false);
+  }
+
+  function setInstaxSwitch(p, on) {
+    p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
+    p.publicWidgets.instax = !!on;
   }
 
   var TOWER_SIDE_KEY = "cognation.tower.side";
@@ -8612,7 +8625,7 @@
       cam.classList.add("is-widget-off");
     }
     function showCam() {
-      if (!owner) {
+      if (!owner || instaxRemoved(p)) {
         hideCam();
         return;
       }
@@ -9666,6 +9679,16 @@
         setProfileStatusSafe("Restored " + (entry.label || entry.id) + ".", false);
         return;
       }
+      if (entry.type === "instax") {
+        var pCamUndo = TowerProfileStore.get();
+        if (!isTowerOwner(pCamUndo)) return;
+        setInstaxSwitch(pCamUndo, true);
+        TowerProfileStore.save(pCamUndo);
+        ensurePersonalPolaroid(root, pCamUndo);
+        applyWidgetLayout(root, pCamUndo);
+        setProfileStatusSafe("Restored Camera.", false);
+        return;
+      }
       if (entry.type === "emoji") {
         var pEmojiUndo = TowerProfileStore.get();
         if (!isTowerOwner(pEmojiUndo)) return;
@@ -9767,6 +9790,8 @@
         if (p.widgetLayout && p.widgetLayout.feed) delete p.widgetLayout.feed;
         if (p.widgetLayout && p.widgetLayout.messages) delete p.widgetLayout.messages;
         p.publicWidgets = JSON.parse(JSON.stringify(DEFAULT_PUBLIC_WIDGETS));
+        /* Explicit "on" so a browser holding an old "camera off" copy follows the reset (#223). */
+        p.publicWidgets.instax = true;
         p.polaroidRemoved = false;
         p.removedFriendPinIds = [];
         p.featuredFriendIds = [];
@@ -10306,6 +10331,18 @@
           pPol.polaroidRemoved = true;
           TowerProfileStore.save(pPol);
           setProfileStatusSafe(label + " removed — Reset layout to restore.", false);
+          return;
+        }
+        if (id === "instax") {
+          /* Owner-only camera (#223): save "off" in the layout row so it stays
+             removed after reload and in other browsers. Its spot is kept for Undo. */
+          pushWidgetUndo({ type: "instax", id: id, label: label });
+          selected.hidden = true;
+          selected.classList.add("is-widget-off");
+          var pCam = TowerProfileStore.get();
+          setInstaxSwitch(pCam, false);
+          TowerProfileStore.save(pCam);
+          setProfileStatusSafe("Camera removed — Undo or Reset layout to restore.", false);
           return;
         }
         if (id === "friends") return;
@@ -11425,7 +11462,9 @@
         /* keep widgetLayout as last dragged */
         if (!p.widgetLayout) p.widgetLayout = {};
         if (root.querySelector("[data-tower-public-widget]")) {
+          var keepInstax = p.publicWidgets && typeof p.publicWidgets.instax === "boolean" ? p.publicWidgets.instax : null;
           p.publicWidgets = readPublicWidgetsFromForm(root);
+          if (keepInstax !== null) p.publicWidgets.instax = keepInstax;
         }
         p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
         p.publicWidgets.social = profileHasSocialLinks(p);

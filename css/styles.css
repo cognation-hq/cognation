@@ -5032,6 +5032,17 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .tower-scrapbook-bar[hidden] {
   display: none !important;
 }
+/* Remove notice: in flow at the toolbar's end, so it never sits over a widget
+   or the tab bar. It wraps to its own toolbar line on narrow screens. */
+#panel-tower .tower-scrapbook-bar.tower-scrapbook-bar .tower-hidden-widget-notice.tower-stage-notice {
+  /* Taller than the toolbar buttons; -5px top and bottom keeps the bar's
+     height (no jump in the stage) when it fits on the button row. */
+  margin: -5px 0 -5px auto !important;
+  max-width: 100%;
+}
+.tower-scrapbook-bar .tower-stage-notice[hidden] {
+  display: none !important;
+}
 .tower-emoji-bar {
   display: flex;
   flex-wrap: wrap;
@@ -15703,7 +15714,9 @@ body.cgn-cal-page {
 }
 
 /* Show hidden widgets notice (Designer LOOK on #244): the #237 dark glass
-   notice, in the section where the shown row was. */
+   notice, in the section where the shown row was. The same notice carries a
+   Remove line at the end of the owner-only toolbar above the stage. */
+#panel-tower .tower-scrapbook-bar .tower-stage-notice.tower-hidden-widget-notice,
 #panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-hidden-widget-notice {
   margin: 0 !important;
   padding: 10px 12px !important;

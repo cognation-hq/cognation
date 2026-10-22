@@ -283,7 +283,7 @@ vm.runInContext([
 
 /* Default spawn never overlaps, Personal and Pro, desktop and phone. */
 var SIZES = { avatar: [220, 220], identity: [400, 90], slogan: [400, 70], music: [300, 380], youtube: [560, 340],
-  friends: [440, 200], "social-instagram": [160, 48], "social-tiktok": [160, 48], badges: [300, 160], calendar: [300, 260], followers: [300, 240],
+  friends: [440, 200], "social-instagram": [160, 48], "social-tiktok": [160, 48], badges: [300, 160], calendar: [300, 260], "visitor-calendar": [400, 430], followers: [300, 240],
   polaroid: [280, 320], html: [420, 200], instax: [220, 280] };
 function expandRows(face) {
   var chips = face === "professional" ? ["social-instagram", "social-tiktok"] : ["social-instagram", "social-tiktok"];

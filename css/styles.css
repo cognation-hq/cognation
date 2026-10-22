@@ -14861,6 +14861,36 @@ body.cgn-cal-page {
 .tower-visitor-calendar .tower-cal-cell { background: rgba(18,16,38,.92); color: #f7f9ff; border-color: rgba(209,241,255,.28); }
 .tower-visitor-calendar .tower-cal-cell.is-today, .tower-visitor-calendar .tower-cal-cell.is-selected { border-color: rgba(197,166,255,.85); box-shadow: 0 0 0 1px rgba(197,166,255,.45) inset; }
 .tower-visitor-calendar .tower-visitor-cal-link { color: #c5a6ff; }
+/* Calendar is its own card directly under the bio card (data-tower-widget="visitor-calendar"):
+   same width as the bio card, same widget gap, same calendar colours as before. */
+#panel-tower .tower-layout--scrapbook.is-sticker-stage > .tower-sticker--visitor-calendar {
+  width: var(--visitor-cal-w, min(28rem, 100%));
+  max-width: 100%;
+  margin: 0;
+  padding: .9rem 1rem 1rem;
+  box-sizing: border-box;
+  background: rgba(18,16,38,.92);
+  border: 1px solid rgba(217,210,240,.22);
+  border-radius: 18px;
+  color: #f7f9ff;
+}
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--visitor-calendar.is-spawned {
+  order: 0;
+  width: auto;
+  max-width: none;
+  padding: .9rem 1rem 1rem;
+  background: rgba(18,16,38,.92);
+  border: 1px solid rgba(217,210,240,.22);
+  border-radius: 18px;
+}
+#panel-tower .tower-sticker--visitor-calendar[hidden] { display: none !important; }
+/* Bio card order for visitors on a saved (free) layout, same as the default grid:
+   photo, name, + follow, then Mutual friends and the message button. The owner's
+   r143 row (actions | Edit profile) is unchanged. */
+#panel-tower [data-tower-is-owner="false"] .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-sticker--identity { grid-row: 2; grid-column: 1 / -1; }
+#panel-tower [data-tower-is-owner="false"] .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-profile-actions { grid-row: 3; grid-column: 1 / -1; justify-self: center; }
+#panel-tower [data-tower-is-owner="false"] .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-under-photo { grid-row: 4; grid-column: 1 / -1; }
+#panel-tower [data-tower-is-owner="false"] .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-live-panel { grid-row: 5; }
 
 /* Cream follow-up (PM + Designer, Oct 21). Website colours only: Times ink #16120c,
    cream #fbf7ec, muted ink #6b6458. */

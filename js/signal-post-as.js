@@ -71,8 +71,32 @@
     } catch (e) {}
   }
 
+  /* Post failures (PM wording). The raw server / database text never reaches
+     the page: callers log it to the console and show one of these two lines. */
+  var POST_ERROR_AS_PAGE = "Couldn't post as that page. Try again.";
+  var POST_ERROR_GENERIC = "Couldn't post. Try again.";
+
+  /* RLS refusal (Postgres 42501 / HTTP 403 / "row-level security") or the
+     browser's own-page check (code post_as_not_own) -> the "as that page" line. */
+  function isAuthorRefusal(error) {
+    if (!error) return false;
+    var code = String(error.code || (error.body && error.body.code) || "");
+    if (code === "42501" || code === "post_as_not_own") return true;
+    if (Number(error.status) === 403) return true;
+    var msg = String(error.message || (error.body && error.body.message) || "");
+    return /row-level security|violates .*policy|only post as your own pages/i.test(msg);
+  }
+
+  function postErrorLine(error) {
+    return isAuthorRefusal(error) ? POST_ERROR_AS_PAGE : POST_ERROR_GENERIC;
+  }
+
   var api = {
     STORE_KEY: STORE_KEY,
+    POST_ERROR_AS_PAGE: POST_ERROR_AS_PAGE,
+    POST_ERROR_GENERIC: POST_ERROR_GENERIC,
+    isAuthorRefusal: isAuthorRefusal,
+    postErrorLine: postErrorLine,
     ownPages: ownPages,
     hasProfessional: hasProfessional,
     authorProfileId: authorProfileId,

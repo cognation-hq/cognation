@@ -2920,6 +2920,13 @@
     }
   }
 
+  /* Post failure line (js/signal-post-as.js postErrorLine; PM wording). */
+  function towerPostErrorLine(error) {
+    var pa = typeof window !== "undefined" ? window.CognationSignalPostAs : null;
+    if (pa && typeof pa.postErrorLine === "function") return pa.postErrorLine(error);
+    return "Couldn't post. Try again.";
+  }
+
   /* Feed card byline. Server posts name the page that wrote them (Personal or
      Professional: post.authorKind from tower_posts.author_profile_id) with its
      picture (profiles.photo_url, else initials) and link to that page. Local
@@ -10996,6 +11003,15 @@
       status.classList.toggle("is-error", !!isError);
     }
 
+    var postSubmitBtn = form && form.querySelector ? form.querySelector("[data-tower-post-submit]") : null;
+    function setPostInFlight(on) {
+      if (form) form.__postInFlight = !!on;
+      if (!postSubmitBtn) return;
+      postSubmitBtn.disabled = !!on;
+      if (on) postSubmitBtn.setAttribute("aria-busy", "true");
+      else postSubmitBtn.removeAttribute("aria-busy");
+    }
+
     renderFeed(root);
     renderProfileChrome(root);
     initFramePicker(root);
@@ -11636,6 +11652,9 @@
           attachments.push(row);
         });
         if (usingRemoteSocial()) {
+          /* One post at a time: the Post button is disabled while a post is in
+             flight (no double posts) and re-enabled on success and on error. */
+          if (form.__postInFlight) return;
           var social = remoteSocial();
           if (!social || !social.createTowerPost) {
             setStatus("Tower is still connecting. Please try again.", true);
@@ -11648,6 +11667,7 @@
              the top of the Feed and the cleared composer are the confirmation.
              Only a failure shows the box. Clear any earlier error first. */
           setStatus("", false);
+          setPostInFlight(true);
           social
             .createTowerPost({
               body: bodyInput ? bodyInput.value : "",
@@ -11659,6 +11679,7 @@
                 ? window.CognationSignalPostAs.currentAuthorProfileId() : "",
             })
             .then(function () {
+              setPostInFlight(false);
               if (bodyInput) bodyInput.value = "";
               if (fileInput) fileInput.value = "";
               setStatus("", false);
@@ -11668,10 +11689,11 @@
               renderFeed(root);
             })
             .catch(function (error) {
-              setStatus(
-                (error && error.message) || "Could not post to Feed. Please try again.",
-                true
-              );
+              setPostInFlight(false);
+              /* PM wording: the raw server / database text goes to the console
+                 only; the page shows one of two plain lines. */
+              try { console.warn("[signal] post failed:", error); } catch (eLog) {}
+              setStatus(towerPostErrorLine(error), true);
               try {
                 if (window.CognationFriction) window.CognationFriction.retry("tower", "post_error");
               } catch (frCatch) {}

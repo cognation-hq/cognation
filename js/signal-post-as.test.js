@@ -122,7 +122,7 @@ test("no success notice: a successful post shows nothing (Alexa, Oct 22 11:45 AM
   assert.ok(!/setStatus\("[^"]/.test(ok), "success sets no message");
   assert.ok(/renderFeed\(root\)/.test(ok) && /bodyInput\.value = ""/.test(ok), "new post renders; composer clears");
   var catchPart = submit.slice(submit.indexOf(".catch("));
-  assert.ok(/Could not post to Feed\. Please try again\./.test(catchPart) && /,\s*true\s*\)/.test(catchPart), "failures still show, as errors");
+  assert.ok(/setStatus\(towerPostErrorLine\(error\), true\)/.test(catchPart), "failures still show, as errors");
 });
 
 test("failure box: glass, 1px #e88a99 at 70%, #f7f9ff text, no brown or yellow", function () {
@@ -135,4 +135,133 @@ test("failure box: glass, 1px #e88a99 at 70%, #f7f9ff text, no brown or yellow",
     assert.ok(rule.indexOf(t) >= 0, t);
   });
   assert.ok(!/#ED9300|237, 147, 0|accent-dim|yellow|amber/i.test(rule), "no brown or yellow");
+});
+
+/* ---- v2 (PM HOLD / Designer LOOK NO, Oct 22) ---------------------------------- */
+
+/* Pull a balanced {...} or (...) chunk starting at the first opener at/after i. */
+function balanced(src, i, open, close) {
+  var start = src.indexOf(open, i), depth = 0;
+  for (var j = start; j < src.length; j++) {
+    if (src[j] === open) depth++;
+    else if (src[j] === close && --depth === 0) return src.slice(start, j + 1);
+  }
+  throw new Error("unbalanced");
+}
+
+/* The real remote-post branch of the composer submit, run with stub DOM + social. */
+function remoteBranch() {
+  var at = tower.indexOf("if (usingRemoteSocial()) {", tower.indexOf("var savedPics = form.__pics"));
+  assert.ok(at > 0);
+  var block = balanced(tower, at, "{", "}");
+  var inFlightAt = tower.indexOf("function setPostInFlight(on)");
+  var inFlightFn = "function setPostInFlight(on)" + balanced(tower, inFlightAt, "{", "}");
+  var lineAt = tower.indexOf("function towerPostErrorLine(error)");
+  var lineFn = "function towerPostErrorLine(error)" + balanced(tower, lineAt, "{", "}");
+  /* setStatus exactly as tower.js writes it, so "the DOM" here is the real status writer. */
+  var statusAt = tower.indexOf("function setStatus(msg, isError)", tower.indexOf('var status = towerFeedQuery(root, "[data-tower-status]")'));
+  var statusFn = "function setStatus(msg, isError)" + balanced(tower, statusAt, "{", "}");
+  return new Function("form", "postSubmitBtn", "status", "bodyInput", "fileInput", "attachments", "social0", "window", "console", "renderFeed", "root",
+    "function usingRemoteSocial(){return true;} function remoteSocial(){return social0;}\n" +
+    statusFn + "\n" + inFlightFn + "\n" + lineFn + "\n" +
+    "return function run() " + block + ";");
+}
+
+function harness(outcome) {
+  var settle = {};
+  var calls = 0;
+  var logs = [];
+  var status = { hidden: true, textContent: "", classList: { on: {}, toggle: function (c, v) { this.on[c] = v; } } };
+  var btn = { disabled: false, attrs: {}, setAttribute: function (k, v) { this.attrs[k] = v; }, removeAttribute: function (k) { delete this.attrs[k]; } };
+  var form = {};
+  var body = { value: "hello" };
+  var social0 = {
+    createTowerPost: function () {
+      calls++;
+      return new Promise(function (res, rej) { settle.res = res; settle.rej = rej; });
+    },
+  };
+  var win = { CognationSignalPostAs: Object.assign({ currentAuthorProfileId: function () { return "pro-1"; } }, postAs) };
+  var cons = { warn: function () { logs.push(Array.prototype.slice.call(arguments)); } };
+  var run = remoteBranch()(form, btn, status, body, { value: "" }, [], social0, win, cons, function () {}, {});
+  return { run: run, settle: settle, status: status, btn: btn, logs: logs, body: body, calls: function () { return calls; } };
+}
+
+var RAW_RLS = 'new row violates row-level security policy for table "tower_posts"';
+
+test("error copy: each error maps to the right line (PM wording)", function () {
+  var rls = new Error(RAW_RLS); rls.status = 403; rls.body = { code: "42501", message: RAW_RLS };
+  var codeOnly = new Error("denied"); codeOnly.body = { code: "42501" };
+  var notOwn = new Error("You can only post as your own pages."); notOwn.code = "post_as_not_own";
+  var as = "Couldn't post as that page. Try again.";
+  var gen = "Couldn't post. Try again.";
+  assert.strictEqual(postAs.POST_ERROR_AS_PAGE, as);
+  assert.strictEqual(postAs.POST_ERROR_GENERIC, gen);
+  assert.strictEqual(postAs.postErrorLine(rls), as, "RLS 403 / 42501");
+  assert.strictEqual(postAs.postErrorLine(codeOnly), as, "42501 code alone");
+  assert.strictEqual(postAs.postErrorLine(new Error(RAW_RLS)), as, "RLS message alone");
+  assert.strictEqual(postAs.postErrorLine(notOwn), as, "author mismatch (browser own-page check)");
+  var e500 = new Error("duplicate key value violates unique constraint \"x\""); e500.status = 500;
+  assert.strictEqual(postAs.postErrorLine(e500), gen, "server 500");
+  assert.strictEqual(postAs.postErrorLine(new TypeError("Failed to fetch")), gen, "network");
+  assert.strictEqual(postAs.postErrorLine(new Error("Add a written update before posting. File uploads are not connected yet.")), gen, "other");
+  assert.strictEqual(postAs.postErrorLine(null), gen, "no error object");
+  assert.ok(/notOwn\.code = "post_as_not_own";/.test(social), "createTowerPost tags the own-page refusal");
+});
+
+test("raw server text never reaches the DOM; it goes to the console only", async function () {
+  var cases = [
+    (function () { var e = new Error(RAW_RLS); e.status = 403; e.body = { code: "42501", message: RAW_RLS }; return [e, "Couldn't post as that page. Try again."]; })(),
+    (function () { var e = new Error("relation \"tower_posts\" does not exist"); e.status = 500; return [e, "Couldn't post. Try again."]; })(),
+  ];
+  for (var i = 0; i < cases.length; i++) {
+    var h = harness();
+    h.run();
+    h.settle.rej(cases[i][0]);
+    await new Promise(function (r) { setTimeout(r, 0); });
+    assert.strictEqual(h.status.textContent, cases[i][1]);
+    assert.strictEqual(h.status.hidden, false);
+    assert.strictEqual(h.status.classList.on["is-error"], true);
+    assert.ok(h.status.textContent.indexOf(cases[i][0].message) < 0, "raw text not on the page");
+    assert.ok(h.logs.length === 1 && h.logs[0][1] === cases[i][0], "raw error logged to the console");
+  }
+  var catchPart = tower.slice(tower.indexOf(".catch(function (error) {", tower.indexOf(".createTowerPost({")));
+  catchPart = balanced(catchPart, 0, "{", "}");
+  assert.ok(!/error\.message|error && error\.message/.test(catchPart), "the catch never prints error.message");
+});
+
+test("in flight: Post is disabled (no double post) and re-enabled on success and on error", async function () {
+  assert.ok(/<button type="submit" class="btn btn-primary" data-tower-post-submit>Post<\/button>/.test(html), "Post button hook");
+  assert.ok(/#panel-signal \[data-tower-compose\] \[data-tower-post-submit\]:disabled \{ opacity: 0\.5; cursor: progress; \}/.test(flat), "disabled Post reads as waiting");
+  for (var k = 0; k < 2; k++) {
+    var h = harness();
+    h.run();
+    assert.strictEqual(h.btn.disabled, true, "disabled while in flight");
+    assert.strictEqual(h.btn.attrs["aria-busy"], "true");
+    h.run(); h.run();
+    assert.strictEqual(h.calls(), 1, "second and third submits ignored while in flight");
+    if (k === 0) h.settle.res(); else h.settle.rej(new Error(RAW_RLS));
+    await new Promise(function (r) { setTimeout(r, 0); });
+    assert.strictEqual(h.btn.disabled, false, k === 0 ? "re-enabled on success" : "re-enabled on error");
+    assert.ok(!("aria-busy" in h.btn.attrs));
+    if (k === 0) {
+      assert.strictEqual(h.status.hidden, true, "success: no notice");
+      assert.strictEqual(h.body.value, "", "success: composer cleared");
+    }
+    h.run();
+    assert.strictEqual(h.calls(), 2, "can post again after it settles");
+  }
+});
+
+test("Feed card timestamp: body sans, #d9d2f0, 13px (12px at 390), right on the name line", function () {
+  var start = flat.indexOf("#panel-signal .tower-feed[data-tower-feed] .tower-post-meta > time {");
+  assert.ok(start > 0);
+  var rule = flat.slice(start, flat.indexOf("}", start));
+  ["font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif) !important", "font-size: 13px !important",
+    "color: #d9d2f0 !important", "margin-left: auto", "text-align: right", "white-space: nowrap"].forEach(function (t) {
+    assert.ok(rule.indexOf(t) >= 0, t);
+  });
+  assert.ok(!/serif\s*!important|Georgia|Times/i.test(rule.replace("sans-serif", "")), "no serif face");
+  assert.ok(/@media \(max-width: 640px\) \{ #panel-signal \.tower-feed\[data-tower-feed\] \.tower-post-meta > time \{ font-size: 12px !important; \} \}/.test(flat), "12px at 390");
+  assert.ok(/'<header class="tower-post-meta">' \+\s*towerPostAuthorHtml\(post\) \+\s*'<time datetime="'/.test(tower), "time sits in the name line");
 });

@@ -364,7 +364,9 @@
         return p && String(p.id) === asId && String(p.user_id || "") === String(me.supabaseUserId);
       })[0];
       if (!own) {
-        return Promise.reject(new Error("You can only post as your own pages."));
+        var notOwn = new Error("You can only post as your own pages.");
+        notOwn.code = "post_as_not_own";
+        return Promise.reject(notOwn);
       }
       profileId = own.id;
     }

@@ -217,13 +217,6 @@ test("pro-job-title.js writes text through .value only (no innerHTML)", function
   assert.ok(/\.value = /.test(js));
 });
 
-test("chevron hover + focus ring use the site accent token with a lilac fallback", function () {
-  var css = src("css/styles.css");
-  assert.ok(/--color-accent:\s*#ED9300;/.test(css), "site accent token exists");
-  assert.ok(/\.tower-edit-profile-btn:is\(:hover, :focus-visible\) \.tower-edit-profile-chevron \{\s*color: var\(--color-accent, #cbb6ff\) !important;/.test(css));
-  assert.ok(/\.tower-edit-profile-btn:focus-visible \{\s*outline: 2px solid var\(--color-accent, #cbb6ff\) !important;/.test(css));
-});
-
 /* UI module: field visible only for the owner's own Pro page with the column present. */
 function uiBoot(state) {
   function el(extra) {

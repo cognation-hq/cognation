@@ -15170,17 +15170,6 @@ body.cgn-cal-page {
   color: var(--cgn-text-soft, rgba(232, 240, 255, 0.48)) !important;
 }
 
-/* ===== Edit profile chevron: site accent on hover and keyboard focus =====
-   --color-accent is the site accent token (defined at the top of this file).
-   Lilac #cbb6ff is only the fallback if the token is ever missing. */
-#panel-tower .tower-edit-profile-btn:is(:hover, :focus-visible) .tower-edit-profile-chevron {
-  color: var(--color-accent, #cbb6ff) !important;
-}
-#panel-tower .tower-edit-profile-btn:focus-visible {
-  outline: 2px solid var(--color-accent, #cbb6ff) !important;
-  outline-offset: 2px;
-}
-
 /* Add widget dialog contrast (Designer spec, Oct 22). Style only. The card was
    #fff5f9 with the site's light text on it, so the title, labels, hint,
    unselected tab and Cancel were near-white on near-white.

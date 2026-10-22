@@ -111,8 +111,10 @@ function adultStores() {
         handle: "clinic",
         displayName: "Clinic Studio",
         headline: "Public health education",
+        accountKind: "real",
         marketingAd: { title: "Ad", body: "Book", videoUrl: "https://example.com/a.mp4" },
       },
+      lab: { id: "lab", kind: "professional", handle: "lab", displayName: "Lab Works", headline: "Insurance research", accountKind: "real" },
     },
   }));
   return { local: local, session: memoryStorage() };
@@ -134,9 +136,11 @@ assert.strictEqual(adult.setMode("professional"), "professional");
 assert.strictEqual(adult.getMode(), "professional");
 assert.strictEqual(stores.session.getItem(adult.MODE_KEY), "professional", "mode stored for the session");
 
-/* No Professional page is live: no Webinar cards; the other six types fill 1:1. */
+/* No Professional page is live and no real feed exists for Research, Auction, Field or
+   Pop culture: the real "you might know" pages and the four Podcast cards show, each once, 1:1. */
 var proDeck = adult.sampleDeck(18);
-assert.strictEqual(proDeck.length, 18);
+assert.strictEqual(proDeck.map(function (c) { return c.type; }).join(","),
+  "pro-know,pro-podcast,pro-podcast,pro-podcast,pro-podcast", "one people card, then the Podcast cards, no filler: " + proDeck.map(function (c) { return c.id; }));
 assert.ok(proDeck.every(function (c) { return c.type !== "pro-webinar"; }), "no Webinar card while nothing is live");
 var banned = ["dating", "know", "friend", "ad", "classroom", "chatroom", "fact", "wellness", "event", "content"];
 proDeck.forEach(function (c) {
@@ -144,57 +148,43 @@ proDeck.forEach(function (c) {
   assert.ok(banned.indexOf(c.type) < 0, "no Personal / dating / friends cards on Professional");
   assert.ok(api.PRO_MARK[c.type], "each card has a type mark");
   assert.ok(c.why, "transparent: each card says why it shows");
+  assert.ok(!c.demo, "no placeholder card: " + c.id);
+  assert.ok(!/-r\d+$/.test(c.id), "no repeated card: " + c.id);
 });
-var counts = {};
-proDeck.forEach(function (c) { counts[c.type] = (counts[c.type] || 0) + 1; });
-api.PRO_ORDER.filter(function (t) { return t !== "pro-webinar"; }).forEach(function (t) {
-  assert.strictEqual(counts[t], 3, "1:1 across Professional types: " + JSON.stringify(counts));
+var lanes0 = adult.buildProfessionalLanes();
+["pro-research", "pro-auction", "pro-field", "pro-popculture"].forEach(function (t) {
+  assert.strictEqual(lanes0[t].length, 0, "no real data: empty lane " + t);
 });
-for (var i = 1; i < proDeck.length; i++) {
-  assert.notStrictEqual(proDeck[i].type, proDeck[i - 1].type, "no back-to-back Professional type");
-}
 
-/* Professionals you might know = professional pages, ranked by shared interest; never personal friends. */
+/* Professionals you might know = one card of real professional pages, ranked by shared interest;
+   never personal friends. */
 var know = proDeck.filter(function (c) { return c.type === "pro-know"; });
-assert.ok(know.every(function (c) { return c.profileId === "clinic"; }), "pros-you-might-know uses professional pages only");
-assert.ok(/public health/.test(know[0].why), "why line names the shared interest");
+assert.strictEqual(know.length, 1, "one people card");
+assert.strictEqual(know[0].people.map(function (r) { return r.profileId; }).join(","), "clinic,lab", "professional pages only, best match first");
+assert.strictEqual(know[0].why, "Matched to your field and interests.", "why line (Designer v2)");
 
-/* Research by interest + field / pop-culture tied to field. */
-var research = proDeck.filter(function (c) { return c.type === "pro-research"; });
-assert.ok(research.some(function (c) { return /public health/.test(c.title); }), "research matched to interests");
-assert.ok(proDeck.some(function (c) { return c.type === "pro-field" && /nursing/.test(c.title); }), "field update tied to field");
-assert.ok(proDeck.some(function (c) { return c.type === "pro-popculture" && /nursing/.test(c.title); }), "pop-culture tied to field");
-var auction = proDeck.filter(function (c) { return c.type === "pro-auction"; })[0];
-assert.strictEqual(auction.title, "Weekly Cognation bot auction", "auction title has no \"webinar\" (PM 2026-10-20)");
-assert.ok(!/webinar/i.test(auction.title) && !/webinar/i.test(auction.body) && /bot auction/i.test(auction.body) && /starter projects for sale/.test(auction.body), "weekly bot auction");
-var podcasts = adult.buildProfessionalLanes()["pro-podcast"].map(function (c) { return c.title + " " + c.body; }).join(" ");
+var podcasts = lanes0["pro-podcast"].map(function (c) { return c.title + " " + c.body; }).join(" ");
 assert.ok(/not only Cognation experts/.test(podcasts) && /Ethical/i.test(podcasts) && /async/i.test(podcasts) && /Continuing education/i.test(podcasts), "podcast topics");
-
-/* Placeholder cards are labeled demo; no invented live numbers/prices. */
-proDeck.forEach(function (c) {
-  if (c.type !== "pro-know") assert.strictEqual(c.demo, true, "placeholder flagged demo: " + c.id);
-  assert.ok(!/\$\d|\d+ (members|listeners|attendees|bids)/i.test(c.title + " " + c.body), "no invented live data: " + c.id);
-});
-assert.ok(/Demo · placeholder/.test(swipeSrc) && /seedops-demo-badge/.test(swipeSrc), "visible Demo label on placeholder cards");
+assert.ok(!/Demo · placeholder/.test(swipeSrc) && !/proPlaceholder/.test(swipeSrc), "no placeholder card builder or label");
 assert.ok(/data-type-mark=/.test(swipeSrc) && /Why you see this:/.test(swipeSrc), "type mark + why line rendered");
 
-/* Swipe right on a professional page follows it; never sends a friend request. */
+/* Swipe right keeps the people card: it follows nobody in bulk (each row opens that page)
+   and never sends a friend request. */
 adult.settleSwipe(know[0], "right");
 var follows = JSON.parse(stores.local.getItem(adult.FOLLOWS_KEY) || "[]");
-assert.ok(follows.indexOf("clinic") >= 0, "pros-you-might-know swipe-right follows the page");
+assert.strictEqual(follows.length, 0, "keeping the people card follows no one by itself");
 assert.strictEqual(stores.local.getItem("cognation.friend.requests.v1"), null, "no friend request from Professional");
 
 /* Switching back restores the unchanged Personal mix. */
 adult.setMode("personal");
 assert.ok(adult.sampleDeck(20).every(function (c) { return !/^pro-/.test(c.type); }), "Personal restored");
 
-/* No professional pages yet → one clearly labeled placeholder, not invented people. */
+/* No professional pages yet → no "you might know" card and no invented people. */
 var empty = loadSwipe(memoryStorage(), memoryStorage());
 empty.setMode("professional");
-var emptyKnow = empty.buildProfessionalLanes()["pro-know"];
-assert.strictEqual(emptyKnow.length, 1);
-assert.strictEqual(emptyKnow[0].demo, true, "placeholder when no professional pages");
-assert.ok(!empty.buildProfessionalLanes()["pro-auction"].length, "auction hidden when age unknown (18+)");
+assert.strictEqual(empty.buildProfessionalLanes()["pro-know"].length, 0, "no card when no professional pages");
+assert.ok(!empty.buildProfessionalLanes()["pro-auction"].length, "no auction scheduled: no Auction card");
+assert.ok(empty.sampleDeck(12).every(function (c) { return c.type === "pro-podcast"; }), "nothing else real: only the Podcast cards, no filler");
 
 /* Under-13: G/PG only — no auction, no pro contact cards under 13. */
 var kidLocal = memoryStorage();
@@ -205,7 +195,7 @@ kidSession.setItem("cognation.commune.mode", "professional");
 var kid = loadSwipe(kidLocal, kidSession);
 assert.strictEqual(kid.getMode(), "professional");
 var kidDeck = kid.sampleDeck(15);
-assert.ok(kidDeck.length > 0, "under-13 still gets a Professional deck");
+assert.ok(kidDeck.length > 0 && kidDeck.every(function (c) { return c.type === "pro-podcast"; }), "under-13 gets the G Podcast cards only");
 assert.ok(kidDeck.every(function (c) {
   return c.type !== "pro-auction" && c.type !== "pro-know" && ["G", "PG"].indexOf(c.rating) >= 0;
 }), "under-13 Professional is G/PG only");

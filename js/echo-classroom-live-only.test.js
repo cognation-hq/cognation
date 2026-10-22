@@ -92,7 +92,7 @@ assert.ok(deck0.every(function (c) { return c.type !== "classroom"; }), "no Clas
 assertNoGapAndEven(deck0, ["ad", "chatroom", "dating", "content"]);
 none.setMode("professional");
 var pro0 = none.sampleDeck(12);
-assert.strictEqual(pro0.length, 12);
+assert.ok(pro0.length === 4 && pro0.every(function (c) { return c.type === "pro-podcast" && !c.demo; }), "nothing live and no real pages: only the 4 Podcast cards, no placeholders");
 assert.ok(pro0.every(function (c) { return c.type !== "pro-webinar"; }), "no Webinar card");
 none.setMode("personal");
 assert.ok(none.sampleDeck(18).every(function (c) { return c.type !== "classroom"; }), "real sample deck: no Classroom");

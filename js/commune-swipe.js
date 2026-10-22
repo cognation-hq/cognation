@@ -117,8 +117,9 @@
     { id: "well-light", title: "A wellness note", body: "Morning daylight helps set the body clock. Many wellness classes start with a few minutes outside." },
   ];
 
-  /* Professional deck (Alexa GO 2026-10-07). Placeholder cards carry a visible Demo label
-   * until real feeds exist — no invented live data, names, prices, or counts. */
+  /* Professional deck (Alexa GO 2026-10-07). Real cards only (Alexa 2026-10-22: "we don need
+   * demo only crds in echo"): a lane with no real data has no cards and drops out of the 1:1 mix.
+   * No invented live data, names, prices, or counts. */
   var MODE_KEY = "cognation.commune.mode";
   var MODE = { PERSONAL: "personal", PROFESSIONAL: "professional" };
   var PRO = {
@@ -139,16 +140,17 @@
   PRO_MARK[PRO.PODCAST] = "Podcast";
   PRO_MARK[PRO.FIELD] = "Field";
   PRO_MARK[PRO.POP] = "Pop-culture";
-  var DEMO_LABEL = "Demo · placeholder";
-  /* The legacy classroom panel. Not the deck's classroom CARD (it also carries
-     data-classroom="card"): hiding that card on Back left a blank deck. */
-  var CLASSROOM_PANEL_SEL = "[data-classroom]:not([data-commune-card]), #panel-classroom, [data-commune-classroom]";
+  /* Podcast cards stay, with no Demo badge (Alexa 2026-10-22 11:46 AM CT, via SeedOps:
+     "this will also be a card when cognation goes live but doesnt need to be a demo"). */
   var PRO_PODCASTS = [
     { id: "pro-podcast-leaders", title: "Top industry performers", body: "Talks with leading people across industries, not only Cognation experts." },
     { id: "pro-podcast-ethics", title: "Ethical collaboration", body: "How strong teams share credit and work through disagreement." },
     { id: "pro-podcast-async", title: "Async by default", body: "Episodes on remote and async craft. Listen on your own schedule." },
     { id: "pro-podcast-ce", title: "Continuing education", body: "Episodes that pair with continuing-education goals." },
   ];
+  /* The legacy classroom panel. Not the deck's classroom CARD (it also carries
+     data-classroom="card"): hiding that card on Back left a blank deck. */
+  var CLASSROOM_PANEL_SEL = "[data-classroom]:not([data-commune-card]), #panel-classroom, [data-commune-classroom]";
 
   function readJson(store, key, fallback) {
     try {
@@ -1627,10 +1629,6 @@
     var p = getMemberProfile();
     return norm(p.field || p.profession || p.industry) || viewerInterestPhrases()[0] || "";
   }
-  function slug(t) { return norm(t).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
-  function proPlaceholder(type, id, title, body, why, minAge) {
-    return { id: id, type: type, title: title, body: body, why: why, demo: true, rating: "G", minAge: minAge || 0 };
-  }
 
   /** Professional pages only — never personal friends-you-may-know. Ranked by shared interest count. */
   function professionalsYouMightKnow() {
@@ -1643,10 +1641,30 @@
         (accounts.getProfilesForUsername(session.username) || []).forEach(function (p) { if (p && p.id) mine[String(p.id)] = true; });
       } catch (eOwn) {}
     }
+    /* The viewer's own server pages, by id and by owner. */
+    var social0 = window.CognationSupabaseSocial;
+    var myUserIds = {};
+    if (social0 && typeof social0.getMyProfiles === "function") {
+      try {
+        (social0.getMyProfiles() || []).forEach(function (p) {
+          if (!p) return;
+          if (p.id) mine[String(p.id)] = true;
+          if (p.user_id) myUserIds[String(p.user_id)] = true;
+        });
+      } catch (eMine) {}
+    }
+    try {
+      var authS = window.CognationAuth && typeof window.CognationAuth.getSession === "function" ? window.CognationAuth.getSession() : null;
+      if (authS && authS.supabaseUserId) myUserIds[String(authS.supabaseUserId)] = true;
+    } catch (eAuthS) {}
+    /* Seed sandbox: only a viewer the server confirms as seed/ops gets seed pages (and only
+       those). Real and unknown viewers get real pages only, so a real member is never
+       suggested a seed account. A page of unknown kind counts as seed (fail closed). */
+    var wantSeed = resolveViewerSeedStatus() === true;
     var interests = viewerInterestPhrases();
     var field = viewerField();
     if (field && interests.indexOf(field) < 0) interests.unshift(field);
-    var out = [];
+    var people = [];
     /* Live site: only real professional pages from the server (supabase-social).
        The local registry (cognation.profiles.v1) holds demo records such as
        prof-alexa-professional whose handle has no server page, so Open their page
@@ -1660,43 +1678,76 @@
           if (!row) return;
           /* accountKind / seedFleetId: the card's Demo badge reads them (not the handle). */
           fn({ id: row.id, kind: row.kind, handle: row.handle, displayName: row.display_name, bio: row.bio || "", userId: row.user_id,
-            accountKind: String(row.account_kind || "").toLowerCase(), seedFleetId: String(row.seed_fleet_id || "") });
+            accountKind: String(row.account_kind || "").toLowerCase(), seedFleetId: String(row.seed_fleet_id || ""), jobTitle: row.job_title || "" });
         });
       };
     }
     each(function (rec) {
       if (!rec || rec.kind !== "professional" || mine[String(rec.id)] || isFollowing(rec.id)) return;
-      var name = rec.displayName || rec.handle;
+      if (rec.userId && myUserIds[String(rec.userId)]) return;
+      if (profileLooksSeed(rec) !== wantSeed) return;
+      var name = String(rec.displayName || rec.handle || "").trim();
       if (!name) return;
       var tags = terms([rec.field, rec.industry, rec.headline, rec.bio, rec.interests].join(" "));
       var shared = interests.filter(function (phrase) {
         var words = terms(phrase);
         return words.length && words.every(function (t) { return tags.indexOf(t) >= 0; });
       });
-      out.push({
-        id: "pro-know-" + rec.id,
-        type: PRO.KNOW,
+      people.push({
         profileId: rec.id,
         record: rec,
         handle: String(rec.handle || "").replace(/^@/, ""),
-        title: name,
-        body: rec.headline || rec.bio || "A professional page on Cognation.",
-        why: shared.length ? "Shares your interest: " + shared[0] : "A professional page you don't follow yet.",
-        rating: "G",
-        minAge: 13,
+        name: name,
+        jobTitle: proJobTitle(rec),
+        shared: shared[0] || "",
         score: shared.length,
       });
     });
-    out.sort(function (a, b) { return b.score - a.score; });
-    /* Live site: zero real professional pages means no "you might know" card at
-       all (never the fallback). The fallback stays only for the signed-out local
-       preview, unchanged from main. */
-    if (!out.length && !liveSignedIn()) {
-      out.push(proPlaceholder(PRO.KNOW, "pro-know-placeholder", "Professionals you might know",
-        "Professional pages that match your field show here once real pages connect.",
-        "Matched by shared field and interests only.", 13));
+    people.sort(function (a, b) { return b.score - a.score; });
+    /* Zero real professional pages: no "you might know" card at all (no placeholder). */
+    if (!people.length) return [];
+    /* One card, up to 3 people (Alexa 2026-10-22 11:49 AM CT: "maybe 3 people you might
+       know on one card"). Fewer real matches: fewer rows. Never padded. */
+    var rows = people.slice(0, PRO_KNOW_MAX);
+    return [{
+      id: "pro-know-" + rows.map(function (r) { return r.profileId; }).join("-"),
+      type: PRO.KNOW,
+      title: "Professionals you might know",
+      people: rows,
+      /* Designer v2 (2026-10-22): one fixed why-line; the heading stays the type mark. */
+      why: "Matched to your field and interests.",
+      rating: "G",
+      minAge: 13,
+      keepOnly: true,
+    }];
+  }
+
+  var PRO_KNOW_MAX = 3;
+
+  /* Job title from the Pro page (Alexa 2026-10-22 11:49 AM CT: "this persons name - job
+     title software eng"). public.profiles has no job title column today
+     (id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id), so live rows
+     show the name only. Only an explicit job title field counts; bio is never used. */
+  function proJobTitle(rec) {
+    var t = rec ? rec.jobTitle || rec.job_title || "" : "";
+    return String(t).replace(/\s+/g, " ").trim().slice(0, 80);
+  }
+
+  function proKnowRowLabel(row) {
+    return row.jobTitle ? row.name + " \u00b7 " + row.jobTitle : row.name;
+  }
+
+  /* Designer v2: the name on its own line, then the job title (only when the row has
+     one, from profiles.job_title, #236) on a second line, one line max with an ellipsis.
+     Rows without a title stay one line. The full "Name · Title" is the accessible name. */
+  function proKnowRowInnerHtml(row) {
+    var html = '<span class="commune-pro-know-text">' +
+      '<span class="commune-pro-know-person">' + escapeHtml(row.name) + "</span>";
+    if (row.jobTitle) {
+      html += '<span class="commune-pro-know-title" data-pro-know-title title="' + escapeHtml(row.jobTitle) + '">' +
+        escapeHtml(row.jobTitle) + "</span>";
     }
-    return out;
+    return html + "</span>";
   }
 
   function professionalCardAllowed(card) {
@@ -1709,52 +1760,57 @@
     return true;
   }
 
+  /* Auction cards appear only when a real auction is scheduled on the Cognation
+     Professional Tower page (Alexa 2026-10-22). No server source holds an auction
+     schedule yet (classroom_sessions.kind allows only classroom / webinar), so the
+     lane is empty and no Auction card renders. */
+  function scheduledAuctionCards() {
+    return [];
+  }
+
   function buildProfessionalLanes() {
-    var field = viewerField();
-    var fieldName = field || "your field";
-    var fieldWhy = field ? "Matches the field on your profile: " + field : "Add your field to your profile to tune this.";
-    var interests = viewerInterestPhrases();
     var lanes = {};
     /* Webinar cards only while a Professional page is live. None live: lane empty. */
     lanes[PRO.WEBINAR] = liveWebinarCards();
     lanes[PRO.KNOW] = professionalsYouMightKnow();
-    lanes[PRO.RESEARCH] = (interests.length ? interests : [""]).map(function (t) {
-      return proPlaceholder(PRO.RESEARCH, "pro-research-" + (slug(t) || "general"),
-        t ? "Research papers: " + t : "Research papers by interest",
-        "Papers matched to " + (t ? "\u201c" + t + "\u201d" : "the interests on your profile") + " show here once a research feed connects.",
-        t ? "Matches your interest: " + t : "Add interests to your profile to tune this.");
-    });
-    lanes[PRO.AUCTION] = [proPlaceholder(PRO.AUCTION, "pro-auction-weekly", "Weekly Cognation bot auction",
-      "Each week Cognation hosts a bot auction on starter projects for sale.",
-      "Weekly Cognation event. Same card for everyone 18+.", 18)];
+    lanes[PRO.AUCTION] = scheduledAuctionCards();
     lanes[PRO.PODCAST] = PRO_PODCASTS.map(function (w) {
-      return proPlaceholder(PRO.PODCAST, w.id, w.title, w.body, "Picked by topic: ethics, async work, continuing education.");
+      return { id: w.id, type: PRO.PODCAST, title: w.title, body: w.body,
+        why: "Picked by topic: ethics, async work, continuing education.", rating: "G", minAge: 0, keepOnly: true };
     });
-    lanes[PRO.FIELD] = [proPlaceholder(PRO.FIELD, "pro-field-" + (slug(field) || "general"), "Field update: " + fieldName,
-      "News and changes in " + fieldName + " show here once a field feed connects.", fieldWhy)];
-    lanes[PRO.POP] = [proPlaceholder(PRO.POP, "pro-popculture-" + (slug(field) || "general"), "Pop culture \u00d7 " + fieldName,
-      "Pop-culture moments that touch " + fieldName + " show here once a feed connects.", fieldWhy)];
+    /* Research, Field update and Pop culture have no real feed: no cards. */
+    lanes[PRO.RESEARCH] = [];
+    lanes[PRO.FIELD] = [];
+    lanes[PRO.POP] = [];
     Object.keys(lanes).forEach(function (type) {
       lanes[type] = omitPassed(lanes[type].filter(professionalCardAllowed));
     });
     return lanes;
   }
 
-  /** Strict 1:1 round-robin across Professional types that have cards. */
+  /** Strict 1:1 round-robin across Professional types that have cards. Real cards
+      only, each once: an empty lane is skipped, and a lane that runs out drops out
+      of the rotation, so the deck never repeats or spins on missing data. */
   function paceProfessional(lanes, count) {
     var out = [];
     var cursors = {};
     var live = PRO_ORDER.filter(function (t) { return lanes && lanes[t] && lanes[t].length; });
     var target = count || 18;
-    for (var n = 0; live.length && out.length < target; n++) {
-      var type = live[n % live.length];
+    var at = 0; /* position in `live`; an exhausted lane is removed and the next lane takes its turn */
+    while (live.length && out.length < target) {
+      if (at >= live.length) at = 0;
+      var type = live[at];
       var list = lanes[type];
       var i = cursors[type] || 0;
+      if (i >= list.length) {
+        live.splice(at, 1);
+        continue;
+      }
       cursors[type] = i + 1;
-      var card = clone(list[i % list.length]);
+      var card = clone(list[i]);
       card.type = type;
-      if (i >= list.length) card.id = String(card.id) + "-r" + i;
       out.push(card);
+      at += 1;
     }
     return out;
   }
@@ -2042,19 +2098,34 @@
     if (PRO_MARK[card.type]) {
       el.setAttribute("data-professional-card", "");
       var badge = "";
-      if (card.demo) {
-        badge = '<span class="seedops-demo-badge" data-account-kind="placeholder" title="Placeholder card until a real feed connects.">' + DEMO_LABEL + "</span>";
-      } else if (card.record && window.CognationSeedOpsBadge && window.CognationSeedOpsBadge.badgeHtml) {
+      if (card.record && window.CognationSeedOpsBadge && window.CognationSeedOpsBadge.badgeHtml) {
         try { badge = window.CognationSeedOpsBadge.badgeHtml(card.record) || ""; } catch (eB) { badge = ""; }
       }
       html = '<div class="commune-card-kicker commune-pro-kicker"><span class="commune-type-mark" data-type-mark="' +
         escapeHtml(card.type.replace(/^pro-/, "")) + '">' + escapeHtml(PRO_MARK[card.type]) + "</span>" + badge + "</div>";
-      html += '<h4 class="commune-card-title">' + escapeHtml(card.title || "") + "</h4>";
+      /* The people card's type mark already reads "Professionals you might know". */
+      if (!card.people) html += '<h4 class="commune-card-title">' + escapeHtml(card.title || "") + "</h4>";
       if (card.body) html += '<p class="commune-card-body">' + escapeHtml(card.body) + "</p>";
-      if (card.why) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
-      if (card.type === PRO.KNOW && card.handle) {
-        html += '<button type="button" class="btn btn-secondary" data-commune-open-profile>Open their page</button>';
+      if (card.type === PRO.KNOW && card.people && card.people.length) {
+        html += '<ul class="commune-pro-know-list" data-pro-know-list>';
+        card.people.forEach(function (row, i) {
+          var badgeRow = "";
+          if (row.record && window.CognationSeedOpsBadge && window.CognationSeedOpsBadge.badgeHtml) {
+            try { badgeRow = window.CognationSeedOpsBadge.badgeHtml(row.record) || ""; } catch (eBR) { badgeRow = ""; }
+          }
+          html += '<li class="commune-pro-know-row">';
+          if (row.handle) {
+            html += '<button type="button" class="commune-pro-know-open" data-pro-know-open="' + i + '" data-pro-know-handle="' +
+              escapeHtml(row.handle) + '" aria-label="' + escapeHtml(proKnowRowLabel(row)) + '">' + proKnowRowInnerHtml(row) +
+              '<span class="commune-pro-know-chevron" aria-hidden="true">\u203a</span></button>';
+          } else {
+            html += '<span class="commune-pro-know-name">' + proKnowRowInnerHtml(row) + "</span>";
+          }
+          html += badgeRow + "</li>";
+        });
+        html += "</ul>";
       }
+      if (card.why) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
       el.innerHTML = html;
       return el;
     }
@@ -2210,6 +2281,11 @@
     });
     var open = el.querySelector("[data-commune-open-profile]");
     if (open) open.addEventListener("click", function (ev) { ev.stopPropagation(); openProfessionalPage(card); });
+    Array.prototype.forEach.call(el.querySelectorAll("[data-pro-know-open]"), function (btn) {
+      var row = card.people && card.people[Number(btn.getAttribute("data-pro-know-open"))];
+      if (!row) return;
+      btn.addEventListener("click", function (ev) { ev.stopPropagation(); openProfessionalPage(row); });
+    });
     if (card.type === TYPE.CLASSROOM) {
       wireClassroomCardClick(el, card, openClassroom);
     } else if (card.type === PRO.AUCTION) {
@@ -3197,20 +3273,28 @@
     }
     if (!card) {
       var roomsOpen = ensureSiteRooms().length;
+      /* Designer v2: deck end is a centered two-line note; Pass / Keep and the status
+         line ("Passed …") hide until a card is back (is-deck-end on the shell). */
+      if (state.shell) state.shell.classList.add("is-deck-end");
+      setStatus("");
       var empty =
-        '<p class="commune-swipe-empty">You\'re caught up.</p>' +
+        '<div class="commune-swipe-end" data-commune-deck-end>' +
+        '<p class="commune-swipe-empty commune-swipe-end-title">You\'re caught up.</p>' +
+        '<p class="commune-swipe-end-sub">New cards show up as people share.</p>' +
         (liveBirthMissing()
           ? '<p class="commune-swipe-empty commune-swipe-empty--rooms" data-commune-birth-needed>Chat rooms (13+) and classrooms (18+) need your birth year and month. Only the month and year are saved.</p>' +
             '<p class="commune-swipe-empty"><button type="button" class="btn btn-primary" data-commune-add-birth>Add birth month</button></p>'
           : roomsOpen
             ? ''
-            : '<p class="commune-swipe-empty commune-swipe-empty--rooms">No chat rooms match your age and interests yet. Update age or interests in your profile, then come back.</p>');
+            : '<p class="commune-swipe-empty commune-swipe-empty--rooms">No chat rooms match your age and interests yet. Update age or interests in your profile, then come back.</p>') +
+        "</div>";
       state.deck.innerHTML = empty;
       var addBirth = state.deck.querySelector("[data-commune-add-birth]");
       if (addBirth) addBirth.addEventListener("click", openBirthPrompt);
       syncActionLabels();
       return;
     }
+    if (state.shell) state.shell.classList.remove("is-deck-end");
     var el = renderCard(card);
     state.deck.appendChild(el);
     bindCard(el, card);
@@ -3478,15 +3562,16 @@
     }
     if (PRO_MARK[card.type]) {
       like(card);
-      if (card.type === PRO.KNOW && card.profileId && !card.demo) {
+      if (card.type === PRO.KNOW && card.profileId && !card.people) {
         if (!isFollowing(card.profileId)) toggleFollow(card.profileId);
         setStatus("Following this professional page.");
       } else {
-        if (!card.demo) {
+        /* Podcast cards have no episode to share yet: Keep only keeps (as on main). */
+        if (!card.keepOnly) {
           confirmInterestTags(card);
           recordShare(card);
         }
-        setStatus(card.demo ? "Kept." : "Shared with friends · interest confirmed.");
+        setStatus(card.keepOnly ? "Kept." : "Shared with friends · interest confirmed.");
       }
       friction("complete", pathway);
       return;
@@ -3886,6 +3971,8 @@
     paceDeck: paceDeck,
     sampleDeck: sampleDeck,
     settleSwipe: settleSwipe,
+    renderCard: renderCard,
+    bindCard: bindCard,
     omitPassed: omitPassed,
     sendPersonalFriendRequest: sendPersonalFriendRequest,
     publicEvents: publicEvents,

@@ -6720,6 +6720,20 @@
      the last hidden widget, the section hides once the notice clears. */
   var HIDDEN_WIDGET_NOTICE_MS = 4000;
 
+  /* After Show, the Edit profile status box no longer says "<Name> removed…":
+     the removal line is cleared (the "<Name> is showing again." notice in Show
+     hidden widgets is the confirmation). Any other status line is left alone. */
+  function clearStaleRemovalStatus(root) {
+    var el = root && root.querySelector("[data-tower-profile-status]");
+    if (!el || !el.__towerRemovalLine) return;
+    if (el.textContent === el.__towerRemovalLine) {
+      el.textContent = "";
+      el.hidden = true;
+      el.classList.remove("is-error");
+    }
+    el.__towerRemovalLine = "";
+  }
+
   function clearHiddenWidgetNotice(root) {
     var box = root && root.querySelector("[data-tower-hidden-widgets]");
     if (!box || !box.__towerShowNotice) return;
@@ -6795,6 +6809,7 @@
           timer: setTimeout(function () { clearHiddenWidgetNotice(root); }, HIDDEN_WIDGET_NOTICE_MS),
         };
         setPublicWidgetVisible(root, id, true);
+        clearStaleRemovalStatus(root);
         renderHiddenWidgetsList(root, TowerProfileStore.get());
       });
     }
@@ -9915,6 +9930,10 @@
       } catch (eMq) {}
     }
     var target = narrow ? root : n.__towerHome;
+    if (!narrow && n.classList) {
+      n.classList.remove("is-top");
+      if (n.style) n.style.removeProperty("--tower-stage-notice-top");
+    }
     if (target && n.parentNode !== target && target.appendChild) target.appendChild(n);
   }
 
@@ -9956,6 +9975,7 @@
     placeStageRemovalNotice(root, n, stageNoticeNarrow());
     n.textContent = msg;
     n.hidden = false;
+    if (!wasShown && stageNoticeNarrow()) pickStageNoticeBand(root, n);
     if (n.classList && !wasShown) {
       /* One frame at the start state, then .is-in runs the 160ms fade/slide. */
       if (typeof requestAnimationFrame === "function" && stageNoticeAnimates()) {
@@ -9966,6 +9986,88 @@
       }
     }
     n.__towerTimer = setTimeout(function () { clearStageRemovalNotice(root); }, STAGE_REMOVAL_NOTICE_MS);
+  }
+
+  /* Remove used to jump the page (SeedOps live check: scrollY 851 -> 185 at 390).
+     The removed widget leaves the stage, the stage and the page get shorter, and
+     when the viewer is within that height of the page bottom the browser clamps
+     scrollY to the new, shorter page. Keep the scroll position: note scrollY
+     before the re-render; afterwards, if the page is now too short to stay there,
+     hold the stage's height by exactly the missing amount (blank space at the
+     stage's foot, nothing else moves), then restore scrollY. The hold goes with
+     the next stage layout (Show, Reset layout, resize, reload). Display only. */
+  function holdTowerScroll(root, x, y) {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+    var doc = document.documentElement;
+    var stage = root && root.querySelector ? root.querySelector("[data-tower-scrapbook]") : null;
+    var missing = y + (window.innerHeight || 0) - (doc ? doc.scrollHeight : 0);
+    if (missing > 0 && stage && stage.getBoundingClientRect) {
+      stage.style.minHeight = Math.ceil(stage.getBoundingClientRect().height + missing) + "px";
+    }
+    var now = window.pageYOffset || 0;
+    /* "instant": the page uses smooth scrolling; the restore must land before the
+       next paint so the viewer never sees the page move. */
+    if (Math.abs(now - y) > 0.5 && typeof window.scrollTo === "function") {
+      window.scrollTo({ left: x, top: y, behavior: "instant" });
+    }
+  }
+
+  function keepTowerScrollAround(root, run) {
+    var x = typeof window !== "undefined" ? window.pageXOffset || 0 : 0;
+    var y = typeof window !== "undefined" ? window.pageYOffset || 0 : 0;
+    try {
+      run();
+    } finally {
+      holdTowerScroll(root, x, y);
+      /* Late re-renders (player teardown, spawn) settle within a frame; only
+         undo a clamp, never a scroll the viewer made since. */
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(function () {
+          if ((window.pageYOffset || 0) < y - 0.5) holdTowerScroll(root, x, y);
+        });
+      }
+    }
+  }
+
+  /* Below 768 (follow-up to #247): the bottom band can sit over the Mutual
+     friends, Go live and Messages envelope controls in the profile card. When it
+     would, the notice shows at the top of the viewport instead (below the tab
+     bar when that is on screen). Picked once as it shows, so it never jumps; it
+     ignores taps either way (pointer-events: none on it and its children). */
+  var STAGE_NOTICE_EDGE = 16;
+  var STAGE_NOTICE_CLEAR_SELECTORS = ["[data-tower-mutual-friends]", "[data-go-live]", "[data-tower-envelope]"];
+
+  function stageNoticeBandsClash(band, rects) {
+    return rects.some(function (r) { return r.bottom > band.top && r.top < band.bottom; });
+  }
+
+  function pickStageNoticeBand(root, n) {
+    n.classList.remove("is-top");
+    if (n.style) n.style.removeProperty("--tower-stage-notice-top");
+    var vh = window.innerHeight || 0;
+    var h = n.getBoundingClientRect().height || 0;
+    var rects = [];
+    STAGE_NOTICE_CLEAR_SELECTORS.forEach(function (sel) {
+      Array.prototype.forEach.call(root.querySelectorAll(sel), function (el) {
+        if (el.hidden || (el.closest && el.closest("[hidden]"))) return;
+        var r = el.getBoundingClientRect();
+        if (!r.width || !r.height || r.bottom <= 0 || r.top >= vh) return;
+        rects.push(r);
+      });
+    });
+    var bottomBand = { top: vh - STAGE_NOTICE_EDGE - h, bottom: vh - STAGE_NOTICE_EDGE };
+    if (!stageNoticeBandsClash(bottomBand, rects)) return "bottom";
+    var top = STAGE_NOTICE_EDGE;
+    var tabs = document.querySelector(".app-topbar");
+    if (tabs) {
+      var tr = tabs.getBoundingClientRect();
+      if (tr.bottom > 0 && tr.top < vh) top = Math.max(top, Math.ceil(tr.bottom) + 8);
+    }
+    var topBand = { top: top, bottom: top + h };
+    if (stageNoticeBandsClash(topBand, rects)) return "bottom";
+    n.style.setProperty("--tower-stage-notice-top", top + "px");
+    n.classList.add("is-top");
+    return "top";
   }
 
   function setProfileStatusOn(root, msg, isError) {
@@ -9996,6 +10098,8 @@
       if (!el) return;
       el.hidden = !msg;
       el.textContent = msg || "";
+      /* Remembered so Show can clear a stale removal line (and nothing else). */
+      el.__towerRemovalLine = removal && msg ? String(msg) : "";
       el.classList.toggle("is-error", !!isError);
     }
 
@@ -10573,7 +10677,7 @@
         var selectedKey = stage.querySelector(".is-widget-selected");
         if (!selectedKey || !stage.contains(selectedKey)) return;
         ev.preventDefault();
-        removeSelectedWidget();
+        removeSelectedKeepingScroll();
       });
       /* One removal path for Backspace/Delete and the touch "Remove" button.
          Owner only, Public side only; never runs while typing (the key handler
@@ -10728,13 +10832,17 @@
           true
         );
       };
-      root.__cognationRemoveSelected = removeSelectedWidget;
+      /* Remove keeps the page where it was (scroll position). */
+      var removeSelectedKeepingScroll = function () {
+        keepTowerScrollAround(root, removeSelectedWidget);
+      };
+      root.__cognationRemoveSelected = removeSelectedKeepingScroll;
       var removeBtn = root.querySelector("[data-tower-remove-selected]");
       if (removeBtn && !removeBtn.__cognationBound) {
         removeBtn.__cognationBound = true;
         removeBtn.addEventListener("click", function (ev) {
           ev.preventDefault();
-          removeSelectedWidget();
+          removeSelectedKeepingScroll();
           syncRotateToolbar(root);
         });
       }

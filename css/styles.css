@@ -14973,6 +14973,32 @@ body.cgn-cal-page {
   font-size: 0.75rem !important; /* same size as the story-level line (.news-report-status); was 0.88rem from .commune-status */
 }
 
+/* Feed photos (P1, Oct 21): a post's picture fills the card width, rounded, in the
+   existing border colour; no pill around it. Posts that saved only a file name keep
+   the pill with a "photo wasn't uploaded" note. */
+.tower-attachments > .tower-attach.tower-attach--image {
+  flex: 1 1 100%;
+  max-width: 100%;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+}
+.tower-attach-img {
+  display: block;
+  width: auto;
+  max-width: 100%; /* never wider than the card; saved photos are 480px, not upscaled */
+  height: auto;
+  max-height: 32rem;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid var(--cgn-border, var(--color-border));
+  background: rgba(16, 19, 48, 0.42);
+}
+.tower-attach-note {
+  font-size: 0.72rem;
+  opacity: 0.85;
+}
+
 /* TOWER Feed contrast (Designer follow-up). TOWER Feed only (.tower-feed[data-tower-feed]
    and the "Send a signal" composer in the same Feed panel):
    - post cards use the site glass rgba(18,16,38,.92) so the existing body text reads

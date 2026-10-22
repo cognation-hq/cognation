@@ -94,8 +94,8 @@
   var SPAWN_ROWS = {
     /* LOOK v3.3: each social/link is its own widget. __socials__ expands to opted-in
        chips (pairs on desktop). No grouped LINKS box. */
-    personal: [["avatar"], ["identity"], ["slogan"], ["music"], ["friends"], ["__socials__"], ["badges", "calendar"], ["polaroid", "html"], ["instax"]],
-    professional: [["avatar"], ["identity"], ["slogan"], ["youtube"], ["__socials__"], ["badges"], ["followers", "calendar"], ["html"]],
+    personal: [["avatar"], ["identity"], ["slogan"], ["visitor-calendar"], ["music"], ["friends"], ["__socials__"], ["badges", "calendar"], ["polaroid", "html"], ["instax"]],
+    professional: [["avatar"], ["identity"], ["slogan"], ["visitor-calendar"], ["youtube"], ["__socials__"], ["badges"], ["followers", "calendar"], ["html"]],
   };
   /* Factory seeds that were never a user's choice. An entry equal to one of these
      is treated as unplaced, so old overlapping defaults get a real spawn spot. */
@@ -104,6 +104,11 @@
     { avatar: [4, 4], identity: [4, 26], slogan: [28, 18], social: [4, 26], music: [4, 34], badges: [4, 44], friends: [4, 56], html: [28, 4] },
     { identity: [4, 18] },
   ];
+  /* Calendar card (visitors): its own widget, one full row directly under the bio
+     card in every default layout (Personal and Professional). The owner's own
+     Calendar stays in Edit profile; this card is hidden on the owner's view. It
+     is never dragged or saved, so a saved layout never holds a spot for it. */
+  var VISITOR_CALENDAR_ID = "visitor-calendar";
   var spawnCache = {};
   /* Avatar, name and slogan read as one profile card: a tight gap between them. */
   var PROFILE_STACK = { avatar: true, identity: true, slogan: true };
@@ -141,6 +146,15 @@
 
   function socialWidgetId(netId) {
     return "social-" + String(netId || "");
+  }
+
+  /* Pro money links (Venmo, Pay for services, Buy ads): one card, stacked pills
+     (Designer spec). Each link is still its own saved field; only the widget on
+     the page is one group. Personal keeps Venmo as its own logo chip. */
+  var PAY_LINKS_ID = "pay-links";
+  var PAY_LINK_NETS = ["venmo", "services", "ads"];
+  function isPayLinkNet(netId, p) {
+    return isProTower(p) && PAY_LINK_NETS.indexOf(String(netId || "")) >= 0;
   }
 
   function socialNetIdFromWidget(wid) {
@@ -205,11 +219,15 @@
     var out = [];
     (rows || []).forEach(function (row) {
       if (row.length === 1 && row[0] === "__socials__") {
-        var ids = optedInSocialNetIds(p).map(socialWidgetId);
+        var opted = optedInSocialNetIds(p);
+        var pay = opted.filter(function (id) { return isPayLinkNet(id, p); });
+        var ids = opted.filter(function (id) { return pay.indexOf(id) < 0; }).map(socialWidgetId);
         var i;
         for (i = 0; i < ids.length; i += 2) {
           out.push(ids.slice(i, i + 2));
         }
+        /* Venmo / Pay for services / Buy ads: one full-width card after the chips. */
+        if (pay.length) out.push([PAY_LINKS_ID]);
         return;
       }
       out.push(row.slice());
@@ -232,6 +250,22 @@
       if (!p.widgetLayout[wid]) p.widgetLayout[wid] = old;
     }
     delete p.widgetLayout.social;
+  }
+
+  /* A saved layout from before the pay-links card: the card takes the spot of the
+     first Venmo / Pay / Buy ads chip the owner placed. The old keys stay as they
+     are (nothing is deleted), so no saved position is lost. */
+  function seedPayLinksLayout(p) {
+    if (!p || !isProTower(p) || !p.widgetLayout || typeof p.widgetLayout !== "object") return;
+    var layout = p.widgetLayout;
+    if (layout[PAY_LINKS_ID]) return;
+    for (var i = 0; i < PAY_LINK_NETS.length; i++) {
+      var old = layout[socialWidgetId(PAY_LINK_NETS[i])];
+      if (old && typeof old === "object" && isPlacedPos(layout, socialWidgetId(PAY_LINK_NETS[i]))) {
+        layout[PAY_LINKS_ID] = JSON.parse(JSON.stringify(old));
+        return;
+      }
+    }
   }
 
   function rectsOverlap(a, b, gap) {
@@ -414,6 +448,7 @@
           var el = stage.querySelector('[data-tower-widget="' + id + '"]');
           if (!el || el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
           if (el.classList.contains("is-dragging")) return;
+          if (id === VISITOR_CALENDAR_ID) el.style.removeProperty("--visitor-cal-w");
           el.classList.add("is-spawned");
           el.classList.toggle("is-spawn-full", row.length === 1);
           el.classList.toggle("is-spawn-half", row.length > 1);
@@ -429,7 +464,15 @@
           gridCache[id] = { x: 0, y: 0, z: 2, tilt: 0 };
         });
       });
-      ordered.forEach(function (el) { stage.appendChild(el); });
+      /* Re-append only when the order changed: moving a node drops keyboard focus,
+         so a re-render used to knock focus off any link in the grid (Tab to a pay
+         link, and focus jumped back to the page). Same final order as before. */
+      var kids = stage.children;
+      var tailOk = kids.length >= ordered.length;
+      for (var oi = 0; tailOk && oi < ordered.length; oi++) {
+        if (kids[kids.length - ordered.length + oi] !== ordered[oi]) tailOk = false;
+      }
+      if (!tailOk) ordered.forEach(function (el) { stage.appendChild(el); });
       ensureProfileStrip(stage, p);
       /* Friend pins: in default grid they sit inside the Top Friends card flow via CSS;
          clear absolute spawn marks so they do not float over the grid. */
@@ -461,10 +504,24 @@
     var sizes = {};
     var occupied = [];
     var colW = phone ? stageW - 32 : (stageW - 48 - SPAWN_GAP) / 2;
+    var avatarEl = stage.querySelector('[data-tower-widget="avatar"]');
+    var calSeat = null;
     stage.querySelectorAll("[data-tower-widget]").forEach(function (el) {
       if (el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
       var id = el.getAttribute("data-tower-widget");
       el.classList.remove("is-spawn-full", "is-spawn-half", "is-grid-friend-pin");
+      if (id === VISITOR_CALENDAR_ID) {
+        /* Same width as the bio card. When the bio card has a saved spot, seat
+           the calendar right under it (below); otherwise it packs in its row. */
+        el.classList.add("is-spawned");
+        var aw = avatarEl && avatarEl.parentNode === stage && !avatarEl.hidden ? avatarEl.offsetWidth : 0;
+        if (aw) el.style.setProperty("--visitor-cal-w", aw + "px");
+        else el.style.removeProperty("--visitor-cal-w");
+        el.style.setProperty("--spawn-max-w", Math.floor(aw || colW) + "px");
+        if (aw && isPlacedPos(layout, "avatar")) calSeat = el;
+        else sizes[id] = { w: el.offsetWidth || 0, h: el.offsetHeight || 0 };
+        return;
+      }
       if (spawnIds[id] && !isPlacedPos(layout, id) && !el.classList.contains("is-dragging")) {
         var full = rows.some(function (r) { return r.length === 1 && r[0] === id; });
         el.classList.add("is-spawned");
@@ -523,7 +580,21 @@
       rows.forEach(function (r, i) { if (r.indexOf("music") >= 0) mi = i; });
       rows.splice(mi >= 0 ? mi + 1 : rows.length, 0, ["__friendpins"]);
     }
+    var calPos = null;
+    if (calSeat) {
+      calPos = {
+        x: avatarEl.offsetLeft,
+        y: avatarEl.offsetTop + avatarEl.offsetHeight + SPAWN_GAP,
+        w: calSeat.offsetWidth || 0,
+        h: calSeat.offsetHeight || 0,
+      };
+      occupied.push({ x: calPos.x, y: calPos.y, w: calPos.w, h: calPos.h });
+    }
     var placed = packSpawn(rows, sizes, occupied, stageW, phone);
+    if (calPos) {
+      placed[VISITOR_CALENDAR_ID] = { x: calPos.x, y: calPos.y };
+      placed.__bottom = Math.max(placed.__bottom, calPos.y + calPos.h + (phone ? 16 : 24));
+    }
     var stageH = Math.max(stage.clientHeight || 0, placed.__bottom);
     if (placed.__bottom > (stage.clientHeight || 0)) stage.style.minHeight = Math.ceil(placed.__bottom) + "px";
     spawnCache = {};
@@ -2997,9 +3068,62 @@
     }
   }
 
+  /* Empty Send a signal post (PM wording): shown before any request is sent. */
+  var EMPTY_POST_LINE = "Write something before posting.";
+
+  /* Post failure line (js/signal-post-as.js postErrorLine; PM wording). */
+  function towerPostErrorLine(error) {
+    var pa = typeof window !== "undefined" ? window.CognationSignalPostAs : null;
+    if (pa && typeof pa.postErrorLine === "function") return pa.postErrorLine(error);
+    return "Couldn't post. Try again.";
+  }
+
+  /* Feed card byline. Server posts name the page that wrote them (Personal or
+     Professional: post.authorKind from tower_posts.author_profile_id) with its
+     picture (profiles.photo_url, else initials) and link to that page. Local
+     posts keep the plain name. */
+  function towerPostAuthorSlug(post) {
+    if (!post || !post._remote) return "";
+    return String(post.handle || post.authorProfileId || "").trim();
+  }
+
+  function towerPostAuthorHtml(post) {
+    var name = escapeHtml(post.authorName || "Neighbor");
+    var slug = towerPostAuthorSlug(post);
+    if (!slug) {
+      return '<span class="tower-author">' + name + towerPostSeedBadge(post) + "</span>";
+    }
+    var photo = String(post.authorPhotoUrl || "");
+    var avatar = /^https:\/\//i.test(photo)
+      ? '<span class="tower-author-avatar has-photo" aria-hidden="true"><img src="' + escapeHtml(photo) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>'
+      : '<span class="tower-author-avatar" aria-hidden="true">' + escapeHtml(initials(post.authorName || "Neighbor")) + "</span>";
+    return '<span class="tower-author">' +
+      '<a class="tower-author-link" href="#tower-profile-' + escapeHtml(encodeURIComponent(slug)) + '"' +
+      ' data-tower-author-open="' + escapeHtml(slug) + '"' +
+      ' data-author-kind="' + (post.authorKind === "professional" ? "professional" : "personal") + '">' +
+      avatar + '<span class="tower-author-name">' + name + "</span></a>" +
+      towerPostSeedBadge(post) + "</span>";
+  }
+
+  function bindTowerAuthorLinks(list) {
+    if (!list || list.__towerAuthorLinksBound || typeof list.addEventListener !== "function") return;
+    list.__towerAuthorLinksBound = true;
+    list.addEventListener("click", function (ev) {
+      var link = ev.target && ev.target.closest ? ev.target.closest("a[data-tower-author-open]") : null;
+      if (!link || !list.contains(link)) return;
+      var slug = link.getAttribute("data-tower-author-open") || "";
+      if (!slug || typeof window.CognationTowerOpenProfile !== "function") return;
+      ev.preventDefault();
+      try { window.CognationTowerOpenProfile(slug); } catch (eOpen) {
+        try { location.hash = "tower-profile-" + slug; } catch (eHash) {}
+      }
+    });
+  }
+
   function renderFeed(root) {
     var list = towerFeedQuery(root, "[data-tower-feed]");
     if (!list) return;
+    bindTowerAuthorLinks(list);
     list.__ageFloorUnder13 = viewerUnder13();
     var posts = TowerStore.list().filter(towerPostVisibleToViewer);
     list.innerHTML = "";
@@ -3013,10 +3137,7 @@
       article.setAttribute("data-tower-post", post.id || "");
       article.innerHTML =
         '<header class="tower-post-meta">' +
-        '<span class="tower-author">' +
-        escapeHtml(post.authorName || "Neighbor") +
-        towerPostSeedBadge(post) +
-        "</span>" +
+        towerPostAuthorHtml(post) +
         '<time datetime="' +
         escapeHtml(post.createdAt) +
         '">' +
@@ -5250,6 +5371,7 @@
   function renderSocialLinks(root, p) {
     if (!root) return;
     migrateGroupedSocialLayout(p);
+    seedPayLinksLayout(p);
     syncEditSocialFields(root, p);
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (!stage) return;
@@ -5266,13 +5388,14 @@
       var wid = el.getAttribute("data-tower-widget") || "";
       var netId = socialNetIdFromWidget(wid);
       if (!netId) return;
-      if (!wanted[netId]) {
+      if (!wanted[netId] || isPayLinkNet(netId, p)) {
         if (el.parentNode) el.parentNode.removeChild(el);
       }
     });
 
     socialLinkDefs().forEach(function (net) {
       if (!wanted[net.id]) return;
+      if (isPayLinkNet(net.id, p)) return; /* drawn in the pay-links card below */
       var wid = socialWidgetId(net.id);
       var href = socialHref(net.id, links[net.id]);
       var el = stage.querySelector('[data-tower-widget="' + wid + '"]');
@@ -5327,11 +5450,70 @@
       el.classList.remove("is-widget-off");
     });
 
+    renderPayLinks(stage, p, links, wanted);
+
     /* Old builds left an X button on each chip; drop any still in the DOM. */
     stage.querySelectorAll(".tower-social-chip-remove").forEach(function (x) {
       if (x.parentNode) x.parentNode.removeChild(x);
     });
     syncOwnerStickerHandles(root);
+  }
+
+  /* One card, one group: Venmo, Pay for services, Buy ads as stacked pills (12px
+     gap). Each opens the owner's own saved link in a new tab; a link that is not
+     set is not shown, and with none set there is no card. Cognation takes no
+     payment here: plain outbound links only. */
+  function renderPayLinks(stage, p, links, wanted) {
+    var nets = isProTower(p)
+      ? socialLinkDefs().filter(function (net) { return wanted[net.id] && isPayLinkNet(net.id, p) && socialHref(net.id, links[net.id]); })
+      : [];
+    var el = stage.querySelector('[data-tower-widget="' + PAY_LINKS_ID + '"]');
+    if (!nets.length) {
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+      return;
+    }
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "tower-sticker tower-sticker--pay-links";
+      el.setAttribute("data-tower-widget", PAY_LINKS_ID);
+      el.setAttribute("data-sticker-label", "Venmo & Buy ads");
+      var handle = document.createElement("button");
+      handle.type = "button";
+      handle.className = "tower-sticker-handle";
+      handle.setAttribute("data-tower-sticker-handle", "");
+      handle.setAttribute("aria-label", "Move Venmo & Buy ads sticker");
+      handle.tabIndex = -1;
+      handle.hidden = true;
+      handle.textContent = "⋮⋮";
+      el.appendChild(handle);
+      var group = document.createElement("div");
+      group.className = "tower-pay-links";
+      group.setAttribute("role", "group");
+      group.setAttribute("aria-label", "Pay and ads links");
+      group.setAttribute("data-tower-pay-links", "");
+      el.appendChild(group);
+      stage.appendChild(el);
+    }
+    var box = el.querySelector("[data-tower-pay-links]");
+    el.hidden = false;
+    el.classList.remove("is-widget-off");
+    /* Same links as last time: leave the pills alone, so a re-render does not
+       drop keyboard focus or a hover ring. */
+    var sig = nets.map(function (net) { return net.id + "=" + socialHref(net.id, links[net.id]); }).join("|");
+    if (box.getAttribute("data-pay-sig") === sig && box.children.length === nets.length) return;
+    box.setAttribute("data-pay-sig", sig);
+    box.innerHTML = "";
+    nets.forEach(function (net) {
+      var a = document.createElement("a");
+      a.className = "tower-social-btn tower-pay-pill tower-social-btn--" + net.id;
+      a.setAttribute("data-tower-pay-link", net.id);
+      a.href = socialHref(net.id, links[net.id]);
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = net.label;
+      a.setAttribute("aria-label", "Open " + net.label + " (opens in a new tab)");
+      box.appendChild(a);
+    });
   }
 
   function getFriendPinLayout(p) {
@@ -7495,8 +7677,10 @@
     var box = root.querySelector("[data-tower-visitor-calendar]");
     if (!box) return;
     var p = TowerProfileStore.get();
+    var wasHidden = box.hidden;
     if (!p || isTowerOwner(p)) {
       box.hidden = true;
+      if (!wasHidden) respawnVisitorCalendar(root, p);
       return;
     }
     box.hidden = false;
@@ -7515,11 +7699,20 @@
     var pro = profileIsProfessional(p);
     var list = pro && api && typeof api.forHost === "function" ? api.forHost(p._profileId || p.id) : [];
     sessionsBox.hidden = !pro;
-    if (!pro) { sessionsBox.innerHTML = ""; return; }
-    sessionsBox.innerHTML = '<h5 class="tower-visitor-sessions-title">Classroom sessions</h5>' +
-      (list.length
-        ? '<ul class="tower-visitor-session-list" role="list">' + list.map(function (sess) { return visitorSessionRowHtml(sess, api); }).join("") + "</ul>"
-        : '<p class="form-hint tower-cal-empty">No sessions booked yet.</p>');
+    if (!pro) sessionsBox.innerHTML = "";
+    else {
+      sessionsBox.innerHTML = '<h5 class="tower-visitor-sessions-title">Classroom sessions</h5>' +
+        (list.length
+          ? '<ul class="tower-visitor-session-list" role="list">' + list.map(function (sess) { return visitorSessionRowHtml(sess, api); }).join("") + "</ul>"
+          : '<p class="form-hint tower-cal-empty">No sessions booked yet.</p>');
+    }
+    /* The card just appeared (or changed height on a sessions list): give it its
+       spot under the bio card. */
+    if (wasHidden) respawnVisitorCalendar(root, p);
+  }
+
+  function respawnVisitorCalendar(root, p) {
+    try { spawnUnplacedWidgets(root, p); } catch (eSpawn) {}
   }
 
   function refreshTowerCalendars(root) {
@@ -10072,6 +10265,11 @@
         syncRotateToolbar(root);
         /* Social link chip (the X button is gone): clear that link, same as the
            old X did, so it stays removed after reload. */
+        /* Pay-links card holds several links: each is cleared in Edit profile. */
+        if (id === PAY_LINKS_ID) {
+          setProfileStatusSafe("Venmo, Pay for services and Buy ads links are set in Edit profile.", false);
+          return;
+        }
         var socialNet = socialNetIdFromWidget(id);
         if (socialNet) {
           removeSocialWidget(root, socialNet);
@@ -11055,6 +11253,15 @@
       status.classList.toggle("is-error", !!isError);
     }
 
+    var postSubmitBtn = form && form.querySelector ? form.querySelector("[data-tower-post-submit]") : null;
+    function setPostInFlight(on) {
+      if (form) form.__postInFlight = !!on;
+      if (!postSubmitBtn) return;
+      postSubmitBtn.disabled = !!on;
+      if (on) postSubmitBtn.setAttribute("aria-busy", "true");
+      else postSubmitBtn.removeAttribute("aria-busy");
+    }
+
     renderFeed(root);
     renderProfileChrome(root);
     initFramePicker(root);
@@ -11695,6 +11902,9 @@
           attachments.push(row);
         });
         if (usingRemoteSocial()) {
+          /* One post at a time: the Post button is disabled while a post is in
+             flight (no double posts) and re-enabled on success and on error. */
+          if (form.__postInFlight) return;
           var social = remoteSocial();
           if (!social || !social.createTowerPost) {
             setStatus("Tower is still connecting. Please try again.", true);
@@ -11703,26 +11913,44 @@
             } catch (frConn) {}
             return;
           }
-          setStatus("Posting to Feed…", false);
+          /* No notice on a post (Alexa, Oct 22 11:45 AM CT): the new post at
+             the top of the Feed and the cleared composer are the confirmation.
+             Only a failure shows the box. Clear any earlier error first. */
+          /* Empty post: its own plain line, checked here before any request
+             (PM, Oct 22). The button is never left disabled. */
+          if (!String(bodyInput ? bodyInput.value : "").trim()) {
+            setPostInFlight(false);
+            setStatus(EMPTY_POST_LINE, true);
+            return;
+          }
+          setStatus("", false);
+          setPostInFlight(true);
           social
             .createTowerPost({
               body: bodyInput ? bodyInput.value : "",
               attachments: attachments,
+              /* PERSONAL | PROFESSIONAL switch (js/signal-post-as.js): one of
+                 the member's own pages, or "" = the current default author. */
+              asProfileId: (window.CognationSignalPostAs &&
+                typeof window.CognationSignalPostAs.currentAuthorProfileId === "function")
+                ? window.CognationSignalPostAs.currentAuthorProfileId() : "",
             })
             .then(function () {
+              setPostInFlight(false);
               if (bodyInput) bodyInput.value = "";
               if (fileInput) fileInput.value = "";
-              setStatus("Posted to Feed.", false);
+              setStatus("", false);
               try {
                 if (window.CognationFriction) window.CognationFriction.complete("tower");
               } catch (frRemote) {}
               renderFeed(root);
             })
             .catch(function (error) {
-              setStatus(
-                (error && error.message) || "Could not post to Feed. Please try again.",
-                true
-              );
+              setPostInFlight(false);
+              /* PM wording: the raw server / database text goes to the console
+                 only; the page shows one of two plain lines. */
+              try { console.warn("[signal] post failed:", error); } catch (eLog) {}
+              setStatus(towerPostErrorLine(error), true);
               try {
                 if (window.CognationFriction) window.CognationFriction.retry("tower", "post_error");
               } catch (frCatch) {}
@@ -11743,7 +11971,7 @@
         }
         if (bodyInput) bodyInput.value = "";
         if (fileInput) fileInput.value = "";
-        setStatus("Posted to Feed. Local COMMUNE will pick this up.", false);
+        setStatus("", false);
         try {
           if (window.CognationFriction) window.CognationFriction.complete("tower");
         } catch (frOk) {}

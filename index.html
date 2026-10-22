@@ -524,14 +524,6 @@
                         </div>
                       </div>
                       </div>
-                      <section class="tower-visitor-calendar" data-tower-visitor-calendar hidden aria-label="Calendar">
-                        <h4 class="tower-cal-public-title">Calendar</h4>
-                        <div class="tower-visitor-sessions" data-tower-visitor-sessions hidden></div>
-                        <div class="tower-cal tower-cal--public" data-tower-cal-visitor data-calendar-busy="true">
-                          <div data-tower-cal-visitor-body></div>
-                        </div>
-                        <a class="tower-visitor-cal-link" href="/calendar.html">Cognation Calendar ›</a>
-                      </section>
                       <div class="tower-profile-edit" data-tower-profile-edit>
                         <button type="button" class="btn btn-secondary tower-edit-profile-btn" data-tower-edit-profile aria-expanded="false" aria-haspopup="true" aria-controls="tower-profile-edit-panel">
                           Edit profile
@@ -625,7 +617,16 @@
                       </div>
                         </div>
                       </div>
-                      </div><div class="tower-sticker tower-sticker--slogan" data-tower-widget="slogan" data-sticker-label="Quote / slogan" hidden><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Quote / slogan sticker" tabindex="-1" hidden>⋮⋮</button><blockquote class="tower-slogan-card" data-tower-slogan-display></blockquote>
+                      </div><!-- Calendar: its own card under the bio card (visitors only; owner keeps Edit profile > Calendar). -->
+                      <section class="tower-sticker tower-sticker--visitor-calendar tower-visitor-calendar" data-tower-widget="visitor-calendar" data-sticker-label="Calendar" data-tower-visitor-calendar hidden aria-label="Calendar">
+                        <h4 class="tower-cal-public-title">Calendar</h4>
+                        <div class="tower-visitor-sessions" data-tower-visitor-sessions hidden></div>
+                        <div class="tower-cal tower-cal--public" data-tower-cal-visitor data-calendar-busy="true">
+                          <div data-tower-cal-visitor-body></div>
+                        </div>
+                        <a class="tower-visitor-cal-link" href="/calendar.html">Cognation Calendar ›</a>
+                      </section>
+                      <div class="tower-sticker tower-sticker--slogan" data-tower-widget="slogan" data-sticker-label="Quote / slogan" hidden><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Quote / slogan sticker" tabindex="-1" hidden>⋮⋮</button><blockquote class="tower-slogan-card" data-tower-slogan-display></blockquote>
                       </div><!-- Per-network social widgets (v3.3); no grouped LINKS box. -->
                       <div class="tower-sticker tower-sticker--music" data-tower-widget="music" data-sticker-label="Music"><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Music sticker" tabindex="-1" hidden>⋮⋮</button><div class="tower-music" data-tower-music data-music-skin="classic" hidden>
                         <audio data-tower-audio preload="metadata" playsinline></audio>
@@ -966,7 +967,16 @@
               <div id="signal-pane-feed" class="signal-pane signal-pane--feed" role="tabpanel" data-signal-pane="feed" aria-labelledby="signal-sub-feed" hidden>
                 <div class="signal-feed-host" data-signal-feed-host>
                     <form class="tower-compose tower-compose--compact" data-tower-compose action="#" method="post">
-                      <h4 class="tower-block-heading" data-tower-block-heading>Send a signal</h4>
+                      <!-- Post as: which of the signed-in member's own pages this signal is from.
+                           Shown only when they own a Professional page (js/signal-post-as.js). -->
+                      <div class="signal-compose-head" data-signal-compose-head>
+                        <h4 class="tower-block-heading" data-tower-block-heading>Send a signal</h4>
+                        <div class="signal-post-as" data-signal-post-as role="radiogroup" aria-label="Post as" hidden>
+                          <button type="button" class="signal-post-as-side is-selected" role="radio" aria-checked="true" data-signal-post-as-btn="personal">Personal</button>
+                          <span class="signal-post-as-sep" aria-hidden="true">|</span>
+                          <button type="button" class="signal-post-as-side" role="radio" aria-checked="false" tabindex="-1" data-signal-post-as-btn="professional">Professional</button>
+                        </div>
+                      </div>
                       <div class="form-group">
                         <label class="visually-hidden" for="tower-body">Update</label>
                         <textarea id="tower-body" name="body" rows="2" maxlength="2000" placeholder="Share a signal…"></textarea>
@@ -994,7 +1004,7 @@
                       </div>
                       <p class="commune-status" data-tower-status hidden role="status" aria-live="polite"></p>
                       <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">Post</button>
+                        <button type="submit" class="btn btn-primary" data-tower-post-submit>Post</button>
                       </div>
                     </form>
 
@@ -1317,6 +1327,7 @@
   <script src="js/login-signup-shell.js" defer></script>
   <script src="js/screen-break.js" defer></script>
   <script src="js/supabase-social.js" defer></script>
+  <script src="js/signal-post-as.js" defer></script>
   <script src="js/seed-preview.js" defer></script>
   <script src="js/people-search.js" defer></script>
   <script src="js/circle-saved-relations.js" defer></script>

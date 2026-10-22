@@ -282,6 +282,11 @@
     var seedFleetId = (author && effectiveFleetId(author)) || String(
       (embedded && embedded.seed_fleet_id) || ""
     );
+    /* Which of the author's pages wrote it (Personal or Professional), and
+       that page's picture (https only, else the card shows initials). */
+    var authorKind = String((author && author.kind) || (embedded && embedded.kind) || "personal");
+    var authorPhotoUrl = String((author && author.photo_url) || (embedded && embedded.photo_url) || "");
+    if (!/^https:\/\//i.test(authorPhotoUrl)) authorPhotoUrl = "";
     var reactions = reactionsMap(row && row.reactions);
     var hearts = reactions["❤️"] ? reactions["❤️"].length : 0;
     return {
@@ -290,6 +295,8 @@
       authorProfileId: row.author_profile_id,
       authorName: display,
       handle: handle,
+      authorKind: authorKind === "professional" ? "professional" : "personal",
+      authorPhotoUrl: authorPhotoUrl,
       accountKind: accountKind,
       isSeed: accountKind === "seed",
       isOpsBot: accountKind === "ops",
@@ -325,7 +332,7 @@
   }
 
   var FEED_COLUMNS =
-    "id,author_profile_id,body,visibility,attachments,created_at,rating,hidden_attachment_indexes,author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id),reactions:tower_post_reactions(face,profile_id)";
+    "id,author_profile_id,body,visibility,attachments,created_at,rating,hidden_attachment_indexes,author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id,photo_url),reactions:tower_post_reactions(face,profile_id)";
   var FEED_TAIL = "&order=created_at.desc&limit=100";
 
   /* The rating column is missing until 20261015_tower_auto_rate.sql runs. */
@@ -344,8 +351,11 @@
       }, function (err) {
         var missingRating = isMissingRatingColumn(err);
         var missingHide = /hidden_attachment_indexes/i.test(String((err && err.message) || err || ""));
-        if (!missingRating && !missingHide) throw err;
-        var q = FEED_COLUMNS;
+        /* profiles.photo_url arrives with 20261016_profiles_photo_url.sql; without
+           it the Feed still loads and author avatars fall back to initials. */
+        var missingPhoto = /photo_url/i.test(String((err && (err.message || err.details || err.hint)) || err || ""));
+        if (!missingRating && !missingHide && !missingPhoto) throw err;
+        var q = FEED_COLUMNS.replace(",photo_url)", ")");
         if (missingRating) q = q.replace(",rating,", ",").replace(",hidden_attachment_indexes,", ",");
         else if (missingHide) q = q.replace(",hidden_attachment_indexes,", ",");
         /* Fail closed: without server ratings, show only the viewer's own posts. */
@@ -375,6 +385,21 @@
     var profileId = me && me.activeProfileId;
     if (!me || !profileId) {
       return Promise.reject(new Error("Sign in before posting to Tower."));
+    }
+    /* Post as: one of the member's OWN pages (Personal or Professional), never
+       anyone else's. The server insert policy "tower authors create their own
+       posts" enforces the same (profiles.user_id = auth.uid()). */
+    if (fields && fields.asProfileId) {
+      var asId = String(fields.asProfileId);
+      var own = state.myProfiles.filter(function (p) {
+        return p && String(p.id) === asId && String(p.user_id || "") === String(me.supabaseUserId);
+      })[0];
+      if (!own) {
+        var notOwn = new Error("You can only post as your own pages.");
+        notOwn.code = "post_as_not_own";
+        return Promise.reject(notOwn);
+      }
+      profileId = own.id;
     }
     if (!body) {
       return Promise.reject(
@@ -807,6 +832,7 @@
   document.addEventListener("cognation:session-ended", function () {
     if (active()) return;
     state.feed = [];
+    state.myProfiles = [];
   });
 
   var sawSessionStart = false;

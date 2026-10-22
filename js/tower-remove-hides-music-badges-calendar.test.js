@@ -192,7 +192,7 @@ assert.strictEqual(ctx.hiddenWidgetsToShow(noBadges).length, 0, "Badges row only
 /* 6. Removal line ends "— Show it again in Edit profile." for all three. */
 var removeStart = tower.indexOf("var removeSelectedWidget = function");
 var removeFn = blockFrom(removeStart);
-assert.ok(removeFn.indexOf('label + " removed — Show it again in Edit profile."') > 0);
+assert.ok(removeFn.indexOf('label + " removed. Show it again in Edit profile."') > 0);
 THREE.forEach(function (id) { assert.ok(ctx.hiddenWidgetRestorable(id), id + " gets the Show-it-again copy"); });
 assert.ok(!ctx.hiddenWidgetRestorable("friends") && !ctx.hiddenWidgetRestorable("social"));
 

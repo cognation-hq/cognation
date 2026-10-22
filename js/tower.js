@@ -9864,6 +9864,95 @@
     }
   }
 
+  /* Remove with Edit profile closed (PM, Oct 22): the removal line also shows as
+     a short dark glass notice for ~4s; a new removal replaces it. 768px and up it
+     sits at the end of the owner-only toolbar above the stage. Below 768px it is
+     a fixed notice at the bottom of the viewport (Designer LOOK on #247), so the
+     stage and toolbar never move; it fades and slides in/out over 160ms (no
+     motion under prefers-reduced-motion). With Edit profile open, only the Edit
+     profile status line shows it (never both). Visitors never see it: the
+     toolbar is owner-only. Display only; nothing is saved. */
+  var STAGE_REMOVAL_NOTICE_MS = 4000;
+  var STAGE_REMOVAL_NOTICE_FADE_MS = 160;
+
+  function stageNoticeNarrow() {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia("(max-width: 767.98px)").matches;
+  }
+
+  function stageNoticeAnimates() {
+    if (!stageNoticeNarrow()) return false;
+    return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  /* Below 768 the notice is position: fixed. The public side's backdrop-filter
+     would make it the containing block (fixed to the page section, not the
+     viewport), so while it shows on a narrow screen the notice sits directly
+     in the Tower app root; it goes back to the end of the toolbar when it clears. */
+  function placeStageRemovalNotice(root, n, narrow) {
+    if (!n.__towerHome) {
+      n.__towerHome = n.parentNode;
+      /* Crossing 768 while it shows: put it straight back in the toolbar. */
+      try {
+        window.matchMedia("(max-width: 767.98px)").addEventListener("change", function () {
+          if (!n.hidden) clearStageRemovalNotice(root, true);
+        });
+      } catch (eMq) {}
+    }
+    var target = narrow ? root : n.__towerHome;
+    if (target && n.parentNode !== target && target.appendChild) target.appendChild(n);
+  }
+
+  function clearStageRemovalNotice(root, instant) {
+    var n = root && root.querySelector("[data-tower-stage-notice]");
+    if (!n) return;
+    if (n.__towerTimer) clearTimeout(n.__towerTimer);
+    n.__towerTimer = null;
+    if (n.__towerFadeTimer) clearTimeout(n.__towerFadeTimer);
+    n.__towerFadeTimer = null;
+    if (n.classList) n.classList.remove("is-in");
+    if (!instant && !n.hidden && stageNoticeAnimates()) {
+      n.__towerFadeTimer = setTimeout(function () {
+        n.__towerFadeTimer = null;
+        n.textContent = "";
+        n.hidden = true;
+        placeStageRemovalNotice(root, n, false);
+      }, STAGE_REMOVAL_NOTICE_FADE_MS);
+      return;
+    }
+    n.textContent = "";
+    n.hidden = true;
+    placeStageRemovalNotice(root, n, false);
+  }
+
+  function showStageRemovalNotice(root, msg) {
+    var n = root && root.querySelector("[data-tower-stage-notice]");
+    if (!n) return;
+    var panel = root.querySelector("[data-tower-profile-edit-panel]");
+    var editOpen = !!(panel && !panel.hidden);
+    if (!msg || editOpen || !isTowerOwner(TowerProfileStore.get())) {
+      clearStageRemovalNotice(root, true);
+      return;
+    }
+    if (n.__towerTimer) clearTimeout(n.__towerTimer);
+    if (n.__towerFadeTimer) clearTimeout(n.__towerFadeTimer);
+    n.__towerFadeTimer = null;
+    var wasShown = !n.hidden && n.classList && n.classList.contains("is-in");
+    placeStageRemovalNotice(root, n, stageNoticeNarrow());
+    n.textContent = msg;
+    n.hidden = false;
+    if (n.classList && !wasShown) {
+      /* One frame at the start state, then .is-in runs the 160ms fade/slide. */
+      if (typeof requestAnimationFrame === "function" && stageNoticeAnimates()) {
+        void n.offsetWidth;
+        requestAnimationFrame(function () { if (!n.hidden) n.classList.add("is-in"); });
+      } else {
+        n.classList.add("is-in");
+      }
+    }
+    n.__towerTimer = setTimeout(function () { clearStageRemovalNotice(root); }, STAGE_REMOVAL_NOTICE_MS);
+  }
+
   function setProfileStatusOn(root, msg, isError) {
     var el = root.querySelector("[data-tower-profile-status]");
     if (!el) return;
@@ -9885,7 +9974,9 @@
     var undoBtn = root.querySelector("[data-tower-undo-widget]");
     if (!root.__cognationWidgetUndo) root.__cognationWidgetUndo = [];
 
-    function setProfileStatusSafe(msg, isError) {
+    function setProfileStatusSafe(msg, isError, removal) {
+      /* removal: a Remove line; also shown near the stage when Edit profile is closed. */
+      if (removal) showStageRemovalNotice(root, msg);
       var el = root.querySelector("[data-tower-profile-status]");
       if (!el) return;
       el.hidden = !msg;
@@ -10491,7 +10582,7 @@
           fp = TowerProfileStore.get();
           renderFriendsPicker(root, fp);
           renderFriendPins(root, fp);
-          setProfileStatusSafe("Friend pin removed — Reset layout to restore.", false);
+          setProfileStatusSafe("Friend pin removed. Reset layout to restore.", false, true);
           return;
         }
 
@@ -10501,7 +10592,7 @@
           clearWidgetSelection(stage);
           pushWidgetUndo({ type: "badge", id: badgeId });
           setBadgeVisibility(root, badgeId, false);
-          setProfileStatusSafe("Badge pin removed.", false);
+          setProfileStatusSafe("Badge pin removed.", false, true);
           return;
         }
 
@@ -10538,7 +10629,7 @@
           });
           TowerProfileStore.save(pEmoji);
           renderEmojiStickers(root, TowerProfileStore.get());
-          setProfileStatusSafe("Emoji removed.", false);
+          setProfileStatusSafe("Emoji removed.", false, true);
           return;
         }
 
@@ -10556,7 +10647,7 @@
           };
           pushWidgetUndo({ type: "quote", id: quoteId || selected.id, layout: qLayout });
           removeQuoteSticker(root, quoteId || selected.getAttribute("data-tower-quote-id"));
-          setProfileStatusSafe("Quote removed.", false);
+          setProfileStatusSafe("Quote removed.", false, true);
           return;
         }
 
@@ -10575,7 +10666,7 @@
         var socialNet = socialNetIdFromWidget(id);
         if (socialNet) {
           removeSocialWidget(root, socialNet);
-          setProfileStatusSafe((selected.getAttribute("data-sticker-label") || "Link") + " link removed. Add it again in Edit profile.", false);
+          setProfileStatusSafe((selected.getAttribute("data-sticker-label") || "Link") + " link removed. Add it again in Edit profile.", false, true);
           return;
         }
         var label = selected.getAttribute("data-sticker-label") || id;
@@ -10586,7 +10677,7 @@
           var pPol = TowerProfileStore.get();
           pPol.polaroidRemoved = true;
           TowerProfileStore.save(pPol);
-          setProfileStatusSafe(label + " removed — Reset layout to restore.", false);
+          setProfileStatusSafe(label + " removed. Reset layout to restore.", false, true);
           return;
         }
         if (id === "instax") {
@@ -10598,7 +10689,7 @@
           var pCam = TowerProfileStore.get();
           setInstaxSwitch(pCam, false);
           TowerProfileStore.save(pCam);
-          setProfileStatusSafe("Camera removed — Reset layout to restore.", false);
+          setProfileStatusSafe("Camera removed. Reset layout to restore.", false, true);
           return;
         }
         if (id === "friends") return;
@@ -10617,8 +10708,9 @@
           }
         }
         setProfileStatusSafe(
-          hiddenWidgetRestorable(id) ? label + " removed — Show it again in Edit profile." : label + " removed.",
-          false
+          hiddenWidgetRestorable(id) ? label + " removed. Show it again in Edit profile." : label + " removed.",
+          false,
+          true
         );
       };
       root.__cognationRemoveSelected = removeSelectedWidget;
@@ -10789,6 +10881,8 @@
         btn.setAttribute("aria-expanded", "true");
         var avatarSticker = wrap.closest('[data-tower-widget="avatar"]');
         if (avatarSticker) avatarSticker.classList.add("is-edit-open");
+        /* Never both: the Edit profile status line takes over from the stage notice. */
+        try { clearStageRemovalNotice(root, true); } catch (eStage) {}
       } else {
         /* Closing without Save still commits typed social URLs so circle buttons stick. */
         try { flushSocialFieldsFromForm(root); } catch (eFlush) {}

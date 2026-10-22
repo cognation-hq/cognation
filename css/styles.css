@@ -12355,8 +12355,12 @@ a.circle-fall-portrait {
   pointer-events: auto;
   cursor: default;
 }
+/* PULSE empty halo frame (fewer than 5 friends): the locked glass empty-frame
+   look from the pulse-falling-friends spec (Alexa 2026-10-20, PM + Designer),
+   glass rgba(18,16,38,0.92) with a thin #d9d2f0 ring. Same 1px width as before. */
 .circle-spot.is-empty {
-  background: #070b16;
+  background: rgba(18, 16, 38, 0.92);
+  border-color: #d9d2f0;
 }
 .circle-spot.has-caption { overflow: visible; }
 .circle-spot-caption {

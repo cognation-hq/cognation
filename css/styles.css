@@ -15100,6 +15100,15 @@ body.cgn-cal-page {
 .tower-sessions-when { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
 @media (max-width: 420px) { .tower-sessions-when { grid-template-columns: 1fr 1fr; } }
 .tower-visitor-calendar :is(.tower-cal-month, .tower-cal-label, .tower-cal-day-heading) { color: #f7f9ff !important; font-family: "Oswald", system-ui, sans-serif; }
+/* Edit profile > Calendar (owner): the month label and weekday row in Oswald,
+   the site's header family (already loaded; no new font). The "Calendar" title
+   and the day heading stay in the body sans at 600. */
+#panel-tower [data-tower-edit-calendar] :is(.tower-cal-label, .tower-cal-dow) {
+  font-family: "Oswald", system-ui, sans-serif !important;
+}
+#panel-tower [data-tower-edit-calendar] :is(.tower-cal-public-title, .tower-cal-day-heading) {
+  font-weight: 600 !important;
+}
 .tower-visitor-calendar .tower-cal-cell { background: rgba(18,16,38,.92); color: #f7f9ff; border-color: rgba(209,241,255,.28); }
 .tower-visitor-calendar .tower-cal-cell.is-today, .tower-visitor-calendar .tower-cal-cell.is-selected { border-color: rgba(197,166,255,.85); box-shadow: 0 0 0 1px rgba(197,166,255,.45) inset; }
 .tower-visitor-calendar .tower-visitor-cal-link { color: #c5a6ff; }

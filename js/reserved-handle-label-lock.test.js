@@ -20,6 +20,8 @@ assert.ok(names.indexOf(LOCK) !== -1 && names.indexOf(LOCK) < names.indexOf(HAND
 assert.ok(!/profiles_block_reserved_handle/.test(sql.replace(/^--.*$/gm, "")), "lock file is only the lock");
 assert.ok(!/profiles_lock_account_labels|profiles_a_lock_account_labels/.test(handleSql), "handle file has no lock");
 assert.ok(/owner_is_fleet/.test(handleSql) && /Run AFTER 01_lock_account_labels\.sql/.test(handleSql), "handle file keeps the fleet exception and says it runs after 01");
+/* PM, Oct 22: the owner lookup with LIMIT 1 is ordered so it always picks the same row. */
+assert.ok(/p\.kind = 'personal'\s+order by p\.created_at, p\.id\s+limit 1;/.test(handleSql), "owner lookup is deterministic (order by created_at, id)");
 var fn = sql.slice(sql.indexOf("function public.profiles_lock_account_labels()"));
 assert.ok(sql.indexOf("function public.profiles_lock_account_labels()") > 0, "label lock function");
 assert.ok(/jwt_role not in \('anon', 'authenticated'\)[\s\S]{0,40}return new/.test(fn), "service_role / SQL editor unchanged");

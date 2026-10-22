@@ -22,6 +22,7 @@
 --      Only fills in a 'real' default; never touches real members' pages.
 -- service_role / postgres (SeedOps scripts) are untouched: they return early as before.
 -- Reads one row of public.profiles (security definer so RLS cannot hide the owner row).
+-- The owner lookup is ordered (created_at, then id) so LIMIT 1 always picks the same row.
 
 create or replace function public.profiles_block_reserved_handle()
 returns trigger
@@ -49,6 +50,7 @@ begin
       into owner_kind, owner_fleet
       from public.profiles p
      where p.user_id = caller and p.kind = 'personal'
+     order by p.created_at, p.id
      limit 1;
     owner_is_fleet := coalesce(owner_kind in ('seed', 'ops'), false)
                       or coalesce(btrim(owner_fleet), '') <> '';

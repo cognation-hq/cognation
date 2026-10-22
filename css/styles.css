@@ -11120,6 +11120,18 @@ body {
   color: var(--cgn-text-muted) !important;
 }
 
+/* SIGNAL Feed empty state contrast (Oct 22). The text was meant to be
+   var(--cgn-text) (#f7f9ff), but the `#panel-signal :is(p, …)` rule just above made it
+   --cgn-text-muted (#e8f0ff at 66%). The grey .tower-feed wash
+   rgba(255,255,255,.28) also showed as pale corners around the rounded dark panel.
+   SIGNAL Feed empty state only; copy unchanged. */
+#panel-signal .signal-feed-host .tower-feed[data-tower-feed] > .commune-empty {
+  color: #f7f9ff !important;
+}
+#panel-signal .signal-feed-host .tower-feed[data-tower-feed]:has(> .commune-empty) {
+  background-color: transparent !important;
+}
+
 #panel-tower :is(a, .tower-post-author, .tower-friends-browse-heading, .tower-personal-calendar-heading),
 #panel-signal :is(a, .paper-eyebrow, .paper-section-kicker, .commune-feed-author),
 #panel-commune :is(a, .commune-card-kicker, .commune-live-label) {

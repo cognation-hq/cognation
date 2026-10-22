@@ -2250,7 +2250,13 @@
       writeScrapbookLayout(data, { keepLayout: !opts.geometry });
       /* Account layout row is written only on a real geometry edit (drag end,
          rotate, resize). Opening the Tower must never POST a layout. */
-      if (opts.geometry && window.CognationTowerLayoutSync) window.CognationTowerLayoutSync.save(data);
+      /* Signed-in owner only (this save already returned for anyone else):
+         drag end uploads positions + added widgets; an add / remove / switch
+         uploads the added widgets when they changed. localStorage is a cache. */
+      if (window.CognationTowerLayoutSync && liveSignedInForTower()) {
+        if (opts.geometry) window.CognationTowerLayoutSync.save(data);
+        else if (window.CognationTowerLayoutSync.saveWidgetsIfChanged) window.CognationTowerLayoutSync.saveWidgetsIfChanged(data);
+      }
       var id = data._profileId || resolveActiveProfileId();
       /* A drop only changes x/y. Never PATCH the profile: that reload paints
          the remote row, which has no sticker coordinates, and the widget
@@ -8779,6 +8785,24 @@
     return p.quoteStickers;
   }
 
+  /* Quote text is public (any visitor, any age), so it must pass the same
+     word check Tower posts are rated with (js/auto-rate.js, the browser copy of
+     the database rater) at the level everyone can see (G or PG), and the
+     shared under-13 keyword floor (js/age-floor-keywords.js). Fails closed when
+     either helper is missing. */
+  var QUOTE_BLOCKED_MESSAGE = "This quote wasn't saved. It didn't pass the word check Tower uses for posts, and quotes show to everyone. Try different words.";
+  function quoteTextAllowed(text) {
+    var t = String(text || "");
+    var ar = window.CognationAutoRate;
+    var floor = window.CognationAgeFloor;
+    if (!ar || typeof ar.rate !== "function") return false;
+    if (!floor || typeof floor.isAdultKeyword !== "function") return false;
+    var r = ar.rate(t, []);
+    if (!r || (r.rating !== "G" && r.rating !== "PG")) return false;
+    return !floor.isAdultKeyword(t);
+  }
+  window.CognationTowerQuoteAllowed = quoteTextAllowed;
+
   function uidQuote() {
     return "quote-" + Date.now().toString(36) + "-" + Math.floor(Math.random() * 1e4).toString(36);
   }
@@ -8799,6 +8823,8 @@
   function addQuoteSticker(root, text, layout, existingId) {
     text = String(text || "").trim().slice(0, 400);
     if (!text) return null;
+    /* Blocked: nothing is written (no server row, no localStorage cache). */
+    if (!quoteTextAllowed(text)) return { blocked: true };
     var p = TowerProfileStore.get();
     var quotes = getQuoteStickers(p);
     var id = existingId || uidQuote();
@@ -8810,6 +8836,7 @@
       z: layout && typeof layout.z === "number" ? layout.z : 10,
       tilt: layout && typeof layout.tilt === "number" ? layout.tilt : 0,
     };
+    if (layout && typeof layout.yPx === "number" && isFinite(layout.yPx)) entry.yPx = layout.yPx;
     var found = false;
     quotes = quotes.map(function (q) {
       if (q.id === id) {
@@ -8833,7 +8860,14 @@
       el.remove();
     });
     var quotes = getQuoteStickers(p);
+    var ownerView = isTowerOwner(p);
+    var stageH = stage.clientHeight || 0;
     quotes.forEach(function (q) {
+      if (!q || !q.text) return;
+      /* A row written before the check (or edited elsewhere) never reaches a
+         visitor. The owner still sees it so they can remove it. */
+      if (!ownerView && !quoteTextAllowed(q.text)) return;
+      var yAt = stickerYFromLayout(q, stageH);
       var el = document.createElement("div");
       el.className = "tower-sticker tower-sticker--quote";
       el.setAttribute("data-tower-widget", "quote");
@@ -8841,10 +8875,12 @@
       el.setAttribute("data-sticker-label", "Quote");
       el.setAttribute("data-quote-text", q.text);
       el.setAttribute("data-sticker-x", String(q.x));
-      el.setAttribute("data-sticker-y", String(q.y));
+      el.setAttribute("data-sticker-y", String(yAt.pct));
       el.setAttribute("data-sticker-z", String(q.z || 10));
       el.style.setProperty("--sticker-x", q.x + "%");
-      el.style.setProperty("--sticker-y", q.y + "%");
+      /* Offset from the canvas top in px (yPx) when saved: the canvas height
+         differs between owner and visitor, so a % of it drifted. */
+      el.style.setProperty("--sticker-y", yAt.css);
       el.style.setProperty("--sticker-z", String(q.z || 10));
       el.style.setProperty("--sticker-tilt", (q.tilt || 0) + "deg");
       el.innerHTML = '<blockquote class="tower-quote-card"></blockquote>';
@@ -8854,6 +8890,100 @@
       stage.appendChild(el);
     });
     syncOwnerStickerHandles(root);
+    watchQuotesClear(stage);
+  }
+
+  /* A Quote never covers another widget (video box, profile card, widget
+     controls). After layout, a quote that overlaps one moves to the nearest
+     clear spot beside it (right, then left), else below everything. Display
+     only; the drop saves the clear spot it lands on. Phone stacks skip this. */
+  /* Top edge of a sticker measured from the canvas top-left, in px (the
+     tilt transform is ignored, so this is what --sticker-y: Npx restores). */
+  function stickerTopInStage(stage, el) {
+    if (!stage || !el) return NaN;
+    if (el.offsetParent === stage) return el.offsetTop;
+    return el.getBoundingClientRect().top - stage.getBoundingClientRect().top;
+  }
+
+  function keepQuoteClear(stage, el) {
+    if (!stage || !el || isPhoneStage(stage) || el.hidden) return false;
+    var sr = stage.getBoundingClientRect();
+    var sw = sr.width || 0;
+    if (!sw) return false;
+    var r = el.getBoundingClientRect();
+    var w = r.width;
+    var h = r.height;
+    if (!w || !h) return false;
+    var blocks = [];
+    stage.querySelectorAll("[data-tower-widget]").forEach(function (b) {
+      if (b === el || b.hidden || b.classList.contains("is-widget-off")) return;
+      if (b.classList.contains("tower-sticker--quote") || b.hasAttribute("data-tower-emoji")) return;
+      if (b.closest(".tower-sticker--quote")) return;
+      var br = b.getBoundingClientRect();
+      if (!br.width || !br.height) return;
+      blocks.push({ l: br.left - sr.left, t: br.top - sr.top, r: br.right - sr.left, b: br.bottom - sr.top });
+    });
+    var GAP = 12;
+    function hit(x, y) {
+      for (var i = 0; i < blocks.length; i++) {
+        var k = blocks[i];
+        if (x < k.r && k.l < x + w && y < k.b && k.t < y + h) return k;
+      }
+      return null;
+    }
+    var x0 = el.offsetParent === stage ? el.offsetLeft : r.left - sr.left;
+    var y0 = stickerTopInStage(stage, el);
+    if (!hit(x0, y0)) return false;
+    var best = null;
+    function consider(x, y) {
+      if (x < GAP || x + w > sw - GAP || y < 0 || hit(x, y)) return;
+      var d = Math.abs(x - x0) + Math.abs(y - y0);
+      if (!best || d < best.d) best = { x: x, y: y, d: d };
+    }
+    blocks.forEach(function (k) {
+      consider(k.r + GAP, y0);
+      consider(k.l - w - GAP, y0);
+    });
+    if (!best) {
+      var bottom = 0;
+      blocks.forEach(function (k) { if (k.b > bottom) bottom = k.b; });
+      best = { x: Math.max(GAP, Math.min(sw - GAP - w, x0)), y: bottom + GAP };
+    }
+    var xPct = Math.round((best.x / sw) * 1000) / 10;
+    var yPx = Math.round(best.y);
+    var sh = stage.clientHeight || 0;
+    el.style.setProperty("--sticker-x", xPct + "%");
+    el.style.setProperty("--sticker-y", yPx + "px");
+    el.setAttribute("data-sticker-x", String(xPct));
+    el.setAttribute("data-sticker-y", String(sh ? Math.round((yPx / sh) * 1000) / 10 : 0));
+    el.setAttribute("data-sticker-y-px", String(yPx));
+    return true;
+  }
+
+  function keepQuotesClear(stage) {
+    if (!stage) return;
+    stage.querySelectorAll(".tower-sticker--quote").forEach(function (el) {
+      if (el.classList.contains("is-dragging")) return;
+      keepQuoteClear(stage, el);
+    });
+  }
+
+  /* Neighbours settle after the profile, video and fonts load: check again
+     whenever the canvas changes size, and once the frame after a render. */
+  function watchQuotesClear(stage) {
+    if (!stage) return;
+    var run = function () { keepQuotesClear(stage); };
+    if (window.requestAnimationFrame) window.requestAnimationFrame(run);
+    else setTimeout(run, 0);
+    if (!stage.__cognationQuoteRO && typeof window.ResizeObserver === "function") {
+      try {
+        stage.__cognationQuoteRO = new window.ResizeObserver(function () {
+          if (window.requestAnimationFrame) window.requestAnimationFrame(run);
+          else run();
+        });
+        stage.__cognationQuoteRO.observe(stage);
+      } catch (eRO) {}
+    }
   }
 
   function commitInlineName(root, el) {
@@ -9113,7 +9243,23 @@
           if (sloganInput) sloganInput.value = p.slogan;
           setProfileStatusOn(root, "Slogan updated.", false);
         } else {
-          addQuoteSticker(root, text);
+          var added = addQuoteSticker(root, text);
+          var qStatus = dlg.querySelector("[data-tower-add-quote-status]");
+          if (added && added.blocked) {
+            /* Keep the dialog open with the words so the owner can change them. */
+            if (!qStatus && ta && ta.parentNode) {
+              qStatus = document.createElement("p");
+              qStatus.className = "commune-status is-error tower-add-quote-status";
+              qStatus.setAttribute("data-tower-add-quote-status", "");
+              qStatus.setAttribute("role", "status");
+              qStatus.setAttribute("aria-live", "polite");
+              ta.insertAdjacentElement("afterend", qStatus);
+            }
+            if (qStatus) { qStatus.hidden = false; qStatus.textContent = QUOTE_BLOCKED_MESSAGE; }
+            setProfileStatusOn(root, QUOTE_BLOCKED_MESSAGE, true);
+            return;
+          }
+          if (qStatus) { qStatus.hidden = true; qStatus.textContent = ""; }
           setProfileStatusOn(root, "Quote sticker added.", false);
         }
         closeAddWidgetDialog();
@@ -9486,7 +9632,11 @@
         if (!dragStarted) {
           if (Math.abs(dxPx) < 5 && Math.abs(dyPx) < 5) return;
           dragStarted = true;
-          if (liftDefaultGrid(stage)) {
+          /* A Quote floats over the page: moving it never lifts the other
+             widgets out of the default grid. That lift only lived in this
+             browser, so the drop spot sat next to different neighbours on the
+             next load (Designer LOOK NO on #223). */
+          if (wid !== "quote" && liftDefaultGrid(stage)) {
             rect = stage.getBoundingClientRect();
             startX = parseFloat(sticker.getAttribute("data-sticker-x") || "0");
             startY = parseFloat(sticker.getAttribute("data-sticker-y") || "0");
@@ -9551,17 +9701,27 @@
         }
         if (id === "quote") {
           var qid = sticker.getAttribute("data-tower-quote-id");
+          /* Land on a clear spot, then save it as an offset from the canvas
+             top-left (x as a share of the width, y in px). */
+          sticker.classList.remove("is-dragging");
+          sticker.removeAttribute("data-sticker-y-px");
+          keepQuoteClear(stage, sticker);
+          var qX = parseFloat(sticker.getAttribute("data-sticker-x") || String(dropX));
+          var qYpx = parseFloat(sticker.getAttribute("data-sticker-y-px") || "NaN");
+          if (!isFinite(qYpx)) qYpx = stickerTopInStage(stage, sticker);
+          if (!isFinite(qYpx)) qYpx = stickerYPxFromDrop(dropY, stage.clientHeight || 0);
           var quotes = getQuoteStickers(p);
           p.quoteStickers = quotes.map(function (q) {
             if (q.id !== qid) return q;
             var moved = {
               id: q.id,
               text: q.text,
-              x: dropX,
-              y: dropY,
+              x: qX,
+              y: parseFloat(sticker.getAttribute("data-sticker-y") || String(dropY)) || dropY,
               z: dropZ,
               tilt: dropTilt,
             };
+            if (typeof qYpx === "number" && isFinite(qYpx)) moved.yPx = Math.round(qYpx);
             if (typeof q.w === "number") moved.w = q.w;
             return moved;
           });
@@ -9585,12 +9745,15 @@
           p.widgetLayout = layout;
           TowerProfileStore.save(p, { geometry: true });
         }
-        sticker.style.setProperty("--sticker-x", dropX + "%");
-        var dropYAt = id !== "quote" && layout[id] ? stickerYFromLayout(layout[id], stage.clientHeight || 0) : { css: dropY + "%" };
-        sticker.style.setProperty("--sticker-y", dropYAt.css);
+        if (id !== "quote") {
+          /* (A Quote already sits on its clamped spot from keepQuoteClear.) */
+          sticker.style.setProperty("--sticker-x", dropX + "%");
+          var dropYAt = layout[id] ? stickerYFromLayout(layout[id], stage.clientHeight || 0) : { css: dropY + "%" };
+          sticker.style.setProperty("--sticker-y", dropYAt.css);
+          sticker.setAttribute("data-sticker-x", String(dropX));
+          sticker.setAttribute("data-sticker-y", String(dropY));
+        }
         sticker.style.setProperty("--sticker-z", String(dropZ));
-        sticker.setAttribute("data-sticker-x", String(dropX));
-        sticker.setAttribute("data-sticker-y", String(dropY));
         sticker.setAttribute("data-sticker-z", String(dropZ));
         sticker.classList.remove("is-dragging");
         /* The drop itself may leave a neighbour overlapping (a full-row widget

@@ -251,11 +251,11 @@ assert.strictEqual(tr.getWidgetLayout({ widgetLayout: { avatar: { x: 0, y: 0 }, 
 
 /* Wiring in the real handler / store (static, so a refactor that drops it fails). */
 var down = grab("      /* Drag from anywhere on the sticker", "    stage.addEventListener(\"pointerdown\", onPointerDown);");
-assert.ok(/dragStarted = true;\s*\n\s*if \(liftDefaultGrid\(stage\)\)/.test(down), "drag start lifts the default grid");
+assert.ok(/dragStarted = true;\s*\n(?:\s*\/\*[\s\S]*?\*\/)?\s*if \(wid !== "quote" && liftDefaultGrid\(stage\)\)/.test(down), "drag start lifts the default grid (built-in widgets; a Quote floats and never lifts it, #223)");
 assert.ok(/if \(!dragStarted\) \{[^}]*return;/.test(down), "no save when the pointer never dragged");
 assert.ok(/freezeSpawnedWidgets\(root, layout\)/.test(down) && /TowerProfileStore\.save\(p, \{ geometry: true \}\)/.test(down), "drop freezes others and saves geometry");
 assert.ok(/stage\.querySelectorAll\("\[data-tower-widget\]\.is-spawned"\)/.test(grab("  function freezeSpawnedWidgets", "  /* Old scrapbook")) && /liftDefaultGrid\(stage\);/.test(grab("  function freezeSpawnedWidgets", "  /* Old scrapbook")), "freeze pins from on-screen spots");
-assert.ok(/if \(opts\.geometry && window\.CognationTowerLayoutSync\) window\.CognationTowerLayoutSync\.save\(data\)/.test(tower), "account layout saved only on a geometry edit (never on open)");
+assert.ok(/if \(window\.CognationTowerLayoutSync && liveSignedInForTower\(\)\) \{\s*if \(opts\.geometry\) window\.CognationTowerLayoutSync\.save\(data\);\s*else if \(window\.CognationTowerLayoutSync\.saveWidgetsIfChanged\) window\.CognationTowerLayoutSync\.saveWidgetsIfChanged\(data\);/.test(tower), "account layout: positions on a geometry edit, added widgets only when they change (never on open), signed-in only");
 assert.ok(/!signInConfigured && window\.CognationAccounts/.test(tower), "demo profile id only in local preview, never with sign-in configured");
 
 })();

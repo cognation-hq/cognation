@@ -5032,6 +5032,50 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .tower-scrapbook-bar[hidden] {
   display: none !important;
 }
+/* Remove notice: in flow at the toolbar's end, so it never sits over a widget
+   or the tab bar. It wraps to its own toolbar line on narrow screens. */
+#panel-tower .tower-scrapbook-bar.tower-scrapbook-bar .tower-hidden-widget-notice.tower-stage-notice {
+  /* Taller than the toolbar buttons; -5px top and bottom keeps the bar's
+     height (no jump in the stage) when it fits on the button row. */
+  margin: -5px 0 -5px auto !important;
+  max-width: 100%;
+}
+#panel-tower .tower-stage-notice[hidden],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-stage-notice] {
+  display: none !important;
+}
+/* Below 768px (Designer LOOK on #247): out of the toolbar flow, a fixed notice
+   at the bottom of the viewport, so the stage and toolbar never move. It may sit
+   over the lower stage for its 4s. 160ms fade and slide in and out. While it
+   shows, tower.js moves it to the Tower app root (the public side's
+   backdrop-filter would otherwise pin "fixed" to that section). */
+@media (max-width: 767.98px) {
+  #panel-tower [data-tower-app] > .tower-hidden-widget-notice.tower-stage-notice {
+    position: fixed !important;
+    left: 50%;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    z-index: 1200;
+    width: max-content;
+    max-width: calc(100% - 32px);
+    margin: 0 !important;
+    box-sizing: border-box;
+    opacity: 0;
+    transform: translate(-50%, 8px);
+    transition: opacity 160ms ease, transform 160ms ease;
+    pointer-events: none;
+  }
+  #panel-tower [data-tower-app] > .tower-hidden-widget-notice.tower-stage-notice.is-in {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@media (max-width: 767.98px) and (prefers-reduced-motion: reduce) {
+  #panel-tower [data-tower-app] > .tower-hidden-widget-notice.tower-stage-notice {
+    transition: none;
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
 .tower-emoji-bar {
   display: flex;
   flex-wrap: wrap;
@@ -15712,7 +15756,9 @@ body.cgn-cal-page {
 }
 
 /* Show hidden widgets notice (Designer LOOK on #244): the #237 dark glass
-   notice, in the section where the shown row was. */
+   notice, in the section where the shown row was. The same notice carries a
+   Remove line at the end of the owner-only toolbar above the stage. */
+#panel-tower .tower-stage-notice.tower-hidden-widget-notice,
 #panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-hidden-widget-notice {
   margin: 0 !important;
   padding: 10px 12px !important;

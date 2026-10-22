@@ -12858,6 +12858,44 @@ a.site-switch-side:focus-visible {
 .commune-card-why {
   font-size: 0.78rem;
 }
+/* Professionals you might know: up to 3 rows, each opens that Pro page. */
+.commune-pro-know-list {
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.commune-pro-know-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.commune-pro-know-open,
+.commune-pro-know-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(232, 214, 245, 0.35);
+  background: rgba(232, 214, 245, 0.08);
+  color: var(--cgn-text, #f7f9ff);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.commune-pro-know-open {
+  cursor: pointer;
+}
+.commune-pro-know-open:hover,
+.commune-pro-know-open:focus-visible {
+  border-color: rgba(183, 246, 255, 0.7);
+  background: rgba(155, 235, 255, 0.12);
+  outline: none;
+}
 
 
 /* ===== Shared pipe-switch sides: SIGNAL News | Feed + COMMUNE Personal | Professional ===== */

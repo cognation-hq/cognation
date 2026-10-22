@@ -90,7 +90,13 @@
       var id = String(q.id || "");
       var text = String(q.text || "").trim().slice(0, MAX_QUOTE_TEXT);
       if (!KEY_RE.test(id) || !text) return;
+      /* Same word check as the page (js/tower.js): a quote that fails it is
+         never uploaded and never applied from a row. */
+      var allowed = root.CognationTowerQuoteAllowed;
+      if (typeof allowed === "function" && !allowed(text)) return;
       var entry = { id: id, text: text, x: num(q.x, 40), y: num(q.y, 40), z: num(q.z, 10), tilt: num(q.tilt, 0) };
+      /* Offset from the canvas top in px (the canvas height differs by viewer). */
+      if (typeof q.yPx === "number" && isFinite(q.yPx)) entry.yPx = Math.round(Math.max(0, Math.min(20000, q.yPx)));
       if (typeof q.w === "number" && isFinite(q.w) && q.w > 0) entry.w = Math.round(Math.max(80, Math.min(4000, q.w)));
       quotes.push(entry);
     });

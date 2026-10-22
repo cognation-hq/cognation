@@ -15413,6 +15413,34 @@ body.cgn-cal-page {
   }
 }
 
+/* Designer nits 2 (follow-up to #234), TOWER Professional page.
+   (a) Owner "Paste a YouTube link": same glass input as Search followers, full card
+       width, 8px below the video box. Font size, padding and radius unchanged. */
+#panel-tower .tower-sticker--youtube .tower-pro-youtube-owner {
+  width: 100%;
+  max-width: none;
+  margin-top: 8px;
+}
+#panel-tower .tower-sticker--youtube .tower-pro-youtube-owner .tower-music-url-label input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(18, 16, 38, 0.92) !important;
+  color: #f7f9ff !important;
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+}
+#panel-tower .tower-sticker--youtube .tower-pro-youtube-owner .tower-music-url-label input::placeholder {
+  color: #d9d2f0 !important;
+  opacity: 1;
+}
+/* (b) Owner Followers title: the drag-dot gutter (r4/postlive149) is unused because
+   #panel-tower hides every .tower-sticker-handle, so the title starts at the card
+   padding like "No followers yet." Calendar keeps its rule. */
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker--followers .tower-widget-title {
+  margin-left: 0;
+  padding-left: 0;
+}
+
 /* TOWER Feed contrast (Designer follow-up). TOWER Feed only (.tower-feed[data-tower-feed]
    and the "Send a signal" composer in the same Feed panel):
    - post cards use the site glass rgba(18,16,38,.92) so the existing body text reads

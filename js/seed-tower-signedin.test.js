@@ -26,7 +26,9 @@ function fnSource(text, name) {
 }
 var social = src("js/supabase-social.js");
 var login = src("js/login.js");
-var toTowerProfile = new Function(fnSource(social, "toTowerProfile") + "\nreturn toTowerProfile;")();
+var toTowerProfile = new Function("var state = { profiles: {}, handles: {}, myProfiles: [] };\n" +
+  ["normalizeHandle", "profileForUser", "fleetKindOf", "ownerFleetKind", "effectiveAccountKind", "effectiveFleetId", "toTowerProfile"]
+    .map(function (n) { return fnSource(social, n); }).join("\n") + "\nreturn toTowerProfile;")();
 var loginFns = new Function(fnSource(login, "mapSupabaseProfile") + "\n" + fnSource(login, "buildSession") +
   "\nreturn { map: mapSupabaseProfile, build: buildSession };")();
 

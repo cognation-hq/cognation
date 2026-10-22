@@ -15668,6 +15668,69 @@ body.cgn-cal-page {
   box-shadow: none !important;
 }
 
+/* Edit profile > Show hidden widgets (#242 follow-up). Owner only, quiet:
+   muted label, one row per hidden widget, small secondary Show button.
+   Existing tokens only. The section is fully hidden when nothing is hidden. */
+#panel-tower .tower-profile-edit-dropdown .tower-hidden-widgets-fields[hidden] { display: none !important; }
+#panel-tower .tower-profile-edit-dropdown .tower-hidden-widgets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+#panel-tower .tower-profile-edit-dropdown .tower-hidden-widget-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-width: 0;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-hidden-widget-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--cgn-text-muted, rgba(232, 240, 255, 0.66)) !important;
+}
+#panel-tower .tower-profile-edit-dropdown .tower-hidden-widget-show {
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.2;
+}
+
+/* Show hidden widgets notice (Designer LOOK on #244): the #237 dark glass
+   notice, in the section where the shown row was. */
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-hidden-widget-notice {
+  margin: 0 !important;
+  padding: 10px 12px !important;
+  background: rgba(18, 16, 38, 0.92) !important;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  color: #f7f9ff !important;
+  font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif);
+  font-size: 14px !important;
+  line-height: 1.35 !important;
+}
+/* Edit profile's own status line ([data-tower-profile-status]: Save, Remove
+   lines) took the site-wide .commune-status accent-dim tint, which reads brown on the
+   dark sheet. Same dark glass here only; .commune-status elsewhere is unchanged. */
+#panel-tower .tower-profile-edit-dropdown .commune-status[data-tower-profile-status]:not(.is-error) {
+  background: rgba(18, 16, 38, 0.92) !important;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  color: #f7f9ff !important;
+}
+
 /* Edit profile status glass (pairs with #244). Inside Edit profile only:
    the Add a professional page status box and the Calendar booking and
    editor lines. Same dark glass as the #237 / #244 notice. Error lines keep the glass with

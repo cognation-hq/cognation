@@ -73,11 +73,11 @@ vm.runInContext([
 function makeRoot() {
   var els = {};
   ctx.PUBLIC_WIDGET_IDS.forEach(function (id) { els[id] = fakeEl(id); });
-  var calEntry = fakeEl("cal-entry");
+  var visitorCal = fakeEl("visitor-calendar");
   return {
-    els: els, calEntry: calEntry,
+    els: els, visitorCal: visitorCal,
     querySelector: function (q) {
-      if (q === "[data-tower-edit-calendar]") return calEntry;
+      if (q === "[data-tower-visitor-calendar]") return visitorCal;
       var m = /^\[data-tower-widget="([^"]+)"\]$/.exec(q);
       return m ? els[m[1]] || null : null;
     },
@@ -106,7 +106,7 @@ ctx.owner = true;
 ctx.profile = withContent({ music: false, badges: false, calendar: false });
 var root = makeRoot();
 ctx.applyPublicWidgetsInner(root, ctx.profile);
-assert.strictEqual(root.calEntry.hidden, false, "Calendar entry stays without the owner switch");
+assert.strictEqual(root.visitorCal.hidden, false, "visitors' Calendar card untouched without the owner switch");
 THREE.forEach(function (id) {
   assert.strictEqual(root.els[id].hidden, false, id + ": old content-driven flag alone does not hide it (no surprise hide on load)");
 });
@@ -119,12 +119,15 @@ assert.strictEqual(ctx.saves, 0, "render never saves");
   ctx.profile = withContent({ "shown.music": false, "shown.badges": false, "shown.calendar": false });
   var r = makeRoot();
   ctx.applyPublicWidgetsInner(r, ctx.profile);
-  THREE.forEach(function (id) {
+  ["music", "badges"].forEach(function (id) {
     assert.strictEqual(r.els[id].hidden, true, id + " hidden for " + (isOwner ? "owner" : "visitor"));
     assert.ok(r.els[id].classList.contains("is-widget-off"));
   });
+  /* Calendar: the sticker in Edit profile > Calendar stays (sessions, bookings);
+     the visitors' Calendar card is what goes. */
+  assert.strictEqual(r.els.calendar.hidden, false, "Edit profile Calendar sticker stays");
+  assert.strictEqual(r.visitorCal.hidden, true, "visitors' Calendar card hidden while Calendar is removed");
   assert.strictEqual(r.els.identity.hidden, false, "others untouched");
-  assert.strictEqual(r.calEntry.hidden, true, "Edit profile > Calendar entry goes while Calendar is removed");
   /* prune ran on this profile (load path): the owner's off survives it. */
   THREE.forEach(function (id) { assert.strictEqual(ctx.profile.publicWidgets["shown." + id], false, id + " off survives prune"); });
 });
@@ -149,7 +152,10 @@ THREE.forEach(function (id) {
   var after = ctx.profile.publicWidgets;
   Object.keys(before).forEach(function (k) { assert.strictEqual(after[k], before[k], id + " Remove leaves " + k); });
   assert.strictEqual(after["shown." + id], false, id + " switch off");
-  assert.strictEqual(r.els[id].hidden, true, id + " hidden right away");
+  if (id === "calendar") {
+    assert.strictEqual(r.els.calendar.hidden, false, "Edit profile Calendar sticker stays on Remove");
+    assert.strictEqual(r.visitorCal.hidden, true, "visitors' Calendar card hidden right away");
+  } else assert.strictEqual(r.els[id].hidden, true, id + " hidden right away");
   var listed = ctx.hiddenWidgetsToShow(ctx.profile).map(function (w) { return w.id; });
   assert.strictEqual(listed.join(","), id, id + " listed in Show hidden widgets");
   var snap = JSON.parse(JSON.stringify(after));
@@ -160,7 +166,6 @@ THREE.forEach(function (id) {
     else assert.strictEqual(ctx.profile.publicWidgets[k], snap[k], id + " Show leaves " + k);
   });
   assert.strictEqual(r.els[id].hidden, false, id + " visible again");
-  assert.strictEqual(r.calEntry.hidden, false, "Calendar entry back");
   assert.strictEqual(ctx.hiddenWidgetsToShow(ctx.profile).length, 0, id + " no longer listed");
 });
 assert.ok(ctx.musicInits >= 2, "Music player stops on Remove and is rebuilt on Show");
@@ -214,8 +219,10 @@ assert.strictEqual(rctx.saved.publicWidgets.instax, true, "camera back");
 
 /* 8. The other places that showed these widgets respect the switch. */
 var cal = fnSrc("renderPublicCalendar");
-assert.ok(/var calRemoved = widgetRemovedByOwner\(p, "calendar"\);\s*calRoot\.hidden = calRemoved;/.test(cal), "calendar render no longer forces it visible");
-assert.ok(cal.indexOf("calRoot.hidden = false") < 0);
+assert.ok(/calRoot\.hidden = false;/.test(cal), "Edit profile Calendar sticker always renders (owners manage sessions and bookings there)");
+assert.ok(cal.indexOf("widgetRemovedByOwner") < 0, "Remove does not empty Edit profile > Calendar");
+assert.ok(tower.indexOf('querySelector("[data-tower-edit-calendar]")') < 0, "Edit profile > Calendar entry is never hidden by Remove");
+assert.ok(/if \(!p \|\| isTowerOwner\(p\) \|\| widgetRemovedByOwner\(p, "calendar"\)\) \{\s*box\.hidden = true;/.test(fnSrc("renderVisitorCalendar")), "visitors' Calendar card stays hidden while removed");
 var music = fnSrc("initTowerMusic");
 assert.ok(/if \(widgetRemovedByOwner\(p, "music"\)\) \{[\s\S]*?clearTowerAudio\(audio\);[\s\S]*?showMusicSticker\(root, false, p\);[\s\S]*?return;/.test(music), "player cleared when removed");
 assert.ok(/if \(on && widgetRemovedByOwner\(p \|\| TowerProfileStore\.get\(\), "music"\)\) on = false;/.test(fnSrc("showMusicSticker")));

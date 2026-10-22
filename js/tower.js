@@ -1248,7 +1248,10 @@
      same publicWidgets map (it rides in the layout row's _widgets). Only
      Remove sets it off; only Show in Edit profile (or Undo) turns it back on.
      Nothing on load writes it, and the old music/badges/calendar flags are
-     left as they are and no longer hide these three. No key = shown. */
+     left as they are and no longer hide these three. No key = shown.
+     Calendar: Remove hides the visitors' Calendar card; the Calendar sticker
+     in Edit profile > Calendar stays, since owners manage sessions and
+     bookings there. */
   var OWNER_REMOVABLE_WIDGET_IDS = ["music", "badges", "calendar"];
 
   function ownerShownKey(id) {
@@ -6854,8 +6857,11 @@
       if (id === "badges") on = !!(milestones && milestones.length);
       /* The same Calendar sticker stays on the personal page and the professional page. */
       if (id === "calendar") on = true;
-      /* The owner removed it: hidden for the owner and visitors, whatever its content. */
-      if (widgetRemovedByOwner(p, id)) on = false;
+      /* The owner removed it: hidden for the owner and visitors, whatever its
+         content. Calendar is the exception here: its sticker is what Edit
+         profile > Calendar shows the owner (sessions, bookings), so it stays;
+         a removed Calendar hides the visitors' Calendar card instead. */
+      if (id !== "calendar" && widgetRemovedByOwner(p, id)) on = false;
       var el = root.querySelector('[data-tower-widget="' + id + '"]');
       if (!el) return;
       if (id === "badges") {
@@ -6867,10 +6873,8 @@
       if (!on) el.classList.remove("is-widget-selected");
     });
     showYoutubeSticker(root, !!p && p._profileKind === "professional");
-    /* The Calendar sticker lives in Edit profile > Calendar; while the owner has
-       it removed, that entry goes too (it would open empty). Show brings it back. */
-    var calEntry = root.querySelector("[data-tower-edit-calendar]");
-    if (calEntry) calEntry.hidden = widgetRemovedByOwner(p, "calendar");
+    var visitorCal = root.querySelector("[data-tower-visitor-calendar]");
+    if (visitorCal && widgetRemovedByOwner(p, "calendar")) visitorCal.hidden = true;
     var avatar = root.querySelector('[data-tower-widget="avatar"]');
     if (avatar) {
       avatar.hidden = false;
@@ -7842,9 +7846,8 @@
     if (!HANGOUT_SUGGESTIONS_LIVE) schedulerHtml = "";
     var calRoot = root.querySelector('[data-tower-widget="calendar"]');
     if (calRoot) {
-      var calRemoved = widgetRemovedByOwner(p, "calendar");
-      calRoot.hidden = calRemoved;
-      calRoot.classList.toggle("is-widget-off", calRemoved);
+      calRoot.hidden = false;
+      calRoot.classList.remove("is-widget-off");
       calRoot.setAttribute("data-calendar-audience", owner ? "owner" : "visitor");
       calRoot.setAttribute("data-calendar-kind", profileIsProfessional(p) ? "professional" : "personal");
     }
@@ -7898,7 +7901,8 @@
     if (!box) return;
     var p = TowerProfileStore.get();
     var wasHidden = box.hidden;
-    if (!p || isTowerOwner(p)) {
+    /* Owners never get this card; visitors don't when the owner removed Calendar. */
+    if (!p || isTowerOwner(p) || widgetRemovedByOwner(p, "calendar")) {
       box.hidden = true;
       if (!wasHidden) respawnVisitorCalendar(root, p);
       return;

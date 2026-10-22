@@ -2753,22 +2753,47 @@
     try { TowerStore.clearMemberCache(); } catch (eClear) {}
   });
 
+  /* Feed photos: the post row carries the picture itself (attachments[i].dataUrl, a
+     shrunk JPEG saved with the post) or an https URL. Only image data/https URLs are
+     drawn; anything else stays a label. */
+  function attachmentImageUrl(a) {
+    if (!a || a.kind === "removed") return "";
+    var url = String(a.dataUrl || a.url || a.src || a.imageUrl || "");
+    if (/^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+\/=]+$/i.test(url)) return url;
+    if (/^https:\/\/[^\s"'<>]+$/i.test(url)) return url;
+    return "";
+  }
+
   function renderAttachments(list) {
     if (!list || !list.length) return "";
     return (
       '<ul class="tower-attachments">' +
       list
         .map(function (a) {
+          var name = (a && (a.label || a.name)) || "file";
+          var img = attachmentImageUrl(a);
+          if (img) {
+            return (
+              '<li class="tower-attach tower-attach--photo tower-attach--image">' +
+              '<img class="tower-attach-img" src="' + escapeHtml(img) + '" alt="' +
+              escapeHtml("Photo: " + name) + '" loading="lazy" decoding="async"></li>'
+            );
+          }
+          /* Older photo posts saved only the file name (no picture was uploaded). */
+          var missing = a && a.kind === "photo";
           return (
             '<li class="tower-attach tower-attach--' +
-            escapeHtml(a.kind || "document") +
+            escapeHtml((a && a.kind) || "document") +
+            (missing ? " tower-attach--missing" : "") +
             '">' +
             '<span class="tower-attach-kind">' +
-            escapeHtml(kindLabel(a.kind)) +
+            escapeHtml(kindLabel(a && a.kind)) +
             "</span> " +
             '<span class="tower-attach-name">' +
-            escapeHtml(a.label || a.name || "file") +
-            "</span></li>"
+            escapeHtml(name) +
+            "</span>" +
+            (missing ? ' <span class="tower-attach-note">· photo wasn\'t uploaded</span>' : "") +
+            "</li>"
           );
         })
         .join("") +
@@ -11355,7 +11380,10 @@
         var kind = (kindSelect && kindSelect.value) || "photo";
         var bodyNow = bodyInput ? bodyInput.value : "";
         var marketPost = /(^|[^a-z0-9])#market(?![a-z0-9])/i.test(bodyNow);
-        if (marketPost && !form.__marketReady) {
+        /* Feed photos: every picture posted to Supabase is shrunk and saved on the post
+           row (attachments[].dataUrl), not only #market ones; before, other posts kept
+           just the file name. Local (signed-out) posts keep the #market-only rule. */
+        if ((marketPost || usingRemoteSocial()) && !form.__marketReady) {
           var pics = files.filter(function (f) {
             return /^image\//.test(String(f.type || "")) || /\.(png|jpe?g|gif|webp)$/i.test(String(f.name || ""));
           });

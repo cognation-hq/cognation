@@ -6632,11 +6632,129 @@
     return p;
   }
 
+  /* Edit profile > "Show hidden widgets" (#242 follow-up). Lists the widgets an
+     owner hid with Remove that the page really hides by their publicWidgets
+     flag and that have something to show. (Music, Badges and Calendar are
+     shown by their own content, Social follows the links, and Friends stays
+     off, so a flag alone does not hide them; they are not listed.) Rendering
+     never writes: only an owner's Show click saves, and it turns on that one
+     flag. */
+  var RESTORABLE_HIDDEN_WIDGETS = [
+    { id: "identity", label: "Name" },
+    { id: "slogan", label: "Quote / slogan" },
+    { id: "envelope", label: "Messages" },
+    { id: "html", label: "Custom HTML" },
+  ];
+
+  function hiddenWidgetRestorable(id) {
+    for (var i = 0; i < RESTORABLE_HIDDEN_WIDGETS.length; i++) {
+      if (RESTORABLE_HIDDEN_WIDGETS[i].id === id) return true;
+    }
+    return false;
+  }
+
+  function hiddenWidgetsToShow(p) {
+    if (!p || !isTowerOwner(p)) return [];
+    var raw = p.publicWidgets && typeof p.publicWidgets === "object" ? p.publicWidgets : {};
+    return RESTORABLE_HIDDEN_WIDGETS.filter(function (w) {
+      if (raw[w.id] !== false) return false;
+      if (w.id === "slogan") return !!(typeof p.slogan === "string" && p.slogan.trim());
+      if (w.id === "html") return !!(typeof p.customHtml === "string" && p.customHtml.trim());
+      return true;
+    });
+  }
+
+  /* After Show: a dark glass notice ("<Name> is showing again.") sits in the
+     section where that row was, for ~4s or until Edit profile closes. If it was
+     the last hidden widget, the section hides once the notice clears. */
+  var HIDDEN_WIDGET_NOTICE_MS = 4000;
+
+  function clearHiddenWidgetNotice(root) {
+    var box = root && root.querySelector("[data-tower-hidden-widgets]");
+    if (!box || !box.__towerShowNotice) return;
+    if (box.__towerShowNotice.timer) clearTimeout(box.__towerShowNotice.timer);
+    box.__towerShowNotice = null;
+    renderHiddenWidgetsList(root, TowerProfileStore.get());
+  }
+
+  function renderHiddenWidgetsList(root, p) {
+    var box = root && root.querySelector("[data-tower-hidden-widgets]");
+    if (!box) return;
+    var list = box.querySelector("[data-tower-hidden-widgets-list]");
+    if (!list) return;
+    var items = hiddenWidgetsToShow(p);
+    var notice = box.__towerShowNotice || null;
+    if (notice && (!p || !isTowerOwner(p))) notice = null;
+    if (notice) {
+      items = items.filter(function (w) { return w.id !== notice.id; });
+    }
+    list.innerHTML = "";
+    function addNotice() {
+      var n = document.createElement("p");
+      n.className = "tower-hidden-widget-notice";
+      n.setAttribute("role", "status");
+      n.setAttribute("aria-live", "polite");
+      n.setAttribute("data-tower-hidden-widget-notice", notice.id);
+      n.textContent = notice.label + " is showing again.";
+      list.appendChild(n);
+    }
+    items.forEach(function (w, i) {
+      if (notice && i === notice.index) addNotice();
+      var row = document.createElement("div");
+      row.className = "tower-hidden-widget-row";
+      var name = document.createElement("span");
+      name.className = "tower-hidden-widget-name";
+      name.textContent = w.label;
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-secondary tower-hidden-widget-show";
+      btn.setAttribute("data-tower-show-widget", w.id);
+      btn.setAttribute("aria-label", "Show " + w.label);
+      btn.textContent = "Show";
+      row.appendChild(name);
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+    if (notice && notice.index >= items.length) addNotice();
+    /* Nothing hidden (and no notice): the whole section stays out of the way. */
+    box.hidden = !items.length && !notice;
+    if (!box.__cognationShowBound) {
+      box.__cognationShowBound = true;
+      box.addEventListener("click", function (ev) {
+        var b = ev.target && ev.target.closest ? ev.target.closest("[data-tower-show-widget]") : null;
+        if (!b || !box.contains(b)) return;
+        ev.preventDefault();
+        var id = b.getAttribute("data-tower-show-widget");
+        if (!hiddenWidgetRestorable(id)) return;
+        var cur = TowerProfileStore.get();
+        if (!isTowerOwner(cur)) return;
+        var shown = hiddenWidgetsToShow(cur);
+        if (box.__towerShowNotice) {
+          var prevId = box.__towerShowNotice.id;
+          shown = shown.filter(function (w) { return w.id !== prevId; });
+          if (box.__towerShowNotice.timer) clearTimeout(box.__towerShowNotice.timer);
+        }
+        var index = 0;
+        var label = id;
+        shown.forEach(function (w, i) { if (w.id === id) { index = i; label = w.label; } });
+        box.__towerShowNotice = {
+          id: id,
+          label: label,
+          index: index,
+          timer: setTimeout(function () { clearHiddenWidgetNotice(root); }, HIDDEN_WIDGET_NOTICE_MS),
+        };
+        setPublicWidgetVisible(root, id, true);
+        renderHiddenWidgetsList(root, TowerProfileStore.get());
+      });
+    }
+  }
+
   function applyPublicWidgets(root, p) {
     try { renderSocialLinks(root, p); } catch (eSoc) {}
     applyPublicWidgetsInner(root, p);
     /* Visibility changed: give newly shown, unplaced widgets their spawn spot. */
     spawnUnplacedWidgets(root, p);
+    try { renderHiddenWidgetsList(root, p); } catch (eHidden) {}
     bindSpawnResize(root);
   }
 
@@ -9828,9 +9946,13 @@
         p.widgetLayout = {};
         if (p.widgetLayout && p.widgetLayout.feed) delete p.widgetLayout.feed;
         if (p.widgetLayout && p.widgetLayout.messages) delete p.widgetLayout.messages;
-        p.publicWidgets = JSON.parse(JSON.stringify(DEFAULT_PUBLIC_WIDGETS));
-        /* Explicit "on" so a browser holding an old "camera off" copy follows the reset (#223). */
-        p.publicWidgets.instax = true;
+        /* Reset restores positions and the camera only. It keeps the owner's
+           other visibility choices (social, music, badges, friends, html, ...):
+           copying the defaults over them turned hidden widgets back on with no
+           owner toggle to turn them off again (#242 follow-up).
+           Explicit camera "on" so a browser holding an old "camera off" copy
+           follows the reset (#223). */
+        setInstaxSwitch(p, true);
         p.polaroidRemoved = false;
         p.removedFriendPinIds = [];
         p.featuredFriendIds = [];
@@ -9844,7 +9966,7 @@
         syncOwnerStickerHandles(root);
         root.__cognationWidgetUndo = [];
         syncUndoButton();
-        setProfileStatusSafe("Layout reset — public widgets restored.", false);
+        setProfileStatusSafe("Layout reset.", false);
       });
     }
 
@@ -10279,7 +10401,7 @@
           fp = TowerProfileStore.get();
           renderFriendsPicker(root, fp);
           renderFriendPins(root, fp);
-          setProfileStatusSafe("Friend pin removed — Undo to restore.", false);
+          setProfileStatusSafe("Friend pin removed — Reset layout to restore.", false);
           return;
         }
 
@@ -10289,7 +10411,7 @@
           clearWidgetSelection(stage);
           pushWidgetUndo({ type: "badge", id: badgeId });
           setBadgeVisibility(root, badgeId, false);
-          setProfileStatusSafe("Badge pin removed — Undo to restore.", false);
+          setProfileStatusSafe("Badge pin removed.", false);
           return;
         }
 
@@ -10326,7 +10448,7 @@
           });
           TowerProfileStore.save(pEmoji);
           renderEmojiStickers(root, TowerProfileStore.get());
-          setProfileStatusSafe("Emoji removed — Undo to restore.", false);
+          setProfileStatusSafe("Emoji removed.", false);
           return;
         }
 
@@ -10344,7 +10466,7 @@
           };
           pushWidgetUndo({ type: "quote", id: quoteId || selected.id, layout: qLayout });
           removeQuoteSticker(root, quoteId || selected.getAttribute("data-tower-quote-id"));
-          setProfileStatusSafe("Quote removed — Undo to restore.", false);
+          setProfileStatusSafe("Quote removed.", false);
           return;
         }
 
@@ -10379,14 +10501,14 @@
         }
         if (id === "instax") {
           /* Owner-only camera (#223): save "off" in the layout row so it stays
-             removed after reload and in other browsers. Its spot is kept for Undo. */
+             removed after reload and in other browsers. Reset layout turns it back on. */
           pushWidgetUndo({ type: "instax", id: id, label: label });
           selected.hidden = true;
           selected.classList.add("is-widget-off");
           var pCam = TowerProfileStore.get();
           setInstaxSwitch(pCam, false);
           TowerProfileStore.save(pCam);
-          setProfileStatusSafe("Camera removed — Undo or Reset layout to restore.", false);
+          setProfileStatusSafe("Camera removed — Reset layout to restore.", false);
           return;
         }
         if (id === "friends") return;
@@ -10404,7 +10526,10 @@
             TowerProfileStore.save(pShell);
           }
         }
-        setProfileStatusSafe(label + " removed — Undo to restore.", false);
+        setProfileStatusSafe(
+          hiddenWidgetRestorable(id) ? label + " removed — Show it again in Edit profile." : label + " removed.",
+          false
+        );
       };
       root.__cognationRemoveSelected = removeSelectedWidget;
       var removeBtn = root.querySelector("[data-tower-remove-selected]");
@@ -10582,6 +10707,8 @@
           root.__cognationProSetupJustCreated = false;
           try { syncAddProfileUi(root); } catch (eSetup) {}
         }
+        /* The Show hidden widgets notice is spent once Edit profile closes. */
+        try { clearHiddenWidgetNotice(root); } catch (eNotice) {}
         panel.hidden = true;
         returnPanelHome();
         wrap.classList.remove("is-open");

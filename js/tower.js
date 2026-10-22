@@ -9308,6 +9308,9 @@
 
   /* Real members cannot take a "seed-" / "seed_" / "ops-" / "ops_" handle (js/handle-reserved.js). */
   function reservedHandleChange(next) {
+    /* Seed/ops owner (its Personal page is fleet-labelled) may keep the fleet prefix. */
+    var social = window.CognationSupabaseSocial;
+    if (social && typeof social.ownerIsFleet === "function" && social.ownerIsFleet()) return false;
     var rules = window.CognationHandleRules;
     return rules ? rules.isReserved(next) : /^(seed|ops)[-_]/.test(normalizeHandle(next));
   }

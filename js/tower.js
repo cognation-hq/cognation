@@ -2920,6 +2920,9 @@
     }
   }
 
+  /* Empty Send a signal post (PM wording): shown before any request is sent. */
+  var EMPTY_POST_LINE = "Write something before posting.";
+
   /* Post failure line (js/signal-post-as.js postErrorLine; PM wording). */
   function towerPostErrorLine(error) {
     var pa = typeof window !== "undefined" ? window.CognationSignalPostAs : null;
@@ -11666,6 +11669,13 @@
           /* No notice on a post (Alexa, Oct 22 11:45 AM CT): the new post at
              the top of the Feed and the cleared composer are the confirmation.
              Only a failure shows the box. Clear any earlier error first. */
+          /* Empty post: its own plain line, checked here before any request
+             (PM, Oct 22). The button is never left disabled. */
+          if (!String(bodyInput ? bodyInput.value : "").trim()) {
+            setPostInFlight(false);
+            setStatus(EMPTY_POST_LINE, true);
+            return;
+          }
           setStatus("", false);
           setPostInFlight(true);
           social

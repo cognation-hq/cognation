@@ -163,18 +163,19 @@ function remoteBranch() {
   var statusFn = "function setStatus(msg, isError)" + balanced(tower, statusAt, "{", "}");
   return new Function("form", "postSubmitBtn", "status", "bodyInput", "fileInput", "attachments", "social0", "window", "console", "renderFeed", "root",
     "function usingRemoteSocial(){return true;} function remoteSocial(){return social0;}\n" +
+    tower.match(/var EMPTY_POST_LINE = "[^"]*";/)[0] + "\n" +
     statusFn + "\n" + inFlightFn + "\n" + lineFn + "\n" +
     "return function run() " + block + ";");
 }
 
-function harness(outcome) {
+function harness(bodyValue) {
   var settle = {};
   var calls = 0;
   var logs = [];
   var status = { hidden: true, textContent: "", classList: { on: {}, toggle: function (c, v) { this.on[c] = v; } } };
   var btn = { disabled: false, attrs: {}, setAttribute: function (k, v) { this.attrs[k] = v; }, removeAttribute: function (k) { delete this.attrs[k]; } };
   var form = {};
-  var body = { value: "hello" };
+  var body = { value: bodyValue == null ? "hello" : bodyValue };
   var social0 = {
     createTowerPost: function () {
       calls++;
@@ -248,6 +249,7 @@ test("in flight: Post is disabled (no double post) and re-enabled on success and
       assert.strictEqual(h.status.hidden, true, "success: no notice");
       assert.strictEqual(h.body.value, "", "success: composer cleared");
     }
+    h.body.value = "again";
     h.run();
     assert.strictEqual(h.calls(), 2, "can post again after it settles");
   }
@@ -264,4 +266,22 @@ test("Feed card timestamp: body sans, #d9d2f0, 13px (12px at 390), right on the 
   assert.ok(!/serif\s*!important|Georgia|Times/i.test(rule.replace("sans-serif", "")), "no serif face");
   assert.ok(/@media \(max-width: 640px\) \{ #panel-signal \.tower-feed\[data-tower-feed\] \.tower-post-meta > time \{ font-size: 12px !important; \} \}/.test(flat), "12px at 390");
   assert.ok(/'<header class="tower-post-meta">' \+\s*towerPostAuthorHtml\(post\) \+\s*'<time datetime="'/.test(tower), "time sits in the name line");
+});
+
+test("empty post: own plain line, checked client-side, no request, button enabled", function () {
+  ["", "   ", "\n\t "].forEach(function (v) {
+    var h = harness(v);
+    h.btn.disabled = true; /* even if it was left disabled, the empty check re-enables it */
+    h.run();
+    assert.strictEqual(h.calls(), 0, "no request sent");
+    assert.strictEqual(h.status.textContent, "Write something before posting.");
+    assert.strictEqual(h.status.hidden, false);
+    assert.strictEqual(h.status.classList.on["is-error"], true, "same error box");
+    assert.notStrictEqual(h.status.textContent, "Couldn't post. Try again.");
+    assert.strictEqual(h.btn.disabled, false, "button enabled");
+    assert.strictEqual(h.logs.length, 0, "nothing to log: no server call");
+  });
+  var h2 = harness("hello");
+  h2.run();
+  assert.strictEqual(h2.calls(), 1, "a real post still goes out");
 });

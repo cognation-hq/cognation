@@ -898,6 +898,7 @@
     var spots = [];
     stage.querySelectorAll("[data-tower-widget]").forEach(function (el) {
       if (el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
+      if (isAddedSticker(el)) return;
       var r = el.getBoundingClientRect();
       spots.push({ el: el, left: r.left - sr.left, top: r.top - sr.top, w: r.width, half: el.classList.contains("is-spawn-half") });
     });
@@ -1101,6 +1102,15 @@
     return changed;
   }
 
+  /* A Quote keeps its own spot in quoteStickers. Every Quote shares the widget
+     id "quote", so pinning one into the widget layout wrote a stray layout.quote
+     from the on-screen spot (#223). Emoji stay: each has its own layout key. */
+  function isAddedSticker(el) {
+    if (!el || !el.getAttribute) return false;
+    if (el.getAttribute("data-tower-quote-id") != null) return true;
+    return !!(el.classList && el.classList.contains("tower-sticker--quote"));
+  }
+
   /* Before saving any layout, pin every on-screen spawned widget where it is now,
      so moving one widget never makes the others jump. */
   function freezeSpawnedWidgets(root, layout) {
@@ -1112,6 +1122,7 @@
     stage.querySelectorAll("[data-tower-widget].is-spawned").forEach(function (el) {
       var id = el.getAttribute("data-tower-widget");
       if (!id || el.hidden || el.classList.contains("is-widget-off")) return;
+      if (isAddedSticker(el)) return;
       if (isPlacedPos(layout, id)) return;
       layout[id] = {
         x: parseFloat(el.getAttribute("data-sticker-x") || "0"),
@@ -6878,6 +6889,20 @@
     }
     var wid = el.getAttribute("data-tower-widget");
     if (!wid || wid === "feed" || wid === "messages") return;
+    /* A Quote's tilt lives on its own quoteStickers entry, never under the
+       shared "quote" layout key (#223). */
+    var tiltQuoteId = el.getAttribute("data-tower-quote-id");
+    if (wid === "quote" && tiltQuoteId) {
+      p.quoteStickers = getQuoteStickers(p).map(function (q) {
+        if (!q || q.id !== tiltQuoteId) return q;
+        var nq = {};
+        Object.keys(q).forEach(function (k) { nq[k] = q[k]; });
+        nq.tilt = tilt;
+        return nq;
+      });
+      TowerProfileStore.save(p, { geometry: true });
+      return;
+    }
     var layout = freezeSpawnedWidgets(el.closest ? el.closest("[data-tower-app]") || document : document, getWidgetLayout(p) || {});
     var prev = layout[wid] || {};
     layout[wid] = {
@@ -9212,6 +9237,9 @@
       el.innerHTML = '<blockquote class="tower-quote-card"></blockquote>';
       el.querySelector(".tower-quote-card").textContent = q.text;
       if (typeof q.w === "number" && q.w > 0) setStickerWidth(el, q.w);
+      /* The saved spot: every clear-check starts from here, so a check run while
+         neighbours were still loading never sticks (#223). */
+      el.__cognationQuoteSpot = { x: q.x, yCss: yAt.css, yPct: yAt.pct };
       ensureResizeHandle(el, "Quote");
       stage.appendChild(el);
     });
@@ -9288,9 +9316,20 @@
 
   function keepQuotesClear(stage) {
     if (!stage) return;
+    /* Render only: every viewer (owner and visitor) shows the Quote at its
+       saved x / y / yPx. No per-viewer nudge and no save from here: the old
+       display-only nudge put the owner at 71.5 and visitors at 53.19 (#223).
+       Quotes are moved off widgets only when the owner drops them
+       (keepQuoteClear in the drop branch), and that drop is what gets saved. */
     stage.querySelectorAll(".tower-sticker--quote").forEach(function (el) {
       if (el.classList.contains("is-dragging")) return;
-      keepQuoteClear(stage, el);
+      var spot = el.__cognationQuoteSpot;
+      if (!spot) return;
+      el.style.setProperty("--sticker-x", spot.x + "%");
+      el.style.setProperty("--sticker-y", spot.yCss);
+      el.setAttribute("data-sticker-x", String(spot.x));
+      el.setAttribute("data-sticker-y", String(spot.yPct));
+      el.removeAttribute("data-sticker-y-px");
     });
   }
 
@@ -10061,6 +10100,11 @@
             };
             if (typeof qYpx === "number" && isFinite(qYpx)) moved.yPx = Math.round(qYpx);
             if (typeof q.w === "number") moved.w = q.w;
+            sticker.__cognationQuoteSpot = {
+              x: moved.x,
+              yCss: typeof moved.yPx === "number" ? moved.yPx + "px" : moved.y + "%",
+              yPct: moved.y,
+            };
             return moved;
           });
           TowerProfileStore.save(p, { geometry: true });

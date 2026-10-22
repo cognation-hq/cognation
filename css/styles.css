@@ -14998,6 +14998,22 @@ body.cgn-cal-page {
   font-size: 0.72rem;
   opacity: 0.85;
 }
+/* Designer nit on #218: the "photo wasn't uploaded" chip was a flat grey slab
+   (--color-surface-2 with a black border). Transparent, 1px #d9d2f0 at 40%,
+   PHOTO label #f7f9ff, file name and note #d9d2f0. Radius and padding unchanged. */
+.tower-attachments > .tower-attach.tower-attach--missing {
+  background: transparent !important;
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  color: #d9d2f0 !important;
+}
+.tower-attach--missing .tower-attach-kind {
+  color: #f7f9ff !important;
+}
+.tower-attach--missing .tower-attach-name,
+.tower-attach--missing .tower-attach-note {
+  color: #d9d2f0 !important;
+  opacity: 1;
+}
 
 /* TOWER Feed contrast (Designer follow-up). TOWER Feed only (.tower-feed[data-tower-feed]
    and the "Send a signal" composer in the same Feed panel):

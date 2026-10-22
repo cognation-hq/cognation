@@ -15384,6 +15384,35 @@ body.cgn-cal-page {
   }
 }
 
+/* Designer nits (follow-up to #228/#232).
+   (a) Followers "Search followers" is a glass input spanning the full card width. */
+#panel-tower .tower-sticker--followers .tower-followers {
+  max-width: none;
+}
+#panel-tower .tower-sticker--followers .tower-followers-find {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(18, 16, 38, 0.92) !important;
+  color: #f7f9ff !important;
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+}
+#panel-tower .tower-sticker--followers .tower-followers-find::placeholder {
+  color: #d9d2f0 !important;
+  opacity: 1;
+}
+/* (b) Desktop: the empty YouTube box fills the card width at 16:9. Phone unchanged. */
+@media (min-width: 768px) {
+  #panel-tower .tower-sticker--youtube .tower-pro-youtube {
+    width: 100%;
+  }
+  #panel-tower .tower-sticker--youtube .tower-pro-youtube-screen {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    min-height: 0;
+    height: auto;
+  }
+}
+
 /* TOWER Feed contrast (Designer follow-up). TOWER Feed only (.tower-feed[data-tower-feed]
    and the "Send a signal" composer in the same Feed panel):
    - post cards use the site glass rgba(18,16,38,.92) so the existing body text reads

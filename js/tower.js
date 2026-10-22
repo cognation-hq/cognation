@@ -1223,20 +1223,7 @@
         out[id] = defaultOn;
       }
     });
-    /* Owner-only Instax camera switch (#223): not a public widget, but an
-       explicit on/off is kept so "camera removed" survives reload (it rides in
-       the layout row's _widgets.publicWidgets). No key = on. */
-    if (raw && typeof raw === "object" && typeof raw.instax === "boolean") out.instax = raw.instax;
     return out;
-  }
-
-  function instaxRemoved(p) {
-    return !!(p && p.publicWidgets && typeof p.publicWidgets === "object" && p.publicWidgets.instax === false);
-  }
-
-  function setInstaxSwitch(p, on) {
-    p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
-    p.publicWidgets.instax = !!on;
   }
 
   var TOWER_SIDE_KEY = "cognation.tower.side";
@@ -8645,7 +8632,7 @@
       cam.classList.add("is-widget-off");
     }
     function showCam() {
-      if (!owner || instaxRemoved(p)) {
+      if (!owner) {
         hideCam();
         return;
       }
@@ -9268,9 +9255,6 @@
       if (b === el || b.hidden || b.classList.contains("is-widget-off")) return;
       if (b.classList.contains("tower-sticker--quote") || b.hasAttribute("data-tower-emoji")) return;
       if (b.closest(".tower-sticker--quote")) return;
-      /* Owner-only camera: visitors never see it, so it must not move the quote
-         for the owner only (owner 71.5 vs visitor 53.19, #223). */
-      if (b.getAttribute("data-tower-widget") === "instax") return;
       var br = b.getBoundingClientRect();
       if (!br.width || !br.height) return;
       blocks.push({ l: br.left - sr.left, t: br.top - sr.top, r: br.right - sr.left, b: br.bottom - sr.top });
@@ -9314,65 +9298,21 @@
 
   function keepQuotesClear(stage) {
     if (!stage) return;
-    var moved = [];
-    /* Visitors show the owner's saved spot as-is. Their stage has other
-       widgets (visitor calendar, shorter bio card), so a visitor-side nudge
-       would put the Quote somewhere the owner never sees (#223). The owner's
-       clear-check result is saved below, so both see the same x. */
-    var pv = TowerProfileStore.get();
-    var ownerView = !!(pv && isTowerOwner(pv));
+    /* Render only: every viewer (owner and visitor) shows the Quote at its
+       saved x / y / yPx. No per-viewer nudge and no save from here: the old
+       display-only nudge put the owner at 71.5 and visitors at 53.19 (#223).
+       Quotes are moved off widgets only when the owner drops them
+       (keepQuoteClear in the drop branch), and that drop is what gets saved. */
     stage.querySelectorAll(".tower-sticker--quote").forEach(function (el) {
       if (el.classList.contains("is-dragging")) return;
       var spot = el.__cognationQuoteSpot;
-      if (spot) {
-        el.style.setProperty("--sticker-x", spot.x + "%");
-        el.style.setProperty("--sticker-y", spot.yCss);
-        el.setAttribute("data-sticker-x", String(spot.x));
-        el.setAttribute("data-sticker-y", String(spot.yPct));
-        el.removeAttribute("data-sticker-y-px");
-        if (!ownerView) return;
-      }
-      if (keepQuoteClear(stage, el) && spot) moved.push(el);
+      if (!spot) return;
+      el.style.setProperty("--sticker-x", spot.x + "%");
+      el.style.setProperty("--sticker-y", spot.yCss);
+      el.setAttribute("data-sticker-x", String(spot.x));
+      el.setAttribute("data-sticker-y", String(spot.yPct));
+      el.removeAttribute("data-sticker-y-px");
     });
-    if (moved.length) scheduleQuoteSpotSave(stage, moved);
-  }
-
-  /* Owner only: when the clear-check moves a Quote off a widget, save that spot
-     (once the page has settled) so the owner after reload and every visitor
-     start from the same x (owner 71.5 / reload 62.8 / visitor 53.19, #223). */
-  var quoteSpotTimer = null;
-  function scheduleQuoteSpotSave(stage, els) {
-    var p0 = TowerProfileStore.get();
-    if (!p0 || !isTowerOwner(p0) || p0._loading || isPhoneStage(stage)) return;
-    if (quoteSpotTimer) clearTimeout(quoteSpotTimer);
-    quoteSpotTimer = setTimeout(function () {
-      quoteSpotTimer = null;
-      var p = TowerProfileStore.get();
-      if (!p || !isTowerOwner(p) || p._loading || isPhoneStage(stage)) return;
-      var spots = {};
-      els.forEach(function (el) {
-        if (!el.parentNode || el.classList.contains("is-dragging")) return;
-        var id = el.getAttribute("data-tower-quote-id");
-        var x = parseFloat(el.getAttribute("data-sticker-x") || "");
-        var yPx = parseFloat(el.getAttribute("data-sticker-y-px") || "");
-        if (!id || isNaN(x) || isNaN(yPx)) return;
-        spots[id] = { x: x, yPx: Math.round(yPx), y: parseFloat(el.getAttribute("data-sticker-y") || "0") || 0, el: el };
-      });
-      var changed = false;
-      p.quoteStickers = getQuoteStickers(p).map(function (q) {
-        var sp = q && spots[q.id];
-        if (!sp || (q.x === sp.x && q.yPx === sp.yPx)) return q;
-        var nq = {};
-        Object.keys(q).forEach(function (k) { nq[k] = q[k]; });
-        nq.x = sp.x;
-        nq.y = sp.y;
-        nq.yPx = sp.yPx;
-        sp.el.__cognationQuoteSpot = { x: sp.x, yCss: sp.yPx + "px", yPct: sp.y };
-        changed = true;
-        return nq;
-      });
-      if (changed) TowerProfileStore.save(p, { geometry: true });
-    }, 1200);
   }
 
   /* Neighbours settle after the profile, video and fonts load: check again
@@ -9760,16 +9700,6 @@
         setProfileStatusSafe("Restored " + (entry.label || entry.id) + ".", false);
         return;
       }
-      if (entry.type === "instax") {
-        var pCamUndo = TowerProfileStore.get();
-        if (!isTowerOwner(pCamUndo)) return;
-        setInstaxSwitch(pCamUndo, true);
-        TowerProfileStore.save(pCamUndo);
-        ensurePersonalPolaroid(root, pCamUndo);
-        applyWidgetLayout(root, pCamUndo);
-        setProfileStatusSafe("Restored Camera.", false);
-        return;
-      }
       if (entry.type === "emoji") {
         var pEmojiUndo = TowerProfileStore.get();
         if (!isTowerOwner(pEmojiUndo)) return;
@@ -9871,8 +9801,6 @@
         if (p.widgetLayout && p.widgetLayout.feed) delete p.widgetLayout.feed;
         if (p.widgetLayout && p.widgetLayout.messages) delete p.widgetLayout.messages;
         p.publicWidgets = JSON.parse(JSON.stringify(DEFAULT_PUBLIC_WIDGETS));
-        /* Explicit "on" so a browser holding an old "camera off" copy follows the reset (#223). */
-        p.publicWidgets.instax = true;
         p.polaroidRemoved = false;
         p.removedFriendPinIds = [];
         p.featuredFriendIds = [];
@@ -10417,18 +10345,6 @@
           pPol.polaroidRemoved = true;
           TowerProfileStore.save(pPol);
           setProfileStatusSafe(label + " removed — Reset layout to restore.", false);
-          return;
-        }
-        if (id === "instax") {
-          /* Owner-only camera (#223): save "off" in the layout row so it stays
-             removed after reload and in other browsers. Its spot is kept for Undo. */
-          pushWidgetUndo({ type: "instax", id: id, label: label });
-          selected.hidden = true;
-          selected.classList.add("is-widget-off");
-          var pCam = TowerProfileStore.get();
-          setInstaxSwitch(pCam, false);
-          TowerProfileStore.save(pCam);
-          setProfileStatusSafe("Camera removed — Undo or Reset layout to restore.", false);
           return;
         }
         if (id === "friends") return;
@@ -11548,9 +11464,7 @@
         /* keep widgetLayout as last dragged */
         if (!p.widgetLayout) p.widgetLayout = {};
         if (root.querySelector("[data-tower-public-widget]")) {
-          var keepInstax = p.publicWidgets && typeof p.publicWidgets.instax === "boolean" ? p.publicWidgets.instax : null;
           p.publicWidgets = readPublicWidgetsFromForm(root);
-          if (keepInstax !== null) p.publicWidgets.instax = keepInstax;
         }
         p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
         p.publicWidgets.social = profileHasSocialLinks(p);

@@ -9828,9 +9828,13 @@
         p.widgetLayout = {};
         if (p.widgetLayout && p.widgetLayout.feed) delete p.widgetLayout.feed;
         if (p.widgetLayout && p.widgetLayout.messages) delete p.widgetLayout.messages;
-        p.publicWidgets = JSON.parse(JSON.stringify(DEFAULT_PUBLIC_WIDGETS));
-        /* Explicit "on" so a browser holding an old "camera off" copy follows the reset (#223). */
-        p.publicWidgets.instax = true;
+        /* Reset restores positions and the camera only. It keeps the owner's
+           other visibility choices (social, music, badges, friends, html, ...):
+           copying the defaults over them turned hidden widgets back on with no
+           owner toggle to turn them off again (#242 follow-up).
+           Explicit camera "on" so a browser holding an old "camera off" copy
+           follows the reset (#223). */
+        setInstaxSwitch(p, true);
         p.polaroidRemoved = false;
         p.removedFriendPinIds = [];
         p.featuredFriendIds = [];
@@ -9844,7 +9848,7 @@
         syncOwnerStickerHandles(root);
         root.__cognationWidgetUndo = [];
         syncUndoButton();
-        setProfileStatusSafe("Layout reset — public widgets restored.", false);
+        setProfileStatusSafe("Layout reset.", false);
       });
     }
 
@@ -10279,7 +10283,7 @@
           fp = TowerProfileStore.get();
           renderFriendsPicker(root, fp);
           renderFriendPins(root, fp);
-          setProfileStatusSafe("Friend pin removed — Undo to restore.", false);
+          setProfileStatusSafe("Friend pin removed — Reset layout to restore.", false);
           return;
         }
 
@@ -10289,7 +10293,7 @@
           clearWidgetSelection(stage);
           pushWidgetUndo({ type: "badge", id: badgeId });
           setBadgeVisibility(root, badgeId, false);
-          setProfileStatusSafe("Badge pin removed — Undo to restore.", false);
+          setProfileStatusSafe("Badge pin removed.", false);
           return;
         }
 
@@ -10326,7 +10330,7 @@
           });
           TowerProfileStore.save(pEmoji);
           renderEmojiStickers(root, TowerProfileStore.get());
-          setProfileStatusSafe("Emoji removed — Undo to restore.", false);
+          setProfileStatusSafe("Emoji removed.", false);
           return;
         }
 
@@ -10344,7 +10348,7 @@
           };
           pushWidgetUndo({ type: "quote", id: quoteId || selected.id, layout: qLayout });
           removeQuoteSticker(root, quoteId || selected.getAttribute("data-tower-quote-id"));
-          setProfileStatusSafe("Quote removed — Undo to restore.", false);
+          setProfileStatusSafe("Quote removed.", false);
           return;
         }
 
@@ -10379,14 +10383,14 @@
         }
         if (id === "instax") {
           /* Owner-only camera (#223): save "off" in the layout row so it stays
-             removed after reload and in other browsers. Its spot is kept for Undo. */
+             removed after reload and in other browsers. Reset layout turns it back on. */
           pushWidgetUndo({ type: "instax", id: id, label: label });
           selected.hidden = true;
           selected.classList.add("is-widget-off");
           var pCam = TowerProfileStore.get();
           setInstaxSwitch(pCam, false);
           TowerProfileStore.save(pCam);
-          setProfileStatusSafe("Camera removed — Undo or Reset layout to restore.", false);
+          setProfileStatusSafe("Camera removed — Reset layout to restore.", false);
           return;
         }
         if (id === "friends") return;
@@ -10404,7 +10408,7 @@
             TowerProfileStore.save(pShell);
           }
         }
-        setProfileStatusSafe(label + " removed — Undo to restore.", false);
+        setProfileStatusSafe(label + " removed.", false);
       };
       root.__cognationRemoveSelected = removeSelectedWidget;
       var removeBtn = root.querySelector("[data-tower-remove-selected]");

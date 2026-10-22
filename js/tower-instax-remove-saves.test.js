@@ -1,7 +1,7 @@
 /**
  * #223 Part A (Oct 22): removing the owner's Instax camera saves server-side
  * (publicWidgets.instax = false in the layout row) and survives reload;
- * Undo / Reset layout turn it back on.
+ * Reset layout turns it back on (Undo has no control on the page).
  * Run: node js/tower-instax-remove-saves.test.js
  */
 "use strict";
@@ -62,7 +62,7 @@ assert.ok(/setInstaxSwitch\(\w+, false\)/.test(instaxBranch), "remove turns the 
 assert.ok(/TowerProfileStore\.save\(\w+/.test(instaxBranch), "remove saves (the switch change uploads the layout row)");
 assert.ok(/type: "instax"/.test(instaxBranch), "remove can be undone");
 assert.ok(/entry\.type === "instax"[\s\S]{0,400}setInstaxSwitch\(\w+, true\)/.test(tower), "Undo turns it back on");
-assert.ok(/publicWidgets\.instax = true/.test(tower), "Reset layout turns it back on");
+assert.ok(/setInstaxSwitch\(p, true\)/.test(tower), "Reset layout turns it back on");
 assert.ok(/instaxRemoved\(p\)/.test(fnSrc("ensurePersonalPolaroid")), "camera stays hidden after reload when removed");
 
 console.log("tower-instax-remove-saves: ok");

@@ -92,6 +92,25 @@
 
   /* Record for a search result: local registry, then the server profile cache
      (account_kind / seed_fleet_id), by id then handle. */
+  /* #233: same owner check as Tower (supabase-social effectiveAccountKind). A 'seed-'
+     Pro page saved before seed-pulse-sql/02 has account_kind 'real' and no fleet id;
+     an explicit 'real' wins in classify, so the raw row never badged. Take the owner's
+     kind when its Personal page is a seed/ops account. Real members stay real. */
+  function withOwnerKind(row) {
+    var social = window.CognationSupabaseSocial;
+    if (!row || !social || typeof social.effectiveAccountKind !== "function") return row;
+    var kind = "";
+    try { kind = String(social.effectiveAccountKind(row) || "").toLowerCase(); } catch (eKind) { return row; }
+    if (kind !== "seed" && kind !== "ops") return row;
+    if (String(row.account_kind || "").toLowerCase() === kind) return row;
+    var copy = Object.assign({}, row);
+    copy.account_kind = kind;
+    if (!copy.seed_fleet_id && typeof social.effectiveFleetId === "function") {
+      try { copy.seed_fleet_id = social.effectiveFleetId(row) || null; } catch (eFleet) {}
+    }
+    return copy;
+  }
+
   function peopleSearchRecord(id, handle) {
     var rec = null;
     if (window.CognationAccounts) {
@@ -104,11 +123,11 @@
     var social = window.CognationSupabaseSocial;
     if (!rec && id && social && typeof social.getProfile === "function") {
       var row = social.getProfile(id);
-      if (row && row.account_kind) rec = row;
+      if (row && row.account_kind) rec = withOwnerKind(row);
     }
     if (!rec && handle && social && typeof social.getProfileForHandle === "function") {
       var byHandle = social.getProfileForHandle(handle);
-      if (byHandle && byHandle.account_kind) rec = byHandle;
+      if (byHandle && byHandle.account_kind) rec = withOwnerKind(byHandle);
     }
     return rec;
   }

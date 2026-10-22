@@ -120,7 +120,9 @@ assert.ok(/select=id,kind,handle,display_name,user_id,account_kind,seed_fleet_id
   assert.strictEqual(gate.canFriend({ accountKind: "real" }, UUID.real).ok, true, "friend gate: real member id stays real");
 })();
 var swipe = src("js/commune-swipe.js");
-assert.ok(/userId: row\.user_id,\s*accountKind: String\(row\.account_kind \|\| ""\)\.toLowerCase\(\), seedFleetId: String\(row\.seed_fleet_id \|\| ""\)/.test(swipe), "professionals-you-might-know cards carry account fields");
+/* #231: account fields now go through the owner check (effectiveAccountKind) first. */
+assert.ok(/var rawKind = String\(row\.account_kind \|\| ""\)\.toLowerCase\(\);/.test(swipe) && /var fleetId = String\(row\.seed_fleet_id \|\| ""\);/.test(swipe) &&
+  /userId: row\.user_id,\s*accountKind: kind, seedFleetId: fleetId,/.test(swipe), "professionals-you-might-know cards carry account fields");
 var badgeSrc = fnSource(src("js/seedops-badge.js"), "peopleSearchRecord");
 assert.ok(/social\.getProfile\(id\)/.test(badgeSrc) && /peopleSearchRecord\(id, handle\)/.test(fnSource(src("js/seedops-badge.js"), "syncPeopleSearch")), "people search badge reads the server profile row");
 

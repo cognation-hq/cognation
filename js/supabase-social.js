@@ -987,6 +987,7 @@
     acceptFriendRequest: acceptFriendRequest,
     memberResults: memberResults,
     effectiveAccountKind: effectiveAccountKind,
+    effectiveFleetId: effectiveFleetId,
     openProfile: openProfile,
     getProfile: profileForId,
     getProfileForHandle: profileForHandle,

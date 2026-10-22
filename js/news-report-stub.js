@@ -19,6 +19,15 @@
   };
 
   var REPORT_FAILED = "Couldn't send report, try again";
+  /* Plain words for the server's known refusals (report_tower_post raises
+     these codes). Anything else stays "Couldn't send report, try again". */
+  var OWN_POST = "This is your own post, so it can't be reported.";
+  var REFUSALS = {
+    cannot_report_own: OWN_POST,
+    post_not_found: "This post was taken down, so there's nothing to report.",
+    report_suspended: "Reporting is paused on your account.",
+    "sign in first": "Sign in to report.",
+  };
   var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
   /* The Times prints Tower posts under display ids ("from-tower-personal-<uuid>",
@@ -39,9 +48,39 @@
     return "";
   }
 
+  /* The reader's own post (any of their profiles): the server refuses it, so
+     say so plainly instead of "try again". */
+  function isOwnPost(post) {
+    var author = post && post.getAttribute("data-author-profile-id");
+    if (!author) return false;
+    var social = window.CognationSupabaseSocial;
+    if (!social || typeof social.getMyProfiles !== "function") return false;
+    var mine = [];
+    try { mine = social.getMyProfiles() || []; } catch (e) { mine = []; }
+    for (var i = 0; i < mine.length; i++) {
+      if (mine[i] && String(mine[i].id) === String(author)) return true;
+    }
+    return false;
+  }
+
+  function failureText(err) {
+    var code = String((err && (err.message || (err.body && err.body.message))) || "").trim().toLowerCase();
+    if (code && window.console && typeof console.warn === "function") {
+      /* Server code only (e.g. cannot_report_own): no names, ids or addresses. */
+      console.warn("[times-report] not filed:", code.slice(0, 60));
+    }
+    return Object.prototype.hasOwnProperty.call(REFUSALS, code) ? REFUSALS[code] : REPORT_FAILED;
+  }
+
   /* Resolves only when the server filed the report (report_tower_post RPC ->
      content_reports, the Investigator queue). */
-  window.CognationNewsStoryReport = { serverPostId: serverPostId, REPORT_FAILED: REPORT_FAILED };
+  window.CognationNewsStoryReport = {
+    serverPostId: serverPostId,
+    isOwnPost: isOwnPost,
+    failureText: failureText,
+    REPORT_FAILED: REPORT_FAILED,
+    OWN_POST: OWN_POST,
+  };
 
   function sendServerReport(post, reason, note) {
     var api = window.CognationContentReport;
@@ -144,6 +183,11 @@
         if (failed) status.setAttribute("data-news-report-failed", "");
         else status.removeAttribute("data-news-report-failed");
       }
+      if (isOwnPost(post)) {
+        /* No server call: report_tower_post refuses your own post. */
+        say(OWN_POST, true);
+        return;
+      }
       post.setAttribute("data-news-report-sending", "true");
       setOptionsDisabled(true);
       say("Sending report…");
@@ -174,12 +218,12 @@
         }
         applyHide(post);
         say("Reported: " + REASON_LABELS[reason] + ". Hidden for you.");
-      }, function () {
-        /* Not filed: say so, keep the story and the options so the reader can retry. */
+      }, function (err) {
+        /* Not filed: say why when the server said, keep the story and the options. */
         post.removeAttribute("data-news-report-sending");
         setOptionsDisabled(false);
         if (menu2) menu2.hidden = false;
-        say(REPORT_FAILED, true);
+        say(failureText(err), true);
       });
     });
 

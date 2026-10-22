@@ -15575,6 +15575,21 @@ body.cgn-cal-page {
   height: auto;
 }
 
+/* Saved side-column (free) layout at 1280: the YouTube card is absolutely placed and
+   shrink-to-fit, so the 100% widths above had nothing to resolve against and the card
+   collapsed to its padding (21.5x16.8). It takes its column width (--yt-col-w, set by
+   the layout pass) with an 18.5rem floor, capped at the stage; a saved width
+   (data-sticker-w) still wins but never drops below the floor. Grid layouts and phone
+   (always the grid) are unchanged. */
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--youtube {
+  min-width: min(18.5rem, 100%);
+  box-sizing: border-box;
+}
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--youtube:not([data-sticker-w]) {
+  width: max(18.5rem, var(--yt-col-w, 18.5rem));
+  max-width: 100%;
+}
+
 /* Designer nits 2 (follow-up to #234), TOWER Professional page.
    (a) Owner "Paste a YouTube link": same glass input as Search followers, full card
        width, 8px below the video box. Font size and padding match Search followers

@@ -449,6 +449,7 @@
           if (!el || el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
           if (el.classList.contains("is-dragging")) return;
           if (id === VISITOR_CALENDAR_ID) el.style.removeProperty("--visitor-cal-w");
+          if (id === "youtube") el.style.removeProperty("--yt-col-w");
           el.classList.add("is-spawned");
           el.classList.toggle("is-spawn-full", row.length === 1);
           el.classList.toggle("is-spawn-half", row.length > 1);
@@ -510,6 +511,10 @@
       if (el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
       var id = el.getAttribute("data-tower-widget");
       el.classList.remove("is-spawn-full", "is-spawn-half", "is-grid-friend-pin");
+      /* YouTube (#234/#235 width:100% + 16:9 inside): a free-layout card is
+         absolutely placed and shrink-to-fit, so a % width collapsed it to its
+         padding (21.5x16.8 live). Give it its column width; CSS reads this. */
+      if (id === "youtube") el.style.setProperty("--yt-col-w", Math.floor(colW) + "px");
       if (id === VISITOR_CALENDAR_ID) {
         /* Same width as the bio card. When the bio card has a saved spot, seat
            the calendar right under it (below); otherwise it packs in its row. */

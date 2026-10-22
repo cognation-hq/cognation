@@ -15142,6 +15142,34 @@ body.cgn-cal-page {
   font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif) !important;
 }
 
+/* ===== Pro job title field (Edit profile) =====
+   Same grid and type as the Social links rows above it. Owner's own Pro page only. */
+#panel-tower .tower-profile-edit-dropdown .tower-job-title-fields {
+  display: grid;
+  grid-template-columns: 5.1rem minmax(0, 1fr);
+  column-gap: 0.35rem;
+  row-gap: 0.22rem;
+  align-items: center;
+}
+#panel-tower .tower-profile-edit-dropdown .tower-job-title-fields[hidden] {
+  display: none !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-job-title-fields label {
+  display: block;
+  margin: 0 !important;
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
+  line-height: 1.1 !important;
+  color: var(--cgn-text-muted, rgba(232, 240, 255, 0.66)) !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-job-title-fields .tower-job-title-hint {
+  grid-column: 1 / -1;
+  margin: 0 !important;
+  font-size: 0.72rem !important;
+  line-height: 1.2 !important;
+  color: var(--cgn-text-soft, rgba(232, 240, 255, 0.48)) !important;
+}
+
 /* Add widget dialog contrast (Designer spec, Oct 22). Style only. The card was
    #fff5f9 with the site's light text on it, so the title, labels, hint,
    unselected tab and Cancel were near-white on near-white.

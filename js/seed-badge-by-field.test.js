@@ -68,7 +68,7 @@ var social = src("js/supabase-social.js");
 assert.ok(/var PROFILE_RETURN_COLUMNS = "id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id";/.test(social), "profile columns include account_kind, seed_fleet_id");
 assert.ok(/function selectProfiles\(\)[\s\S]{0,200}"select=" \+ PROFILE_RETURN_COLUMNS \+ "&order=created_at\.desc/.test(social), "member list select uses them");
 assert.ok(/function refreshMyProfiles\(\)[\s\S]{0,300}"select=" \+ PROFILE_RETURN_COLUMNS \+ "&user_id=eq\."/.test(social), "my-profiles select uses them");
-assert.ok(/author:profiles!tower_posts_author_profile_id_fkey\(id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id\)/.test(social), "feed author embed has both");
+assert.ok(/author:profiles!tower_posts_author_profile_id_fkey\(id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id(,photo_url)?\)/.test(social), "feed author embed has both");
 var mig = src("supabase/migrations/20261002_seedops_account_kind.sql");
 assert.ok(/add column if not exists account_kind/.test(mig) && /add column if not exists seed_fleet_id text/.test(mig), "columns exist in migrations");
 

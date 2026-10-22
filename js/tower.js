@@ -2920,9 +2920,52 @@
     }
   }
 
+  /* Feed card byline. Server posts name the page that wrote them (Personal or
+     Professional: post.authorKind from tower_posts.author_profile_id) with its
+     picture (profiles.photo_url, else initials) and link to that page. Local
+     posts keep the plain name. */
+  function towerPostAuthorSlug(post) {
+    if (!post || !post._remote) return "";
+    return String(post.handle || post.authorProfileId || "").trim();
+  }
+
+  function towerPostAuthorHtml(post) {
+    var name = escapeHtml(post.authorName || "Neighbor");
+    var slug = towerPostAuthorSlug(post);
+    if (!slug) {
+      return '<span class="tower-author">' + name + towerPostSeedBadge(post) + "</span>";
+    }
+    var photo = String(post.authorPhotoUrl || "");
+    var avatar = /^https:\/\//i.test(photo)
+      ? '<span class="tower-author-avatar has-photo" aria-hidden="true"><img src="' + escapeHtml(photo) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>'
+      : '<span class="tower-author-avatar" aria-hidden="true">' + escapeHtml(initials(post.authorName || "Neighbor")) + "</span>";
+    return '<span class="tower-author">' +
+      '<a class="tower-author-link" href="#tower-profile-' + escapeHtml(encodeURIComponent(slug)) + '"' +
+      ' data-tower-author-open="' + escapeHtml(slug) + '"' +
+      ' data-author-kind="' + (post.authorKind === "professional" ? "professional" : "personal") + '">' +
+      avatar + '<span class="tower-author-name">' + name + "</span></a>" +
+      towerPostSeedBadge(post) + "</span>";
+  }
+
+  function bindTowerAuthorLinks(list) {
+    if (!list || list.__towerAuthorLinksBound || typeof list.addEventListener !== "function") return;
+    list.__towerAuthorLinksBound = true;
+    list.addEventListener("click", function (ev) {
+      var link = ev.target && ev.target.closest ? ev.target.closest("a[data-tower-author-open]") : null;
+      if (!link || !list.contains(link)) return;
+      var slug = link.getAttribute("data-tower-author-open") || "";
+      if (!slug || typeof window.CognationTowerOpenProfile !== "function") return;
+      ev.preventDefault();
+      try { window.CognationTowerOpenProfile(slug); } catch (eOpen) {
+        try { location.hash = "tower-profile-" + slug; } catch (eHash) {}
+      }
+    });
+  }
+
   function renderFeed(root) {
     var list = towerFeedQuery(root, "[data-tower-feed]");
     if (!list) return;
+    bindTowerAuthorLinks(list);
     list.__ageFloorUnder13 = viewerUnder13();
     var posts = TowerStore.list().filter(towerPostVisibleToViewer);
     list.innerHTML = "";
@@ -2936,10 +2979,7 @@
       article.setAttribute("data-tower-post", post.id || "");
       article.innerHTML =
         '<header class="tower-post-meta">' +
-        '<span class="tower-author">' +
-        escapeHtml(post.authorName || "Neighbor") +
-        towerPostSeedBadge(post) +
-        "</span>" +
+        towerPostAuthorHtml(post) +
         '<time datetime="' +
         escapeHtml(post.createdAt) +
         '">' +
@@ -11604,16 +11644,24 @@
             } catch (frConn) {}
             return;
           }
-          setStatus("Posting to Feed…", false);
+          /* No notice on a post (Alexa, Oct 22 11:45 AM CT): the new post at
+             the top of the Feed and the cleared composer are the confirmation.
+             Only a failure shows the box. Clear any earlier error first. */
+          setStatus("", false);
           social
             .createTowerPost({
               body: bodyInput ? bodyInput.value : "",
               attachments: attachments,
+              /* PERSONAL | PROFESSIONAL switch (js/signal-post-as.js): one of
+                 the member's own pages, or "" = the current default author. */
+              asProfileId: (window.CognationSignalPostAs &&
+                typeof window.CognationSignalPostAs.currentAuthorProfileId === "function")
+                ? window.CognationSignalPostAs.currentAuthorProfileId() : "",
             })
             .then(function () {
               if (bodyInput) bodyInput.value = "";
               if (fileInput) fileInput.value = "";
-              setStatus("Posted to Feed.", false);
+              setStatus("", false);
               try {
                 if (window.CognationFriction) window.CognationFriction.complete("tower");
               } catch (frRemote) {}
@@ -11644,7 +11692,7 @@
         }
         if (bodyInput) bodyInput.value = "";
         if (fileInput) fileInput.value = "";
-        setStatus("Posted to Feed. Local COMMUNE will pick this up.", false);
+        setStatus("", false);
         try {
           if (window.CognationFriction) window.CognationFriction.complete("tower");
         } catch (frOk) {}

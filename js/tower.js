@@ -1232,7 +1232,33 @@
        explicit on/off is kept so "camera removed" survives reload (it rides in
        the layout row's _widgets.publicWidgets). No key = on. */
     if (raw && typeof raw === "object" && typeof raw.instax === "boolean") out.instax = raw.instax;
+    /* Owner's Remove on Music, Badges and Calendar: "shown.<id>": false (see
+       OWNER_REMOVABLE_WIDGET_IDS). Kept as saved; no key = shown. */
+    ["music", "badges", "calendar"].forEach(function (id) {
+      var k = "shown." + id;
+      if (raw && typeof raw === "object" && typeof raw[k] === "boolean") out[k] = raw[k];
+    });
     return out;
+  }
+
+  /* Remove on Music, Badges and Calendar (Oct 22). Their old flags can't tell
+     "the owner hid it" from "it's empty": the page turns music and badges off
+     by itself when they have nothing to show, and that copy is saved with the
+     next edit. So the owner's Remove has its own switch, "shown.<id>", in the
+     same publicWidgets map (it rides in the layout row's _widgets). Only
+     Remove sets it off; only Show in Edit profile (or Undo) turns it back on.
+     Nothing on load writes it, and the old music/badges/calendar flags are
+     left as they are and no longer hide these three. No key = shown. */
+  var OWNER_REMOVABLE_WIDGET_IDS = ["music", "badges", "calendar"];
+
+  function ownerShownKey(id) {
+    return "shown." + id;
+  }
+
+  function widgetRemovedByOwner(p, id) {
+    if (OWNER_REMOVABLE_WIDGET_IDS.indexOf(id) < 0) return false;
+    var raw = p && p.publicWidgets && typeof p.publicWidgets === "object" ? p.publicWidgets : null;
+    return !!raw && raw[ownerShownKey(id)] === false;
   }
 
   function instaxRemoved(p) {
@@ -4888,9 +4914,10 @@
     });
   }
 
-  function showMusicSticker(root, on) {
+  function showMusicSticker(root, on, p) {
     var musicSticker = root.querySelector('[data-tower-widget="music"]');
     if (!musicSticker) return;
+    if (on && widgetRemovedByOwner(p || TowerProfileStore.get(), "music")) on = false;
     musicSticker.hidden = !on;
     musicSticker.classList.toggle("is-widget-off", !on);
     if (!on) musicSticker.classList.remove("is-widget-selected");
@@ -4980,6 +5007,17 @@
       return;
     }
     showYoutubeSticker(root, false);
+    if (widgetRemovedByOwner(p, "music")) {
+      /* The owner removed Music: no player for anyone until Show. */
+      clearYoutubeEmbed(root);
+      clearTowerAudio(audio);
+      hideMusicSkins(root);
+      wrap.hidden = true;
+      wrap.removeAttribute("data-music-mode");
+      showMusicSticker(root, false, p);
+      if (proBox) proBox.hidden = true;
+      return;
+    }
     if (proBox) {
       proBox.hidden = true;
       proBox.classList.remove("has-video");
@@ -4997,7 +5035,7 @@
       if (ownerPublic && (skin === "none" || (!personal && !url))) {
         wrap.hidden = false;
         wrap.setAttribute("data-music-mode", "none");
-        showMusicSticker(root, true);
+        showMusicSticker(root, true, p);
         return;
       }
       wrap.hidden = true;
@@ -5006,7 +5044,7 @@
       return;
     }
 
-    showMusicSticker(root, true);
+    showMusicSticker(root, true, p);
     if (!url) {
       var keptOnScreen = savedPinkVideoId();
       if (keptOnScreen && skin === "classic") {
@@ -6634,16 +6672,19 @@
 
   /* Edit profile > "Show hidden widgets" (#242 follow-up). Lists the widgets an
      owner hid with Remove that the page really hides by their publicWidgets
-     flag and that have something to show. (Music, Badges and Calendar are
-     shown by their own content, Social follows the links, and Friends stays
-     off, so a flag alone does not hide them; they are not listed.) Rendering
-     never writes: only an owner's Show click saves, and it turns on that one
-     flag. */
+     flag and that have something to show. Music, Badges and Calendar are
+     listed by their own "shown.<id>" switch (set only by Remove), not by
+     their old content-driven flags. Social follows the links and Friends
+     stays off, so they are not listed. Rendering never writes: only an
+     owner's Show click saves, and it turns on that one flag. */
   var RESTORABLE_HIDDEN_WIDGETS = [
     { id: "identity", label: "Name" },
     { id: "slogan", label: "Quote / slogan" },
     { id: "envelope", label: "Messages" },
     { id: "html", label: "Custom HTML" },
+    { id: "music", label: "Music" },
+    { id: "badges", label: "Badges" },
+    { id: "calendar", label: "Calendar" },
   ];
 
   function hiddenWidgetRestorable(id) {
@@ -6657,6 +6698,13 @@
     if (!p || !isTowerOwner(p)) return [];
     var raw = p.publicWidgets && typeof p.publicWidgets === "object" ? p.publicWidgets : {};
     return RESTORABLE_HIDDEN_WIDGETS.filter(function (w) {
+      if (OWNER_REMOVABLE_WIDGET_IDS.indexOf(w.id) >= 0) {
+        if (!widgetRemovedByOwner(p, w.id)) return false;
+        /* Professional pages have no music player; Badges needs an applied milestone. */
+        if (w.id === "music") return !isProTower(p);
+        if (w.id === "badges") return appliedMilestoneList(p).length > 0;
+        return true;
+      }
       if (raw[w.id] !== false) return false;
       if (w.id === "slogan") return !!(typeof p.slogan === "string" && p.slogan.trim());
       if (w.id === "html") return !!(typeof p.customHtml === "string" && p.customHtml.trim());
@@ -6806,6 +6854,8 @@
       if (id === "badges") on = !!(milestones && milestones.length);
       /* The same Calendar sticker stays on the personal page and the professional page. */
       if (id === "calendar") on = true;
+      /* The owner removed it: hidden for the owner and visitors, whatever its content. */
+      if (widgetRemovedByOwner(p, id)) on = false;
       var el = root.querySelector('[data-tower-widget="' + id + '"]');
       if (!el) return;
       if (id === "badges") {
@@ -6817,6 +6867,10 @@
       if (!on) el.classList.remove("is-widget-selected");
     });
     showYoutubeSticker(root, !!p && p._profileKind === "professional");
+    /* The Calendar sticker lives in Edit profile > Calendar; while the owner has
+       it removed, that entry goes too (it would open empty). Show brings it back. */
+    var calEntry = root.querySelector("[data-tower-edit-calendar]");
+    if (calEntry) calEntry.hidden = widgetRemovedByOwner(p, "calendar");
     var avatar = root.querySelector('[data-tower-widget="avatar"]');
     if (avatar) {
       avatar.hidden = false;
@@ -6835,7 +6889,7 @@
         }
       });
       stage.querySelectorAll("[data-tower-badge-pin]").forEach(function (pin) {
-        if (!widgets.badges) {
+        if (!widgets.badges || widgetRemovedByOwner(p, "badges")) {
           pin.hidden = true;
           pin.classList.add("is-widget-off");
         } else {
@@ -6872,10 +6926,14 @@
     if (PUBLIC_WIDGET_IDS.indexOf(id) < 0) return;
     var p = TowerProfileStore.get();
     p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
-    p.publicWidgets[id] = !!on;
+    /* Music, Badges and Calendar: Remove / Show flip only the owner's own switch. */
+    if (OWNER_REMOVABLE_WIDGET_IDS.indexOf(id) >= 0) p.publicWidgets[ownerShownKey(id)] = !!on;
+    else p.publicWidgets[id] = !!on;
     TowerProfileStore.save(p);
     applyPublicWidgets(root, p);
     syncPublicWidgetsForm(root, p);
+    /* The player stops when removed and is rebuilt when shown again. */
+    if (id === "music") initTowerMusic(root, p);
     if (id === "friends") {
       if (on) renderFriendPins(root, p);
       else {
@@ -7784,8 +7842,9 @@
     if (!HANGOUT_SUGGESTIONS_LIVE) schedulerHtml = "";
     var calRoot = root.querySelector('[data-tower-widget="calendar"]');
     if (calRoot) {
-      calRoot.hidden = false;
-      calRoot.classList.remove("is-widget-off");
+      var calRemoved = widgetRemovedByOwner(p, "calendar");
+      calRoot.hidden = calRemoved;
+      calRoot.classList.toggle("is-widget-off", calRemoved);
       calRoot.setAttribute("data-calendar-audience", owner ? "owner" : "visitor");
       calRoot.setAttribute("data-calendar-kind", profileIsProfessional(p) ? "professional" : "personal");
     }
@@ -11634,8 +11693,12 @@
         if (!p.widgetLayout) p.widgetLayout = {};
         if (root.querySelector("[data-tower-public-widget]")) {
           var keepInstax = p.publicWidgets && typeof p.publicWidgets.instax === "boolean" ? p.publicWidgets.instax : null;
+          var keepShown = normalizePublicWidgets(p.publicWidgets);
           p.publicWidgets = readPublicWidgetsFromForm(root);
           if (keepInstax !== null) p.publicWidgets.instax = keepInstax;
+          OWNER_REMOVABLE_WIDGET_IDS.forEach(function (wid) {
+            if (ownerShownKey(wid) in keepShown) p.publicWidgets[ownerShownKey(wid)] = keepShown[ownerShownKey(wid)];
+          });
         }
         p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
         p.publicWidgets.social = profileHasSocialLinks(p);

@@ -73,7 +73,7 @@ var mig = src("supabase/migrations/20261002_seedops_account_kind.sql");
 assert.ok(/add column if not exists account_kind/.test(mig) && /add column if not exists seed_fleet_id text/.test(mig), "columns exist in migrations");
 
 var sctx = vm.createContext({ window: {}, state: { profiles: {}, handles: {} } });
-vm.runInContext(["normalizeHandle", "cacheProfile", "profileForId", "reactionsMap", "mapPost"].map(function (n) { return fnSource(social, n); }).join("\n"), sctx);
+vm.runInContext(["normalizeHandle", "cacheProfile", "profileForId", "profileForUser", "fleetKindOf", "ownerFleetKind", "effectiveAccountKind", "effectiveFleetId", "reactionsMap", "mapPost"].map(function (n) { return fnSource(social, n); }).join("\n"), sctx);
 function author(id, handle, ak, fleet) { return { id: id, user_id: "u-" + id, kind: "personal", handle: handle, display_name: handle, bio: "", account_kind: ak, seed_fleet_id: fleet || null }; }
 var seedPost = sctx.mapPost({ id: "p1", author_profile_id: "a1", body: "hi", created_at: "2026-10-20T20:00:00Z", author: author("a1", "sasha", "seed", "seed-0001") });
 assert.strictEqual(seedPost.accountKind, "seed"); assert.strictEqual(seedPost.isSeed, true); assert.strictEqual(seedPost.seedFleetId, "seed-0001");

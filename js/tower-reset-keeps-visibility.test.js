@@ -83,14 +83,14 @@ assert.ok(lines.length >= 7, "status lines found");
 lines.forEach(function (l) {
   assert.ok(!/Undo/.test(l), "no Undo in: " + l);
 });
-assert.ok(removeFn.indexOf('"Camera removed — Reset layout to restore."') > 0, "camera copy");
-assert.ok(removeFn.indexOf('"Friend pin removed — Reset layout to restore."') > 0, "friend pin copy (Reset clears removed pins)");
+assert.ok(removeFn.indexOf('"Camera removed. Reset layout to restore."') > 0, "camera copy");
+assert.ok(removeFn.indexOf('"Friend pin removed. Reset layout to restore."') > 0, "friend pin copy (Reset clears removed pins)");
 assert.ok(removeFn.indexOf('"Badge pin removed."') > 0, "badge copy (Reset keeps badgeVisibility)");
 assert.ok(removeFn.indexOf('"Emoji removed."') > 0, "emoji copy (Reset does not bring stickers back)");
 assert.ok(removeFn.indexOf('"Quote removed."') > 0, "quote copy (Reset does not bring quotes back)");
-assert.ok(removeFn.indexOf('label + " removed — Show it again in Edit profile."') > 0, "generic copy for widgets the Edit profile list restores");
+assert.ok(removeFn.indexOf('label + " removed. Show it again in Edit profile."') > 0, "generic copy for widgets the Edit profile list restores");
 assert.ok(/hiddenWidgetRestorable\(id\) \?[^:]+: label \+ " removed\."/.test(removeFn), "plain copy for widgets it cannot restore");
-assert.ok(removeFn.indexOf('"Polaroid removed') < 0 && removeFn.indexOf('label + " removed — Reset layout to restore."') > 0, "Polaroid keeps Reset copy");
+assert.ok(removeFn.indexOf('"Polaroid removed') < 0 && removeFn.indexOf('label + " removed. Reset layout to restore."') > 0, "Polaroid keeps Reset copy");
 
 /* 4. Edit profile > Show hidden widgets. */
 var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");

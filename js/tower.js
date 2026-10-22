@@ -8326,11 +8326,25 @@
       });
       btn.hidden = hasRemoteProfessional;
       if (status) {
-        status.hidden = !hasRemoteProfessional;
-        status.textContent = hasRemoteProfessional
+        /* "Your professional page is set up." shows once: only in the moment
+           right after this tab created the Pro page, and only while the Pro
+           page is the one being edited. Closing Edit profile clears it, so it
+           never shows on a later open, after a reload, or in Personal Edit
+           profile. In memory only (no storage, no server write). */
+        var currentKindForNotice =
+          (TowerProfileStore.get() && TowerProfileStore.get()._profileKind) ||
+          (session && session.profileKind) ||
+          "personal";
+        var showSetupNotice =
+          hasRemoteProfessional &&
+          root.__cognationProSetupJustCreated === true &&
+          currentKindForNotice === "professional";
+        status.hidden = !showSetupNotice;
+        status.textContent = showSetupNotice
           ? "Your professional page is set up."
           : "";
         status.classList.remove("is-error");
+        status.classList.toggle("tower-pro-setup-notice", showSetupNotice);
       }
       return;
     }
@@ -8398,6 +8412,8 @@
               : "professional-page",
           })
           .then(function (profile) {
+            /* One-time "set up" notice for this moment only (see syncAddProfileUi). */
+            root.__cognationProSetupJustCreated = true;
             setSt("Professional page created.", false);
             if (profile && profile.handle) {
               location.hash = "tower-profile-" + profile.handle;
@@ -10475,6 +10491,11 @@
       } else {
         /* Closing without Save still commits typed social URLs so circle buttons stick. */
         try { flushSocialFieldsFromForm(root); } catch (eFlush) {}
+        /* The one-time Pro "set up" notice is spent once Edit profile closes. */
+        if (root.__cognationProSetupJustCreated) {
+          root.__cognationProSetupJustCreated = false;
+          try { syncAddProfileUi(root); } catch (eSetup) {}
+        }
         panel.hidden = true;
         returnPanelHome();
         wrap.classList.remove("is-open");

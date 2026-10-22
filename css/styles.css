@@ -15052,11 +15052,76 @@ body.cgn-cal-page {
   font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif) !important;
 }
 
-/* Blocked-quote line in the light Add widget card: the dialog's own dark text
-   colour so the message is readable on #fff5f9. */
+/* Add widget dialog contrast (Designer spec, Oct 22). Style only. The card was
+   #fff5f9 with the site's light text on it, so the title, labels, hint,
+   unselected tab and Cancel were near-white on near-white.
+   - Card: site glass rgba(18,16,38,.92), 12px blur, 1px #d9d2f0 at 40%.
+   - Title and label #f7f9ff, hint #d9d2f0.
+   - Unselected tab and Cancel: transparent, 1px #d9d2f0 at 40%, #f7f9ff text.
+   - Selected tab and Add sticker: the same gradient pill, laid on #f7f9ff so it
+     keeps its light look on the dark card, with ink #1c1630 text. The selected
+     tab follows the dialog's data-add-choice (the choice Add sticker uses), so
+     picking Slogan card moves the pill to it. The accent-colour selection
+     ring and textarea focus ring become #d9d2f0.
+   - Textarea rgba(255,255,255,.06), #f7f9ff text, #d9d2f0 placeholder.
+   - Blocked-quote line: #fbe3e6, #1c1630 text, 1px #e88a99. */
+.tower-add-widget-dialog .tower-add-widget-dialog-card {
+  background: rgba(18, 16, 38, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(217, 210, 240, 0.4);
+  color: #f7f9ff;
+}
+.tower-add-widget-dialog .tower-add-widget-title,
+.tower-add-widget-dialog .tower-add-widget-label {
+  color: #f7f9ff !important;
+}
+.tower-add-widget-dialog .tower-add-widget-dialog-card .form-hint {
+  color: #d9d2f0 !important;
+}
+.tower-add-widget-dialog .tower-add-widget-choices [data-tower-add-choice],
+.tower-add-widget-dialog .form-actions [data-tower-add-widget-cancel] {
+  background: transparent !important;
+  background-image: none !important;
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  color: #f7f9ff !important;
+  box-shadow: none !important;
+  outline: none;
+}
+.tower-add-widget-dialog:not([data-add-choice="slogan"]) .tower-add-widget-choices [data-tower-add-choice="quote"],
+.tower-add-widget-dialog[data-add-choice="slogan"] .tower-add-widget-choices [data-tower-add-choice="slogan"],
+.tower-add-widget-dialog .form-actions [data-tower-add-quote-confirm] {
+  background-color: #f7f9ff !important;
+  background-image: linear-gradient(100deg, rgba(139, 237, 255, 0.42), rgba(204, 161, 255, 0.38)) !important;
+  border: 1px solid rgba(208, 249, 255, 0.72) !important;
+  color: #1c1630 !important;
+  box-shadow: 0 0 21px rgba(142, 234, 255, 0.2) !important;
+}
+.tower-add-widget-dialog .tower-add-widget-choices [data-tower-add-choice]:focus-visible,
+.tower-add-widget-dialog .form-actions .btn:focus-visible {
+  outline: 2px solid #d9d2f0;
+  outline-offset: 2px;
+}
+.tower-add-widget-dialog [data-tower-add-quote-text] {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #f7f9ff !important;
+}
+.tower-add-widget-dialog [data-tower-add-quote-text]:focus,
+.tower-add-widget-dialog [data-tower-add-quote-text]:focus-visible {
+  border-color: rgba(217, 210, 240, 0.4) !important;
+  outline: 2px solid #d9d2f0 !important;
+  outline-offset: 1px;
+  box-shadow: none !important;
+}
+.tower-add-widget-dialog [data-tower-add-quote-text]::placeholder {
+  color: #d9d2f0 !important;
+  opacity: 1;
+}
 .tower-add-widget-dialog-card .tower-add-quote-status {
   margin: 0 0 0.75rem;
-  color: #4a2c3a !important;
+  background: #fbe3e6 !important;
+  border: 1px solid #e88a99 !important;
+  color: #1c1630 !important;
 }
 
 /* TOWER Feed contrast (Designer follow-up). TOWER Feed only (.tower-feed[data-tower-feed]

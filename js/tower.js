@@ -12568,10 +12568,39 @@
     for (var i = 0; i < spots.length; i++) {
       var sq = PULSE_BG_SQUARES[spots[i].getAttribute("data-circle-spot")];
       if (!sq) continue;
-      spots[i].style.transform = "translate(-50%, -50%) translate(" + (sq.x * k).toFixed(1) + "px," + (sq.y * k).toFixed(1) + "px) scale(" + (sq.s * grow).toFixed(3) + ")";
+      var pin = "translate(-50%, -50%) translate(" + (sq.x * k).toFixed(1) + "px," + (sq.y * k).toFixed(1) + "px) scale(" + (sq.s * grow).toFixed(3) + ")";
+      spots[i].style.transform = pin;
+      /* The pinned spot stays on the frame while it orbits: the falling circles keep
+         clear of all five pinned spots, which bound the whole orbit path. */
+      spots[i].setAttribute("data-pulse-pin", pin);
       spots[i].style.zIndex = String(Math.round(sq.s * 100));
       /* names under the frames divide by this so they land at true screen px */
       spots[i].style.setProperty("--pulse-spot-s", (sq.s * grow).toFixed(3));
+    }
+    if (circleFallState) { circleFallState.pulseK = k; circleFallState.pulseGrow = grow; }
+    return true;
+  }
+
+  /* PULSE frames orbit (Alexa 2026-10-22): the five frames slowly circle the ring
+     again, one turn every 28s, steady speed (js/pulse-frames-orbit.js). They slide
+     (translate + scale only), so photos stay upright. Reduced motion: no orbit,
+     frames stay on their pinned spots. Returns false when the frames stay pinned. */
+  var pulseOrbitPath = null;
+  function orbitCircleSpots(spots) {
+    var orbit = window.CognationPulseOrbit;
+    var st = circleFallState;
+    if (!orbit || !st || !st.pulseK || orbit.reducedMotion(window)) return false;
+    spots = spots || document.querySelectorAll("[data-circle-fall][data-pulse-bg] [data-circle-ring] [data-circle-spot]");
+    if (!spots.length) return false;
+    if (!pulseOrbitPath) pulseOrbitPath = orbit.buildPath(PULSE_BG_SQUARES);
+    var elapsed = performance.now() - st.ringStarted;
+    for (var i = 0; i < spots.length; i++) {
+      var id = spots[i].getAttribute("data-circle-spot");
+      if (!PULSE_BG_SQUARES[id]) continue;
+      var f = orbit.frameAt(pulseOrbitPath, id, elapsed);
+      spots[i].style.transform = orbit.frameTransform(f, st.pulseK, st.pulseGrow);
+      spots[i].style.zIndex = String(Math.round(f.s * 100));
+      spots[i].style.setProperty("--pulse-spot-s", (f.s * st.pulseGrow).toFixed(3));
     }
     return true;
   }
@@ -12580,7 +12609,7 @@
     if (!circleFallState) return;
     var spots = document.querySelectorAll("[data-circle-ring] [data-circle-spot]");
     if (!spots.length) return;
-    if (pinCircleSpotsToBackground(spots)) return;
+    if (pinCircleSpotsToBackground(spots)) { orbitCircleSpots(spots); return; }
     var shift = ((performance.now() - circleFallState.ringStarted) / 28000) * CIRCLE_SPOTS.length;
     var i;
     var front = 0;
@@ -12742,14 +12771,32 @@
     function frameShell() {
       var st = circleFallState;
       if (!st || !st.shellOnly) return;
-      placeCircleSpots();
-      /* Pinned spots on the background are still: no per-frame loop (light on phones). */
-      if (layer.hasAttribute("data-pulse-bg")) { st.raf = 0; return; }
-      st.raf = requestAnimationFrame(frameShell);
+      if (layer.hasAttribute("data-pulse-bg")) {
+        /* Orbit: measure once (and on resize/repaint), then only move the five frames
+           each frame (light on phones). Reduced motion: pin them and stop the loop. */
+        if (!st.pulseK) placeCircleSpots();
+        if (orbitCircleSpots()) st.raf = requestAnimationFrame(frameShell);
+        else { placeCircleSpots(); st.raf = 0; }
+      } else {
+        placeCircleSpots();
+        st.raf = requestAnimationFrame(frameShell);
+      }
     }
+    circleFallState.frameShell = frameShell;
     if (!window.__cognationPulseBgResize) {
       window.__cognationPulseBgResize = true;
       window.addEventListener("resize", function () { if (circleFallState) placeCircleSpots(); });
+      /* Reduced motion switched on: frames go back to their pinned spots and stay.
+         Switched off again: the orbit picks up. */
+      var motionQuery = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+      var onMotionPref = function () {
+        var st = circleFallState;
+        if (!st) return;
+        placeCircleSpots();
+        if (!st.raf && typeof st.frameShell === "function") st.raf = requestAnimationFrame(st.frameShell);
+      };
+      if (motionQuery && motionQuery.addEventListener) motionQuery.addEventListener("change", onMotionPref);
+      else if (motionQuery && motionQuery.addListener) motionQuery.addListener(onMotionPref);
     }
     circleFallState.raf = requestAnimationFrame(frameShell);
     /* PM 2026-10-21 (Alexa's spec: PULSE shows your own friends only): the

@@ -351,7 +351,10 @@
 
   /* Vertical band (layer px) covered by the ring image and the five frames + captions.
      Read from layout values (offset sizes + the pinned transform), so the ring's
-     build animation (scale 0.82 -> 1) never skews the measurement. */
+     build animation (scale 0.82 -> 1) never skews the measurement.
+     The frames orbit the ring (js/pulse-frames-orbit.js) on a path bounded by their
+     five pinned spots (data-pulse-pin), so the band covers every frame at every
+     pinned spot: the falling circles stay clear of the frames all the way round. */
   function blockedBand(layer) {
     if (!layer) return null;
     var H = layer.clientHeight || 0;
@@ -362,18 +365,31 @@
     var top = cy - 230 * k;
     var bottom = cy + 230 * k;
     var spots = layer.querySelectorAll ? layer.querySelectorAll("[data-circle-ring] [data-circle-spot]") : [];
-    for (var i = 0; i < spots.length; i++) {
+    var re = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)\s*scale\(([\d.]+)\)/;
+    var pins = [];
+    var i;
+    for (i = 0; i < spots.length; i++) {
+      var pm = spots[i].getAttribute ? re.exec(spots[i].getAttribute("data-pulse-pin") || "") : null;
+      if (pm) pins.push(pm);
+    }
+    for (i = 0; i < spots.length; i++) {
       var sp = spots[i];
-      var m = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)\s*scale\(([\d.]+)\)/.exec(sp.style.transform || "");
+      var m = re.exec(sp.style.transform || "");
       if (!m) continue;
       var s = num(m[3]) || 1;
-      var half = (sp.offsetHeight || 0) * s / 2;
-      var y = cy + num(m[2]);
+      var h = sp.offsetHeight || 0;
       var cap = sp.querySelector ? sp.querySelector("[data-circle-caption]") : null;
-      /* names sit below the photo (offsetTop includes the gap), scaled with the frame */
-      var capBottom = cap ? ((cap.offsetTop || sp.offsetHeight || 0) + (cap.offsetHeight || 0)) * s : 0;
-      top = Math.min(top, y - half);
-      bottom = Math.max(bottom, y + half, y - half + capBottom);
+      /* names sit below the photo (offsetTop includes the gap), scaled with the frame:
+         screen px they reach below the photo */
+      var capBelow = cap ? ((cap.offsetTop || h) + (cap.offsetHeight || 0) - h) * s : 0;
+      var at = pins.length ? pins : [m];
+      for (var j = 0; j < at.length; j++) {
+        var ps = num(at[j][3]) || 1;
+        var half = h * ps / 2;
+        var y = cy + num(at[j][2]);
+        top = Math.min(top, y - half);
+        bottom = Math.max(bottom, y + half, y + half + capBelow);
+      }
     }
     return { top: Math.max(0, top), bottom: Math.min(H, bottom) };
   }

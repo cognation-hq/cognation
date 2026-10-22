@@ -15400,22 +15400,22 @@ body.cgn-cal-page {
   color: #d9d2f0 !important;
   opacity: 1;
 }
-/* (b) Desktop: the empty YouTube box fills the card width at 16:9. Phone unchanged. */
-@media (min-width: 768px) {
-  #panel-tower .tower-sticker--youtube .tower-pro-youtube {
-    width: 100%;
-  }
-  #panel-tower .tower-sticker--youtube .tower-pro-youtube-screen {
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    min-height: 0;
-    height: auto;
-  }
+/* (b) The empty YouTube box fills the card width at 16:9 at every width
+   (#234 desktop; #235 extends it below 768px to match the full-width link field). */
+#panel-tower .tower-sticker--youtube .tower-pro-youtube {
+  width: 100%;
+}
+#panel-tower .tower-sticker--youtube .tower-pro-youtube-screen {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 0;
+  height: auto;
 }
 
 /* Designer nits 2 (follow-up to #234), TOWER Professional page.
    (a) Owner "Paste a YouTube link": same glass input as Search followers, full card
-       width, 8px below the video box. Font size, padding and radius unchanged. */
+       width, 8px below the video box. Font size and padding match Search followers
+       (0.82rem, 0.28rem 0.45rem); radius unchanged. */
 #panel-tower .tower-sticker--youtube .tower-pro-youtube-owner {
   width: 100%;
   max-width: none;
@@ -15428,6 +15428,8 @@ body.cgn-cal-page {
   background: rgba(18, 16, 38, 0.92) !important;
   color: #f7f9ff !important;
   border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  font-size: 0.82rem;
+  padding: 0.28rem 0.45rem;
 }
 #panel-tower .tower-sticker--youtube .tower-pro-youtube-owner .tower-music-url-label input::placeholder {
   color: #d9d2f0 !important;

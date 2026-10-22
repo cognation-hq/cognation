@@ -13,10 +13,11 @@ var flat = css.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\s+/g, " ");
 var S = "#panel-tower .tower-sticker--youtube .tower-pro-youtube-owner";
 
 var owner = flat.indexOf(S + " { width: 100%; max-width: none; margin-top: 8px; }");
-var input = flat.indexOf(S + " .tower-music-url-label input { display: block; width: 100%; box-sizing: border-box; background: rgba(18, 16, 38, 0.92) !important; color: #f7f9ff !important; border: 1px solid rgba(217, 210, 240, 0.4) !important; }");
+var input = flat.indexOf(S + " .tower-music-url-label input { display: block; width: 100%; box-sizing: border-box; background: rgba(18, 16, 38, 0.92) !important; color: #f7f9ff !important; border: 1px solid rgba(217, 210, 240, 0.4) !important; font-size: 0.82rem; padding: 0.28rem 0.45rem; }");
 var ph = flat.indexOf(S + " .tower-music-url-label input::placeholder { color: #d9d2f0 !important; opacity: 1; }");
 assert.ok(owner !== -1, "full card width, 8px above");
-assert.ok(input !== -1, "glass input");
+assert.ok(input !== -1, "glass input, Search followers type (0.82rem, 0.28rem 0.45rem)");
+assert.ok(/#panel-tower \.tower-followers-find \{ width: 100%; box-sizing: border-box; background: #fff !important; color: #111 !important; border: 1px solid #111 !important; border-radius: 6px; padding: 0\.28rem 0\.45rem; font-size: 0\.82rem; \}/.test(flat), "Search followers still 0.82rem / 0.28rem 0.45rem");
 assert.ok(ph !== -1, "placeholder #d9d2f0");
 var oldInput = flat.indexOf("#panel-tower .tower-music-url-label input, .tower-music-url-label input { width: 100%; box-sizing: border-box; background: #fff !important;");
 assert.ok(oldInput !== -1 && input > oldInput, "after the white input rule");

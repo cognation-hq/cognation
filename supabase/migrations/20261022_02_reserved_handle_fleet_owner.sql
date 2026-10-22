@@ -17,9 +17,11 @@
 --      Personal page is fleet-labelled (account_kind 'seed'/'ops' or a seed_fleet_id).
 --      Everyone else gets the same 'handle_reserved_prefix' error as today.
 --   b. A NEW Professional page whose owner is fleet-labelled is stored with the owner's
---      account_kind and seed_fleet_id instead of the column default 'real'. That is the
+--      account_kind instead of the column default 'real'. That is the
 --      root cause of #233 / #231 (3 seed Pro pages stored 'real'), so it cannot recur.
 --      Only fills in a 'real' default; never touches real members' pages.
+--      seed_fleet_id is NOT copied: profiles_seed_fleet_id_uidx makes it unique and the
+--      owner's Personal page already holds it (copying it made every seed Pro create fail).
 -- service_role / postgres (SeedOps scripts) are untouched: they return early as before.
 -- Reads one row of public.profiles (security definer so RLS cannot hide the owner row).
 -- The owner lookup is ordered (created_at, then id) so LIMIT 1 always picks the same row.
@@ -66,7 +68,6 @@ begin
   if tg_op = 'INSERT' and new.kind = 'professional' and owner_is_fleet
      and coalesce(new.account_kind, 'real') = 'real' then
     new.account_kind := case when owner_kind in ('seed', 'ops') then owner_kind else 'seed' end;
-    new.seed_fleet_id := coalesce(nullif(btrim(new.seed_fleet_id), ''), owner_fleet);
   end if;
 
   return new;

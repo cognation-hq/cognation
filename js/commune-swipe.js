@@ -1677,15 +1677,28 @@
         rows.forEach(function (row) {
           if (!row) return;
           /* accountKind / seedFleetId: the card's Demo badge reads them (not the handle). */
+          /* #231: same owner check as Tower (effectiveAccountKind). A 'seed-' Pro page
+             saved before seed-pulse-sql/02 reads 'real'; its seed/ops owner decides. */
+          var rawKind = String(row.account_kind || "").toLowerCase();
+          var kind = rawKind;
+          var fleetId = String(row.seed_fleet_id || "");
+          if (social && typeof social.effectiveAccountKind === "function") {
+            try { kind = String(social.effectiveAccountKind(row) || rawKind).toLowerCase(); } catch (eKind) {}
+          }
+          var ownerFleet = (kind === "seed" || kind === "ops") && kind !== rawKind;
+          if (ownerFleet && !fleetId && typeof social.effectiveFleetId === "function") {
+            try { fleetId = String(social.effectiveFleetId(row) || ""); } catch (eFleet) {}
+          }
           fn({ id: row.id, kind: row.kind, handle: row.handle, displayName: row.display_name, bio: row.bio || "", userId: row.user_id,
-            accountKind: String(row.account_kind || "").toLowerCase(), seedFleetId: String(row.seed_fleet_id || ""), jobTitle: row.job_title || "" });
+            accountKind: kind, seedFleetId: fleetId, ownerFleet: ownerFleet, jobTitle: row.job_title || "" });
         });
       };
     }
     each(function (rec) {
       if (!rec || rec.kind !== "professional" || mine[String(rec.id)] || isFollowing(rec.id)) return;
       if (rec.userId && myUserIds[String(rec.userId)]) return;
-      if (profileLooksSeed(rec) !== wantSeed) return;
+      /* ownerFleet: seed/ops by owner even if the per-id cache read the raw 'real'. */
+      if ((rec.ownerFleet === true || profileLooksSeed(rec)) !== wantSeed) return;
       var name = String(rec.displayName || rec.handle || "").trim();
       if (!name) return;
       var tags = terms([rec.field, rec.industry, rec.headline, rec.bio, rec.interests].join(" "));

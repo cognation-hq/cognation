@@ -7832,6 +7832,21 @@
     }
   }
 
+  /* Owner's Calendar day heading (Edit profile > Calendar): "Thu, Oct 22".
+     Display only: the stored date stays YYYY-MM-DD. The parts are read as a
+     local calendar date (never new Date("YYYY-MM-DD"), which is UTC midnight
+     and can land on the day before west of UTC). Anything else comes back as is. */
+  function formatCalendarDayLabel(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso == null ? "" : iso));
+    if (!m) return String(iso == null ? "" : iso);
+    var y = Number(m[1]), mo = Number(m[2]) - 1, d = Number(m[3]);
+    var date = new Date(y, mo, d, 12, 0, 0, 0);
+    if (isNaN(date.getTime()) || date.getFullYear() !== y || date.getMonth() !== mo || date.getDate() !== d) {
+      return String(iso);
+    }
+    return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  }
+
   function renderPublicCalendar(root) {
     var body = root.querySelector("[data-tower-cal-public-body]");
     if (!body) return;
@@ -7876,8 +7891,8 @@
       renderTowerMonthGrid(view, events, { gridLabel: "Calendar" }) +
       '<div class="tower-cal-day-panel">' +
       '<h5 class="tower-cal-day-heading">' +
-      (owner ? "On " : "Busy · ") +
-      escapeHtml(selected) +
+      (owner ? "" : "Busy · ") +
+      escapeHtml(owner ? formatCalendarDayLabel(selected) : selected) +
       "</h5>" +
       renderDayEventList(events, selected, { ownerControls: owner, busyOnly: !owner }) +
       "</div>" +

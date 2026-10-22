@@ -7701,7 +7701,7 @@
           escapeHtml(opts.picked) +
           '">Book</button>'
         : "") +
-      '<p class="commune-status" data-tower-cal-book-status' +
+      '<p class="commune-status' + (opts.bookError ? " is-error" : "") + '" data-tower-cal-book-status' +
       (opts.bookStatus ? "" : " hidden") +
       ' role="status" aria-live="polite">' +
       escapeHtml(opts.bookStatus || "") +
@@ -7715,6 +7715,21 @@
   /* "Suggested hangouts" are fixed times (HANGOUT_SLOTS), not real saved data:
      hidden until owners publish real open times on the server. */
   var HANGOUT_SUGGESTIONS_LIVE = false;
+
+  /* Status boxes in Edit profile show a plain line; raw error text is logged only. */
+  function friendlyBookingError(err) {
+    var raw = String((err && err.message) || "");
+    if (/sign in/i.test(raw)) return "Sign in to book a time.";
+    if (/can't take/i.test(raw)) return "This calendar can't take bookings yet.";
+    return "Couldn't send the request. Try again.";
+  }
+
+  function friendlyAddProfileError(err) {
+    var raw = String((err && err.message) || err || "");
+    if (/sign in/i.test(raw)) return "Sign in to add a page.";
+    if (/handle/i.test(raw)) return "That page handle isn't available. Change your handle and try again.";
+    return "Couldn't create your professional page. Try again.";
+  }
 
   /* Visitor books an open time: one hangout request to the Tower owner, saved on the server. */
   function requestHangoutOnServer(profileId, iso, time) {
@@ -7840,6 +7855,7 @@
           visitor: !owner,
           picked: owner ? "" : view.pickedTime || "",
           bookStatus: owner ? "" : view.bookStatus || "",
+          bookError: owner ? false : !!view.bookError,
         })
       : "";
     /* No-fake rule: the slots are fixed clock times, not saved Supabase data. */
@@ -8051,6 +8067,7 @@
           view2.schedulerOpen = true;
           view2.pickedTime = "";
           view2.bookStatus = "";
+          view2.bookError = false;
         } else {
           var privHost = root.querySelector("[data-tower-cal-private]");
           if (privHost && !privHost.getAttribute("data-editing-id")) {
@@ -8138,6 +8155,7 @@
           viewS.schedulerOpen = true;
           viewS.pickedTime = slotTime;
           viewS.bookStatus = "";
+          viewS.bookError = false;
           ev.preventDefault();
           refreshTowerCalendars(root);
           return;
@@ -8172,6 +8190,7 @@
         if (!/^\d{2}:\d{2}$/.test(bookTime) || !/^\d{4}-\d{2}-\d{2}$/.test(bookIso)) return;
         if (!HANGOUT_BOOKING_LIVE) {
           /* Owner inbox not shipped yet: say so honestly, send nothing. */
+          viewB.bookError = false;
           viewB.bookStatus = "Booking is coming soon.";
           refreshTowerCalendars(root);
           return;
@@ -8182,12 +8201,14 @@
           function () {
             viewB.pickedTime = "";
             viewB.bookStatus = "Request sent.";
+            viewB.bookError = false;
             refreshTowerCalendars(root);
           },
           function (err) {
-            viewB.bookStatus = (err && err.message && /Sign in|can't take/.test(err.message))
-              ? err.message
-              : "Couldn't send the request. Try again.";
+            /* Raw error text goes to the console only; the box shows a fixed line. */
+            try { console.warn("[tower] hangout request failed", err); } catch (eLog) {}
+            viewB.bookStatus = friendlyBookingError(err);
+            viewB.bookError = true;
             refreshTowerCalendars(root);
           }
         );
@@ -8648,10 +8669,9 @@
             applyTowerSide(root, "public");
           })
           .catch(function (error) {
-            setSt(
-              (error && error.message) || "Could not create a professional page.",
-              true
-            );
+            /* Raw error text goes to the console only; the box shows a fixed line. */
+            try { console.error("[tower] add professional page failed", error); } catch (eLog) {}
+            setSt(friendlyAddProfileError(error), true);
           })
           .finally(function () {
             btn.disabled = false;
@@ -8673,7 +8693,8 @@
       }
       var gate = window.CognationAccounts.canAddProfileForPhone(phone);
       if (!gate.ok) {
-        setSt(gate.reason, true);
+        try { console.warn("[tower] add page blocked", gate.reason); } catch (eLog) {}
+        setSt("This phone number already has a Personal and a Professional page.", true);
         return;
       }
       var kind = btn.getAttribute("data-add-kind") || "professional";
@@ -8686,7 +8707,8 @@
         displayName: kind === "professional" ? "Alexa J Thomas" : "Alexa",
       });
       if (!result.ok) {
-        setSt(result.error || "Could not create profile.", true);
+        try { console.warn("[tower] add page failed", result.error); } catch (eLog) {}
+        setSt(/taken/i.test(String(result.error || "")) ? "That page handle is already taken." : "Couldn't create the page. Try again.", true);
         return;
       }
       setSt((kind === "professional" ? "Professional" : "Personal") + " page created.", false);

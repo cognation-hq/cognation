@@ -214,6 +214,37 @@
     );
   }
 
+  /* Seed Pro pages saved before the relabel SQL (seed-pulse-sql/02) carry
+     account_kind 'real' and no fleet id. Treat a 'seed-' Pro page as its owner's
+     kind when the OWNER's Personal page is a seed/ops account (account_kind or
+     seed_fleet_id). A real member who picked a 'seed-' handle keeps 'real'.
+     Owner not loaded: unchanged (shown as before). */
+  function fleetKindOf(row) {
+    var k = String((row && row.account_kind) || "").toLowerCase();
+    if (k === "seed" || k === "ops") return k;
+    return row && row.seed_fleet_id ? "seed" : "";
+  }
+  function ownerFleetKind(profile) {
+    if (!profile || profile.kind !== "professional" || fleetKindOf(profile)) return "";
+    if (normalizeHandle(profile.handle).indexOf("seed-") !== 0 || !profile.user_id) return "";
+    return fleetKindOf(profileForUser(String(profile.user_id), "personal"));
+  }
+  function effectiveAccountKind(profile) {
+    return fleetKindOf(profile) || ownerFleetKind(profile) ||
+      String((profile && profile.account_kind) || "").toLowerCase();
+  }
+  function effectiveFleetId(profile) {
+    if (!profile) return "";
+    if (profile.seed_fleet_id) return String(profile.seed_fleet_id);
+    if (!ownerFleetKind(profile)) return "";
+    var owner = profileForUser(String(profile.user_id), "personal");
+    return owner && owner.seed_fleet_id ? String(owner.seed_fleet_id) : "";
+  }
+  /* Viewer is a seed/ops account (seeds still see seeds). */
+  function viewerIsFleet() {
+    return (state.myProfiles || []).some(function (row) { return !!fleetKindOf(row); });
+  }
+
   var PROFILE_RETURN_COLUMNS = "id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id";
 
   /* Leave Sage (seed-0248, the under-13 test viewer) out of member lists. */
@@ -281,10 +312,10 @@
       handle: profile.handle,
       /* Seed/ops Demo badge (syncTowerBadges) and the friend gate
          (tower-follow "Unavailable") read these, never the handle. */
-      accountKind: String(profile.account_kind || "").toLowerCase(),
-      isSeed: String(profile.account_kind || "").toLowerCase() === "seed",
-      isOpsBot: String(profile.account_kind || "").toLowerCase() === "ops",
-      seedFleetId: String(profile.seed_fleet_id || ""),
+      accountKind: effectiveAccountKind(profile),
+      isSeed: effectiveAccountKind(profile) === "seed",
+      isOpsBot: effectiveAccountKind(profile) === "ops",
+      seedFleetId: effectiveFleetId(profile),
       slogan: profile.bio,
       socialLinks: {},
       badges: { role: "", interest: "", status: "" },
@@ -349,12 +380,17 @@
     var handle = author ? normalizeHandle(author.handle) : "";
     /* Seed/ops badges read these account fields, not the handle. Missing
        (older cache) stays "" so classify falls back to "real". */
-    var accountKind = String(
-      (author && author.account_kind) || (embedded && embedded.account_kind) || ""
+    var accountKind = (author && effectiveAccountKind(author)) || String(
+      (embedded && embedded.account_kind) || ""
     ).toLowerCase();
-    var seedFleetId = String(
-      (author && author.seed_fleet_id) || (embedded && embedded.seed_fleet_id) || ""
+    var seedFleetId = (author && effectiveFleetId(author)) || String(
+      (embedded && embedded.seed_fleet_id) || ""
     );
+    /* Which of the author's pages wrote it (Personal or Professional), and
+       that page's picture (https only, else the card shows initials). */
+    var authorKind = String((author && author.kind) || (embedded && embedded.kind) || "personal");
+    var authorPhotoUrl = String((author && author.photo_url) || (embedded && embedded.photo_url) || "");
+    if (!/^https:\/\//i.test(authorPhotoUrl)) authorPhotoUrl = "";
     var reactions = reactionsMap(row && row.reactions);
     var hearts = reactions["❤️"] ? reactions["❤️"].length : 0;
     return {
@@ -363,6 +399,8 @@
       authorProfileId: row.author_profile_id,
       authorName: display,
       handle: handle,
+      authorKind: authorKind === "professional" ? "professional" : "personal",
+      authorPhotoUrl: authorPhotoUrl,
       accountKind: accountKind,
       isSeed: accountKind === "seed",
       isOpsBot: accountKind === "ops",
@@ -398,7 +436,7 @@
   }
 
   var FEED_COLUMNS =
-    "id,author_profile_id,body,visibility,attachments,created_at,rating,hidden_attachment_indexes,author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id),reactions:tower_post_reactions(face,profile_id)";
+    "id,author_profile_id,body,visibility,attachments,created_at,rating,hidden_attachment_indexes,author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id,photo_url),reactions:tower_post_reactions(face,profile_id)";
   var FEED_TAIL = "&order=created_at.desc&limit=100";
 
   /* The rating column is missing until 20261015_tower_auto_rate.sql runs. */
@@ -417,8 +455,11 @@
       }, function (err) {
         var missingRating = isMissingRatingColumn(err);
         var missingHide = /hidden_attachment_indexes/i.test(String((err && err.message) || err || ""));
-        if (!missingRating && !missingHide) throw err;
-        var q = FEED_COLUMNS;
+        /* profiles.photo_url arrives with 20261016_profiles_photo_url.sql; without
+           it the Feed still loads and author avatars fall back to initials. */
+        var missingPhoto = /photo_url/i.test(String((err && (err.message || err.details || err.hint)) || err || ""));
+        if (!missingRating && !missingHide && !missingPhoto) throw err;
+        var q = FEED_COLUMNS.replace(",photo_url)", ")");
         if (missingRating) q = q.replace(",rating,", ",").replace(",hidden_attachment_indexes,", ",");
         else if (missingHide) q = q.replace(",hidden_attachment_indexes,", ",");
         /* Fail closed: without server ratings, show only the viewer's own posts. */
@@ -448,6 +489,21 @@
     var profileId = me && me.activeProfileId;
     if (!me || !profileId) {
       return Promise.reject(new Error("Sign in before posting to Tower."));
+    }
+    /* Post as: one of the member's OWN pages (Personal or Professional), never
+       anyone else's. The server insert policy "tower authors create their own
+       posts" enforces the same (profiles.user_id = auth.uid()). */
+    if (fields && fields.asProfileId) {
+      var asId = String(fields.asProfileId);
+      var own = state.myProfiles.filter(function (p) {
+        return p && String(p.id) === asId && String(p.user_id || "") === String(me.supabaseUserId);
+      })[0];
+      if (!own) {
+        var notOwn = new Error("You can only post as your own pages.");
+        notOwn.code = "post_as_not_own";
+        return Promise.reject(notOwn);
+      }
+      profileId = own.id;
     }
     if (!body) {
       return Promise.reject(
@@ -636,6 +692,17 @@
       })
       .filter(function (profile) {
         return (!me || profile.user_id !== me.supabaseUserId) && !isSageRow(profile);
+      })
+      /* Real viewers: hide a mislabelled seed Pro page (owner is a seed). */
+      .filter(function (profile) {
+        return viewerIsFleet() || !ownerFleetKind(profile);
+      })
+      .map(function (profile) {
+        if (!ownerFleetKind(profile)) return profile;
+        var copy = Object.assign({}, profile);
+        copy.account_kind = effectiveAccountKind(profile);
+        copy.seed_fleet_id = effectiveFleetId(profile);
+        return copy;
       });
     return list.slice(0, 8);
   }
@@ -878,6 +945,7 @@
   document.addEventListener("cognation:session-ended", function () {
     if (active()) return;
     state.feed = [];
+    state.myProfiles = [];
   });
 
   var sawSessionStart = false;
@@ -918,6 +986,7 @@
     createProfessionalProfile: createProfessionalProfile,
     acceptFriendRequest: acceptFriendRequest,
     memberResults: memberResults,
+    effectiveAccountKind: effectiveAccountKind,
     openProfile: openProfile,
     getProfile: profileForId,
     getProfileForHandle: profileForHandle,

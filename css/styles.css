@@ -13678,6 +13678,69 @@ body.is-circle-open .circle-spot.is-filled {
   padding-left: 2.2rem;
 }
 
+/* Venmo / Pay for services / Buy ads (Pro): one card, stacked pills, 12px gap
+   (Designer spec, PM confirmed). Same width each: 240px on the website, the full
+   card width minus 16px each side on a phone. Orange ring on hover/focus only. */
+.tower-layout--scrapbook .tower-sticker--pay-links,
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--pay-links.is-spawned {
+  padding: 16px;
+  box-sizing: border-box;
+  /* Same card chrome as the default-grid widgets, also on a saved layout. */
+  background: rgba(16, 19, 48, 0.42);
+  border: 1px solid rgba(209, 241, 255, 0.28);
+  border-radius: 1rem;
+}
+.tower-pay-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.tower-pay-links .tower-pay-pill {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 240px;
+  max-width: 100%;
+  min-height: 44px;
+  height: auto;
+  margin: 0;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: rgba(18, 16, 38, 0.92);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(217, 210, 240, 0.4);
+  color: #f7f9ff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-decoration: none;
+  outline: none;
+  box-shadow: none;
+}
+.tower-pay-links .tower-pay-pill:hover,
+.tower-pay-links .tower-pay-pill:focus-visible {
+  color: #f7f9ff;
+  border-color: rgba(217, 210, 240, 0.4);
+  box-shadow: 0 0 0 2px #ED9300;
+}
+.tower-layout--scrapbook.is-phone-stack .tower-pay-links .tower-pay-pill {
+  width: 100%;
+}
+@media (max-width: 767px) {
+  .tower-pay-links .tower-pay-pill { width: 100%; }
+}
+/* The panel-wide accent link colour (!important) would turn the text cyan. */
+#panel-tower .tower-pay-links .tower-pay-pill,
+#panel-tower .tower-pay-links .tower-pay-pill:hover,
+#panel-tower .tower-pay-links .tower-pay-pill:focus-visible {
+  color: #f7f9ff !important;
+}
+
 /* Tower "Message" action next to Add friend (another member's personal page). */
 .tower-follow-row .tower-message-btn { margin-left: 0.5rem; }
 .tower-follow-row .tower-message-status { margin: 0.35rem 0 0; flex-basis: 100%; }
@@ -14861,6 +14924,36 @@ body.cgn-cal-page {
 .tower-visitor-calendar .tower-cal-cell { background: rgba(18,16,38,.92); color: #f7f9ff; border-color: rgba(209,241,255,.28); }
 .tower-visitor-calendar .tower-cal-cell.is-today, .tower-visitor-calendar .tower-cal-cell.is-selected { border-color: rgba(197,166,255,.85); box-shadow: 0 0 0 1px rgba(197,166,255,.45) inset; }
 .tower-visitor-calendar .tower-visitor-cal-link { color: #c5a6ff; }
+/* Calendar is its own card directly under the bio card (data-tower-widget="visitor-calendar"):
+   same width as the bio card, same widget gap, same calendar colours as before. */
+#panel-tower .tower-layout--scrapbook.is-sticker-stage > .tower-sticker--visitor-calendar {
+  width: var(--visitor-cal-w, min(28rem, 100%));
+  max-width: 100%;
+  margin: 0;
+  padding: .9rem 1rem 1rem;
+  box-sizing: border-box;
+  background: rgba(18,16,38,.92);
+  border: 1px solid rgba(217,210,240,.22);
+  border-radius: 18px;
+  color: #f7f9ff;
+}
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--visitor-calendar.is-spawned {
+  order: 0;
+  width: auto;
+  max-width: none;
+  padding: .9rem 1rem 1rem;
+  background: rgba(18,16,38,.92);
+  border: 1px solid rgba(217,210,240,.22);
+  border-radius: 18px;
+}
+#panel-tower .tower-sticker--visitor-calendar[hidden] { display: none !important; }
+/* Bio card order for visitors on a saved (free) layout, same as the default grid:
+   photo, name, + follow, then Mutual friends and the message button. The owner's
+   r143 row (actions | Edit profile) is unchanged. */
+#panel-tower [data-tower-is-owner="false"] .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-sticker--identity { grid-row: 2; grid-column: 1 / -1; }
+#panel-tower [data-tower-is-owner="false"] .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-profile-actions { grid-row: 3; grid-column: 1 / -1; justify-self: center; }
+#panel-tower [data-tower-is-owner="false"] .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-under-photo { grid-row: 4; grid-column: 1 / -1; }
+#panel-tower [data-tower-is-owner="false"] .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-live-panel { grid-row: 5; }
 
 /* Cream follow-up (PM + Designer, Oct 21). Website colours only: Times ink #16120c,
    cream #fbf7ec, muted ink #6b6458. */
@@ -15160,6 +15253,205 @@ body.cgn-cal-page {
   color: #1c1630 !important;
 }
 
+/* SIGNAL Feed "Send a signal": PERSONAL | PROFESSIONAL post-as switch
+   (Designer spec, Oct 22). Same line as the heading, right edge; under-tab pipe
+   style: Oswald, the side you post as lit #f7f9ff, the other #d9d2f0 at 60%,
+   pipe #d9d2f0 at 40%. Hidden unless the member owns a Professional page
+   (js/signal-post-as.js). One line at 390. */
+#panel-signal .signal-feed-host .signal-compose-head[data-signal-compose-head] {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+  min-width: 0;
+  margin: 0 0 0.35rem;
+}
+#panel-signal .signal-feed-host .signal-compose-head[data-signal-compose-head] > .tower-block-heading {
+  margin: 0;
+  min-width: 0;
+  white-space: nowrap;
+}
+#panel-signal .signal-feed-host .signal-post-as[data-signal-post-as] {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+  margin: 0 0 0 auto;
+  white-space: nowrap;
+}
+#panel-signal .signal-feed-host .signal-post-as[data-signal-post-as][hidden] {
+  display: none;
+}
+#panel-signal .signal-feed-host .signal-post-as-side[data-signal-post-as-btn] {
+  appearance: none;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0;
+  min-height: 0;
+  font-family: "Oswald", system-ui, sans-serif !important;
+  font-weight: 800 !important;
+  font-size: clamp(0.72rem, 1.6vw, 0.92rem) !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase;
+  line-height: 1.1;
+  text-shadow: none;
+  color: rgba(217, 210, 240, 0.6) !important;
+  cursor: pointer;
+}
+#panel-signal .signal-feed-host .signal-post-as-side[data-signal-post-as-btn][aria-checked="true"] {
+  color: #f7f9ff !important;
+  cursor: default;
+}
+#panel-signal .signal-feed-host .signal-post-as-side[data-signal-post-as-btn]:focus-visible {
+  outline: 1px solid rgba(217, 210, 240, 0.6);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+#panel-signal .signal-feed-host .signal-post-as-sep {
+  font-family: "Oswald", system-ui, sans-serif !important;
+  font-weight: 700 !important;
+  font-size: clamp(0.72rem, 1.6vw, 0.92rem) !important;
+  color: rgba(217, 210, 240, 0.4) !important;
+  user-select: none;
+}
+@media (max-width: 640px) {
+  #panel-signal .signal-feed-host .signal-post-as-side[data-signal-post-as-btn],
+  #panel-signal .signal-feed-host .signal-post-as-sep {
+    font-size: 0.65rem !important;
+  }
+  #panel-signal .signal-feed-host .signal-post-as[data-signal-post-as] {
+    gap: 0.22rem;
+  }
+}
+
+/* Send a signal status box: failures only (Alexa, Oct 22 11:45 AM CT: no
+   "Posted to Feed." notice on success; the post at the top of the Feed and the
+   cleared composer confirm it). Designer spec: site glass rgba(18,16,38,.92),
+   1px #e88a99 at 70%, #f7f9ff text; 12px blur, 12px radius, 14px site sans,
+   10px 14px padding, left edge on the Share field, 12px above and below (the
+   form is a grid with a 0.35rem row gap, so the margin tops that up). No slab,
+   no warm accent, no icon. */
+#panel-signal .signal-feed-host .tower-compose[data-tower-compose] .commune-status[data-tower-status] {
+  margin: calc(12px - 0.35rem) 0 !important;
+  padding: 10px 14px !important;
+  background: rgba(18, 16, 38, 0.92) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(232, 138, 153, 0.7) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  color: #f7f9ff !important;
+  font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif) !important;
+  font-size: 14px !important;
+  line-height: 1.45;
+  max-width: none;
+  width: auto;
+}
+#panel-signal .signal-feed-host .tower-compose[data-tower-compose] .commune-status[data-tower-status][hidden] {
+  display: none !important;
+}
+
+/* Feed card byline: the page that posted (Personal or Professional) with its
+   picture or initials, linking to that page. */
+.tower-post-meta .tower-author-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.tower-post-meta .tower-author-link:hover .tower-author-name,
+.tower-post-meta .tower-author-link:focus-visible .tower-author-name {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.tower-post-meta .tower-author-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(18, 16, 38, 0.92);
+  border: 1px solid rgba(217, 210, 240, 0.4);
+  color: #f7f9ff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.tower-post-meta .tower-author-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Send a signal Post button while a post is in flight: disabled (no double
+   posts), shown dimmed so the wait reads; back to normal on success or error. */
+#panel-signal [data-tower-compose] [data-tower-post-submit]:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+/* Feed card timestamp (Designer, Oct 22): the date fell back to a serif face.
+   Site body sans in #d9d2f0, 13px (12px at 390), right-aligned on the name line. */
+#panel-signal .tower-feed[data-tower-feed] .tower-post-meta {
+  align-items: center;
+}
+#panel-signal .tower-feed[data-tower-feed] .tower-post-meta > time {
+  margin-left: auto;
+  flex: 0 0 auto;
+  text-align: right;
+  white-space: nowrap;
+  font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif) !important;
+  font-size: 13px !important;
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: normal;
+  line-height: 1.3;
+  color: #d9d2f0 !important;
+}
+@media (max-width: 640px) {
+  #panel-signal .tower-feed[data-tower-feed] .tower-post-meta > time {
+    font-size: 12px !important;
+  }
+}
+
+/* Designer nits (follow-up to #228/#232).
+   (a) Followers "Search followers" is a glass input spanning the full card width. */
+#panel-tower .tower-sticker--followers .tower-followers {
+  max-width: none;
+}
+#panel-tower .tower-sticker--followers .tower-followers-find {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(18, 16, 38, 0.92) !important;
+  color: #f7f9ff !important;
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+}
+#panel-tower .tower-sticker--followers .tower-followers-find::placeholder {
+  color: #d9d2f0 !important;
+  opacity: 1;
+}
+/* (b) Desktop: the empty YouTube box fills the card width at 16:9. Phone unchanged. */
+@media (min-width: 768px) {
+  #panel-tower .tower-sticker--youtube .tower-pro-youtube {
+    width: 100%;
+  }
+  #panel-tower .tower-sticker--youtube .tower-pro-youtube-screen {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    min-height: 0;
+    height: auto;
+  }
+}
+
 /* TOWER Feed contrast (Designer follow-up). TOWER Feed only (.tower-feed[data-tower-feed]
    and the "Send a signal" composer in the same Feed panel):
    - post cards use the site glass rgba(18,16,38,.92) so the existing body text reads
@@ -15184,3 +15476,4 @@ body.cgn-cal-page {
   color: #d9d2f0 !important;
   opacity: 1;
 }
+

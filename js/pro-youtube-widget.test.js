@@ -54,7 +54,7 @@ var pro = tower.slice(tower.indexOf("    if (!personal) {\n      /* No music pla
 assert.ok(pro.length > 0, "professional branch found");
 assert.ok(/showMusicSticker\(root, false\)/.test(pro) && /wrap\.hidden = true/.test(pro), "Professional: no music player");
 assert.ok(/showYoutubeSticker\(root, true\)/.test(pro), "Professional: YouTube widget shown");
-assert.ok(/ensureProYoutubeIframe\(root, ytId\)/.test(pro) && /showEmptyProYoutube\(root\)/.test(pro), "video or empty box");
+assert.ok(/ensureProYoutubeIframe\(root, ytId, proProfileId\)/.test(pro) && /showEmptyProYoutube\(root, proProfileId\)/.test(pro), "video or empty box (for the viewed profile)");
 assert.ok(/if \(!personalMusic\) \{\s*\/\*[^*]*\*\/\s*on = false;/.test(tower), "public widgets: music off on Professional");
 assert.ok(/showYoutubeSticker\(root, !!p && p\._profileKind === "professional"\)/.test(tower), "public widgets: YouTube only on Professional");
 assert.ok(/function bindProYoutubeUrl[\s\S]*?isTowerOwner\(cur\) \|\| !profileIsProfessional\(cur\)/.test(tower), "link field: owner + Professional only");

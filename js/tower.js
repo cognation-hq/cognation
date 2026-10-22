@@ -4282,19 +4282,29 @@
   }
 
   /* Professional page: empty box plus a link field. No pink player and no MP3 face. */
-  function showEmptyProYoutube(root) {
+  function showEmptyProYoutube(root, profileId) {
     var box = root.querySelector("[data-tower-pro-youtube]");
     var frame = root.querySelector("[data-tower-pro-youtube-frame]");
-    if (frame && !frame.querySelector("iframe")) frame.innerHTML = "";
+    /* #24 keeps this profile's video through a later blank read. A video that
+       belongs to another Pro page (the one viewed before) is cleared, so the
+       next page with no video shows an empty box. */
+    var ownerId = frame ? frame.getAttribute("data-tower-pro-youtube-profile") || "" : "";
+    var sameProfile = !!profileId && ownerId === String(profileId);
+    if (frame && (!frame.querySelector("iframe") || !sameProfile)) {
+      frame.innerHTML = "";
+      frame.removeAttribute("data-tower-pro-youtube-profile");
+    }
     if (!box) return;
     box.hidden = false;
     box.classList.remove("has-video");
   }
 
-  function ensureProYoutubeIframe(root, videoId) {
+  function ensureProYoutubeIframe(root, videoId, profileId) {
     var box = root.querySelector("[data-tower-pro-youtube]");
     var frame = root.querySelector("[data-tower-pro-youtube-frame]");
     if (!box || !frame || !videoId) return null;
+    if (profileId) frame.setAttribute("data-tower-pro-youtube-profile", String(profileId));
+    else frame.removeAttribute("data-tower-pro-youtube-profile");
     box.hidden = false;
     box.classList.add("has-video");
     var src = youtubeEmbedSrc(videoId, false, false);
@@ -4709,8 +4719,9 @@
       bindProYoutubeUrl(root);
       var proInput = root.querySelector("[data-tower-pro-youtube-url]");
       if (proInput && document.activeElement !== proInput) proInput.value = url;
-      if (ytId) ensureProYoutubeIframe(root, ytId);
-      else showEmptyProYoutube(root);
+      var proProfileId = (p && p._profileId) || "";
+      if (ytId) ensureProYoutubeIframe(root, ytId, proProfileId);
+      else showEmptyProYoutube(root, proProfileId);
       return;
     }
     showYoutubeSticker(root, false);

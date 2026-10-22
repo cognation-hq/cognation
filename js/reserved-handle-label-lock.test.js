@@ -8,7 +8,18 @@
 var assert = require("assert");
 var fs = require("fs");
 var path = require("path");
-var sql = fs.readFileSync(path.join(__dirname, "..", "supabase", "migrations", "20261022_reserved_handle_fleet_owner.sql"), "utf8");
+var dir = path.join(__dirname, "..", "supabase", "migrations");
+var LOCK = "20261022_01_lock_account_labels.sql";
+var HANDLE = "20261022_02_reserved_handle_fleet_owner.sql";
+var sql = fs.readFileSync(path.join(dir, LOCK), "utf8");
+var handleSql = fs.readFileSync(path.join(dir, HANDLE), "utf8");
+/* Split (PM, Oct 22): the lock is its own file, ordered first; the handle file has no lock. */
+assert.ok(!fs.existsSync(path.join(dir, "20261022_reserved_handle_fleet_owner.sql")), "old combined file gone");
+var names = fs.readdirSync(dir).sort();
+assert.ok(names.indexOf(LOCK) !== -1 && names.indexOf(LOCK) < names.indexOf(HANDLE), "lock migration sorts first");
+assert.ok(!/profiles_block_reserved_handle/.test(sql.replace(/^--.*$/gm, "")), "lock file is only the lock");
+assert.ok(!/profiles_lock_account_labels|profiles_a_lock_account_labels/.test(handleSql), "handle file has no lock");
+assert.ok(/owner_is_fleet/.test(handleSql) && /Run AFTER 01_lock_account_labels\.sql/.test(handleSql), "handle file keeps the fleet exception and says it runs after 01");
 var fn = sql.slice(sql.indexOf("function public.profiles_lock_account_labels()"));
 assert.ok(sql.indexOf("function public.profiles_lock_account_labels()") > 0, "label lock function");
 assert.ok(/jwt_role not in \('anon', 'authenticated'\)[\s\S]{0,40}return new/.test(fn), "service_role / SQL editor unchanged");

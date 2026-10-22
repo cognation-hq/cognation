@@ -65,8 +65,14 @@ var priv = fnSrc("renderPrivateCalendar");
 assert.ok(/type="date" required value="' \+\s*escapeHtml\(formDate\)/.test(priv), "date input keeps the raw YYYY-MM-DD value");
 
 /* Oswald headers, scoped to Edit profile > Calendar, no new font loaded. */
-var rule = /#panel-tower \[data-tower-edit-calendar\] :is\(\.tower-cal-public-title, \.tower-cal-label, \.tower-cal-dow, \.tower-cal-day-heading\) \{\s*font-family: "Oswald", system-ui, sans-serif !important;\s*\}/;
-assert.ok(rule.test(css), "Oswald header rule");
+var rule = /#panel-tower \[data-tower-edit-calendar\] :is\(\.tower-cal-label, \.tower-cal-dow\) \{\s*font-family: "Oswald", system-ui, sans-serif !important;\s*\}/;
+assert.ok(rule.test(css), "Oswald on the month label and weekday row");
+var bodyRule = /#panel-tower \[data-tower-edit-calendar\] :is\(\.tower-cal-public-title, \.tower-cal-day-heading\) \{\s*font-weight: 600 !important;\s*\}/;
+assert.ok(bodyRule.test(css), "title and day heading: body sans at 600");
+var editRules = css.match(/#panel-tower \[data-tower-edit-calendar\][^{]*\{[^}]*\}/g) || [];
+editRules.forEach(function (r) {
+  if (/tower-cal-public-title|tower-cal-day-heading/.test(r)) assert.ok(!/Oswald|font-family/.test(r), "title and day heading keep the body sans: " + r);
+});
 assert.ok(/<details class="tower-edit-entry" data-tower-edit-calendar>/.test(html), "the rule's scope exists");
 assert.strictEqual((html.match(/fonts\.googleapis\.com\/css2/g) || []).length, 1, "one font stylesheet, unchanged");
 assert.ok(/family=Oswald:wght@500;600;700&/.test(html), "Oswald already loaded");

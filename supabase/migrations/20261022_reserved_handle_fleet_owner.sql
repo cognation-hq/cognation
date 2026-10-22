@@ -71,3 +71,57 @@ drop trigger if exists profiles_block_reserved_handle on public.profiles;
 create trigger profiles_block_reserved_handle
 before insert or update of handle on public.profiles
 for each row execute function public.profiles_block_reserved_handle();
+
+
+-- ---------------------------------------------------------------------------
+-- Label lock (PM, Oct 22). Browser roles (anon / authenticated) cannot write
+-- account_kind or seed_fleet_id on public.profiles:
+--   * UPDATE: any change to either column is rejected ('profile_label_locked').
+--   * INSERT: a new row must arrive with the defaults (account_kind 'real' or
+--     null, no seed_fleet_id). A fleet owner's new Pro page still gets the
+--     owner's labels, filled in by profiles_block_reserved_handle above from the
+--     owner's own Personal row, never from what the browser sent.
+-- service_role, postgres and the SQL editor (no browser JWT role) are unchanged,
+-- so SeedOps scripts and seed-pulse-sql/02 can still set labels.
+-- Why a trigger and not a column REVOKE: the browser roles hold table-level
+-- UPDATE (Supabase default; no migration revokes it), and revoking one column
+-- does not override a table-level grant. Swapping to a column allow-list would
+-- risk breaking profile saves.
+-- Name starts "profiles_a_" so it fires before "profiles_block_reserved_handle"
+-- (Postgres fires same-timing row triggers in name order).
+-- Idempotent: create or replace + drop trigger if exists.
+
+create or replace function public.profiles_lock_account_labels()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  jwt_role text := coalesce(
+    nullif(current_setting('request.jwt.claim.role', true), ''),
+    nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role',
+    ''
+  );
+begin
+  if jwt_role not in ('anon', 'authenticated') then
+    return new;
+  end if;
+  if tg_op = 'UPDATE' then
+    if new.account_kind is distinct from old.account_kind
+       or new.seed_fleet_id is distinct from old.seed_fleet_id then
+      raise exception 'profile_label_locked'
+        using hint = 'account_kind and seed_fleet_id are set by Cognation, not by the account.';
+    end if;
+  elsif coalesce(new.account_kind::text, 'real') <> 'real'
+        or coalesce(btrim(new.seed_fleet_id), '') <> '' then
+    raise exception 'profile_label_locked'
+      using hint = 'account_kind and seed_fleet_id are set by Cognation, not by the account.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_a_lock_account_labels on public.profiles;
+create trigger profiles_a_lock_account_labels
+before insert or update on public.profiles
+for each row execute function public.profiles_lock_account_labels();

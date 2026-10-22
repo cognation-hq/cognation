@@ -88,6 +88,87 @@ assert.ok(removeFn.indexOf('"Friend pin removed — Reset layout to restore."') 
 assert.ok(removeFn.indexOf('"Badge pin removed."') > 0, "badge copy (Reset keeps badgeVisibility)");
 assert.ok(removeFn.indexOf('"Emoji removed."') > 0, "emoji copy (Reset does not bring stickers back)");
 assert.ok(removeFn.indexOf('"Quote removed."') > 0, "quote copy (Reset does not bring quotes back)");
-assert.ok(removeFn.indexOf('label + " removed."') > 0, "generic copy (Reset keeps visibility flags)");
+assert.ok(removeFn.indexOf('label + " removed — Show it again in Edit profile."') > 0, "generic copy for widgets the Edit profile list restores");
+assert.ok(/hiddenWidgetRestorable\(id\) \?[^:]+: label \+ " removed\."/.test(removeFn), "plain copy for widgets it cannot restore");
+assert.ok(removeFn.indexOf('"Polaroid removed') < 0 && removeFn.indexOf('label + " removed — Reset layout to restore."') > 0, "Polaroid keeps Reset copy");
+
+/* 4. Edit profile > Show hidden widgets. */
+var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+var panelAt = html.indexOf("data-tower-profile-edit-panel");
+var sectionAt = html.indexOf("data-tower-hidden-widgets ");
+assert.ok(panelAt > 0 && sectionAt > panelAt && sectionAt < html.indexOf("</form>", panelAt), "section lives inside the owner-only Edit profile panel");
+assert.ok(/data-tower-hidden-widgets hidden>/.test(html), "section starts hidden");
+
+function el(tag) {
+  return {
+    tagName: tag, children: [], attrs: {}, hidden: false, textContent: "", className: "", listeners: {},
+    classList: { remove: function () {}, add: function () {}, toggle: function () {} },
+    set innerHTML(v) { this.children = []; }, get innerHTML() { return ""; },
+    appendChild: function (c) { c.parent = this; this.children.push(c); return c; },
+    setAttribute: function (k, v) { this.attrs[k] = String(v); },
+    getAttribute: function (k) { return k in this.attrs ? this.attrs[k] : null; },
+    addEventListener: function (t, fn) { this.listeners[t] = fn; },
+    contains: function (n) { for (var x = n; x; x = x.parent) if (x === this) return true; return false; },
+    closest: function (sel) {
+      var m = /^\[([^\]]+)\]$/.exec(sel);
+      for (var x = this; x; x = x.parent) if (m && x.attrs && m[1] in x.attrs) return x;
+      return null;
+    },
+  };
+}
+var box = el("div"), list = el("div"), status = el("p");
+box.querySelector = function (q) { return q === "[data-tower-hidden-widgets-list]" ? list : null; };
+list.parent = box;
+var hctx = { saves: 0, owner: true, box: box, status: status, applied: 0 };
+vm.createContext(hctx);
+var hStart = tower.indexOf("var RESTORABLE_HIDDEN_WIDGETS =");
+vm.runInContext([
+  constSrc("PUBLIC_WIDGET_IDS"),
+  "var DEFAULT_PUBLIC_WIDGETS = " + blockFrom(tower.indexOf("{", tower.indexOf("var DEFAULT_PUBLIC_WIDGETS ="))) + ";",
+  fnSrc("normalizePublicWidgets"),
+  tower.slice(hStart, tower.indexOf("];", hStart) + 2),
+  fnSrc("hiddenWidgetRestorable"), fnSrc("hiddenWidgetsToShow"), fnSrc("renderHiddenWidgetsList"), fnSrc("setPublicWidgetVisible"),
+  "var document = { createElement: function (t) { return mk(t); } };",
+  "var profile = { slogan: 'Hi there', customHtml: '', publicWidgets: { identity: false, slogan: false, envelope: true, html: false, music: false, badges: false, calendar: true, social: false, friends: false } };",
+  "var TowerProfileStore = { get: function () { return profile; }, save: function () { saves++; return true; } };",
+  "function isTowerOwner() { return owner; }",
+  "function applyPublicWidgets() { applied++; } function syncPublicWidgetsForm() {} function renderFriendPins() {} function renderBadgePins() {}",
+  "var root = { querySelector: function (q) { return q === '[data-tower-hidden-widgets]' ? box : (q === '[data-tower-profile-status]' ? status : null); } };",
+].join("\n"), hctx);
+hctx.mk = el;
+/* Visitors: nothing rendered. */
+hctx.owner = false;
+hctx.renderHiddenWidgetsList(hctx.root, hctx.profile);
+assert.strictEqual(box.hidden, true, "hidden from visitors");
+assert.strictEqual(list.children.length, 0, "no rows for visitors");
+/* Owner: hidden widgets with content are listed; opening/rendering does not write. */
+hctx.owner = true;
+hctx.renderHiddenWidgetsList(hctx.root, hctx.profile);
+var ids = list.children.map(function (r) { return r.children[1].getAttribute("data-tower-show-widget"); });
+assert.strictEqual(ids.join(","), "identity,slogan", "lists hidden Name and Quote/slogan (html is empty; music/badges/calendar/social/friends are not flag-hidden)");
+assert.strictEqual(box.hidden, false, "section shows when something is hidden");
+assert.strictEqual(hctx.saves, 0, "render never saves");
+/* Show flips only that flag. */
+var before = JSON.parse(JSON.stringify(hctx.profile.publicWidgets));
+var showBtn = list.children[1].children[1];
+box.listeners.click({ target: showBtn, preventDefault: function () {} });
+assert.strictEqual(hctx.saves, 1, "Show saves once");
+var after = hctx.profile.publicWidgets;
+Object.keys(before).forEach(function (k) {
+  if (k === "slogan") assert.strictEqual(after[k], true, "slogan turned on");
+  else assert.strictEqual(after[k], before[k], k + " unchanged by Show");
+});
+assert.strictEqual(status.textContent, "Quote / slogan is showing again.", "status line");
+/* Non-owner click does nothing. */
+hctx.owner = false;
+box.listeners.click({ target: list.children[0].children[1], preventDefault: function () {} });
+assert.strictEqual(hctx.saves, 1, "no save for a non-owner click");
+assert.strictEqual(hctx.profile.publicWidgets.identity, false, "identity still hidden");
+/* Nothing hidden: section hides entirely. */
+hctx.owner = true;
+hctx.profile.publicWidgets = { identity: true, slogan: true, envelope: true, html: false };
+hctx.renderHiddenWidgetsList(hctx.root, hctx.profile);
+assert.strictEqual(box.hidden, true, "nothing hidden = no section");
+assert.strictEqual(hctx.saves, 1, "still no write from render");
 
 console.log("tower-reset-keeps-visibility: ok");

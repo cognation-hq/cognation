@@ -6632,11 +6632,91 @@
     return p;
   }
 
+  /* Edit profile > "Show hidden widgets" (#242 follow-up). Lists the widgets an
+     owner hid with Remove that the page really hides by their publicWidgets
+     flag and that have something to show. (Music, Badges and Calendar are
+     shown by their own content, Social follows the links, and Friends stays
+     off, so a flag alone does not hide them; they are not listed.) Rendering
+     never writes: only an owner's Show click saves, and it turns on that one
+     flag. */
+  var RESTORABLE_HIDDEN_WIDGETS = [
+    { id: "identity", label: "Name" },
+    { id: "slogan", label: "Quote / slogan" },
+    { id: "envelope", label: "Messages" },
+    { id: "html", label: "Custom HTML" },
+  ];
+
+  function hiddenWidgetRestorable(id) {
+    for (var i = 0; i < RESTORABLE_HIDDEN_WIDGETS.length; i++) {
+      if (RESTORABLE_HIDDEN_WIDGETS[i].id === id) return true;
+    }
+    return false;
+  }
+
+  function hiddenWidgetsToShow(p) {
+    if (!p || !isTowerOwner(p)) return [];
+    var raw = p.publicWidgets && typeof p.publicWidgets === "object" ? p.publicWidgets : {};
+    return RESTORABLE_HIDDEN_WIDGETS.filter(function (w) {
+      if (raw[w.id] !== false) return false;
+      if (w.id === "slogan") return !!(typeof p.slogan === "string" && p.slogan.trim());
+      if (w.id === "html") return !!(typeof p.customHtml === "string" && p.customHtml.trim());
+      return true;
+    });
+  }
+
+  function renderHiddenWidgetsList(root, p) {
+    var box = root && root.querySelector("[data-tower-hidden-widgets]");
+    if (!box) return;
+    var list = box.querySelector("[data-tower-hidden-widgets-list]");
+    if (!list) return;
+    var items = hiddenWidgetsToShow(p);
+    list.innerHTML = "";
+    items.forEach(function (w) {
+      var row = document.createElement("div");
+      row.className = "tower-hidden-widget-row";
+      var name = document.createElement("span");
+      name.className = "tower-hidden-widget-name";
+      name.textContent = w.label;
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-secondary tower-hidden-widget-show";
+      btn.setAttribute("data-tower-show-widget", w.id);
+      btn.setAttribute("aria-label", "Show " + w.label);
+      btn.textContent = "Show";
+      row.appendChild(name);
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+    /* Nothing hidden: the whole section stays out of the way. */
+    box.hidden = !items.length;
+    if (!box.__cognationShowBound) {
+      box.__cognationShowBound = true;
+      box.addEventListener("click", function (ev) {
+        var b = ev.target && ev.target.closest ? ev.target.closest("[data-tower-show-widget]") : null;
+        if (!b || !box.contains(b)) return;
+        ev.preventDefault();
+        var id = b.getAttribute("data-tower-show-widget");
+        if (!hiddenWidgetRestorable(id)) return;
+        if (!isTowerOwner(TowerProfileStore.get())) return;
+        setPublicWidgetVisible(root, id, true);
+        var label = id;
+        RESTORABLE_HIDDEN_WIDGETS.forEach(function (w) { if (w.id === id) label = w.label; });
+        var st = root.querySelector("[data-tower-profile-status]");
+        if (st) {
+          st.hidden = false;
+          st.textContent = label + " is showing again.";
+          st.classList.remove("is-error");
+        }
+      });
+    }
+  }
+
   function applyPublicWidgets(root, p) {
     try { renderSocialLinks(root, p); } catch (eSoc) {}
     applyPublicWidgetsInner(root, p);
     /* Visibility changed: give newly shown, unplaced widgets their spawn spot. */
     spawnUnplacedWidgets(root, p);
+    try { renderHiddenWidgetsList(root, p); } catch (eHidden) {}
     bindSpawnResize(root);
   }
 
@@ -10408,7 +10488,10 @@
             TowerProfileStore.save(pShell);
           }
         }
-        setProfileStatusSafe(label + " removed.", false);
+        setProfileStatusSafe(
+          hiddenWidgetRestorable(id) ? label + " removed — Show it again in Edit profile." : label + " removed.",
+          false
+        );
       };
       root.__cognationRemoveSelected = removeSelectedWidget;
       var removeBtn = root.querySelector("[data-tower-remove-selected]");

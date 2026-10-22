@@ -15668,6 +15668,40 @@ body.cgn-cal-page {
   box-shadow: none !important;
 }
 
+/* Edit profile > Show hidden widgets (#242 follow-up). Owner only, quiet:
+   muted label, one row per hidden widget, small secondary Show button.
+   Existing tokens only. The section is fully hidden when nothing is hidden. */
+#panel-tower .tower-profile-edit-dropdown .tower-hidden-widgets-fields[hidden] { display: none !important; }
+#panel-tower .tower-profile-edit-dropdown .tower-hidden-widgets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+#panel-tower .tower-profile-edit-dropdown .tower-hidden-widget-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-width: 0;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-hidden-widget-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--cgn-text-muted, rgba(232, 240, 255, 0.66)) !important;
+}
+#panel-tower .tower-profile-edit-dropdown .tower-hidden-widget-show {
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.2;
+}
+
 /* TOWER Feed contrast (Designer follow-up). TOWER Feed only (.tower-feed[data-tower-feed]
    and the "Send a signal" composer in the same Feed panel):
    - post cards use the site glass rgba(18,16,38,.92) so the existing body text reads

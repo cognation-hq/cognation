@@ -7917,8 +7917,13 @@
     if (!box) return;
     var p = TowerProfileStore.get();
     var wasHidden = box.hidden;
-    /* Owners never get this card; visitors don't when the owner removed Calendar. */
-    if (!p || isTowerOwner(p) || widgetRemovedByOwner(p, "calendar")) {
+    if (!p || isTowerOwner(p)) {
+      box.hidden = true;
+      if (!wasHidden) respawnVisitorCalendar(root, p);
+      return;
+    }
+    /* The owner removed Calendar: visitors don't get this card until Show. */
+    if (widgetRemovedByOwner(p, "calendar")) {
       box.hidden = true;
       if (!wasHidden) respawnVisitorCalendar(root, p);
       return;

@@ -222,7 +222,7 @@ var cal = fnSrc("renderPublicCalendar");
 assert.ok(/calRoot\.hidden = false;/.test(cal), "Edit profile Calendar sticker always renders (owners manage sessions and bookings there)");
 assert.ok(cal.indexOf("widgetRemovedByOwner") < 0, "Remove does not empty Edit profile > Calendar");
 assert.ok(tower.indexOf('querySelector("[data-tower-edit-calendar]")') < 0, "Edit profile > Calendar entry is never hidden by Remove");
-assert.ok(/if \(!p \|\| isTowerOwner\(p\) \|\| widgetRemovedByOwner\(p, "calendar"\)\) \{\s*box\.hidden = true;/.test(fnSrc("renderVisitorCalendar")), "visitors' Calendar card stays hidden while removed");
+assert.ok(/if \(widgetRemovedByOwner\(p, "calendar"\)\) \{\s*box\.hidden = true;[\s\S]{0,80}return;\s*\}\s*box\.hidden = false;/.test(fnSrc("renderVisitorCalendar")), "visitors' Calendar card stays hidden while removed");
 var music = fnSrc("initTowerMusic");
 assert.ok(/if \(widgetRemovedByOwner\(p, "music"\)\) \{[\s\S]*?clearTowerAudio\(audio\);[\s\S]*?showMusicSticker\(root, false, p\);[\s\S]*?return;/.test(music), "player cleared when removed");
 assert.ok(/if \(on && widgetRemovedByOwner\(p \|\| TowerProfileStore\.get\(\), "music"\)\) on = false;/.test(fnSrc("showMusicSticker")));

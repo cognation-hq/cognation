@@ -14,10 +14,96 @@
     myProfiles: [],
     feed: [],
     initialized: false,
+    /* profiles.job_title ships with its own SQL. null = not known yet,
+       true = readable, false = missing or not granted (name only). */
+    jobTitleColumn: null,
   };
 
   function client() {
-    return window.CognationSupabase || null;
+    var c = window.CognationSupabase || null;
+    return c ? jobTitleAware(c) : null;
+  }
+
+  /* Pro job title on profiles reads. Every profiles request that selects
+     PROFILE_RETURN_COLUMNS also asks for job_title until the server says the
+     column is missing (400: 42703 / PGRST204) or not readable (42501). Then
+     the same request runs once more without it and later requests leave it
+     out, so the page keeps working before the SQL runs. A PATCH that writes
+     job_title is never retried without it: that error goes to the caller. */
+  var jobTitleWrapFor = null;
+  var jobTitleWrap = null;
+  var jobTitleProbe = null;
+  function jobTitleAware(c) {
+    if (jobTitleWrapFor === c) return jobTitleWrap;
+    jobTitleWrapFor = c;
+    jobTitleWrap = Object.create(c);
+    jobTitleWrap.rest = function (table, options) {
+      return profilesRest(c, table, options || {});
+    };
+    return jobTitleWrap;
+  }
+  function withJobTitle(options) {
+    var q = String(options.query || "");
+    var base = "select=" + PROFILE_RETURN_COLUMNS;
+    var at = q.indexOf(base);
+    if (at === -1) return null;
+    var end = at + base.length;
+    if (end < q.length && q.charAt(end) !== "&") return null;
+    return Object.assign({}, options, { query: q.slice(0, end) + ",job_title" + q.slice(end) });
+  }
+  function writesJobTitle(options) {
+    return !!(options.body && typeof options.body === "object" &&
+      Object.prototype.hasOwnProperty.call(options.body, "job_title"));
+  }
+  function withoutJobTitle(options) {
+    if (!writesJobTitle(options)) return options;
+    var body = Object.assign({}, options.body);
+    delete body.job_title;
+    return Object.assign({}, options, { body: body });
+  }
+  function jobTitleUnavailable(err, options) {
+    if (!err) return false;
+    var body = err.body && typeof err.body === "object" ? err.body : {};
+    var code = String(body.code || err.code || "");
+    var text = [err.message, body.message, body.details, body.hint].join(" ");
+    if ((code === "42703" || code === "PGRST204") && /job_title/i.test(text)) return true;
+    /* Column exists but SELECT was not granted: Postgres names the table only. */
+    return code === "42501" && !writesJobTitle(options);
+  }
+  function setJobTitleColumn(value) {
+    if (state.jobTitleColumn === value) return;
+    state.jobTitleColumn = value;
+    emit("cognation:pro-job-title-support", { supported: value === true });
+  }
+  function profilesRest(c, table, options) {
+    if (table !== "profiles") return c.rest(table, options);
+    if (state.jobTitleColumn === false) return c.rest(table, withoutJobTitle(options));
+    var asked = withJobTitle(options);
+    if (!asked) return c.rest(table, options);
+    /* One request finds out; the others wait for its answer. */
+    if (state.jobTitleColumn !== true && jobTitleProbe) {
+      var again = function () { return profilesRest(c, table, options); };
+      return jobTitleProbe.then(again, again);
+    }
+    var req = c.rest(table, asked).then(
+      function (rows) {
+        setJobTitleColumn(true);
+        return rows;
+      },
+      function (err) {
+        if (!jobTitleUnavailable(err, options)) throw err;
+        return c.rest(table, withoutJobTitle(options)).then(function (rows) {
+          setJobTitleColumn(false);
+          return rows;
+        });
+      }
+    );
+    if (state.jobTitleColumn !== true) {
+      jobTitleProbe = req;
+      var clear = function () { if (jobTitleProbe === req) jobTitleProbe = null; };
+      req.then(clear, clear);
+    }
+    return req;
   }
 
   function session() {
@@ -67,8 +153,21 @@
       .slice(0, 40);
   }
 
+  /* Pro job title: optional plain text, trimmed, inner whitespace collapsed,
+     capped at JOB_TITLE_MAX. Never HTML; callers render it as text. */
+  var JOB_TITLE_MAX = 60;
+  function normalizeJobTitle(value) {
+    return String(value == null ? "" : value)
+      .replace(/[\u0000-\u001f\u007f]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, JOB_TITLE_MAX)
+      .trim();
+  }
+
   function cacheProfile(profile) {
     if (!profile || !profile.id) return null;
+    var prev = state.profiles[String(profile.id)] || null;
     var item = {
       id: String(profile.id),
       user_id: String(profile.user_id || ""),
@@ -79,6 +178,11 @@
       /* profiles.account_kind / seed_fleet_id (20261002_seedops_account_kind.sql). */
       account_kind: profile.account_kind ? String(profile.account_kind) : "",
       seed_fleet_id: profile.seed_fleet_id ? String(profile.seed_fleet_id) : "",
+      /* profiles.job_title (optional). Rows fetched without the column keep
+         the cached value instead of wiping it. */
+      job_title: Object.prototype.hasOwnProperty.call(profile, "job_title")
+        ? normalizeJobTitle(profile.job_title)
+        : (prev && prev.job_title) || "",
     };
     state.profiles[item.id] = item;
     if (item.handle) state.handles[item.handle] = item.id;
@@ -457,6 +561,15 @@
     if (data && Object.prototype.hasOwnProperty.call(data, "bio")) {
       changes.bio = String(data.bio || "").trim().slice(0, 280);
     }
+    /* Job title: Pro pages only, once the column is known to be readable.
+       Blank clears it (null), so "" never reaches the length check. */
+    if (
+      data && Object.prototype.hasOwnProperty.call(data, "jobTitle") &&
+      state.jobTitleColumn === true && row.kind === "professional"
+    ) {
+      changes.job_title = normalizeJobTitle(data.jobTitle) || null;
+      if ((changes.job_title || "") === (row.job_title || "")) delete changes.job_title;
+    }
     Object.keys(changes).forEach(function (key) {
       if (changes[key] === row[key]) delete changes[key];
     });
@@ -824,6 +937,12 @@
       return toTowerProfile(profileForId(id));
     },
     setActiveProfile: setActiveProfile,
+    /* Pro job title (profiles.job_title). False until the column is confirmed. */
+    JOB_TITLE_MAX: JOB_TITLE_MAX,
+    normalizeJobTitle: normalizeJobTitle,
+    jobTitleSupported: function () {
+      return state.jobTitleColumn === true;
+    },
   };
 
   if (document.readyState === "loading") {

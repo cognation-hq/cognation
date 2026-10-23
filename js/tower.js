@@ -7766,12 +7766,23 @@
       one("classroom", "Classroom") + one("auction", "Auction") +
       '<p class="form-hint">Check one before the event is added. Auction sets up a chat room with video, a presenter who can hand the live spot to another speaker and take it back, and a Bid button that pays on the seller’s professional page. No one under 16 can bid.</p></div>';
   }
-  function applyEventKind(event, kind, profile) {
+  function auctionSaleFields(editing) {
+    var sale = (editing && editing.auction) || {};
+    var shown = editing && editing.kind === "auction";
+    return '<div data-tower-cal-auction-fields' + (shown ? "" : " hidden") + ">" +
+      '<div class="form-group"><label for="tower-cal-selling">Selling</label>' +
+      '<input id="tower-cal-selling" name="selling" type="text" maxlength="120" value="' + escapeHtml(sale.item || "") + '" data-tower-cal-selling></div>' +
+      '<div class="form-group"><label for="tower-cal-start">Starting bid</label>' +
+      '<input id="tower-cal-start" name="start" inputmode="decimal" maxlength="8" value="' + escapeHtml(sale.start == null ? "" : String(sale.start)) + '" data-tower-cal-start></div></div>';
+  }
+  function applyEventKind(event, kind, profile, sale) {
     event.kind = kind === "auction" ? "auction" : "classroom";
     if (event.kind !== "auction") { delete event.auction; return; }
+    sale = sale || {};
     event.auction = {
       chat: true, video: true, presenter: "handoff", bid: "professional-page",
-      item: event.title, handle: String((profile && profile.handle) || "").replace(/^@/, ""),
+      item: String(sale.item || "").trim(), start: Number(sale.start),
+      handle: String((profile && profile.handle) || "").replace(/^@/, ""),
       minAge: 16, payInRoom: false,
     };
   }
@@ -7784,6 +7795,7 @@
     return '<form class="tower-cal-editor" data-tower-cal-editor action="#" method="post">' +
       "<h5>" + (editing ? "Edit event" : "Add event") + "</h5>" +
       calendarKindPills(editing && editing.kind) +
+      auctionSaleFields(editing) +
       (editing ? '<input type="hidden" name="id" value="' + escapeHtml(editing.id) + '" data-tower-cal-edit-id>' : "") +
       '<div class="form-group"><label for="tower-cal-edit-title">Title</label>' +
       '<input id="tower-cal-edit-title" name="title" type="text" maxlength="120" required value="' + escapeHtml(formTitle) + '" data-tower-cal-edit-title></div>' +
@@ -8278,6 +8290,8 @@
       var group = box.closest("[data-tower-cal-pills]");
       if (!group) return;
       group.querySelectorAll("[data-tower-cal-kind]").forEach(function (el) { if (el !== box) el.checked = false; });
+      var saleFields = box.closest("form") && box.closest("form").querySelector("[data-tower-cal-auction-fields]");
+      if (saleFields) saleFields.hidden = box.value !== "auction";
     });
     root.addEventListener("submit", function (ev) {
       var form = ev.target;
@@ -8316,6 +8330,17 @@
           setEdStatus("Check Classroom or Auction.", true);
           return;
         }
+        var sale = {};
+        if (kind === "auction") {
+          var sellEl = form.querySelector("[data-tower-cal-selling]");
+          var startEl = form.querySelector("[data-tower-cal-start]");
+          sale.item = sellEl ? sellEl.value.trim().slice(0, 120) : "";
+          sale.start = Number(String(startEl ? startEl.value : "").replace(/[$,]/g, ""));
+          if (!sale.item || !isFinite(sale.start) || sale.start < 0) {
+            setEdStatus("Type what you are selling and the starting bid.", true);
+            return;
+          }
+        }
         var editId = idEl ? idEl.value : "";
         saveCalendarToProfile(function (p) {
           if (editId) {
@@ -8326,7 +8351,7 @@
                 e.date = date;
                 e.time = time;
                 e.notes = notes;
-                applyEventKind(e, kind, p);
+                applyEventKind(e, kind, p, sale);
                 found = true;
               }
             });
@@ -8334,14 +8359,14 @@
               var revived = {
                 id: editId, title: title, date: date, time: time, notes: notes, status: "accepted", source: "owner",
               };
-              applyEventKind(revived, kind, p);
+              applyEventKind(revived, kind, p, sale);
               p.calendarEvents.push(revived);
             }
           } else {
             var added = {
               id: newCalendarEventId(), title: title, date: date, time: time, notes: notes, status: "accepted", source: "owner",
             };
-            applyEventKind(added, kind, p);
+            applyEventKind(added, kind, p, sale);
             p.calendarEvents.push(added);
           }
         });

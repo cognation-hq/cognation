@@ -4497,8 +4497,7 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .tower-social-btn--venmo { background: #008cff; color: #fff; border-color: #0074d4; }
 
 .tower-social-btn--linktree { background: #43e55e; color: #111; border-color: #2ecc71; }
-.tower-pro-links { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin: 0.35rem 0 0; }
-.tower-pro-links[hidden], .tower-pro-pay-confirm[hidden], .tower-pro-pay-note[hidden] { display: none !important; }
+.tower-pro-links { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin: 0.35rem 0 0; } .tower-pro-links[hidden], .tower-pro-pay-confirm[hidden], .tower-pro-pay-note[hidden] { display: none !important; }
 .tower-pro-link {
   appearance: none; display: inline-flex; align-items: center; margin: 0; padding: 0.22rem 0.5rem;
   border: 1px solid rgba(183, 246, 255, 0.72); border-radius: 999px; background: transparent;
@@ -4508,7 +4507,7 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 }
 .tower-pro-link:hover, .tower-pro-link:focus-visible { color: #fff; outline: none; box-shadow: 0 0 0 1px rgba(183, 246, 255, 0.72); }
 #panel-tower .tower-pro-link, #panel-tower .tower-pro-link:hover { color: #f7f9ff !important; }
-.tower-pro-for { font-size: 0.75rem; line-height: 1.2; color: #f7f9ff; }
+.tower-pro-for { flex: 1 0 100%; font-size: 0.75rem; line-height: 1.2; color: #f7f9ff; }
 .tower-pro-pay-confirm { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin-top: 0.35rem; }
 .tower-pro-pay-confirm input {
   flex: 1; min-width: 8rem; font: inherit; font-size: 0.75rem; padding: 0.22rem 0.4rem;

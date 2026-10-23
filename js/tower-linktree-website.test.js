@@ -32,17 +32,18 @@ var pay = vm.createContext({
 vm.runInContext([
   grab("hasCardNumber"), grab("plainLabel"), grab("soldBidAmount"), grab("normalizeSoldBid"),
   grab("acceptSoldBid"), grab("readSoldBid"), grab("proPayAttempt"),
-  "this.store = function (id, v) { return id === 'applepay' || id === 'applefor' ? plainLabel(v, 120) : ''; };",
+  "this.store = function (id, v) { if (id === 'appleamt') return soldBidAmount(v); return id === 'applepay' || id === 'applefor' ? plainLabel(v, 120) : ''; };",
   "this.accept = acceptSoldBid; this.read = readSoldBid; this.pay = proPayAttempt; this.norm = normalizeSoldBid;",
 ].join("\n"), pay);
 assert.strictEqual(pay.store("applepay", "4111111111111111"), "", "card number is not stored");
 assert.strictEqual(pay.store("applepay", "Prada"), "Prada", "payee name is saved");
-var sale = pay.accept({ amount: "$50,000", description: "five software developers and a leftover website", profileId: "co", email: "co@example.com" });
-assert.strictEqual(sale.amount, "$50,000");
-assert.strictEqual(sale.description, "five software developers and a leftover website");
+var sale = pay.accept({ amount: "80", description: "wool coat", profileId: "co", email: "co@example.com" });
+assert.strictEqual(sale.amount, "$80");
+assert.strictEqual(sale.description, "wool coat");
 assert.strictEqual(sale.profileId, "co");
 assert.strictEqual(sale.email, undefined, "sold bid does not take an email");
-assert.strictEqual(pay.read({ _profileId: "co" }).amount, "$50,000", "that bid is what Apple Pay uses");
+assert.strictEqual(pay.read({ _profileId: "co" }).amount, "$80", "a saved bid keeps the amount entered");
+assert.strictEqual(pay.store("appleamt", "") === "" && pay.store("appleamt", "890") === "$890", true, "seller amount, or no sale");
 assert.strictEqual(pay.read({ _profileId: "other" }), null, "another page does not pick up the bid");
 assert.strictEqual(pay.accept({ amount: 50000 }), null, "amount alone is not a sold bid");
 assert.strictEqual(pay.pay({ signedIn: false, phase: "confirm", forText: "coat" }).text, "Sign in to pay. No payment was taken.");
@@ -52,6 +53,7 @@ var done = pay.pay({ signedIn: true, phase: "confirm", forText: sale.description
 assert.strictEqual(done.taken, false);
 assert.strictEqual(done.text, "No payment was taken.");
 assert.ok(!/receipt|issued|paid|success/i.test(done.text), "no pretend receipt");
-assert.ok(/Apple Pay " \+ sold\.amount/.test(tower), "button shows the sold amount");
+assert.ok(/Apple Pay " \+ amount/.test(tower), "button shows the seller amount");
+assert.ok(!/five software developers|\$50,000/.test(tower + html), "the example sale is not a listing");
 assert.ok(/isProTower\(p\)/.test(tower.slice(tower.indexOf("function renderProLinks"), tower.indexOf("function renderSocialLinks"))), "personal page does not get the buttons");
 console.log("tower-linktree-website.test.js: OK");

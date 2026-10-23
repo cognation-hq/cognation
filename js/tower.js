@@ -153,7 +153,7 @@
      the page is one group. Personal keeps Venmo as its own logo chip. */
   var PAY_LINKS_ID = "pay-links";
   var PAY_LINK_NETS = ["venmo", "services", "ads"];
-  var PAGE_BUTTON_NETS = ["shop", "linktree", "applepay", "applefor"];
+  var PAGE_BUTTON_NETS = ["shop", "linktree", "applepay", "appleamt", "applefor"];
   function isPayLinkNet(netId, p) {
     return isProTower(p) && PAY_LINK_NETS.indexOf(String(netId || "")) >= 0;
   }
@@ -4405,7 +4405,7 @@
     { id: "shop", label: "Shop", short: "Shop", professionalOnly: true },
     { id: "linktree", label: "Linktree", short: "Linktree", professionalOnly: true },
     { id: "applepay", label: "Apple Pay", short: "Apple Pay", professionalOnly: true },
-    { id: "applefor", label: "Goods or services", short: "For", professionalOnly: true },
+    { id: "appleamt", label: "Amount", short: "$", professionalOnly: true }, { id: "applefor", label: "Goods or services", short: "For", professionalOnly: true },
     /* NEW (not restored): owner-set outbound link on Pro. A plain https link out;
        Cognation takes no payment, stores no card data and calls no service. */
     { id: "services", label: "Pay for services", short: "Pay for services", professionalOnly: true, quiet: true, httpsOnly: true },
@@ -5348,13 +5348,13 @@
   function socialHref(id, raw) {
     if (id === "venmo") return venmoHref(raw);
     if (id === "services" || id === "ads") return safeHttpsUrl(raw);
-    if (id === "applepay" || id === "applefor") return "";
+    if (id === "applepay" || id === "applefor" || id === "appleamt") return "";
     return safeHttpUrl(raw);
   }
 
   function storedSocialValue(id, value) {
     if (id === "venmo") return String(value || "").trim().slice(0, 500);
-    if (id === "applepay" || id === "applefor") return plainLabel(value, 120);
+    if (id === "appleamt") return soldBidAmount(value); if (id === "applepay" || id === "applefor") return plainLabel(value, 120);
     if (id === "services" || id === "ads") return safeHttpsUrl(value);
     return safeHttpUrl(value);
   }
@@ -5510,8 +5510,7 @@
       return;
     }
     var input = box && box.querySelector("[data-tower-pro-pay-for]");
-    var sold = readSoldBid(p);
-    var line = sold ? sold.description : storedSocialValue("applefor", ((p && p.socialLinks) || {}).applefor);
+    var line = storedSocialValue("applefor", ((p && p.socialLinks) || {}).applefor);
     if (input && document.activeElement !== input) input.value = line || "";
     if (box) box.hidden = false;
     payNote(root, "");
@@ -5557,9 +5556,9 @@
     var shop = pro ? socialHref("shop", links.shop) : "";
     var tree = pro ? socialHref("linktree", links.linktree) : "";
     var payee = pro ? storedSocialValue("applepay", links.applepay) : "";
-    var sold = payee ? readSoldBid(p) : null;
-    var forLine = payee ? (sold ? sold.description : storedSocialValue("applefor", links.applefor)) : "";
-    var sig = [shop, tree, payee, sold ? sold.amount : "", forLine].join("\n");
+    var amount = payee ? storedSocialValue("appleamt", links.appleamt) : "";
+    var forLine = payee ? storedSocialValue("applefor", links.applefor) : "";
+    var sig = [shop, tree, payee, amount, forLine].join("\n");
     if (row.getAttribute("data-sig") !== sig) {
       row.setAttribute("data-sig", sig);
       row.textContent = "";
@@ -5570,7 +5569,7 @@
         b.type = "button";
         b.className = "tower-pro-link";
         b.setAttribute("data-tower-pro-link", "applepay");
-        b.textContent = sold ? "Apple Pay " + sold.amount : "Apple Pay";
+        b.textContent = amount ? "Apple Pay " + amount : "Apple Pay";
         row.appendChild(b);
       }
       if (forLine) {

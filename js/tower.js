@@ -7758,6 +7758,48 @@
     return sb.rpc("request_hangout", { p_profile_id: profileId, p_date: iso, p_time: time });
   }
 
+  function calendarKindPills(kind) {
+    function one(value, label) {
+      return '<label class="tower-cal-pill"><input type="checkbox" name="eventKind" value="' + value + '" data-tower-cal-kind' + (kind === value ? " checked" : "") + "> " + label + "</label>";
+    }
+    return '<div class="tower-cal-pills" data-tower-cal-pills role="group" aria-label="Event kind">' +
+      one("classroom", "Classroom") + one("auction", "Auction") +
+      '<p class="form-hint">Check one before the event is added. Auction sets up a chat room with video, a presenter who can hand the live spot to another speaker and take it back, and a Bid button that pays on the seller’s professional page. No one under 16 can bid.</p></div>';
+  }
+  function applyEventKind(event, kind, profile) {
+    event.kind = kind === "auction" ? "auction" : "classroom";
+    if (event.kind !== "auction") { delete event.auction; return; }
+    event.auction = {
+      chat: true, video: true, presenter: "handoff", bid: "professional-page",
+      item: event.title, handle: String((profile && profile.handle) || "").replace(/^@/, ""),
+      minAge: 16, payInRoom: false,
+    };
+  }
+
+  function calendarEditorHtml(editing, selected) {
+    var formTitle = editing ? editing.title : "";
+    var formDate = editing ? editing.date : selected;
+    var formTime = editing ? editing.time || "" : "";
+    var formNotes = editing ? editing.notes || "" : "";
+    return '<form class="tower-cal-editor" data-tower-cal-editor action="#" method="post">' +
+      "<h5>" + (editing ? "Edit event" : "Add event") + "</h5>" +
+      calendarKindPills(editing && editing.kind) +
+      (editing ? '<input type="hidden" name="id" value="' + escapeHtml(editing.id) + '" data-tower-cal-edit-id>' : "") +
+      '<div class="form-group"><label for="tower-cal-edit-title">Title</label>' +
+      '<input id="tower-cal-edit-title" name="title" type="text" maxlength="120" required value="' + escapeHtml(formTitle) + '" data-tower-cal-edit-title></div>' +
+      '<div class="tower-cal-friend-row">' +
+      '<div class="form-group"><label for="tower-cal-edit-date">Date</label>' +
+      '<input id="tower-cal-edit-date" name="date" type="date" required value="' + escapeHtml(formDate) + '" data-tower-cal-edit-date></div>' +
+      '<div class="form-group"><label for="tower-cal-edit-time">Time</label>' +
+      '<input id="tower-cal-edit-time" name="time" type="time" value="' + escapeHtml(formTime) + '" data-tower-cal-edit-time></div></div>' +
+      '<div class="form-group"><label for="tower-cal-edit-notes">Notes</label>' +
+      '<input id="tower-cal-edit-notes" name="notes" type="text" maxlength="240" value="' + escapeHtml(formNotes) + '" data-tower-cal-edit-notes></div>' +
+      '<div class="form-actions"><button type="submit" class="btn btn-primary">' + (editing ? "Save changes" : "Add event") + "</button>" +
+      (editing ? '<button type="button" class="btn btn-secondary" data-tower-cal-cancel-edit>Cancel</button>' : "") +
+      "</div>" +
+      '<p class="commune-status" data-tower-cal-editor-status hidden role="status" aria-live="polite"></p></form>';
+  }
+
   function renderPrivateCalendar(root) {
     var host = root.querySelector("[data-tower-cal-private]");
     if (!host) return;
@@ -7768,53 +7810,6 @@
     var ownerFeed = isTowerOwner(p);
     var events = ownerFeed ? (p.calendarEvents || []) : busyBlocksOnly(p.calendarEvents || []);
     var selected = view.selected;
-    var editingId = host.getAttribute("data-editing-id") || "";
-    var editing = null;
-    if (editingId) {
-      editing = events.filter(function (e) {
-        return e.id === editingId;
-      })[0] || null;
-    }
-    var formTitle = editing ? editing.title : "";
-    var formDate = editing ? editing.date : selected;
-    var formTime = editing ? editing.time || "" : "";
-    var formNotes = editing ? editing.notes || "" : "";
-    var editorHtml = ownerFeed ? (
-      '<form class="tower-cal-editor" data-tower-cal-editor action="#" method="post">' +
-      "<h5>" +
-      (editing ? "Edit event" : "Add event") +
-      "</h5>" +
-      (editing
-        ? '<input type="hidden" name="id" value="' + escapeHtml(editing.id) + '" data-tower-cal-edit-id>'
-        : "") +
-      '<div class="form-group"><label for="tower-cal-edit-title">Title</label>' +
-      '<input id="tower-cal-edit-title" name="title" type="text" maxlength="120" required value="' +
-      escapeHtml(formTitle) +
-      '" data-tower-cal-edit-title></div>' +
-      '<div class="tower-cal-friend-row">' +
-      '<div class="form-group"><label for="tower-cal-edit-date">Date</label>' +
-      '<input id="tower-cal-edit-date" name="date" type="date" required value="' +
-      escapeHtml(formDate) +
-      '" data-tower-cal-edit-date></div>' +
-      '<div class="form-group"><label for="tower-cal-edit-time">Time</label>' +
-      '<input id="tower-cal-edit-time" name="time" type="time" value="' +
-      escapeHtml(formTime) +
-      '" data-tower-cal-edit-time></div></div>' +
-      '<div class="form-group"><label for="tower-cal-edit-notes">Notes</label>' +
-      '<input id="tower-cal-edit-notes" name="notes" type="text" maxlength="240" value="' +
-      escapeHtml(formNotes) +
-      '" data-tower-cal-edit-notes></div>' +
-      '<div class="form-actions">' +
-      '<button type="submit" class="btn btn-primary">' +
-      (editing ? "Save changes" : "Add event") +
-      "</button>" +
-      (editing
-        ? '<button type="button" class="btn btn-secondary" data-tower-cal-cancel-edit>Cancel</button>'
-        : "") +
-      "</div>" +
-      '<p class="commune-status" data-tower-cal-editor-status hidden role="status" aria-live="polite"></p>' +
-      "</form>"
-    ) : "";
     host.innerHTML =
       renderTowerMonthGrid(view, events, { gridLabel: ownerFeed ? "My calendar" : "Calendar" }) +
       '<div class="tower-cal-day-panel">' +
@@ -7823,8 +7818,7 @@
       escapeHtml(selected) +
       "</h5>" +
       renderDayEventList(events, selected, { ownerControls: ownerFeed, busyOnly: !ownerFeed }) +
-      "</div>" +
-      editorHtml;
+      "</div>";
 
     var icsInput = root.querySelector("[data-tower-cal-ics-url]");
     if (icsInput && document.activeElement !== icsInput) {
@@ -7902,6 +7896,8 @@
       publicCal.setAttribute("aria-label", "Calendar");
       publicCal.setAttribute("data-calendar-busy", owner ? "false" : "true");
     }
+    var editingId = publicCal && publicCal.getAttribute("data-editing-id") || "";
+    var editing = editingId ? (events.filter(function (e) { return e && e.id === editingId; })[0] || null) : null;
     body.innerHTML =
       renderTowerMonthGrid(view, events, { gridLabel: "Calendar" }) +
       '<div class="tower-cal-day-panel">' +
@@ -7911,7 +7907,8 @@
       "</h5>" +
       renderDayEventList(events, selected, { ownerControls: owner, busyOnly: !owner }) +
       "</div>" +
-      schedulerHtml;
+      schedulerHtml +
+      (owner ? calendarEditorHtml(editing, selected) : "");
   }
 
   function visitorSessionRowHtml(sess, api) {
@@ -8134,7 +8131,7 @@
             return e.id !== did;
           });
         });
-        var ph = root.querySelector("[data-tower-cal-private]");
+        var ph = root.querySelector("[data-tower-cal-public]");
         if (ph && ph.getAttribute("data-editing-id") === did) ph.removeAttribute("data-editing-id");
         refreshTowerCalendars(root);
         return;
@@ -8143,7 +8140,7 @@
       var editBtn = t.closest("[data-tower-cal-edit]");
       if (editBtn) {
         var eid = editBtn.getAttribute("data-tower-cal-edit");
-        var priv = root.querySelector("[data-tower-cal-private]");
+        var priv = root.querySelector("[data-tower-cal-public]");
         if (priv) priv.setAttribute("data-editing-id", eid);
         /* Switch to private side if editing from public */
         if (editBtn.closest("[data-tower-cal-public], [data-tower-widget=\"calendar\"]")) {
@@ -8160,7 +8157,7 @@
       }
 
       if (t.closest("[data-tower-cal-cancel-edit]")) {
-        var priv2 = root.querySelector("[data-tower-cal-private]");
+        var priv2 = root.querySelector("[data-tower-cal-public]");
         if (priv2) priv2.removeAttribute("data-editing-id");
         refreshTowerCalendars(root);
         return;
@@ -8275,6 +8272,13 @@
       refreshTowerCalendars(root);
     });
 
+    root.addEventListener("change", function (ev) {
+      var box = ev.target && ev.target.matches && ev.target.matches("[data-tower-cal-kind]") ? ev.target : null;
+      if (!box || !box.checked || !root.contains(box)) return;
+      var group = box.closest("[data-tower-cal-pills]");
+      if (!group) return;
+      group.querySelectorAll("[data-tower-cal-kind]").forEach(function (el) { if (el !== box) el.checked = false; });
+    });
     root.addEventListener("submit", function (ev) {
       var form = ev.target;
       if (!form || !root.contains(form)) return;
@@ -8306,6 +8310,12 @@
           setEdStatus("Title and a valid date are required.", true);
           return;
         }
+        var kindBox = form.querySelector("[data-tower-cal-kind]:checked");
+        var kind = kindBox ? kindBox.value : "";
+        if (kind !== "classroom" && kind !== "auction") {
+          setEdStatus("Check Classroom or Auction.", true);
+          return;
+        }
         var editId = idEl ? idEl.value : "";
         saveCalendarToProfile(function (p) {
           if (editId) {
@@ -8316,33 +8326,26 @@
                 e.date = date;
                 e.time = time;
                 e.notes = notes;
+                applyEventKind(e, kind, p);
                 found = true;
               }
             });
             if (!found) {
-              p.calendarEvents.push({
-                id: editId,
-                title: title,
-                date: date,
-                time: time,
-                notes: notes,
-                status: "accepted",
-                source: "owner",
-              });
+              var revived = {
+                id: editId, title: title, date: date, time: time, notes: notes, status: "accepted", source: "owner",
+              };
+              applyEventKind(revived, kind, p);
+              p.calendarEvents.push(revived);
             }
           } else {
-            p.calendarEvents.push({
-              id: newCalendarEventId(),
-              title: title,
-              date: date,
-              time: time,
-              notes: notes,
-              status: "accepted",
-              source: "owner",
-            });
+            var added = {
+              id: newCalendarEventId(), title: title, date: date, time: time, notes: notes, status: "accepted", source: "owner",
+            };
+            applyEventKind(added, kind, p);
+            p.calendarEvents.push(added);
           }
         });
-        var priv3 = root.querySelector("[data-tower-cal-private]");
+        var priv3 = root.querySelector("[data-tower-cal-public]");
         if (priv3) priv3.removeAttribute("data-editing-id");
         var view3 = getCalendarViewState(root, "private");
         view3.selected = date;

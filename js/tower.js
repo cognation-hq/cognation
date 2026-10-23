@@ -5612,14 +5612,14 @@
       var wid = el.getAttribute("data-tower-widget") || "";
       var netId = socialNetIdFromWidget(wid);
       if (!netId) return;
-      if (!wanted[netId] || isPayLinkNet(netId, p) || isPageButtonNet(netId)) {
+      if (!wanted[netId] || isPayLinkNet(netId, p) || isPageButtonNet(netId) || netId === "venmo" || netId === "services" || netId === "ads") {
         if (el.parentNode) el.parentNode.removeChild(el);
       }
     });
 
     socialLinkDefs().forEach(function (net) {
       if (!wanted[net.id]) return;
-      if (isPayLinkNet(net.id, p) || isPageButtonNet(net.id)) return;
+      if (isPayLinkNet(net.id, p) || isPageButtonNet(net.id) || net.id === "venmo" || net.id === "services" || net.id === "ads") return;
       var wid = socialWidgetId(net.id);
       var href = socialHref(net.id, links[net.id]);
       var el = stage.querySelector('[data-tower-widget="' + wid + '"]');
@@ -5673,8 +5673,6 @@
       el.hidden = false;
       el.classList.remove("is-widget-off");
     });
-
-    renderPayLinks(stage, p, links, wanted);
 
     /* Old builds left an X button on each chip; drop any still in the DOM. */
     stage.querySelectorAll(".tower-social-chip-remove").forEach(function (x) {

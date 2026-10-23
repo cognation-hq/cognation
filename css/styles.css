@@ -4507,7 +4507,6 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 }
 .tower-pro-link:hover, .tower-pro-link:focus-visible { color: #fff; outline: none; box-shadow: 0 0 0 1px rgba(183, 246, 255, 0.72); }
 #panel-tower .tower-pro-link, #panel-tower .tower-pro-link:hover { color: #f7f9ff !important; }
-.tower-pro-for { flex: 1 0 100%; font-size: 0.75rem; line-height: 1.2; color: #f7f9ff; }
 .tower-pro-pay-confirm { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin-top: 0.35rem; }
 .tower-pro-pay-confirm input {
   flex: 1; min-width: 8rem; font: inherit; font-size: 0.75rem; padding: 0.22rem 0.4rem;

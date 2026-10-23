@@ -153,8 +153,12 @@
      the page is one group. Personal keeps Venmo as its own logo chip. */
   var PAY_LINKS_ID = "pay-links";
   var PAY_LINK_NETS = ["venmo", "services", "ads"];
+  var PAGE_BUTTON_NETS = ["shop", "linktree", "applepay", "applefor"];
   function isPayLinkNet(netId, p) {
     return isProTower(p) && PAY_LINK_NETS.indexOf(String(netId || "")) >= 0;
+  }
+  function isPageButtonNet(netId) {
+    return PAGE_BUTTON_NETS.indexOf(String(netId || "")) >= 0;
   }
 
   function socialNetIdFromWidget(wid) {
@@ -221,7 +225,7 @@
       if (row.length === 1 && row[0] === "__socials__") {
         var opted = optedInSocialNetIds(p);
         var pay = opted.filter(function (id) { return isPayLinkNet(id, p); });
-        var ids = opted.filter(function (id) { return pay.indexOf(id) < 0; }).map(socialWidgetId);
+        var ids = opted.filter(function (id) { return pay.indexOf(id) < 0 && !isPageButtonNet(id); }).map(socialWidgetId);
         var i;
         for (i = 0; i < ids.length; i += 2) {
           out.push(ids.slice(i, i + 2));
@@ -4398,7 +4402,10 @@
     { id: "tiktok", label: "TikTok", short: "TT", logo: "assets/social/tiktok.svg" },
     { id: "linkedin", label: "LinkedIn", short: "in", logo: "assets/social/linkedin.png", professionalOnly: true },
     { id: "venmo", label: "Venmo", short: "Vm", logo: "assets/social/venmo.svg" },
-    { id: "linktree", label: "Website", short: "Web", logo: "assets/social/linktree.svg", professionalOnly: true },
+    { id: "shop", label: "Shop", short: "Shop", professionalOnly: true },
+    { id: "linktree", label: "Linktree", short: "Linktree", professionalOnly: true },
+    { id: "applepay", label: "Apple Pay", short: "Apple Pay", professionalOnly: true },
+    { id: "applefor", label: "Goods or services", short: "For", professionalOnly: true },
     /* NEW (not restored): owner-set outbound link on Pro. A plain https link out;
        Cognation takes no payment, stores no card data and calls no service. */
     { id: "services", label: "Pay for services", short: "Pay for services", professionalOnly: true, quiet: true, httpsOnly: true },
@@ -5329,14 +5336,25 @@
     return "https://venmo.com/u/" + handle;
   }
 
+  function hasCardNumber(raw) {
+    return /\d(?:[ -]*\d){12,18}/.test(String(raw || ""));
+  }
+
+  function plainLabel(raw, max) {
+    var t = String(raw || "").replace(/\s+/g, " ").trim().slice(0, max || 120);
+    return !t || hasCardNumber(t) ? "" : t;
+  }
+
   function socialHref(id, raw) {
     if (id === "venmo") return venmoHref(raw);
     if (id === "services" || id === "ads") return safeHttpsUrl(raw);
+    if (id === "applepay" || id === "applefor") return "";
     return safeHttpUrl(raw);
   }
 
   function storedSocialValue(id, value) {
     if (id === "venmo") return String(value || "").trim().slice(0, 500);
+    if (id === "applepay" || id === "applefor") return plainLabel(value, 120);
     if (id === "services" || id === "ads") return safeHttpsUrl(value);
     return safeHttpUrl(value);
   }
@@ -5437,12 +5455,148 @@
     try { spawnUnplacedWidgets(root, TowerProfileStore.get()); } catch (eSp) {}
   }
 
+  function soldBidAmount(raw) {
+    var n = typeof raw === "number" ? raw : Number(String(raw || "").replace(/[^0-9.]/g, ""));
+    if (!isFinite(n) || n <= 0 || n > 1e9) return "";
+    return "$" + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+  function normalizeSoldBid(bid) {
+    if (!bid || typeof bid !== "object") return null;
+    var amount = soldBidAmount(bid.amount);
+    var description = plainLabel(bid.description || bid.goods, 120);
+    if (!amount || !description) return null;
+    return { amount: amount, description: description, profileId: String(bid.profileId || "") };
+  }
+  function acceptSoldBid(bid) {
+    var rec = normalizeSoldBid(bid);
+    if (!rec) return null;
+    try { sessionStorage.setItem("cognation.sold-bid.v1", JSON.stringify(rec)); } catch (eBid) {}
+    return rec;
+  }
+  function readSoldBid(p) {
+    var rec = null;
+    try { rec = JSON.parse(sessionStorage.getItem("cognation.sold-bid.v1") || "null"); } catch (eRead) {}
+    rec = normalizeSoldBid(rec);
+    if (!rec) return null;
+    var id = p && String(p._profileId || p.id || "");
+    if (rec.profileId && id && rec.profileId !== id) return null;
+    return rec;
+  }
+  function proPayAttempt(o) {
+    o = o || {};
+    if (!o.signedIn) return { taken: false, text: "Sign in to pay. No payment was taken." };
+    if (o.owner) return { taken: false, text: "Only the payer can start this. No payment was taken." };
+    if (o.phase !== "confirm") return { taken: false, text: "", open: true };
+    if (!plainLabel(o.forText, 120)) return { taken: false, text: "Name what this payment is for. No payment was taken.", open: true };
+    return { taken: false, text: "No payment was taken." };
+  }
+  function payerSignedIn() {
+    var s = getSessionObject();
+    return !!(s && (s.username || s.supabaseUserId || s.activeProfileId));
+  }
+  function payNote(root, text) {
+    var note = root.querySelector("[data-tower-pro-pay-note]");
+    if (!note) return;
+    note.hidden = !text;
+    note.textContent = text || "";
+  }
+  function openProPay(root) {
+    var p = TowerProfileStore.get();
+    var res = proPayAttempt({ signedIn: payerSignedIn(), owner: isTowerOwner(p), phase: "open" });
+    var box = root.querySelector("[data-tower-pro-pay-confirm]");
+    if (!res.open) {
+      if (box) box.hidden = true;
+      payNote(root, res.text);
+      return;
+    }
+    var input = box && box.querySelector("[data-tower-pro-pay-for]");
+    var sold = readSoldBid(p);
+    var line = sold ? sold.description : storedSocialValue("applefor", ((p && p.socialLinks) || {}).applefor);
+    if (input && document.activeElement !== input) input.value = line || "";
+    if (box) box.hidden = false;
+    payNote(root, "");
+  }
+  function confirmProPay(root) {
+    var input = root.querySelector("[data-tower-pro-pay-for]");
+    var p = TowerProfileStore.get();
+    var res = proPayAttempt({
+      signedIn: payerSignedIn(),
+      owner: isTowerOwner(p),
+      phase: "confirm",
+      forText: input ? input.value : "",
+    });
+    payNote(root, res.text);
+  }
+  function bindProPay(root) {
+    if (!root || root.__proPay) return;
+    root.__proPay = true;
+    root.addEventListener("click", function (ev) {
+      var t = ev.target && ev.target.closest ? ev.target : null;
+      if (!t) return;
+      if (t.closest("[data-tower-pro-link='applepay']")) { ev.preventDefault(); openProPay(root); }
+      else if (t.closest("[data-tower-pro-pay-go]")) { ev.preventDefault(); confirmProPay(root); }
+    });
+  }
+  function addProAnchor(row, id, label, href) {
+    if (!href) return;
+    var a = document.createElement("a");
+    a.className = "tower-pro-link";
+    a.setAttribute("data-tower-pro-link", id);
+    a.href = href;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = label;
+    row.appendChild(a);
+  }
+  function renderProLinks(root, p) {
+    bindProPay(root);
+    var row = root.querySelector("[data-tower-pro-links]");
+    if (!row) return;
+    var pro = isProTower(p);
+    var links = (p && p.socialLinks) || {};
+    var shop = pro ? socialHref("shop", links.shop) : "";
+    var tree = pro ? socialHref("linktree", links.linktree) : "";
+    var payee = pro ? storedSocialValue("applepay", links.applepay) : "";
+    var sold = payee ? readSoldBid(p) : null;
+    var forLine = payee ? (sold ? sold.description : storedSocialValue("applefor", links.applefor)) : "";
+    var sig = [shop, tree, payee, sold ? sold.amount : "", forLine].join("\n");
+    if (row.getAttribute("data-sig") !== sig) {
+      row.setAttribute("data-sig", sig);
+      row.textContent = "";
+      addProAnchor(row, "shop", "Shop", shop);
+      addProAnchor(row, "linktree", "Linktree", tree);
+      if (payee) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "tower-pro-link";
+        b.setAttribute("data-tower-pro-link", "applepay");
+        b.textContent = sold ? "Apple Pay " + sold.amount : "Apple Pay";
+        row.appendChild(b);
+      }
+      if (forLine) {
+        var span = document.createElement("span");
+        span.className = "tower-pro-for";
+        span.setAttribute("data-tower-pro-for-line", "");
+        span.textContent = forLine;
+        row.appendChild(span);
+      }
+    }
+    row.hidden = !row.firstChild;
+    if (!payee) {
+      var box = root.querySelector("[data-tower-pro-pay-confirm]");
+      if (box) box.hidden = true;
+      payNote(root, "");
+    }
+  }
+  try { window.CognationSoldBid = { accept: acceptSoldBid }; } catch (eSold) {}
+
   /* v3.3: one [data-tower-widget] per linked social — never a grouped LINKS box. */
   function renderSocialLinks(root, p) {
     if (!root) return;
     migrateGroupedSocialLayout(p);
     seedPayLinksLayout(p);
     syncEditSocialFields(root, p);
+    renderProLinks(root, p);
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (!stage) return;
     var links = chipSocialLinks(p);
@@ -5458,14 +5612,14 @@
       var wid = el.getAttribute("data-tower-widget") || "";
       var netId = socialNetIdFromWidget(wid);
       if (!netId) return;
-      if (!wanted[netId] || isPayLinkNet(netId, p)) {
+      if (!wanted[netId] || isPayLinkNet(netId, p) || isPageButtonNet(netId)) {
         if (el.parentNode) el.parentNode.removeChild(el);
       }
     });
 
     socialLinkDefs().forEach(function (net) {
       if (!wanted[net.id]) return;
-      if (isPayLinkNet(net.id, p)) return; /* drawn in the pay-links card below */
+      if (isPayLinkNet(net.id, p) || isPageButtonNet(net.id)) return;
       var wid = socialWidgetId(net.id);
       var href = socialHref(net.id, links[net.id]);
       var el = stage.querySelector('[data-tower-widget="' + wid + '"]');
@@ -6531,7 +6685,7 @@
     var links = (p && p.socialLinks) || {};
     var defs = socialLinkDefs();
     for (var i = 0; i < defs.length; i++) {
-      if (socialHref(defs[i].id, links[defs[i].id])) return true;
+      if (storedSocialValue(defs[i].id, links[defs[i].id])) return true;
     }
     return false;
   }

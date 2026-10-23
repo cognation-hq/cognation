@@ -4497,6 +4497,25 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .tower-social-btn--venmo { background: #008cff; color: #fff; border-color: #0074d4; }
 
 .tower-social-btn--linktree { background: #43e55e; color: #111; border-color: #2ecc71; }
+.tower-pro-links { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin: 0.35rem 0 0; }
+.tower-pro-links[hidden], .tower-pro-pay-confirm[hidden], .tower-pro-pay-note[hidden] { display: none !important; }
+.tower-pro-link {
+  appearance: none; display: inline-flex; align-items: center; margin: 0; padding: 0.22rem 0.5rem;
+  border: 1px solid rgba(183, 246, 255, 0.72); border-radius: 999px; background: transparent;
+  color: #f7f9ff; font-family: "Oswald", system-ui, sans-serif; font-size: 0.68rem; font-weight: 700;
+  letter-spacing: 0.04em; line-height: 1; text-transform: uppercase; text-decoration: none;
+  white-space: nowrap; cursor: pointer;
+}
+.tower-pro-link:hover, .tower-pro-link:focus-visible { color: #fff; outline: none; box-shadow: 0 0 0 1px rgba(183, 246, 255, 0.72); }
+#panel-tower .tower-pro-link, #panel-tower .tower-pro-link:hover { color: #f7f9ff !important; }
+.tower-pro-for { font-size: 0.75rem; line-height: 1.2; color: #f7f9ff; }
+.tower-pro-pay-confirm { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin-top: 0.35rem; }
+.tower-pro-pay-confirm input {
+  flex: 1; min-width: 8rem; font: inherit; font-size: 0.75rem; padding: 0.22rem 0.4rem;
+  border-radius: 0.35rem; border: 1px solid rgba(183, 246, 255, 0.45);
+  background: rgba(5, 8, 28, 0.55); color: #f7f9ff;
+}
+.tower-pro-pay-note { margin: 0.3rem 0 0; font-size: 0.75rem; color: #f7f9ff; }
 /* Pro money links (Venmo, Pay for services, Buy ads): quiet secondary buttons in the muted widget chrome. */
 .tower-social-btn.is-quiet { background: transparent; color: var(--cgn-text-muted); border: 1px solid var(--cgn-border); border-radius: 0.5rem; padding: 0.3rem 0.75rem; width: auto; height: auto; font-size: 0.8rem; font-weight: 400; white-space: nowrap; }
 .tower-social-btn.is-quiet:hover, .tower-social-btn.is-quiet:focus-visible { color: inherit; }

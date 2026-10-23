@@ -516,6 +516,13 @@
                         </div>
                       </div>
                       <div class="tower-under-photo" data-tower-under-photo>
+                        <div class="tower-pro-links" data-tower-pro-links hidden></div>
+                        <div class="tower-pro-pay-confirm" data-tower-pro-pay-confirm hidden>
+                          <label class="visually-hidden" for="tower-pro-pay-for">What this payment is for</label>
+                          <input id="tower-pro-pay-for" data-tower-pro-pay-for type="text" maxlength="120" placeholder="What this payment is for" autocomplete="off">
+                          <button type="button" class="tower-pro-link" data-tower-pro-pay-go>Confirm</button>
+                        </div>
+                        <p class="tower-pro-pay-note" data-tower-pro-pay-note hidden role="status"></p>
                         <button type="button" class="tower-follow-btn" data-tower-add-friends aria-label="Find friends">Find friends</button>
                         <p class="tower-mutual-friends" data-tower-mutual-friends>Mutual friends</p>
                         <button type="button" class="tower-go-live-btn" data-go-live aria-label="Go live">Go live</button>
@@ -552,8 +559,14 @@
                           <input id="tower-social-tiktok" name="socialTiktok" type="url" maxlength="500" placeholder="https://tiktok.com/@…" data-tower-social="tiktok" inputmode="url">
                           <label for="tower-social-linkedin">LinkedIn</label>
                           <input id="tower-social-linkedin" name="socialLinkedin" type="url" maxlength="500" placeholder="https://linkedin.com/in/…" data-tower-social="linkedin" inputmode="url">
-                          <label for="tower-social-linktree">Website</label>
+                          <label for="tower-social-shop">Shop</label>
+                          <input id="tower-social-shop" name="socialShop" type="url" maxlength="500" placeholder="https://…" data-tower-social="shop" inputmode="url">
+                          <label for="tower-social-linktree">Linktree</label>
                           <input id="tower-social-linktree" name="socialLinktree" type="url" maxlength="500" placeholder="https://linktr.ee/…" data-tower-social="linktree" inputmode="url">
+                          <label for="tower-social-applepay">Apple Pay</label>
+                          <input id="tower-social-applepay" name="socialApplePay" type="text" maxlength="120" placeholder="Payee name, not a card number" data-tower-social="applepay" autocomplete="off">
+                          <label for="tower-social-applefor">Goods or services</label>
+                          <input id="tower-social-applefor" name="socialAppleFor" type="text" maxlength="120" placeholder="Short line for the receipt" data-tower-social="applefor" autocomplete="off">
                           <label for="tower-social-venmo">Venmo</label>
                           <input id="tower-social-venmo" name="socialVenmo" type="text" maxlength="500" placeholder="@handle or https://venmo.com/…" data-tower-social="venmo" autocomplete="off">
                           <label for="tower-social-services">Pay for services link</label>

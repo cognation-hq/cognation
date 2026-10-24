@@ -9458,13 +9458,14 @@ body.tower-messages-page [data-tower-follow-row],
 }
 .tower-add-widget-dialog[hidden] { display: none !important; }
 .tower-add-widget-dialog-card {
-  width: min(24rem, 100%);
+  width: min(16rem, 100%);
   background: #fff5f9;
   border: 1px solid rgba(74, 44, 58, 0.2);
   border-radius: 0.85rem;
-  padding: 1rem 1.1rem 1.1rem;
+  padding: 0.7rem 0.8rem 0.75rem;
   box-shadow: 0 1rem 2.5rem rgba(40, 20, 30, 0.25);
 }
+[data-tower-add-quote-fields][hidden] { display: none !important; }
 .tower-add-widget-title { margin: 0 0 0.35rem; font-size: 1.1rem; color: #4a2c3a; }
 .tower-add-widget-choices { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0 0.75rem; }
 .tower-add-widget-choices .is-selected,
@@ -15349,7 +15350,7 @@ body.cgn-cal-page {
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(217, 210, 240, 0.4) !important;
   border-radius: 0.65rem;
-  padding: 0.55rem 0.65rem;
+  padding: 0.55rem 1.5rem 0.7rem 0.65rem;
   color: #f7f9ff !important;
   font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif) !important;
 }
@@ -15388,11 +15389,9 @@ body.cgn-cal-page {
    - Card: site glass rgba(18,16,38,.92), 12px blur, 1px #d9d2f0 at 40%.
    - Title and label #f7f9ff, hint #d9d2f0.
    - Unselected tab and Cancel: transparent, 1px #d9d2f0 at 40%, #f7f9ff text.
-   - Selected tab and Add sticker: the same gradient pill, laid on #f7f9ff so it
-     keeps its light look on the dark card, with ink #1c1630 text. The selected
-     tab follows the dialog's data-add-choice (the choice Add sticker uses), so
-     picking Slogan card moves the pill to it. The accent-colour selection
-     ring and textarea focus ring become #d9d2f0.
+   - Quote and Add sticker: the same gradient pill, laid on #f7f9ff so it
+     keeps its light look on the dark card, with ink #1c1630 text.
+     The accent-colour selection ring and textarea focus ring become #d9d2f0.
    - Textarea rgba(255,255,255,.06), #f7f9ff text, #d9d2f0 placeholder.
    - Blocked-quote line: #fbe3e6, #1c1630 text, 1px #e88a99. */
 .tower-add-widget-dialog .tower-add-widget-dialog-card {
@@ -15418,8 +15417,7 @@ body.cgn-cal-page {
   box-shadow: none !important;
   outline: none;
 }
-.tower-add-widget-dialog:not([data-add-choice="slogan"]) .tower-add-widget-choices [data-tower-add-choice="quote"],
-.tower-add-widget-dialog[data-add-choice="slogan"] .tower-add-widget-choices [data-tower-add-choice="slogan"],
+.tower-add-widget-dialog .tower-add-widget-choices [data-tower-add-choice="quote"],
 .tower-add-widget-dialog .form-actions [data-tower-add-quote-confirm] {
   background-color: #f7f9ff !important;
   background-image: linear-gradient(100deg, rgba(139, 237, 255, 0.42), rgba(204, 161, 255, 0.38)) !important;

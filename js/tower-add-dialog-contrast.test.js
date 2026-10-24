@@ -35,8 +35,7 @@ assert.ok(/background:\s*transparent !important/.test(outline));
 assert.ok(/border:\s*1px solid rgba\(217, 210, 240, 0\.4\) !important/.test(outline));
 assert.ok(/color:\s*#f7f9ff !important/.test(outline), "unselected tab + Cancel");
 
-assert.ok(/\.tower-add-widget-dialog:not\(\[data-add-choice="slogan"\]\) \.tower-add-widget-choices \[data-tower-add-choice="quote"\],/.test(blk), "Quote pill by default");
-assert.ok(/\.tower-add-widget-dialog\[data-add-choice="slogan"\] \.tower-add-widget-choices \[data-tower-add-choice="slogan"\],/.test(blk), "Slogan pill when chosen");
+assert.ok(/\.tower-add-widget-dialog \.tower-add-widget-choices \[data-tower-add-choice="quote"\],/.test(blk), "Quote pill");
 var pill = rule(".tower-add-widget-dialog .form-actions [data-tower-add-quote-confirm] {");
 assert.ok(/linear-gradient\(100deg, rgba\(139, 237, 255, 0\.42\), rgba\(204, 161, 255, 0\.38\)\)/.test(pill), "same gradient pill");
 assert.ok(/color:\s*#1c1630 !important/.test(pill), "ink text");
@@ -50,7 +49,7 @@ assert.ok(/background:\s*#fbe3e6/.test(err) && /border:\s*1px solid #e88a99/.tes
 
 assert.ok(!/#ED9300|--color-accent/i.test(blk), "no yellow");
 /* Copy and controls unchanged. */
-["Add to scrapbook", "Add a quote or text sticker you can drag and resize.", "Quote / text", "Slogan card", "Quote text", "Type a quote or note…", "Add sticker", "Cancel"].forEach(function (t) {
+["Add to scrapbook", "Quote", "Quote text", "Type a quote or note…", "Add sticker", "Cancel"].forEach(function (t) {
   assert.ok(html.indexOf(t) > 0, "copy kept: " + t);
 });
 console.log("tower-add-dialog-contrast tests passed");

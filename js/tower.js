@@ -9420,8 +9420,8 @@
     var entry = {
       id: id,
       text: text,
-      x: layout && typeof layout.x === "number" ? layout.x : 36 + Math.random() * 20,
-      y: layout && typeof layout.y === "number" ? layout.y : 30 + Math.random() * 25,
+      x: layout && typeof layout.x === "number" ? layout.x : 4,
+      y: layout && typeof layout.y === "number" ? layout.y : 2,
       z: layout && typeof layout.z === "number" ? layout.z : 10,
       tilt: layout && typeof layout.tilt === "number" ? layout.tilt : 0,
     };
@@ -9438,6 +9438,42 @@
     p.quoteStickers = quotes;
     TowerProfileStore.save(p);
     renderQuoteStickers(root, p);
+    /* A new quote used to land on a random percent of the tall canvas and sat
+       on the profile card. Seat it in a clear spot and bring that spot on screen. */
+    if (!layout && typeof keepQuoteClear === "function" && root && typeof root.querySelector === "function") {
+      var stage = root.querySelector("[data-tower-scrapbook]");
+      var el = stage && stage.querySelector('[data-tower-quote-id="' + id + '"]');
+      if (stage && el && (typeof isPhoneStage !== "function" || !isPhoneStage(stage))) {
+        el.style.setProperty("--sticker-x", "4%");
+        el.style.setProperty("--sticker-y", "8px");
+        el.setAttribute("data-sticker-x", "4");
+        el.setAttribute("data-sticker-y", "1");
+        if (keepQuoteClear(stage, el)) {
+          entry.x = parseFloat(el.getAttribute("data-sticker-x")) || entry.x;
+          entry.y = parseFloat(el.getAttribute("data-sticker-y")) || entry.y;
+          var qPx = parseFloat(el.getAttribute("data-sticker-y-px") || "");
+          if (isFinite(qPx)) entry.yPx = qPx;
+        } else {
+          entry.x = 4;
+          entry.y = 1;
+          entry.yPx = 8;
+        }
+        p.quoteStickers = getQuoteStickers(p).map(function (q) {
+          return q && q.id === id ? entry : q;
+        });
+        TowerProfileStore.save(p);
+        el.__cognationQuoteSpot = {
+          x: entry.x,
+          yCss: typeof entry.yPx === "number" ? entry.yPx + "px" : entry.y + "%",
+          yPct: entry.y,
+        };
+        el.style.setProperty("--sticker-x", entry.x + "%");
+        el.style.setProperty("--sticker-y", el.__cognationQuoteSpot.yCss);
+        if (el.scrollIntoView) {
+          try { el.scrollIntoView({ block: "center", inline: "nearest" }); } catch (eSee) {}
+        }
+      }
+    }
     return entry;
   }
 
@@ -9792,11 +9828,13 @@
     var dlg = document.querySelector("[data-tower-add-widget-dialog]");
     if (!dlg) return;
     dlg.hidden = false;
+    dlg.removeAttribute("data-add-choice");
+    var fields = dlg.querySelector("[data-tower-add-quote-fields]");
+    if (fields) fields.hidden = true;
     var ta = dlg.querySelector("[data-tower-add-quote-text]");
-    if (ta) {
-      ta.value = "";
-      ta.focus();
-    }
+    if (ta) ta.value = "";
+    var quoteBtn = dlg.querySelector('[data-tower-add-choice="quote"]');
+    if (quoteBtn) quoteBtn.focus();
   }
 
   function closeAddWidgetDialog() {
@@ -9832,21 +9870,9 @@
         if (!isTowerOwner(TowerProfileStore.get())) return;
         var ta = dlg.querySelector("[data-tower-add-quote-text]");
         var text = ta ? ta.value : "";
-        var choice = dlg.getAttribute("data-add-choice") || "quote";
-        if (choice === "slogan") {
-          var p = TowerProfileStore.get();
-          p.slogan = String(text || "").trim().slice(0, 400);
-          p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
-          p.publicWidgets.slogan = !!p.slogan;
-          TowerProfileStore.save(p);
-          applyPublicWidgets(root, p);
-          var sloganDisplay = root.querySelector("[data-tower-slogan-display]");
-          if (sloganDisplay) sloganDisplay.textContent = p.slogan;
-          var sloganInput = root.querySelector("[data-tower-slogan]");
-          if (sloganInput) sloganInput.value = p.slogan;
-          setProfileStatusOn(root, "Slogan updated.", false);
-        } else {
-          var added = addQuoteSticker(root, text);
+        var fields = dlg.querySelector("[data-tower-add-quote-fields]");
+        if (fields && fields.hidden) return;
+        var added = addQuoteSticker(root, text);
           var qStatus = dlg.querySelector("[data-tower-add-quote-status]");
           if (added && added.blocked) {
             /* Keep the dialog open with the words so the owner can change them. */
@@ -9864,16 +9890,18 @@
           }
           if (qStatus) { qStatus.hidden = true; qStatus.textContent = ""; }
           setProfileStatusOn(root, "Quote sticker added.", false);
-        }
         closeAddWidgetDialog();
       });
     }
     dlg.querySelectorAll("[data-tower-add-choice]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         dlg.setAttribute("data-add-choice", btn.getAttribute("data-tower-add-choice") || "quote");
-        dlg.querySelectorAll("[data-tower-add-choice]").forEach(function (b) {
-          b.classList.toggle("is-selected", b === btn);
-        });
+        var fields = dlg.querySelector("[data-tower-add-quote-fields]");
+        if (fields) fields.hidden = false;
+        var oldStatus = dlg.querySelector("[data-tower-add-quote-status]");
+        if (oldStatus) { oldStatus.hidden = true; oldStatus.textContent = ""; }
+        var box = dlg.querySelector("[data-tower-add-quote-text]");
+        if (box) box.focus();
       });
     });
 

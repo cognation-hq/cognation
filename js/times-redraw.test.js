@@ -71,14 +71,19 @@ var panel = new El("section"); panel.id = "panel-signal";
 var feedList = panel.appendChild(new El("div"));
 var env = { editionId: "local" };
 var appendPostEl = new Function("feedList", "escapeHtml", "formatTime", "env",
-  "var editionId = env.editionId;\n" + appendSrc + "\nreturn appendPostEl;")(
+  "var editionId = env.editionId;\n" + fnSource("timesHeadline") + "\n" + appendSrc + "\nreturn appendPostEl;")(
   feedList, function (s) { return String(s == null ? "" : s); }, function () { return "now"; }, env);
 
 /* renderFeed's printing block, driven by the real appendPostEl. */
 var printBlock = /var printed = posts\.slice\(0, TIMES_SLOTS\);[\s\S]*?var spare = [^;]*;/.exec(fnSource("renderFeed"))[0];
 function renderFeed(posts) {
   feedList.innerHTML = "";
-  new Function("posts", "TIMES_SLOTS", "appendPostEl", printBlock)(posts, 10, appendPostEl);
+  new Function("posts", "TIMES_SLOTS", "appendPostEl", "postScore", printBlock)(posts, 10, appendPostEl, function (post) {
+    var score = Number(post && post.likes) || 0;
+    var reactions = post && post.reactions;
+    if (reactions && typeof reactions === "object") Object.keys(reactions).forEach(function (face) { if (Array.isArray(reactions[face])) score += reactions[face].length; });
+    return score;
+  });
 }
 var state = { byEdition: {} };
 function applyRefreshedPosts(posts, note) {

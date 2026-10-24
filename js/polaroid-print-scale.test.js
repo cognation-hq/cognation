@@ -69,5 +69,11 @@ assert.ok(
 /* Per-print {url, scale} with legacy string acceptance */
 assert.ok(tower.indexOf("polaroidPrintEntry") !== -1, "polaroidPrintEntry normalizes string|{url,scale}");
 assert.ok(tower.indexOf("polaroidHasUrl") !== -1, "polaroidHasUrl for upload dedupe");
+assert.ok(tower.indexOf("prints[i].url") !== -1 && tower.indexOf("prints[i + 1]") === -1, "each print is its own polaroid");
+assert.ok(/paintPolaroidPhoto\(primaryPhoto, ""\)/.test(tower), "original polaroid stays blank");
+assert.ok(tower.indexOf("pullChosenPolaroids") !== -1 && /multiple[^>]*data-tower-instax-file|data-tower-instax-file[^>]*multiple/.test(html), "each chosen picture uploads");
+assert.ok(tower.indexOf("polaroidShell") === -1, "blank polaroid is not the upload control");
+assert.ok(tower.indexOf('closest(\'[data-tower-widget="instax"]\')') !== -1, "camera opens the image picker");
+assert.ok(tower.indexOf("normalized.length > 6") === -1 && tower.indexOf("normalized.push({ url: dataUrl, scale: 1 })") !== -1, "each upload adds a polaroid and earlier ones stay");
 
 console.log("polaroid-print-scale.test.js: ok");

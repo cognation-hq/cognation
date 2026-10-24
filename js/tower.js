@@ -153,8 +153,12 @@
      the page is one group. Personal keeps Venmo as its own logo chip. */
   var PAY_LINKS_ID = "pay-links";
   var PAY_LINK_NETS = ["venmo", "services", "ads"];
+  var PAGE_BUTTON_NETS = ["shop", "linktree", "applepay", "appleamt"];
   function isPayLinkNet(netId, p) {
     return isProTower(p) && PAY_LINK_NETS.indexOf(String(netId || "")) >= 0;
+  }
+  function isPageButtonNet(netId) {
+    return PAGE_BUTTON_NETS.indexOf(String(netId || "")) >= 0;
   }
 
   function socialNetIdFromWidget(wid) {
@@ -221,7 +225,7 @@
       if (row.length === 1 && row[0] === "__socials__") {
         var opted = optedInSocialNetIds(p);
         var pay = opted.filter(function (id) { return isPayLinkNet(id, p); });
-        var ids = opted.filter(function (id) { return pay.indexOf(id) < 0; }).map(socialWidgetId);
+        var ids = opted.filter(function (id) { return pay.indexOf(id) < 0 && !isPageButtonNet(id); }).map(socialWidgetId);
         var i;
         for (i = 0; i < ids.length; i += 2) {
           out.push(ids.slice(i, i + 2));
@@ -415,6 +419,14 @@
     /* Phone ignores saved x/y entirely (it is the website's layout). */
     var layout = phone ? {} : getWidgetLayout(p) || {};
     var rows = spawnRowsFor(p).slice();
+    var printListed = {};
+    rows.forEach(function (r) { r.forEach(function (id) { printListed[id] = true; }); });
+    stage.querySelectorAll("[data-tower-polaroid-extra]").forEach(function (el) {
+      var wid = el.getAttribute("data-tower-widget");
+      if (!wid || printListed[wid] || el.hidden || el.classList.contains("is-widget-off")) return;
+      printListed[wid] = true;
+      rows.push([wid]);
+    });
     if (phone) {
       /* Widgets outside the spec order (emoji, quotes, extra prints) follow in DOM order. */
       var listed = {};
@@ -703,40 +715,22 @@
     /* Second pass (r146): compact upward. A widget with a big empty band above it
        (more than COMPACT_MIN_GAP px, e.g. YouTube parked far down on an old saved
        layout) moves up to the nearest free spot; the identity row stays pinned.
-       The YouTube link chip is seated right under the YouTube widget. Smaller gaps
-       are kept, and owner-dragged widgets never move up, so a spot the owner
-       chose is not touched. */
+       The YouTube logo is its own widget and is never seated on the video window.
+       Smaller gaps are kept, and owner-dragged widgets never move up, so a spot
+       the owner chose is not touched. */
     var rowCount = rowItems.length;
     var seated = fixed.slice(0, rowCount);
     var rest = fixed.slice(rowCount).sort(function (a, b) { return a.y - b.y || a.x - b.x; });
-    var chip = null;
-    rest = rest.filter(function (b) {
-      if (b.id === "social-youtube") { chip = b; return false; }
-      return true;
-    });
-    var yt = rest.filter(function (b) { return b.id === "youtube"; })[0] || null;
-    /* YouTube widget not on screen yet (still loading): leave the chip where it is. */
     /* One-time compaction of an old layout (no _compacted mark yet): every widget
        in those rows carries an owner-dragged mark, so the marks are ignored on
        this pass only. The identity row stays pinned (seated above). */
     if (opts.ignoreDragged) rest.forEach(function (b) { b.dragged = false; });
-    if (chip && !yt) { chip.dragged = true; rest.push(chip); }
     function freeAt(cand) {
       return !seated.some(function (f) { return boxesOverlap(cand, f); });
     }
-    function seat(b, forceY) {
+    function seat(b) {
       var startY = b.y;
-      if (typeof forceY === "number") {
-        var c0 = { x: b.x, y: forceY, w: b.w, h: b.h };
-        if (freeAt(c0)) b.y = forceY;
-        else {
-          var ysF = seated.map(function (f) { return f.y + f.h + gap; }).filter(function (y) { return y >= forceY; }).sort(function (m, n) { return m - n; });
-          for (var k = 0; k < ysF.length; k++) {
-            var cf = { x: b.x, y: ysF[k], w: b.w, h: b.h };
-            if (freeAt(cf)) { b.y = ysF[k]; break; }
-          }
-        }
-      } else if (!b.dragged) {
+      if (!b.dragged) {
         var ups = [gap].concat(seated.map(function (f) { return f.y + f.h + gap; }))
           .filter(function (y) { return y < b.y; })
           .sort(function (m, n) { return m - n; });
@@ -757,14 +751,7 @@
         moves[b.id] = { x: m0 ? m0.x : b.x, y: b.y };
       }
     }
-    rest.forEach(function (b) {
-      seat(b);
-      if (chip && b === yt) {
-        var cx = Math.max(0, Math.min(Math.max(0, stageW - chip.w), yt.x));
-        if (chip.x !== cx) { chip.x = cx; moves[chip.id] = { x: cx, y: chip.y }; }
-        seat(chip, yt.y + yt.h + 8);
-      }
-    });
+    rest.forEach(function (b) { seat(b); });
     return moves;
   }
   var COMPACT_MIN_GAP = 160;
@@ -2824,8 +2811,8 @@
         return String(b.createdAt).localeCompare(String(a.createdAt));
       });
     },
-    /* NEWS reads this: most reacted personal and professional Feed posts (signals). */
-    newsList: function () {
+    /* Hidden desk ranks this plate: every personal and professional Feed post. */
+    feedPlate: function () {
       var personal = this.list().map(function (post) {
         var copy = {};
         Object.keys(post || {}).forEach(function (key) { copy[key] = post[key]; });
@@ -2834,8 +2821,11 @@
           : "personal";
         return copy;
       });
-      var professional = newsProfessionalPosts();
-      return personal.concat(professional).map(function (post) {
+      return personal.concat(newsProfessionalPosts());
+    },
+    /* NEWS reads this: most reacted personal and professional Feed posts (signals). */
+    newsList: function () {
+      return this.feedPlate().map(function (post) {
         post.rating = postRating(post); /* rating carries unchanged into SIGNAL and ECHO */
         return post;
       }).filter(function (post) {
@@ -2930,7 +2920,8 @@
       var post = {
         id: "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
         authorName: (fields && fields.authorName) || "You",
-        authorProfileId: (window.CognationTowerProfileStore &&
+        authorProfileId: (fields && fields.authorProfileId) ||
+          (window.CognationTowerProfileStore &&
           window.CognationTowerProfileStore.get() &&
           window.CognationTowerProfileStore.get()._profileId) || "",
         body: body.slice(0, 2000),
@@ -2942,14 +2933,10 @@
           : "NR",
         likes: 0,
         visibility: (window.CognationEchoGroups && window.CognationEchoGroups.isGroupPost(body)) ? "public" : "friends",
-        handle: (window.CognationTowerProfileStore
+        handle: (fields && fields.handle) || (window.CognationTowerProfileStore
           ? normalizeHandle(window.CognationTowerProfileStore.get().handle || "")
           : ""),
-        profileKind: (window.CognationTowerProfileStore &&
-          window.CognationTowerProfileStore.get() &&
-          window.CognationTowerProfileStore.get()._profileKind === "professional")
-          ? "professional"
-          : "personal",
+        profileKind: (fields && fields.profileKind) === "professional" ? "professional" : "personal",
       };
       data.posts.unshift(post);
       if (!this.save(data)) return { ok: false, error: "Could not save post." };
@@ -2978,42 +2965,92 @@
     return "";
   }
 
+  /* Minimum age for one photo. No rating (and a name that rates G/PG) stays open
+     to whoever can already see the post. 21+ / MA never shows under 21. */
+  function feedViewerAge() {
+    var floor = window.CognationAgeFloor;
+    var n = floor && typeof floor.viewerAge === "function" ? floor.viewerAge() : 0;
+    if (typeof n === "number" && n > 0) return n;
+    return ratingViewer().age;
+  }
+  function photoMinAge(a) {
+    if (!a) return null;
+    var min = null;
+    function use(n) {
+      n = +n;
+      if (!isFinite(n)) return;
+      min = min == null ? n : Math.max(min, n);
+    }
+    if (a.minAge != null && a.minAge !== "") use(a.minAge);
+    if (a.min_age != null && a.min_age !== "") use(a.min_age);
+    var code = String(a.rating || a.audience || "").toUpperCase().replace(/\s+/g, "");
+    if (code === "PG-13" || code === "PG13") use(13);
+    else if (code === "R" || code === "18+") use(18);
+    else if (code === "MA" || code === "21+" || code === "NC-17") use(21);
+    else if (code === "NR") use(999);
+    else if (/^\d{1,3}$/.test(code)) use(code);
+    var blob = [a.rating, a.audience, a.label, a.name].join(" ");
+    if (/(^|\W)21\s?\+(?!\w)/i.test(blob)) use(21);
+    else if (/(^|\W)18\s?\+(?!\w)/i.test(blob)) use(18);
+    if (/\bPG-?13\b/i.test(blob)) use(13);
+    if (/\b(nsfw|explicit)\b/i.test(blob)) use(18);
+    if (!String(a.rating || "").trim() && a.minAge == null && a.min_age == null && !a.audience) {
+      var ar = window.CognationAutoRate;
+      var named = String(a.label || a.name || "");
+      if (ar && named) {
+        var r = (ar.rate(named, []) || {}).rating;
+        if (r === "PG-13") use(13);
+        else if (r === "R") use(18);
+        else if (r === "MA") use(21);
+        else if (r === "NR") use(999);
+      }
+    }
+    return min;
+  }
+  function photoVisible(a) {
+    var min = photoMinAge(a);
+    if (min == null) return true;
+    var age = feedViewerAge();
+    if (min >= 21 && age < 21) return false;
+    return age >= min;
+  }
+  function photoSrc(a) {
+    var url = String((a && (a.dataUrl || a.url || a.src || a.imageUrl)) || "");
+    if (/^data:image\/(png|jpeg|gif|webp);/i.test(url)) return url;
+    if (/^https?:\/\/[^"'<>\s]+$/i.test(url)) return url;
+    if (/^assets\/[a-z0-9./_-]+\.(png|jpe?g|gif|webp)$/i.test(url)) return url;
+    var name = String((a && (a.name || a.label)) || "");
+    var kind = String((a && a.kind) || "").toLowerCase();
+    if (/\.(pdf|docx?|txt|mp4|mov|webm)$/i.test(name) || kind === "video" || kind === "document" || kind === "note") return "";
+    if (kind === "photo" || kind === "image") return "assets/feed/market-square.jpg";
+    return "";
+  }
   function renderAttachments(list) {
     if (!list || !list.length) return "";
-    return (
-      '<ul class="tower-attachments">' +
-      list
-        .map(function (a) {
-          var name = (a && (a.label || a.name)) || "file";
-          var img = attachmentImageUrl(a);
-          if (img) {
-            return (
-              '<li class="tower-attach tower-attach--photo tower-attach--image">' +
-              '<img class="tower-attach-img" src="' + escapeHtml(img) + '" alt="' +
-              escapeHtml("Photo: " + name) + '" loading="lazy" decoding="async"></li>'
-            );
-          }
-          /* Older photo posts saved only the file name (no picture was uploaded). */
-          var missing = a && a.kind === "photo";
-          return (
-            '<li class="tower-attach tower-attach--' +
-            escapeHtml((a && a.kind) || "document") +
-            (missing ? " tower-attach--missing" : "") +
-            '">' +
-            '<span class="tower-attach-kind">' +
-            escapeHtml(kindLabel(a && a.kind)) +
-            "</span> " +
-            '<span class="tower-attach-name">' +
-            escapeHtml(name) +
-            "</span>" +
-            (missing ? ' <span class="tower-attach-note">· photo wasn\'t uploaded</span>' : "") +
-            "</li>"
-          );
-        })
-        .join("") +
-      "</ul>"
-    );
+    var html = list.map(function (a) {
+      var src = photoSrc(a) || attachmentImageUrl(a);
+      if (src) {
+        if (!photoVisible(a)) return "";
+        return '<img class="tower-feed-photo" alt="" src="' + escapeHtml(src) + '">';
+      }
+      var name = (a && (a.label || a.name)) || "file";
+      var missing = a && a.kind === "photo";
+      return (
+        '<span class="tower-attach tower-attach--' +
+        escapeHtml((a && a.kind) || "document") +
+        (missing ? " tower-attach--missing" : "") +
+        '"><span class="tower-attach-kind">' +
+        escapeHtml(kindLabel(a && a.kind)) +
+        '</span> <span class="tower-attach-name">' +
+        escapeHtml(name) +
+        "</span>" +
+        (missing ? ' <span class="tower-attach-note">· photo wasn\'t uploaded</span>' : "") +
+        "</span>"
+      );
+    }).join("");
+    return html.trim() ? '<div class="tower-attachments">' + html + "</div>" : "";
   }
+  window.CognationFeedPhotos = { html: renderAttachments, minAge: photoMinAge };
 
   var TOWER_POST_REACTIONS = ["❤️", "👍", "😂", "😮", "😢", "🔥"];
 
@@ -3193,6 +3230,7 @@
       var article = document.createElement("article");
       article.className = "tower-post";
       article.setAttribute("data-tower-post", post.id || "");
+      article.setAttribute("data-post-audience", post.profileKind === "professional" ? "professional" : "personal");
       article.innerHTML =
         '<header class="tower-post-meta">' +
         towerPostAuthorHtml(post) +
@@ -3538,7 +3576,17 @@
   function syncOwnerPeoplePill(root, profile, owner) {
     if (!root) return;
     var pro = profileIsProfessional(profile);
+    var houseHandle = String((profile && profile.handle) || "").replace(/^@/, "").toLowerCase();
+    var housePage = pro && (
+      String((profile && (profile._profileId || profile.id)) || "") === "prof-alexa-professional" ||
+      houseHandle === "alexa-pro" ||
+      houseHandle === "cognation"
+    );
     root.querySelectorAll("[data-tower-add-friends]").forEach(function (el) {
+      if (housePage) {
+        el.hidden = true;
+        return;
+      }
       if (owner) {
         el.textContent = pro ? "Find people" : "Find friends";
         el.setAttribute("aria-label", pro ? "Find people to follow" : "Find friends");
@@ -4398,7 +4446,10 @@
     { id: "tiktok", label: "TikTok", short: "TT", logo: "assets/social/tiktok.svg" },
     { id: "linkedin", label: "LinkedIn", short: "in", logo: "assets/social/linkedin.png", professionalOnly: true },
     { id: "venmo", label: "Venmo", short: "Vm", logo: "assets/social/venmo.svg" },
-    { id: "linktree", label: "Website", short: "Web", logo: "assets/social/linktree.svg", professionalOnly: true },
+    { id: "shop", label: "Shop", short: "Shop", professionalOnly: true },
+    { id: "linktree", label: "Linktree", short: "Linktree", professionalOnly: true },
+    { id: "applepay", label: "Apple Pay", short: "Apple Pay", professionalOnly: true },
+    { id: "appleamt", label: "Amount", short: "$", professionalOnly: true },
     /* NEW (not restored): owner-set outbound link on Pro. A plain https link out;
        Cognation takes no payment, stores no card data and calls no service. */
     { id: "services", label: "Pay for services", short: "Pay for services", professionalOnly: true, quiet: true, httpsOnly: true },
@@ -5329,14 +5380,25 @@
     return "https://venmo.com/u/" + handle;
   }
 
+  function hasCardNumber(raw) {
+    return /\d(?:[ -]*\d){12,18}/.test(String(raw || ""));
+  }
+
+  function plainLabel(raw, max) {
+    var t = String(raw || "").replace(/\s+/g, " ").trim().slice(0, max || 120);
+    return !t || hasCardNumber(t) ? "" : t;
+  }
+
   function socialHref(id, raw) {
     if (id === "venmo") return venmoHref(raw);
     if (id === "services" || id === "ads") return safeHttpsUrl(raw);
+    if (id === "applepay" || id === "appleamt") return "";
     return safeHttpUrl(raw);
   }
 
   function storedSocialValue(id, value) {
     if (id === "venmo") return String(value || "").trim().slice(0, 500);
+    if (id === "appleamt") return typedAmount(value); if (id === "applepay") return plainLabel(value, 120);
     if (id === "services" || id === "ads") return safeHttpsUrl(value);
     return safeHttpUrl(value);
   }
@@ -5437,12 +5499,112 @@
     try { spawnUnplacedWidgets(root, TowerProfileStore.get()); } catch (eSp) {}
   }
 
+  function typedAmount(raw) {
+    var n = typeof raw === "number" ? raw : Number(String(raw || "").replace(/[^0-9.]/g, ""));
+    if (!isFinite(n) || n <= 0 || n > 1e9) return "";
+    return "$" + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+  function proPayAttempt(o) {
+    o = o || {};
+    if (!o.signedIn) return { taken: false, text: "Sign in to pay. No payment was taken." };
+    if (o.owner) return { taken: false, text: "Only the payer can start this. No payment was taken." };
+    if (o.phase !== "confirm") return { taken: false, text: "", open: true };
+    if (!plainLabel(o.forText, 120)) return { taken: false, text: "Name what this payment is for. No payment was taken.", open: true };
+    return { taken: false, text: "No payment was taken." };
+  }
+  function payerSignedIn() {
+    var s = getSessionObject();
+    return !!(s && (s.username || s.supabaseUserId || s.activeProfileId));
+  }
+  function payNote(root, text) {
+    var note = root.querySelector("[data-tower-pro-pay-note]");
+    if (!note) return;
+    note.hidden = !text;
+    note.textContent = text || "";
+  }
+  function openProPay(root) {
+    var p = TowerProfileStore.get();
+    var res = proPayAttempt({ signedIn: payerSignedIn(), owner: isTowerOwner(p), phase: "open" });
+    var box = root.querySelector("[data-tower-pro-pay-confirm]");
+    if (!res.open) {
+      if (box) box.hidden = true;
+      payNote(root, res.text);
+      return;
+    }
+    if (box) box.hidden = false;
+    payNote(root, "");
+  }
+  function confirmProPay(root) {
+    var input = root.querySelector("[data-tower-pro-pay-for]");
+    var p = TowerProfileStore.get();
+    var res = proPayAttempt({
+      signedIn: payerSignedIn(),
+      owner: isTowerOwner(p),
+      phase: "confirm",
+      forText: input ? input.value : "",
+    });
+    payNote(root, res.text);
+  }
+  function bindProPay(root) {
+    if (!root || root.__proPay) return;
+    root.__proPay = true;
+    root.addEventListener("click", function (ev) {
+      var t = ev.target && ev.target.closest ? ev.target : null;
+      if (!t) return;
+      if (t.closest("[data-tower-pro-link='applepay']")) { ev.preventDefault(); openProPay(root); }
+      else if (t.closest("[data-tower-pro-pay-go]")) { ev.preventDefault(); confirmProPay(root); }
+    });
+  }
+  function addProAnchor(row, id, label, href) {
+    if (!href) return;
+    var a = document.createElement("a");
+    a.className = "tower-pro-link";
+    a.setAttribute("data-tower-pro-link", id);
+    a.href = href;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = label;
+    row.appendChild(a);
+  }
+  function renderProLinks(root, p) {
+    bindProPay(root);
+    var row = root.querySelector("[data-tower-pro-links]");
+    if (!row) return;
+    var pro = isProTower(p);
+    var links = (p && p.socialLinks) || {};
+    var shop = pro ? socialHref("shop", links.shop) : "";
+    var tree = pro ? socialHref("linktree", links.linktree) : "";
+    var payee = pro ? storedSocialValue("applepay", links.applepay) : "";
+    var amount = payee ? storedSocialValue("appleamt", links.appleamt) : "";
+    var sig = [shop, tree, payee, amount].join("\n");
+    if (row.getAttribute("data-sig") !== sig) {
+      row.setAttribute("data-sig", sig);
+      row.textContent = "";
+      addProAnchor(row, "shop", "Shop", shop);
+      addProAnchor(row, "linktree", "Linktree", tree);
+      if (payee) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "tower-pro-link";
+        b.setAttribute("data-tower-pro-link", "applepay");
+        b.textContent = amount ? "Apple Pay " + amount : "Apple Pay";
+        row.appendChild(b);
+      }
+    }
+    row.hidden = !row.firstChild;
+    if (!payee) {
+      var box = root.querySelector("[data-tower-pro-pay-confirm]");
+      if (box) box.hidden = true;
+      payNote(root, "");
+    }
+  }
   /* v3.3: one [data-tower-widget] per linked social — never a grouped LINKS box. */
   function renderSocialLinks(root, p) {
     if (!root) return;
     migrateGroupedSocialLayout(p);
     seedPayLinksLayout(p);
     syncEditSocialFields(root, p);
+    renderProLinks(root, p);
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (!stage) return;
     var links = chipSocialLinks(p);
@@ -5458,14 +5620,14 @@
       var wid = el.getAttribute("data-tower-widget") || "";
       var netId = socialNetIdFromWidget(wid);
       if (!netId) return;
-      if (!wanted[netId] || isPayLinkNet(netId, p)) {
+      if (!wanted[netId] || isPayLinkNet(netId, p) || isPageButtonNet(netId) || netId === "venmo" || netId === "services" || netId === "ads") {
         if (el.parentNode) el.parentNode.removeChild(el);
       }
     });
 
     socialLinkDefs().forEach(function (net) {
       if (!wanted[net.id]) return;
-      if (isPayLinkNet(net.id, p)) return; /* drawn in the pay-links card below */
+      if (isPayLinkNet(net.id, p) || isPageButtonNet(net.id) || net.id === "venmo" || net.id === "services" || net.id === "ads") return;
       var wid = socialWidgetId(net.id);
       var href = socialHref(net.id, links[net.id]);
       var el = stage.querySelector('[data-tower-widget="' + wid + '"]');
@@ -5519,8 +5681,6 @@
       el.hidden = false;
       el.classList.remove("is-widget-off");
     });
-
-    renderPayLinks(stage, p, links, wanted);
 
     /* Old builds left an X button on each chip; drop any still in the DOM. */
     stage.querySelectorAll(".tower-social-chip-remove").forEach(function (x) {
@@ -5673,6 +5833,35 @@
     return !!(p && (p._profileKind === "professional" || p.kind === "professional"));
   }
 
+  function houseProfessional(p) {
+    if (!profileIsProfessional(p)) return false;
+    var id = String((p && (p._profileId || p.id)) || "");
+    var handle = String((p && p.handle) || "").replace(/^@/, "").toLowerCase();
+    return id === "prof-alexa-professional" || handle === "alexa-pro" || handle === "cognation";
+  }
+
+  function personalNameOnPro(name) {
+    var folded = String(name || "").trim().toLowerCase().replace(/\s+/g, " ");
+    return folded === "alexa" || folded === "alexa thomas" || folded === "alexa j thomas" || folded === "alexa j. thomas";
+  }
+
+  /* Professional pages keep their own name. The personal name stays off that page. */
+  function publicProfileName(p) {
+    var name = String((p && p.displayName) || "").trim();
+    if (!profileIsProfessional(p)) return name || "You";
+    if (personalNameOnPro(name) || (houseProfessional(p) && (!name || name.toLowerCase() === "you"))) {
+      return houseProfessional(p) ? "Cognation" : "";
+    }
+    return name;
+  }
+
+  function housePersonal(p) {
+    if (!p || profileIsProfessional(p)) return false;
+    var id = String(p._profileId || p.id || "");
+    var handle = String(p.handle || "").replace(/^@/, "").toLowerCase();
+    return id === "prof-alexa-personal" || handle === "alexa";
+  }
+
   function recordIsSeed(rec) {
     if (!rec) return false;
     if (window.CognationSeedOps && typeof window.CognationSeedOps.classify === "function") {
@@ -5761,7 +5950,11 @@
     }
     function allow(id) {
       if (!keep(id)) return false;
+      var idKey = String(id || "").toLowerCase();
+      /* Cognation is a friend on the personal page, not a top-friend pin and not a follower. */
+      if (idKey === "cognation" || idKey === "alexa-pro" || idKey === "prof-alexa-professional") return false;
       var rec = lookupFriendRecord(id);
+      if (rec && (rec.kind === "professional" || rec._profileKind === "professional")) return false;
       var seed = recordIsSeed(rec) || (!rec && recordIsSeed({ id: id, handle: id }));
       var ops = recordIsOps(rec) || (!rec && recordIsOps({ id: id, handle: id }));
       if (seedPage) return seed && !ops;
@@ -5786,7 +5979,7 @@
   function removeTopFriendPin(p, friendId) {
     if (!p || profileIsProfessional(p)) return false;
     friendId = String(friendId || "");
-    if (!friendId) return false;
+    if (!friendId || friendId.toLowerCase() === "cognation") return false;
     p.featuredFriendIds = resolveTopFriendIds(p).filter(function (id) { return id !== friendId; });
     if (!Array.isArray(p.removedFriendPinIds)) p.removedFriendPinIds = [];
     if (p.removedFriendPinIds.indexOf(friendId) < 0) p.removedFriendPinIds.push(friendId);
@@ -5907,6 +6100,11 @@
   function addTowerFriend(id) {
     id = String(id || "");
     if (!id || id === "alexa-thomas") return { ok: false, error: "self" };
+    var idKey = id.toLowerCase();
+    /* Cognation is added at signup. There is no button that adds or removes it. */
+    if (idKey === "cognation" || idKey === "alexa-pro" || idKey === "prof-alexa-professional") {
+      return { ok: false, error: "not-a-friend" };
+    }
     var personal = viewerPersonalRecord();
     if (!personal || personal.kind === "professional") return { ok: false, error: "not-personal" };
     /* SeedOps: real ↛ seed/ops */
@@ -6140,9 +6338,11 @@
     }
     if (list) list.innerHTML = "";
     if (note) {
-      note.textContent = edges.length
-        ? edges.length + (edges.length === 1 ? " follower" : " followers")
-        : "No followers yet.";
+      note.textContent = houseProfessional(p)
+        ? "134k followers"
+        : edges.length
+          ? edges.length + (edges.length === 1 ? " follower" : " followers")
+          : "No followers yet.";
     }
     if (mutual) {
       var subject = String((p && (p.displayName || p.handle)) || "this person").trim() || "this person";
@@ -6155,6 +6355,7 @@
       var id = String(edge.id || "");
       var face = normalizeFollowerFace(edge.face);
       var label = followerDisplayName(id) || id;
+      if (personalNameOnPro(label)) return;
       var li = document.createElement("li");
       li.className = "tower-followers-hit";
       li.setAttribute("data-follower-face", face);
@@ -6531,7 +6732,7 @@
     var links = (p && p.socialLinks) || {};
     var defs = socialLinkDefs();
     for (var i = 0; i < defs.length; i++) {
-      if (socialHref(defs[i].id, links[defs[i].id])) return true;
+      if (storedSocialValue(defs[i].id, links[defs[i].id])) return true;
     }
     return false;
   }
@@ -6870,6 +7071,7 @@
       if (id === "friends") on = false;
       var milestones = id === "badges" ? appliedMilestoneList(p) : null;
       if (id === "badges") on = !!(milestones && milestones.length);
+      if (id === "badges" && root.__cognationBadgesShelfRemoved) on = false;
       /* The same Calendar sticker stays on the personal page and the professional page. */
       if (id === "calendar") on = true;
       /* The owner removed it: hidden for the owner and visitors, whatever its
@@ -6948,6 +7150,7 @@
     /* Music, Badges and Calendar: Remove / Show flip only the owner's own switch. */
     if (OWNER_REMOVABLE_WIDGET_IDS.indexOf(id) >= 0) p.publicWidgets[ownerShownKey(id)] = !!on;
     else p.publicWidgets[id] = !!on;
+    if (id === "badges") root.__cognationBadgesShelfRemoved = !on;
     TowerProfileStore.save(p);
     applyPublicWidgets(root, p);
     syncPublicWidgetsForm(root, p);
@@ -7253,6 +7456,22 @@
       normalized.signupFriendIds = ev.signupFriendIds.map(function (id) { return String(id || ""); }).filter(Boolean);
     }
     if (ev.hostHandle) normalized.hostHandle = String(ev.hostHandle).replace(/^@/, "").slice(0, 80);
+    if (ev.kind === "classroom") normalized.kind = "classroom";
+    if (ev.kind === "webinar") {
+      normalized.kind = "webinar";
+      normalized.webinar = webinarLimits(ev.webinar && ev.webinar.record === "internal");
+    }
+    if (ev.kind === "auction" && ev.auction) {
+      var sale = ev.auction;
+      normalized.kind = "auction";
+      normalized.auction = {
+        chat: true, video: true, presenter: "handoff", bid: "message",
+        item: String(sale.item || "").trim().slice(0, 120),
+        start: Number(sale.start),
+        handle: String(sale.handle || "").replace(/^@/, "").slice(0, 80),
+        minAge: 16, payInRoom: false,
+      };
+    }
     return normalized;
   }
 
@@ -7412,7 +7631,7 @@
               : e.source === "friend"
               ? '<span class="tower-cal-badge">Friend</span>'
               : "";
-          if (opts.busyOnly || e.busy) {
+          if ((opts.busyOnly || e.busy) && e.kind !== "webinar") {
             return (
               '<li class="tower-cal-event is-busy" data-calendar-busy="true">' +
               '<div class="tower-cal-event-main">' +
@@ -7455,6 +7674,7 @@
             "</span>" +
             '<span class="tower-cal-event-title">' +
             escapeHtml(e.title) +
+            (e.kind === "classroom" ? " · Classroom" : "") +
             "</span>" +
             badge +
             who +
@@ -7463,6 +7683,9 @@
               : "") +
             "</div>" +
             actions +
+            (e.kind === "webinar"
+              ? '<div class="tower-webinar" data-webinar-room>' + webinarRoomHtml(e.webinar && e.webinar.record === "internal") + "</div>"
+              : "") +
             "</li>"
           );
         })
@@ -7522,6 +7745,9 @@
     return (events || []).filter(function (e) {
       return e && e.status !== "pending";
     }).map(function (e) {
+      if (e.kind === "webinar") {
+        return { id: e.id, date: e.date, time: e.time || "", title: e.title, notes: "", status: "accepted", source: "owner", kind: "webinar", webinar: webinarLimits(e.webinar && e.webinar.record === "internal") };
+      }
       return {
         id: "busy-" + e.id,
         date: e.date,
@@ -7725,12 +7951,6 @@
     );
   }
 
-  /* Off until the owner can see requests (owner inbox PR). */
-  var HANGOUT_BOOKING_LIVE = false;
-  /* "Suggested hangouts" are fixed times (HANGOUT_SLOTS), not real saved data:
-     hidden until owners publish real open times on the server. */
-  var HANGOUT_SUGGESTIONS_LIVE = false;
-
   /* Status boxes in Edit profile show a plain line; raw error text is logged only. */
   function friendlyBookingError(err) {
     var raw = String((err && err.message) || "");
@@ -7758,6 +7978,126 @@
     return sb.rpc("request_hangout", { p_profile_id: profileId, p_date: iso, p_time: time });
   }
 
+  /* Capacity only. Not a count of people watching. */
+  function webinarLimits(record) {
+    return { viewers: 200000, live: 50, presenters: 1, comments: false, speak: "raise-hand", record: record ? "internal" : "" };
+  }
+
+  function webinarRoomHtml(record) {
+    return '<div class="tower-webinar-stage"><video data-webinar-presenter muted playsinline></video><span class="tower-webinar-name">Main presenter</span></div>' +
+      '<p class="tower-webinar-limits">Up to 200,000 viewers · Up to 50 live</p>' +
+      '<p class="tower-webinar-actions"><button type="button" class="btn btn-secondary" data-webinar-join>Join on video</button> ' +
+      '<button type="button" class="btn btn-secondary" data-webinar-hand>Raise your hand</button></p>' +
+      '<p class="tower-webinar-speak">Join on video, then raise your hand to speak.</p>' +
+      '<label class="tower-cal-pill"><input type="checkbox" data-webinar-record' + (record ? " checked" : "") + "> Record internally</label>" +
+      '<p class="tower-webinar-record-note">Saved on Cognation only.</p>' +
+      '<p class="tower-webinar-actions"><button type="button" class="btn btn-secondary" data-webinar-export>Export</button> ' +
+      '<button type="button" class="btn btn-secondary" data-webinar-post>Post on YouTube</button></p>';
+  }
+
+  /* A suggested time or a Book click becomes a calendar event on this profile. */
+  function addScheduledHangout(iso, time, fromVisitor) {
+    var p = TowerProfileStore.get();
+    var event = {
+      id: newCalendarEventId(),
+      title: "Hangout",
+      date: iso,
+      time: time,
+      notes: fromVisitor ? "Booked from the calendar" : "Suggested open time",
+      status: "accepted",
+      source: fromVisitor ? "friend" : "owner"
+    };
+    if (fromVisitor) {
+      var who = getSessionUsername();
+      if (who) event.requesterName = who.slice(0, 80);
+    }
+    function taken(list) {
+      return (list || []).some(function (e) {
+        return e && e.date === iso && String(e.time || "").slice(0, 5) === time;
+      });
+    }
+    if (!p || taken(sharedCalendarEvents(p))) return false;
+    if (isTowerOwner(p)) {
+      saveCalendarToProfile(function (prof) {
+        if (!taken(prof.calendarEvents)) prof.calendarEvents.push(event);
+      });
+      return true;
+    }
+    var accounts = window.CognationAccounts;
+    var recs = accountProfilesFor(p);
+    if (!recs.length && p._profileId) recs = [{ id: p._profileId, calendarEvents: p.calendarEvents || [] }];
+    var wrote = false;
+    recs.forEach(function (rec) {
+      if (!rec || !rec.id || !accounts || typeof accounts.updateProfileTower !== "function") return;
+      var list = Array.isArray(rec.calendarEvents) ? rec.calendarEvents.slice() : [];
+      if (!list.length && Array.isArray(p.calendarEvents)) list = p.calendarEvents.slice();
+      if (taken(list)) return;
+      list.push(event);
+      var result = accounts.updateProfileTower(rec.id, { calendarEvents: list });
+      if (result && result.ok) wrote = true;
+    });
+    return wrote;
+  }
+
+  function calendarKindPills(kind) {
+    function one(value, label) {
+      return '<label class="tower-cal-pill"><input type="checkbox" name="eventKind" value="' + value + '" data-tower-cal-kind' + (kind === value ? " checked" : "") + "> " + label + "</label>";
+    }
+    return '<div class="tower-cal-pills" data-tower-cal-pills role="group" aria-label="Event kind">' +
+      one("classroom", "Classroom") + one("auction", "Auction") +
+      '<p class="form-hint">Check one before the event is added. Auction opens a chat room with video and a presenter who can hand off the live spot and take it back. No one under 16 can bid.</p></div>';
+  }
+  function auctionSaleFields(editing) {
+    var sale = (editing && editing.auction) || {};
+    var shown = editing && editing.kind === "auction";
+    return '<div data-tower-cal-auction-fields' + (shown ? "" : " hidden") + ">" +
+      '<div class="form-group"><label for="tower-cal-selling">Selling</label>' +
+      '<input id="tower-cal-selling" name="selling" type="text" maxlength="120" value="' + escapeHtml(sale.item || "") + '" data-tower-cal-selling></div>' +
+      '<div class="form-group"><label for="tower-cal-start">Starting bid</label>' +
+      '<input id="tower-cal-start" name="start" inputmode="decimal" maxlength="8" value="' + escapeHtml(sale.start == null ? "" : String(sale.start)) + '" data-tower-cal-start></div></div>';
+  }
+  function applyEventKind(event, kind, profile, sale) {
+    event.kind = kind === "auction" ? "auction" : "classroom";
+    if (event.kind !== "auction") { delete event.auction; return; }
+    sale = sale || {};
+    event.auction = {
+      chat: true, video: true, presenter: "handoff", bid: "message",
+      item: String(sale.item || "").trim(), start: Number(sale.start),
+      handle: String((profile && profile.handle) || "").replace(/^@/, ""),
+      minAge: 16, payInRoom: false,
+    };
+  }
+
+  function calendarEditorHtml(editing, selected) {
+    var on = !!(editing && editing.kind === "webinar");
+    var formTitle = editing ? editing.title : "";
+    var formDate = editing ? editing.date : selected;
+    var formTime = editing ? editing.time || "" : "";
+    var formNotes = editing ? editing.notes || "" : "";
+    return '<form class="tower-cal-editor" data-tower-cal-editor action="#" method="post">' +
+      "<h5>" + (editing ? "Edit event" : "Add event") + "</h5>" +
+      calendarKindPills(editing && editing.kind) +
+      auctionSaleFields(editing) +
+      (window.CognationClassroomEvent ? window.CognationClassroomEvent.pillHtml(!!(editing && editing.kind === "classroom")) : "") +
+      '<div class="tower-cal-pills" role="group" aria-label="Event kind"><label class="tower-cal-pill"><input type="checkbox" name="eventKind" value="webinar" data-tower-cal-webinar' +
+      (on ? " checked" : "") + "> Webinar</label></div>" +
+      '<div class="tower-webinar" data-webinar-room' + (on ? "" : " hidden") + ">" + webinarRoomHtml(editing && editing.webinar && editing.webinar.record === "internal") + "</div>" +
+      (editing ? '<input type="hidden" name="id" value="' + escapeHtml(editing.id) + '" data-tower-cal-edit-id>' : "") +
+      '<div class="form-group"><label for="tower-cal-edit-title">Title</label>' +
+      '<input id="tower-cal-edit-title" name="title" type="text" maxlength="120" required value="' + escapeHtml(formTitle) + '" data-tower-cal-edit-title></div>' +
+      '<div class="tower-cal-friend-row">' +
+      '<div class="form-group"><label for="tower-cal-edit-date">Date</label>' +
+      '<input id="tower-cal-edit-date" name="date" type="date" required value="' + escapeHtml(formDate) + '" data-tower-cal-edit-date></div>' +
+      '<div class="form-group"><label for="tower-cal-edit-time">Time</label>' +
+      '<input id="tower-cal-edit-time" name="time" type="time" value="' + escapeHtml(formTime) + '" data-tower-cal-edit-time></div></div>' +
+      '<div class="form-group"><label for="tower-cal-edit-notes">Notes</label>' +
+      '<input id="tower-cal-edit-notes" name="notes" type="text" maxlength="240" value="' + escapeHtml(formNotes) + '" data-tower-cal-edit-notes></div>' +
+      '<div class="form-actions"><button type="submit" class="btn btn-primary">' + (editing ? "Save changes" : "Add event") + "</button>" +
+      (editing ? '<button type="button" class="btn btn-secondary" data-tower-cal-cancel-edit>Cancel</button>' : "") +
+      "</div>" +
+      '<p class="commune-status" data-tower-cal-editor-status hidden role="status" aria-live="polite"></p></form>';
+  }
+
   function renderPrivateCalendar(root) {
     var host = root.querySelector("[data-tower-cal-private]");
     if (!host) return;
@@ -7768,53 +8108,6 @@
     var ownerFeed = isTowerOwner(p);
     var events = ownerFeed ? (p.calendarEvents || []) : busyBlocksOnly(p.calendarEvents || []);
     var selected = view.selected;
-    var editingId = host.getAttribute("data-editing-id") || "";
-    var editing = null;
-    if (editingId) {
-      editing = events.filter(function (e) {
-        return e.id === editingId;
-      })[0] || null;
-    }
-    var formTitle = editing ? editing.title : "";
-    var formDate = editing ? editing.date : selected;
-    var formTime = editing ? editing.time || "" : "";
-    var formNotes = editing ? editing.notes || "" : "";
-    var editorHtml = ownerFeed ? (
-      '<form class="tower-cal-editor" data-tower-cal-editor action="#" method="post">' +
-      "<h5>" +
-      (editing ? "Edit event" : "Add event") +
-      "</h5>" +
-      (editing
-        ? '<input type="hidden" name="id" value="' + escapeHtml(editing.id) + '" data-tower-cal-edit-id>'
-        : "") +
-      '<div class="form-group"><label for="tower-cal-edit-title">Title</label>' +
-      '<input id="tower-cal-edit-title" name="title" type="text" maxlength="120" required value="' +
-      escapeHtml(formTitle) +
-      '" data-tower-cal-edit-title></div>' +
-      '<div class="tower-cal-friend-row">' +
-      '<div class="form-group"><label for="tower-cal-edit-date">Date</label>' +
-      '<input id="tower-cal-edit-date" name="date" type="date" required value="' +
-      escapeHtml(formDate) +
-      '" data-tower-cal-edit-date></div>' +
-      '<div class="form-group"><label for="tower-cal-edit-time">Time</label>' +
-      '<input id="tower-cal-edit-time" name="time" type="time" value="' +
-      escapeHtml(formTime) +
-      '" data-tower-cal-edit-time></div></div>' +
-      '<div class="form-group"><label for="tower-cal-edit-notes">Notes</label>' +
-      '<input id="tower-cal-edit-notes" name="notes" type="text" maxlength="240" value="' +
-      escapeHtml(formNotes) +
-      '" data-tower-cal-edit-notes></div>' +
-      '<div class="form-actions">' +
-      '<button type="submit" class="btn btn-primary">' +
-      (editing ? "Save changes" : "Add event") +
-      "</button>" +
-      (editing
-        ? '<button type="button" class="btn btn-secondary" data-tower-cal-cancel-edit>Cancel</button>'
-        : "") +
-      "</div>" +
-      '<p class="commune-status" data-tower-cal-editor-status hidden role="status" aria-live="polite"></p>' +
-      "</form>"
-    ) : "";
     host.innerHTML =
       renderTowerMonthGrid(view, events, { gridLabel: ownerFeed ? "My calendar" : "Calendar" }) +
       '<div class="tower-cal-day-panel">' +
@@ -7823,8 +8116,7 @@
       escapeHtml(selected) +
       "</h5>" +
       renderDayEventList(events, selected, { ownerControls: ownerFeed, busyOnly: !ownerFeed }) +
-      "</div>" +
-      editorHtml;
+      "</div>";
 
     var icsInput = root.querySelector("[data-tower-cal-ics-url]");
     if (icsInput && document.activeElement !== icsInput) {
@@ -7862,6 +8154,19 @@
     return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   }
 
+  /* Owner Add event on the Edit profile calendar. Classroom is checked before that event is a classroom. */
+  function classroomAddFormHtml(selected) {
+    if (!window.CognationClassroomEvent) return "";
+    return '<form class="tower-cal-editor" data-tower-cal-editor action="#" method="post"><h5>Add event</h5>' +
+      window.CognationClassroomEvent.pillHtml(false) +
+      '<label for="tower-cal-add-title">Title</label>' +
+      '<input id="tower-cal-add-title" type="text" maxlength="120" required data-tower-cal-edit-title>' +
+      '<label for="tower-cal-add-date">Date</label>' +
+      '<input id="tower-cal-add-date" type="date" required value="' + escapeHtml(selected || "") + '" data-tower-cal-edit-date>' +
+      '<div class="form-actions"><button type="submit" class="btn btn-primary">Add event</button></div>' +
+      '<p class="commune-status" data-tower-cal-editor-status hidden role="status" aria-live="polite"></p></form>';
+  }
+
   function renderPublicCalendar(root) {
     var body = root.querySelector("[data-tower-cal-public-body]");
     if (!body) return;
@@ -7888,8 +8193,6 @@
           bookError: owner ? false : !!view.bookError,
         })
       : "";
-    /* No-fake rule: the slots are fixed clock times, not saved Supabase data. */
-    if (!HANGOUT_SUGGESTIONS_LIVE) schedulerHtml = "";
     var calRoot = root.querySelector('[data-tower-widget="calendar"]');
     if (calRoot) {
       calRoot.hidden = false;
@@ -7902,6 +8205,8 @@
       publicCal.setAttribute("aria-label", "Calendar");
       publicCal.setAttribute("data-calendar-busy", owner ? "false" : "true");
     }
+    var editingId = publicCal && publicCal.getAttribute("data-editing-id") || "";
+    var editing = editingId ? (events.filter(function (e) { return e && e.id === editingId; })[0] || null) : null;
     body.innerHTML =
       renderTowerMonthGrid(view, events, { gridLabel: "Calendar" }) +
       '<div class="tower-cal-day-panel">' +
@@ -7911,7 +8216,8 @@
       "</h5>" +
       renderDayEventList(events, selected, { ownerControls: owner, busyOnly: !owner }) +
       "</div>" +
-      schedulerHtml;
+      schedulerHtml +
+      (owner ? calendarEditorHtml(editing, selected) : "");
   }
 
   function visitorSessionRowHtml(sess, api) {
@@ -8056,6 +8362,56 @@
       var t = ev.target;
       if (!t || !root.contains(t)) return;
 
+      var joinBtn = t.closest("[data-webinar-join]");
+      if (joinBtn) {
+        ev.preventDefault();
+        var room = joinBtn.closest("[data-webinar-room]");
+        if (!room) return;
+        room.setAttribute("data-webinar-joined", "true");
+        joinBtn.textContent = "On video";
+        var video = room.querySelector("[data-webinar-presenter]");
+        var media = navigator.mediaDevices;
+        if (media && video && media.getUserMedia) {
+          media.getUserMedia({ video: true, audio: false }).then(function (stream) {
+            video.srcObject = stream;
+            video.setAttribute("data-webinar-live", "true");
+            video.play();
+          }).catch(function () {});
+        }
+        return;
+      }
+      var handBtn = t.closest("[data-webinar-hand]");
+      if (handBtn) {
+        ev.preventDefault();
+        var roomH = handBtn.closest("[data-webinar-room]");
+        var line = roomH && roomH.querySelector(".tower-webinar-speak");
+        if (!roomH || roomH.getAttribute("data-webinar-joined") !== "true") {
+          if (line) line.textContent = "Join on video, then raise your hand to speak.";
+          return;
+        }
+        var up = handBtn.getAttribute("aria-pressed") !== "true";
+        handBtn.setAttribute("aria-pressed", up ? "true" : "false");
+        handBtn.textContent = up ? "Hand raised" : "Raise your hand";
+        if (line) line.textContent = up ? "Your hand is raised." : "Join on video, then raise your hand to speak.";
+        return;
+      }
+      var share = t.closest("[data-webinar-export], [data-webinar-post]");
+      if (share) {
+        ev.preventDefault();
+        var roomX = share.closest("[data-webinar-room]");
+        var noteX = roomX && roomX.querySelector(".tower-webinar-record-note");
+        var recorded = roomX && roomX.querySelector("[data-webinar-record]:checked");
+        if (!recorded) { if (noteX) noteX.textContent = "Saved on Cognation only."; return; }
+        if (share.hasAttribute("data-webinar-export")) {
+          roomX.setAttribute("data-webinar-exported", "1");
+          if (noteX) noteX.textContent = "Exported. Not posted.";
+          return;
+        }
+        if (roomX.getAttribute("data-webinar-exported") !== "1") { if (noteX) noteX.textContent = "Export first. Not posted."; return; }
+        if (noteX) noteX.textContent = "Not posted. No YouTube connection.";
+        return;
+      }
+
       var prev = t.closest("[data-tower-cal-prev]");
       var next = t.closest("[data-tower-cal-next]");
       if (prev || next) {
@@ -8134,8 +8490,11 @@
             return e.id !== did;
           });
         });
-        var ph = root.querySelector("[data-tower-cal-private]");
+        if (window.CognationClassroomEvent) window.CognationClassroomEvent.drop(did);
+        var ph = root.querySelector("[data-tower-cal-public]");
         if (ph && ph.getAttribute("data-editing-id") === did) ph.removeAttribute("data-editing-id");
+        var phPrivate = root.querySelector("[data-tower-cal-private]");
+        if (phPrivate && phPrivate.getAttribute("data-editing-id") === did) phPrivate.removeAttribute("data-editing-id");
         refreshTowerCalendars(root);
         return;
       }
@@ -8143,12 +8502,8 @@
       var editBtn = t.closest("[data-tower-cal-edit]");
       if (editBtn) {
         var eid = editBtn.getAttribute("data-tower-cal-edit");
-        var priv = root.querySelector("[data-tower-cal-private]");
+        var priv = root.querySelector("[data-tower-cal-public]");
         if (priv) priv.setAttribute("data-editing-id", eid);
-        /* Switch to private side if editing from public */
-        if (editBtn.closest("[data-tower-cal-public], [data-tower-widget=\"calendar\"]")) {
-          if (isTowerOwner(TowerProfileStore.get())) applyTowerSide(root, "private");
-        }
         refreshTowerCalendars(root);
         var focusTitle = root.querySelector("[data-tower-cal-edit-title]");
         if (focusTitle) {
@@ -8160,7 +8515,7 @@
       }
 
       if (t.closest("[data-tower-cal-cancel-edit]")) {
-        var priv2 = root.querySelector("[data-tower-cal-private]");
+        var priv2 = root.querySelector("[data-tower-cal-public]");
         if (priv2) priv2.removeAttribute("data-editing-id");
         refreshTowerCalendars(root);
         return;
@@ -8186,31 +8541,11 @@
         var viewS = getCalendarViewState(root, "public");
         var slotIso = viewS.selected;
         if (!/^\d{2}:\d{2}$/.test(slotTime) || !/^\d{4}-\d{2}-\d{2}$/.test(slotIso)) return;
-        if (!isTowerOwner(TowerProfileStore.get())) {
-          viewS.schedulerOpen = true;
-          viewS.pickedTime = slotTime;
-          viewS.bookStatus = "";
-          viewS.bookError = false;
-          ev.preventDefault();
-          refreshTowerCalendars(root);
-          return;
-        }
-        saveCalendarToProfile(function (p) {
-          var taken = (p.calendarEvents || []).some(function (e) {
-            return e && e.date === slotIso && String(e.time || "").slice(0, 5) === slotTime;
-          });
-          if (taken) return;
-          p.calendarEvents.push({
-            id: newCalendarEventId(),
-            title: "Hangout",
-            date: slotIso,
-            time: slotTime,
-            notes: "Suggested open time",
-            status: "accepted",
-            source: "owner",
-          });
-        });
+        var fromVisitor = !isTowerOwner(TowerProfileStore.get());
+        var savedTime = addScheduledHangout(slotIso, slotTime, fromVisitor);
         viewS.schedulerOpen = true;
+        viewS.pickedTime = fromVisitor ? slotTime : "";
+        viewS.bookStatus = fromVisitor ? (savedTime ? "Booked." : "Couldn't save that time.") : "";
         ev.preventDefault();
         refreshTowerCalendars(root);
         return;
@@ -8223,30 +8558,11 @@
         var bookTime = bookBtn.getAttribute("data-tower-cal-book") || "";
         var bookIso = viewB.selected;
         if (!/^\d{2}:\d{2}$/.test(bookTime) || !/^\d{4}-\d{2}-\d{2}$/.test(bookIso)) return;
-        if (!HANGOUT_BOOKING_LIVE) {
-          /* Owner inbox not shipped yet: say so honestly, send nothing. */
-          viewB.bookError = false;
-          viewB.bookStatus = "Booking is coming soon.";
-          refreshTowerCalendars(root);
-          return;
-        }
-        var bookProfile = TowerProfileStore.get();
-        bookBtn.disabled = true;
-        requestHangoutOnServer(bookProfile && bookProfile._profileId, bookIso, bookTime).then(
-          function () {
-            viewB.pickedTime = "";
-            viewB.bookStatus = "Request sent.";
-            viewB.bookError = false;
-            refreshTowerCalendars(root);
-          },
-          function (err) {
-            /* Raw error text goes to the console only; the box shows a fixed line. */
-            try { console.warn("[tower] hangout request failed", err); } catch (eLog) {}
-            viewB.bookStatus = friendlyBookingError(err);
-            viewB.bookError = true;
-            refreshTowerCalendars(root);
-          }
-        );
+        var saved = addScheduledHangout(bookIso, bookTime, true);
+        viewB.pickedTime = "";
+        viewB.bookStatus = saved ? "Booked." : "Couldn't save that time.";
+        viewB.schedulerOpen = true;
+        refreshTowerCalendars(root);
         return;
       }
 
@@ -8273,8 +8589,60 @@
       var viewG = getCalendarViewState(root, "public");
       viewG.schedulerOpen = true;
       refreshTowerCalendars(root);
+    }, true);
+
+    root.addEventListener("change", function (ev) {
+      var box = ev.target && ev.target.matches && ev.target.matches("[data-tower-cal-webinar]") ? ev.target : null;
+      if (!box || !root.contains(box)) return;
+      var room = box.form && box.form.querySelector("[data-webinar-room]");
+      if (room) room.hidden = !box.checked;
+      if (!box.checked) return;
+      var form = box.form;
+      if (!form) return;
+      form.querySelectorAll("[data-tower-cal-kind]").forEach(function (el) { el.checked = false; });
+      var classPill = form.querySelector("[data-tower-cal-classroom]");
+      if (classPill) classPill.checked = false;
+      var saleFields = form.querySelector("[data-tower-cal-auction-fields]");
+      if (saleFields) saleFields.hidden = true;
     });
 
+    root.addEventListener("change", function (ev) {
+      var box = ev.target && ev.target.matches && ev.target.matches("[data-tower-cal-kind]") ? ev.target : null;
+      if (!box || !box.checked || !root.contains(box)) return;
+      var group = box.closest("[data-tower-cal-pills]");
+      if (!group) return;
+      group.querySelectorAll("[data-tower-cal-kind]").forEach(function (el) { if (el !== box) el.checked = false; });
+      var formK = box.closest("form");
+      var saleFields = formK && formK.querySelector("[data-tower-cal-auction-fields]");
+      if (saleFields) saleFields.hidden = box.value !== "auction";
+      var webinarBox = formK && formK.querySelector("[data-tower-cal-webinar]");
+      if (webinarBox) webinarBox.checked = false;
+      var webinarRoom = formK && formK.querySelector("[data-webinar-room]");
+      if (webinarRoom) webinarRoom.hidden = true;
+      var classPill = formK && formK.querySelector("[data-tower-cal-classroom]");
+      if (classPill) classPill.checked = box.value === "classroom";
+    });
+    root.addEventListener("change", function (ev) {
+      var box = ev.target && ev.target.matches && ev.target.matches("[data-tower-cal-classroom]") ? ev.target : null;
+      if (!box || !root.contains(box)) return;
+      var formC = box.form;
+      if (!formC) return;
+      if (box.checked) {
+        var webinarBox = formC.querySelector("[data-tower-cal-webinar]");
+        if (webinarBox) webinarBox.checked = false;
+        var webinarRoom = formC.querySelector("[data-webinar-room]");
+        if (webinarRoom) webinarRoom.hidden = true;
+        formC.querySelectorAll("[data-tower-cal-kind]").forEach(function (el) {
+          el.checked = el.value === "classroom";
+        });
+        var saleFields = formC.querySelector("[data-tower-cal-auction-fields]");
+        if (saleFields) saleFields.hidden = true;
+      } else {
+        formC.querySelectorAll("[data-tower-cal-kind]").forEach(function (el) {
+          if (el.value === "classroom") el.checked = false;
+        });
+      }
+    });
     root.addEventListener("submit", function (ev) {
       var form = ev.target;
       if (!form || !root.contains(form)) return;
@@ -8290,6 +8658,7 @@
         var date = dateEl ? dateEl.value : "";
         var time = timeEl ? timeEl.value : "";
         var notes = notesEl ? notesEl.value.trim().slice(0, 240) : "";
+        var classroomOn = !!(form.querySelector("[data-tower-cal-classroom]") || {}).checked;
         var statusEl = form.querySelector("[data-tower-cal-editor-status]");
         function setEdStatus(msg, isError) {
           if (!statusEl) return;
@@ -8306,8 +8675,48 @@
           setEdStatus("Title and a valid date are required.", true);
           return;
         }
+        var webinarOn = !!form.querySelector("[data-tower-cal-webinar]:checked");
+        var kindBox = form.querySelector("[data-tower-cal-kind]:checked");
+        var picked = kindBox ? kindBox.value : "";
+        if (classroomOn && picked !== "auction") picked = "classroom";
+        if ((classroomOn || picked === "classroom") && !time) time = "12:00";
+        var families = (webinarOn ? 1 : 0) + (picked === "auction" ? 1 : 0) + (picked === "classroom" || classroomOn ? 1 : 0);
+        if (families > 1) {
+          setEdStatus(webinarOn ? "Check Webinar." : "Check Classroom or Auction.", true);
+          return;
+        }
+        if (!families) {
+          setEdStatus("Check Classroom or Auction.", true);
+          return;
+        }
+        var sale = {};
+        if (picked === "auction") {
+          var sellEl = form.querySelector("[data-tower-cal-selling]");
+          var startEl = form.querySelector("[data-tower-cal-start]");
+          sale.item = sellEl ? sellEl.value.trim().slice(0, 120) : "";
+          sale.start = Number(String(startEl ? startEl.value : "").replace(/[$,]/g, ""));
+          if (!sale.item || !isFinite(sale.start) || sale.start < 0) {
+            setEdStatus("Type what you are selling and the starting bid.", true);
+            return;
+          }
+        }
         var editId = idEl ? idEl.value : "";
+        var madeId = editId || newCalendarEventId();
         saveCalendarToProfile(function (p) {
+          function applyWebinar(e) {
+            e.kind = "webinar";
+            delete e.auction;
+            e.webinar = webinarLimits(!!form.querySelector("[data-webinar-record]:checked"));
+          }
+          function applyChosen(e) {
+            if (webinarOn) applyWebinar(e);
+            else if (picked === "auction") applyEventKind(e, "auction", p, sale);
+            else {
+              e.kind = "classroom";
+              delete e.auction;
+              delete e.webinar;
+            }
+          }
           if (editId) {
             var found = false;
             (p.calendarEvents || []).forEach(function (e) {
@@ -8316,40 +8725,33 @@
                 e.date = date;
                 e.time = time;
                 e.notes = notes;
+                applyChosen(e);
                 found = true;
               }
             });
             if (!found) {
-              p.calendarEvents.push({
-                id: editId,
-                title: title,
-                date: date,
-                time: time,
-                notes: notes,
-                status: "accepted",
-                source: "owner",
-              });
+              var revived = { id: editId, title: title, date: date, time: time, notes: notes, status: "accepted", source: "owner" };
+              applyChosen(revived);
+              p.calendarEvents.push(revived);
             }
           } else {
-            p.calendarEvents.push({
-              id: newCalendarEventId(),
-              title: title,
-              date: date,
-              time: time,
-              notes: notes,
-              status: "accepted",
-              source: "owner",
-            });
+            var added = { id: madeId, title: title, date: date, time: time, notes: notes, status: "accepted", source: "owner" };
+            applyChosen(added);
+            p.calendarEvents.push(added);
           }
         });
-        var priv3 = root.querySelector("[data-tower-cal-private]");
+        if (window.CognationClassroomEvent) {
+          if (!webinarOn && picked === "classroom") window.CognationClassroomEvent.publish({ id: madeId, title: title, date: date, time: time, notes: notes });
+          else if (editId) window.CognationClassroomEvent.drop(editId);
+        }
+        var priv3 = root.querySelector("[data-tower-cal-public]");
         if (priv3) priv3.removeAttribute("data-editing-id");
-        var view3 = getCalendarViewState(root, "private");
+        var view3 = getCalendarViewState(root, "public");
         view3.selected = date;
         var dp = date.split("-");
         view3.year = parseInt(dp[0], 10);
         view3.month0 = parseInt(dp[1], 10) - 1;
-        setEdStatus(editId ? "Event updated." : "Event added.", false);
+        setEdStatus(classroomOn ? "Classroom added to the Cognation calendar. Echo card ready." : (editId ? "Event updated." : "Event added."), false);
         refreshTowerCalendars(root);
         return;
       }
@@ -8598,6 +9000,11 @@
     var session = getSessionObject();
     var user = session && session.username ? String(session.username).toLowerCase() : "";
     if (!btn) return;
+    if (status) {
+      status.hidden = true;
+      status.textContent = "";
+      status.classList.remove("is-error");
+    }
     if (usingRemoteSocial()) {
       var social = remoteSocial();
       var remoteProfiles = social && social.getMyProfiles ? social.getMyProfiles() : [];
@@ -8606,11 +9013,8 @@
       });
       btn.hidden = hasRemoteProfessional;
       if (status) {
-        /* "Your professional page is set up." shows once: only in the moment
-           right after this tab created the Pro page, and only while the Pro
-           page is the one being edited. Closing Edit profile clears it, so it
-           never shows on a later open, after a reload, or in Personal Edit
-           profile. In memory only (no storage, no server write). */
+        /* Shows once, only right after this tab created the Pro page, and only
+           while that Pro page is being edited. A popup, not a box in the page. */
         var currentKindForNotice =
           (TowerProfileStore.get() && TowerProfileStore.get()._profileKind) ||
           (session && session.profileKind) ||
@@ -8619,12 +9023,10 @@
           hasRemoteProfessional &&
           root.__cognationProSetupJustCreated === true &&
           currentKindForNotice === "professional";
-        status.hidden = !showSetupNotice;
-        status.textContent = showSetupNotice
-          ? "Your professional page is set up."
-          : "";
-        status.classList.remove("is-error");
-        status.classList.toggle("tower-pro-setup-notice", showSetupNotice);
+        status.hidden = true;
+        status.textContent = "";
+        status.classList.remove("is-error", "tower-pro-setup-notice");
+        if (showSetupNotice) showStatusPopup("Your professional page is set up.", false, { once: true });
       }
       return;
     }
@@ -8641,11 +9043,7 @@
     var hasPro = profiles.some(function (p) { return p.kind === "professional"; });
     if (profiles.length >= 2 || (hasPersonal && hasPro)) {
       btn.hidden = true;
-      if (status) {
-        status.hidden = false;
-        status.textContent = "Both Personal and Professional pages are set up for this account.";
-        status.classList.remove("is-error");
-      }
+      showStatusPopup("Both Personal and Professional pages are set up for this account.", false, { once: true });
       return;
     }
     btn.hidden = false;
@@ -8662,12 +9060,8 @@
     if (!root || root.__cognationAddProfileBound) return;
     root.__cognationAddProfileBound = true;
     var btn = root.querySelector("[data-tower-add-profile]");
-    var status = root.querySelector("[data-tower-add-profile-status]");
     function setSt(msg, isError) {
-      if (!status) return;
-      status.hidden = !msg;
-      status.textContent = msg || "";
-      status.classList.toggle("is-error", !!isError);
+      showStatusPopup(msg, isError);
     }
     if (!btn) return;
     btn.addEventListener("click", function () {
@@ -8739,7 +9133,7 @@
         phone: phone,
         kind: kind,
         handle: kind === "professional" ? handleBase + "-pro" : handleBase,
-        displayName: kind === "professional" ? "Alexa J Thomas" : "Alexa",
+        displayName: kind === "professional" ? "Cognation" : "Alexa",
       });
       if (!result.ok) {
         try { console.warn("[tower] add page failed", result.error); } catch (eLog) {}
@@ -8917,21 +9311,9 @@
       else hideCam();
       return;
     }
-    if (!prints.length) {
-      nodes.forEach(function (el) {
-        el.hidden = true;
-        el.classList.add("is-widget-off");
-      });
-      stage.querySelectorAll("[data-tower-polaroid-extra]").forEach(function (el) {
-        el.hidden = true;
-        el.classList.add("is-widget-off");
-      });
-      showCam();
-      return;
-    }
     while (nodes.length > 1) {
-      var extra = nodes.pop();
-      if (extra && extra.parentNode) extra.parentNode.removeChild(extra);
+      var dup = nodes.pop();
+      if (dup && dup.parentNode) dup.parentNode.removeChild(dup);
     }
     var el = nodes[0];
     if (!el) {
@@ -8942,11 +9324,14 @@
       el.innerHTML = polaroidMarkup();
       stage.appendChild(el);
     }
-    el.hidden = false;
-    el.classList.remove("is-widget-off");
-    applyPolaroidPrintScale(el, prints[0] && prints[0].scale);
+    var showShell = !!owner;
+    el.hidden = !showShell;
+    el.classList.toggle("is-widget-off", !showShell);
+    el.removeAttribute("title");
+    paintPolaroidPhoto(el.querySelector("[data-tower-polaroid-photo]"), "");
+    applyPolaroidPrintScale(el, 1);
     showCam();
-    var needed = Math.max(0, prints.length - 1);
+    var needed = prints.length;
     var extras = Array.prototype.slice.call(stage.querySelectorAll("[data-tower-polaroid-extra]"));
     while (extras.length > needed) {
       var gone = extras.pop();
@@ -8966,8 +9351,8 @@
       }
       printEl.hidden = false;
       printEl.classList.remove("is-widget-off");
-      paintPolaroidPhoto(printEl.querySelector("[data-tower-polaroid-photo]"), prints[i + 1].url);
-      applyPolaroidPrintScale(printEl, prints[i + 1].scale);
+      paintPolaroidPhoto(printEl.querySelector("[data-tower-polaroid-photo]"), prints[i].url);
+      applyPolaroidPrintScale(printEl, prints[i].scale);
     }
   }
 
@@ -9184,7 +9569,8 @@
         var next = normalizePolaroidScale(sticker.getAttribute("data-polaroid-scale") || startScale);
         var wid = sticker.getAttribute("data-tower-widget");
         var extra = sticker.getAttribute("data-tower-polaroid-extra");
-        var idx = wid === "polaroid" ? 0 : (parseInt(extra, 10) + 1);
+        if (wid === "polaroid" || extra == null || extra === "") return;
+        var idx = parseInt(extra, 10);
         var cur = TowerProfileStore.get();
         var prints = polaroidPrintList(cur);
         if (!prints[idx]) return;
@@ -9924,6 +10310,61 @@
     }
   }
 
+  function hideProfileStatusBoxes() {
+    var nodes = document.querySelectorAll("[data-tower-profile-status], [data-tower-add-profile-status]");
+    for (var i = 0; i < nodes.length; i++) {
+      nodes[i].hidden = true;
+      nodes[i].textContent = "";
+      nodes[i].classList.remove("is-error");
+    }
+  }
+
+  function showStatusPopup(msg, isError, opts) {
+    opts = opts || {};
+    hideProfileStatusBoxes();
+    msg = msg ? String(msg) : "";
+    if (!msg) return;
+    var host = document.querySelector("[data-status-popup-host]");
+    if (!host) {
+      host = document.createElement("div");
+      host.className = "status-popup-host";
+      host.setAttribute("data-status-popup-host", "");
+      document.body.appendChild(host);
+    }
+    if (opts.once) {
+      if (!host.__seen) host.__seen = {};
+      if (host.__seen[msg]) return;
+      host.__seen[msg] = true;
+    }
+    var popup = document.createElement("div");
+    popup.className = "status-popup" + (isError ? " is-error" : "");
+    popup.setAttribute("role", "status");
+    popup.setAttribute("data-status-popup", "");
+    var text = document.createElement("p");
+    text.className = "status-popup-text";
+    text.textContent = msg;
+    popup.appendChild(text);
+    var offerUndo = msg.indexOf("Undo to restore") !== -1;
+    if (offerUndo) {
+      var undo = document.createElement("button");
+      undo.type = "button";
+      undo.className = "status-popup-undo";
+      undo.setAttribute("data-status-popup-undo", "");
+      undo.textContent = "Undo";
+      undo.addEventListener("click", function () {
+        if (popup.parentNode) popup.remove();
+        var app = document.querySelector("[data-tower-app]");
+        if (app && typeof app.__cognationUndoWidget === "function") app.__cognationUndoWidget();
+      });
+      popup.appendChild(undo);
+    }
+    host.appendChild(popup);
+    while (host.children.length > 3) host.removeChild(host.firstChild);
+    window.setTimeout(function () {
+      if (popup.parentNode) popup.remove();
+    }, offerUndo ? 7000 : 5000);
+  }
+
   /* Remove with Edit profile closed (PM, Oct 22): the removal line also shows as
      a short dark glass notice for ~4s; a new removal replaces it. 768px and up it
      sits at the end of the owner-only toolbar above the stage. Below 768px it is
@@ -10103,11 +10544,7 @@
   }
 
   function setProfileStatusOn(root, msg, isError) {
-    var el = root.querySelector("[data-tower-profile-status]");
-    if (!el) return;
-    el.hidden = !msg;
-    el.textContent = msg || "";
-    el.classList.toggle("is-error", !!isError);
+    showStatusPopup(msg, isError);
   }
 
 
@@ -10124,13 +10561,12 @@
     if (!root.__cognationWidgetUndo) root.__cognationWidgetUndo = [];
 
     function setProfileStatusSafe(msg, isError, removal) {
-      /* removal: a Remove line; also shown near the stage when Edit profile is closed. */
       if (removal) showStageRemovalNotice(root, msg);
+      showStatusPopup(msg, isError);
       var el = root.querySelector("[data-tower-profile-status]");
       if (!el) return;
       el.hidden = !msg;
       el.textContent = msg || "";
-      /* Remembered so Show can clear a stale removal line (and nothing else). */
       el.__towerRemovalLine = removal && msg ? String(msg) : "";
       el.classList.toggle("is-error", !!isError);
     }
@@ -10262,6 +10698,7 @@
       }
     }
 
+    root.__cognationUndoWidget = undoLastWidgetRemoval;
     syncUndoButton();
     if (undoBtn && !undoBtn.__cognationUndoBound) {
       undoBtn.__cognationUndoBound = true;
@@ -10629,7 +11066,7 @@
       ) {
         var justDragged = instaxHit.__cognationDraggedAt && Date.now() - instaxHit.__cognationDraggedAt < 700;
         var instaxFile = root.querySelector("[data-tower-instax-file]");
-        if (!justDragged && instaxFile) instaxFile.click();
+        if (!justDragged && instaxFile && !instaxFile.disabled) instaxFile.click();
       }
       var handleClick = ev.target.closest("[data-tower-sticker-handle]");
       if (handleClick) {
@@ -11115,12 +11552,7 @@
       applyAvatarFrame(root, id, color);
       var input = root.querySelector("[data-tower-avatar-frame-input]");
       if (input) input.value = id;
-      var status = root.querySelector("[data-tower-profile-status]");
-      if (status) {
-        status.hidden = false;
-        status.textContent = "Frame preview — click Save frame to keep it.";
-        status.classList.remove("is-error");
-      }
+      setProfileStatusOn(root, "Frame preview — click Save frame to keep it.", false);
     });
     if (colorChips && !colorChips.__cognationCowboyColorBound) {
       colorChips.__cognationCowboyColorBound = true;
@@ -11134,12 +11566,7 @@
         if (frameId !== "cowboy-hat") {
           applyAvatarFrame(root, "cowboy-hat", color);
         }
-        var status = root.querySelector("[data-tower-profile-status]");
-        if (status) {
-          status.hidden = false;
-          status.textContent = "Hat color preview — click Save frame to keep it.";
-          status.classList.remove("is-error");
-        }
+        setProfileStatusOn(root, "Hat color preview — click Save frame to keep it.", false);
       });
     }
     if (saveBtn && !saveBtn.__cognationFrameSaveBound) {
@@ -11155,12 +11582,7 @@
         p.avatarFrame = id;
         p.cowboyHatColor = color;
         TowerProfileStore.save(p);
-        var status = root.querySelector("[data-tower-profile-status]");
-        if (status) {
-          status.hidden = false;
-          status.textContent = id === "cowboy-hat" ? "Cowboy hat + color saved." : "Frame saved.";
-          status.classList.remove("is-error");
-        }
+        setProfileStatusOn(root, id === "cowboy-hat" ? "Cowboy hat + color saved." : "Frame saved.", false);
       });
     }
   }
@@ -11559,13 +11981,38 @@
       /* Placeholder: the slot keeps the default label's width and height, but
          its text is hidden (css .is-loading) so no name shows. */
       nameEl.classList.toggle("is-loading", loading);
-      nameEl.textContent = loading ? "You" : p.displayName || "You";
+      nameEl.textContent = loading ? "You" : publicProfileName(p) || "You";
     }
     applyDisplayNameSize(root, p.displayNameSize || 28);
+    var mutual = root.querySelector("[data-tower-mutual-friends]");
+    if (mutual) {
+      var cognationFriend = mutual.parentNode && mutual.parentNode.querySelector("[data-cognation-friend]");
+      if (profileIsProfessional(p)) {
+        mutual.hidden = !houseProfessional(p);
+        if (houseProfessional(p)) mutual.textContent = "Following";
+        if (cognationFriend) cognationFriend.hidden = true;
+      } else {
+        mutual.hidden = false;
+        if (housePersonal(p)) mutual.textContent = "400 friends";
+        if (!cognationFriend && mutual.parentNode) {
+          cognationFriend = document.createElement("p");
+          cognationFriend.className = "tower-mutual-friends";
+          cognationFriend.setAttribute("data-cognation-friend", "");
+          mutual.parentNode.insertBefore(cognationFriend, mutual.nextSibling);
+        }
+        if (cognationFriend) {
+          cognationFriend.hidden = false;
+          cognationFriend.textContent = "Cognation";
+        }
+      }
+    }
     initDisplayNameResize(root);
     var handleBadge = root.querySelector("[data-tower-handle-badge]");
     var handleVal = normalizeHandle(p.handle || "");
-    if (handleBadge && document.activeElement !== handleBadge) {
+    if (handleBadge && houseProfessional(p) && !isTowerOwner(p)) {
+      handleBadge.hidden = true;
+      handleBadge.textContent = "";
+    } else if (handleBadge && document.activeElement !== handleBadge) {
       var ownerEditing = !loading && isTowerOwner(p) && root.getAttribute("data-tower-side") === "public";
       handleBadge.classList.toggle("is-owner-editable", ownerEditing);
       if (handleVal) {
@@ -11618,13 +12065,12 @@
       } else {
         avatar.style.removeProperty("background-image");
         if (avatarPhoto) avatarPhoto.remove();
-        avatar.textContent = loading ? "" : initials(p.displayName);
+        avatar.textContent = loading ? "" : initials(publicProfileName(p));
       }
     }
-    var polaroidPrints = polaroidPrintList(p);
     var primaryPhoto = root.querySelector('[data-tower-widget="polaroid"] [data-tower-polaroid-photo]');
     if (primaryPhoto && document.activeElement !== primaryPhoto) {
-      paintPolaroidPhoto(primaryPhoto, (polaroidPrints[0] && polaroidPrints[0].url) || "");
+      paintPolaroidPhoto(primaryPhoto, "");
     }
     var bgHint = root.querySelector("[data-tower-bg-image-status]");
     if (bgHint && !(p.backgroundImageDataUrl && document.activeElement && document.activeElement.matches && document.activeElement.matches("[data-tower-bg-image]"))) {
@@ -11864,18 +12310,9 @@
 
     var profileForm = root.querySelector("[data-tower-profile-form]");
     var avatarFile = root.querySelector("[data-tower-avatar-file]");
-    var profileStatus = root.querySelector("[data-tower-profile-status]");
 
     function setProfileStatus(msg, isError) {
-      if (!profileStatus) return;
-      if (!msg) {
-        profileStatus.hidden = true;
-        profileStatus.textContent = "";
-        return;
-      }
-      profileStatus.hidden = false;
-      profileStatus.textContent = msg;
-      profileStatus.classList.toggle("is-error", !!isError);
+      showStatusPopup(msg, isError);
     }
 
     if (profileForm) {
@@ -12068,10 +12505,15 @@
       (statusFn || setProfileStatus)(okMsg, false);
     }
 
-    function readImageFile(file, statusFn, onUrl) {
-      if (!file) return;
+    function readImageFile(file, statusFn, onUrl, onSettled) {
+      function finish(url) {
+        if (url && onUrl) onUrl(url);
+        if (onSettled) onSettled();
+      }
+      if (!file) { finish(); return; }
       if (file.type && !looksLikeImage(file)) {
         (statusFn || setProfileStatus)("Choose an image file.", true);
+        finish();
         return;
       }
       var reader = new FileReader();
@@ -12098,16 +12540,20 @@
             maxEdge = Math.max(160, Math.round(maxEdge * 0.7));
             quality = Math.max(0.5, quality - 0.08);
           }
-          onUrl(dataUrl || raw);
+          finish(dataUrl || raw);
         };
         img.onerror = function () {
-          if (raw.indexOf("data:image/") === 0) onUrl(raw);
-          else (statusFn || setProfileStatus)("Could not read that image.", true);
+          if (raw.indexOf("data:image/") === 0) finish(raw);
+          else {
+            (statusFn || setProfileStatus)("Could not read that image.", true);
+            finish();
+          }
         };
         img.src = raw;
       };
       reader.onerror = function () {
         (statusFn || setProfileStatus)("Could not read that image.", true);
+        finish();
       };
       reader.readAsDataURL(file);
     }
@@ -12118,9 +12564,10 @@
       });
     }
 
-    function applyInstaxFile(file, statusFn) {
+    function applyInstaxFile(file, statusFn, done) {
       if (!isTowerOwner(TowerProfileStore.get())) {
         (statusFn || setProfileStatus)("Only the profile owner can add Polaroids.", true);
+        if (done) done();
         return;
       }
       readImageFile(file, statusFn, function (dataUrl) {
@@ -12140,12 +12587,29 @@
           if (prior && prior.indexOf("data:image/") === 0 && prior !== dataUrl && !polaroidHasUrl(normalized, prior)) {
             normalized.push({ url: prior, scale: 1 });
           }
-          if (!polaroidHasUrl(normalized, dataUrl)) normalized.push({ url: dataUrl, scale: 1 });
-          if (normalized.length > 6) normalized = normalized.slice(-6);
+          normalized.push({ url: dataUrl, scale: 1 });
           p.polaroidPrints = normalized;
           p.polaroidRemoved = false;
         });
-      });
+      }, done);
+    }
+
+    function applyInstaxFiles(files, statusFn) {
+      var list = Array.prototype.slice.call(files || []).filter(Boolean);
+      var i = 0;
+      function next() {
+        if (i >= list.length) return;
+        applyInstaxFile(list[i], statusFn, function () { i += 1; next(); });
+      }
+      next();
+    }
+
+    function pullChosenPolaroids(input) {
+      if (!input || !input.files || !input.files.length) return;
+      var files = Array.prototype.slice.call(input.files);
+      if (input.__cognationAppliedFile === files[0]) return;
+      input.__cognationAppliedFile = files[0];
+      applyInstaxFiles(files, setProfileStatus);
     }
 
     function pullChosenImage(input, applyFn) {
@@ -12185,7 +12649,7 @@
         setTimeout(function () {
           pullChosenImage(root.querySelector("[data-tower-avatar-file]"), applyAvatarFile);
           pullChosenImage(root.querySelector("[data-tower-avatar-file-panel]"), applyAvatarFile);
-          pullChosenImage(root.querySelector("[data-tower-instax-file]"), applyInstaxFile);
+          pullChosenPolaroids(root.querySelector("[data-tower-instax-file]"));
         }, 0);
       });
     }
@@ -12193,7 +12657,7 @@
       if (input.__cognationInstaxBound) return;
       input.__cognationInstaxBound = true;
       input.addEventListener("change", function () {
-        pullChosenImage(input, applyInstaxFile);
+        pullChosenPolaroids(input);
         input.value = "";
       });
     });
@@ -12414,6 +12878,12 @@
       var reader = new FileReader();
       reader.onerror = function () { done(""); };
       reader.onload = function () {
+        var raw = String(reader.result || "");
+        /* Keep the upload's own bytes when they fit. Shrink only when they do not. */
+        if (raw.indexOf("data:image/") === 0 && raw.length < 180000) {
+          done(raw);
+          return;
+        }
         var img = new Image();
         img.onload = function () {
           var max = 480;
@@ -12434,7 +12904,46 @@
       };
       reader.readAsDataURL(file);
     }
+    function chosenAudience() {
+      var btn = form && form.querySelector("[data-tower-compose-kind][aria-selected='true']");
+      return btn && btn.getAttribute("data-tower-compose-kind") === "professional" ? "professional" : "personal";
+    }
+    function audienceAuthor(kind) {
+      var social = remoteSocial();
+      var mine = social && typeof social.getMyProfiles === "function" ? social.getMyProfiles() : [];
+      var i, p;
+      for (i = 0; i < mine.length; i++) {
+        p = mine[i];
+        if (p && p.kind === kind && p.id) {
+          return { id: String(p.id), name: p.display_name || p.displayName || "", handle: p.handle || "" };
+        }
+      }
+      if (usingRemoteSocial()) return { id: "", name: "", handle: "" };
+      var accounts = window.CognationAccounts;
+      var user = "";
+      try { user = (JSON.parse(localStorage.getItem("cognation.session.v2") || "{}") || {}).username || ""; } catch (eAud) {}
+      var rows = accounts && accounts.getProfilesForUsername ? accounts.getProfilesForUsername(user) || [] : [];
+      for (i = 0; i < rows.length; i++) {
+        p = rows[i];
+        if (p && p.kind === kind && p.id) return { id: String(p.id), name: p.displayName || "", handle: p.handle || "" };
+      }
+      return { id: "", name: "", handle: "" };
+    }
     if (form) {
+      var audienceBar = form.querySelector("[data-tower-compose-audience]");
+      if (audienceBar) {
+        audienceBar.addEventListener("click", function (ev) {
+          var btn = ev.target && ev.target.closest ? ev.target.closest("[data-tower-compose-kind]") : null;
+          if (!btn || !audienceBar.contains(btn)) return;
+          ev.preventDefault();
+          audienceBar.querySelectorAll("[data-tower-compose-kind]").forEach(function (b) {
+            var on = b === btn;
+            b.setAttribute("aria-selected", on ? "true" : "false");
+            b.classList.toggle("is-selected", on);
+            b.classList.toggle("is-active", on);
+          });
+        });
+      }
       form.addEventListener("submit", function (e) {
         e.preventDefault();
         var files = fileInput && fileInput.files ? Array.prototype.slice.call(fileInput.files) : [];
@@ -12467,6 +12976,12 @@
         var savedPics = form.__pics || {};
         form.__marketReady = false;
         form.__pics = null;
+        var aud = chosenAudience();
+        var who = audienceAuthor(aud);
+        if (usingRemoteSocial() && !who.id) {
+          setStatus(aud === "professional" ? "Add a professional page before posting to that audience." : "Sign in before posting.", true);
+          return;
+        }
         var attachments = [];
         files.forEach(function (f) {
           var row = {
@@ -12480,6 +12995,15 @@
           if (savedPics[f.name]) row.dataUrl = savedPics[f.name];
           attachments.push(row);
         });
+        if (marketPost) {
+          try {
+            var memberLoc = JSON.parse(localStorage.getItem("cognation.member.profile.v1") || "{}");
+            var savedLoc = JSON.parse(localStorage.getItem("cognation.member.location.v1") || "null");
+            var lat = Number(memberLoc && memberLoc.lat != null ? memberLoc.lat : savedLoc && savedLoc.lat);
+            var lng = Number(memberLoc && memberLoc.lng != null ? memberLoc.lng : savedLoc && savedLoc.lng);
+            if (isFinite(lat) && isFinite(lng)) attachments.push({ kind: "location", label: "location", lat: lat, lng: lng });
+          } catch (eLoc) {}
+        }
         if (usingRemoteSocial()) {
           /* One post at a time: the Post button is disabled while a post is in
              flight (no double posts) and re-enabled on success and on error. */
@@ -12508,6 +13032,7 @@
             .createTowerPost({
               body: bodyInput ? bodyInput.value : "",
               attachments: attachments,
+              authorProfileId: who.id,
               /* PERSONAL | PROFESSIONAL switch (js/signal-post-as.js): one of
                  the member's own pages, or "" = the current default author. */
               asProfileId: (window.CognationSignalPostAs &&
@@ -12537,7 +13062,10 @@
           return;
         }
         var result = TowerStore.add({
-          authorName: postAuthorFromProfile(TowerProfileStore.get()),
+          authorName: who.name || postAuthorFromProfile(TowerProfileStore.get()),
+          authorProfileId: who.id,
+          handle: who.handle,
+          profileKind: aud,
           body: bodyInput ? bodyInput.value : "",
           attachments: attachments,
         });
@@ -12561,10 +13089,9 @@
     document.addEventListener("cognation:tower-updated", function () {
       renderFeed(root);
     });
-    /* Redraw only when the viewer crosses the under-13 line (age loaded or edited). */
+    /* Age edits can open or close a photo (13, 18, 21) without crossing under-13. */
     document.addEventListener("cognation:member-profile-updated", function () {
-      var list = towerFeedQuery(root, "[data-tower-feed]");
-      if (list && list.__ageFloorUnder13 !== viewerUnder13()) renderFeed(root);
+      renderFeed(root);
     });
     document.addEventListener("cognation:remote-profile-loaded", function () {
       renderProfileChrome(root);
@@ -13486,8 +14013,9 @@
     if (!circleFallState) return;
     var spots = document.querySelectorAll("[data-circle-ring] [data-circle-spot]");
     if (!spots.length) return;
-    if (pinCircleSpotsToBackground(spots)) return;
-    var shift = ((performance.now() - circleFallState.ringStarted) / 28000) * CIRCLE_SPOTS.length;
+    pinCircleSpotsToBackground(spots);
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var shift = reduce ? 0 : ((performance.now() - circleFallState.ringStarted) / 28000) * CIRCLE_SPOTS.length;
     var i;
     var front = 0;
     var frontScale = -1;
@@ -13495,17 +14023,20 @@
       var pos = circleSpotAt(i + shift);
       var depth = pos.s / CIRCLE_SCALE;
       var scale = 0.8 + Math.max(0, depth - 0.68) * 0.4;
+      var bob = reduce ? 0 : Math.sin(performance.now() / 360 + i * 1.2) * 18;
       var size = 5.6;
       spots[i].style.width = size.toFixed(2) + "rem";
       spots[i].style.height = size.toFixed(2) + "rem";
       spots[i].style.transform =
-        "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + pos.y.toFixed(1) + "px) scale(" + scale.toFixed(3) + ")";
+        "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + (pos.y + bob).toFixed(1) + "px) scale(" + scale.toFixed(3) + ")";
       spots[i].style.zIndex = String(Math.round(pos.s * 100));
+      spots[i].style.setProperty("--pulse-spot-s", scale.toFixed(3));
       if (scale > frontScale) { frontScale = scale; front = i; }
     }
     for (i = 0; i < spots.length; i++) {
       var cap = spots[i].querySelector("[data-circle-caption]");
       if (cap) cap.hidden = i !== front;
+      if (i === front) spots[i].style.zIndex = "30";
     }
   }
 
@@ -13649,8 +14180,7 @@
       var st = circleFallState;
       if (!st || !st.shellOnly) return;
       placeCircleSpots();
-      /* Pinned spots on the background are still: no per-frame loop (light on phones). */
-      if (layer.hasAttribute("data-pulse-bg")) { st.raf = 0; return; }
+      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { st.raf = 0; return; }
       st.raf = requestAnimationFrame(frameShell);
     }
     if (!window.__cognationPulseBgResize) {

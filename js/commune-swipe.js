@@ -130,8 +130,9 @@
     PODCAST: "pro-podcast",
     FIELD: "pro-field",
     POP: "pro-popculture",
+    CREATOR: "pro-creator",
   };
-  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.FIELD, PRO.POP];
+  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.FIELD, PRO.POP, PRO.CREATOR];
   var PRO_MARK = {};
   PRO_MARK[PRO.WEBINAR] = "Webinar";
   PRO_MARK[PRO.KNOW] = "Professionals you might know";
@@ -140,6 +141,7 @@
   PRO_MARK[PRO.PODCAST] = "Podcast";
   PRO_MARK[PRO.FIELD] = "Field";
   PRO_MARK[PRO.POP] = "Pop-culture";
+  PRO_MARK[PRO.CREATOR] = "Content Creator";
   /* Podcast cards stay, with no Demo badge (Alexa 2026-10-22 11:46 AM CT, via SeedOps:
      "this will also be a card when cognation goes live but doesnt need to be a demo"). */
   var PRO_PODCASTS = [
@@ -1781,6 +1783,44 @@
     return [];
   }
 
+  /* Shown only with a Content Creator interest. A left swipe still passes it. */
+  function contentCreatorCards() {
+    var api = window.CognationContentCreator;
+    if (!api || typeof api.cards !== "function") return [];
+    return api.cards(hasInterest(api.INTERESTS));
+  }
+
+  function openContentCreator(card) {
+    var api = window.CognationContentCreator;
+    var panel = roomEl();
+    if (!api || !panel || !card) return false;
+    var res = api.enter(card.id, currentProfileId());
+    if (!res.ok) {
+      setStatus(res.error === "kicked" ? "You were removed from this chatroom." : "This room is full. Another Content Creator card is in the deck.");
+      if (res.error === "full") rebuildDeck();
+      return false;
+    }
+    closeClassroom();
+    panel.setAttribute("data-creator-room", card.id);
+    api.bind(panel, { me: currentProfileId, after: function (out) { creatorAfter(panel, out); } });
+    api.paint(panel, res.room);
+    ensureRoomHeader(panel);
+    state.roomId = card.id;
+    state.liveRoom = false;
+    showRoom(true);
+    setStatus("Content Creator chatroom. Camera requests only — no live video.");
+    return true;
+  }
+  function creatorAfter(panel, out) {
+    var api = window.CognationContentCreator;
+    if (!out || !out.ok) {
+      setStatus(out && out.error === "camera_full" ? "15 people already asked to join on camera." : "Couldn't do that.");
+      return;
+    }
+    if (api) api.paint(panel, out.room);
+    setStatus(out.kicked ? "10 reports. Removed from this chatroom only." : (out.count ? "Reported." : "Camera request saved. No live video."));
+  }
+
   function buildProfessionalLanes() {
     var lanes = {};
     /* Webinar cards only while a Professional page is live. None live: lane empty. */
@@ -1795,6 +1835,7 @@
     lanes[PRO.RESEARCH] = [];
     lanes[PRO.FIELD] = [];
     lanes[PRO.POP] = [];
+    lanes[PRO.CREATOR] = contentCreatorCards();
     Object.keys(lanes).forEach(function (type) {
       lanes[type] = omitPassed(lanes[type].filter(professionalCardAllowed));
     });
@@ -2138,6 +2179,10 @@
         });
         html += "</ul>";
       }
+      if (card.roomKind === "content-creator") {
+        html += '<button type="button" class="btn btn-primary" data-creator-enter>Enter room</button>';
+        html += '<p class="commune-card-meta">Chatroom · 100 people · up to 15 camera requests · no presenter · no calendar</p>';
+      }
       if (card.why) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
       el.innerHTML = html;
       return el;
@@ -2307,6 +2352,11 @@
     /* Alexa's rule: an ECHO card opens its own full-screen window or a Tower profile, nothing else. */
     if (card.type === TYPE.CHAT) {
       wireClassroomCardClick(el, card, function () { openRoom(card.id, true); });
+    }
+    if (card.roomKind === "content-creator") {
+      var enterCreator = el.querySelector("[data-creator-enter]");
+      if (enterCreator) enterCreator.addEventListener("click", function (ev) { ev.stopPropagation(); openContentCreator(card); });
+      wireClassroomCardClick(el, card, function () { openContentCreator(card); });
     }
     if ((card.type === TYPE.KNOW || card.type === TYPE.FRIEND) && (card.profileId || card.handle)) {
       el.setAttribute("data-commune-opens-profile", "");
@@ -3106,6 +3156,7 @@
     state.liveRoom = false;
     state.roomSqlId = "";
     state.liveMessages = [];
+    if (roomEl()) roomEl().removeAttribute("data-creator-room");
     showRoom(false);
     clearPointer();
     try {
@@ -3838,6 +3889,15 @@
         var body = input ? String(input.value || "").trim() : "";
         if (!body || !state.roomId) return;
         body = body.slice(0, 500);
+        var creatorPanel = roomEl();
+        if (creatorPanel && creatorPanel.getAttribute("data-creator-room") && window.CognationContentCreator) {
+          var sent = window.CognationContentCreator.send(creatorPanel.getAttribute("data-creator-room"), currentProfileId(), viewerDisplayName(), body);
+          if (input) input.value = "";
+          if (sent && sent.ok) { window.CognationContentCreator.paint(creatorPanel, sent.room); setStatus("Sent."); }
+          else setStatus(sent && sent.error === "kicked" ? "You were removed from this chatroom." : "This room is full. Another Content Creator card is in the deck.");
+          if (sent && sent.error === "full") rebuildDeck();
+          return;
+        }
         if (state.liveRoom && state.roomSqlId) {
           var sqlId = state.roomSqlId;
           setStatus("Sending…");

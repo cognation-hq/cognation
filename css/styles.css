@@ -14621,17 +14621,17 @@ textarea::placeholder {
 }
 /* SIGNAL → Cognation Times. From the publication block down: broadsheet, not the NEWS card. */
 #panel-signal .commune-paper {
-  background: #f4efe4 !important;
-  color: #16120c !important;
-  border: 1px solid #16120c !important;
+  background: #fbf8f2 !important;
+  color: #0c0b0a !important;
+  border: 1px solid #1a140f !important;
   border-radius: 0 !important;
   padding: 0.7rem 1rem 1.25rem !important;
   box-shadow: none !important;
 }
 #panel-signal .commune-paper,
 #panel-signal .commune-paper * {
-  font-family: "Old Standard TT", Georgia, "Times New Roman", serif !important;
-  color: #16120c !important;
+  font-family: "Source Serif 4", Inter, Georgia, "Liberation Serif", "Times New Roman", serif !important;
+  color: #0c0b0a !important;
 }
 #panel-signal .paper-eyebrow,
 #panel-signal .paper-subtitle,
@@ -14660,15 +14660,15 @@ textarea::placeholder {
   text-align: center !important;
 }
 #panel-signal .paper-title {
-  margin: 0 0 0.4rem !important;
-  font-family: Oswald, Impact, "Arial Narrow", sans-serif !important;
-  font-size: clamp(3.4rem, 8.6vw, 6.6rem) !important;
+  margin: 0.2rem 0 0.65rem !important;
+  font-family: "Source Serif 4", Inter, Georgia, "Liberation Serif", "Times New Roman", serif !important;
+  font-size: clamp(1.9rem, 4.2vw, 3.05rem) !important;
   font-weight: 700 !important;
-  letter-spacing: 0.045em !important;
-  line-height: 0.78 !important;
+  letter-spacing: 0.01em !important;
+  line-height: 1.15 !important;
   text-align: center !important;
   text-transform: uppercase !important;
-  color: #111 !important;
+  color: #0c0b0a !important;
   text-shadow: none !important;
   white-space: nowrap;
 }
@@ -14676,20 +14676,23 @@ textarea::placeholder {
 #panel-signal .paper-volume,
 #panel-signal .paper-price,
 #panel-signal .paper-date {
-  color: #111 !important;
-  font-family: "Special Elite", "Courier New", monospace !important;
-  font-size: 0.72rem !important;
-  letter-spacing: 0.14em !important;
+  color: #0c0b0a !important;
+  font-family: "Source Serif 4", Inter, Georgia, "Liberation Serif", "Times New Roman", serif !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+  line-height: 1.4 !important;
+  text-transform: none !important;
 }
 #panel-signal .paper-dateline {
   display: flex !important;
   justify-content: space-between !important;
   gap: 0.6rem !important;
-  border-block: 4px double #111 !important;
+  border-block: 4px double #1a140f !important;
   margin: 0 !important;
   padding: 0.28rem 0.2rem !important;
 }
-#panel-signal .paper-rule { background: #111 !important; width: 1.5rem !important; height: 2px !important; }
+#panel-signal .paper-rule { background: #1a140f !important; width: 1.5rem !important; height: 2px !important; }
 #panel-signal .paper-grid,
 #panel-signal .paper-col,
 #panel-signal .paper-section,
@@ -14715,8 +14718,8 @@ textarea::placeholder {
   margin: 0.85rem 0 0 !important;
   padding: 0 !important;
   border: 0 !important;
-  border-top: 1px solid #16120c !important;
-  border-left: 1px solid #16120c !important;
+  border-top: 1px solid #1a140f !important;
+  border-left: 1px solid #1a140f !important;
   border-radius: 0 !important;
   background: transparent !important;
 }
@@ -14728,11 +14731,11 @@ textarea::placeholder {
   min-height: 9.1rem !important;
   box-sizing: border-box !important;
   margin: 0 !important;
-  padding: 0.65rem 0.75rem !important;
+  padding: 0.85rem 0.95rem !important;
   overflow: hidden !important;
   border: 0 !important;
-  border-right: 1px solid #16120c !important;
-  border-bottom: 1px solid #16120c !important;
+  border-right: 1px solid #1a140f !important;
+  border-bottom: 1px solid #1a140f !important;
   background: transparent !important;
   box-shadow: none !important;
   text-align: left !important;
@@ -14742,25 +14745,68 @@ textarea::placeholder {
   justify-content: space-between !important;
   gap: 0.45rem !important;
   align-items: baseline !important;
-  font-family: "Special Elite", "Courier New", monospace !important;
-  font-size: 0.68rem !important;
-  letter-spacing: 0.06em !important;
-  text-transform: uppercase;
-  margin: 0 0 0.3rem !important;
+  font-family: "Source Serif 4", Inter, Georgia, "Liberation Serif", "Times New Roman", serif !important;
+  font-size: 1.05rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.01em !important;
+  line-height: 1.35 !important;
+  text-transform: none !important;
+  margin: 0 0 0.45rem !important;
+}
+#panel-signal .commune-feed-author,
+#panel-signal .commune-feed-author a,
+#panel-signal .commune-feed-meta time {
+  font-family: "Source Serif 4", Inter, Georgia, "Liberation Serif", "Times New Roman", serif !important;
+  font-size: 1.05rem !important;
+  letter-spacing: 0.005em !important;
+  line-height: 1.35 !important;
+  text-transform: none !important;
+  color: #0c0b0a !important;
+}
+#panel-signal .commune-feed-author,
+#panel-signal .commune-feed-author a {
+  font-weight: 600 !important;
+}
+#panel-signal .commune-feed-meta time {
+  font-weight: 500 !important;
+}
+#panel-signal .commune-profile-link,
+#panel-signal .commune-at-link {
+  color: #0c0b0a !important;
+  font-weight: 600 !important;
+  text-decoration-color: #0c0b0a;
+  text-underline-offset: 0.14em;
 }
 #panel-signal .commune-feed-body,
 #panel-signal .is-lead .commune-feed-body {
   margin: 0 !important;
-  font-family: "Old Standard TT", Georgia, "Times New Roman", serif !important;
-  font-size: 0.92rem !important;
+  font-family: "Source Serif 4", Inter, Georgia, "Liberation Serif", "Times New Roman", serif !important;
+  font-size: 1.125rem !important;
   font-weight: 400 !important;
-  line-height: 1.35 !important;
+  line-height: 1.55 !important;
   letter-spacing: 0 !important;
   text-transform: none !important;
   text-align: left !important;
+  color: #0c0b0a !important;
 }
+#panel-signal .commune-feed-item.is-lead {
+  grid-column: 1 / -1 !important; height: auto !important; overflow: visible !important;
+  padding: 1.15rem 1.25rem 1.3rem !important;
+}
+#panel-signal .times-lead-headline {
+  margin: 0 0 0.35rem !important; font-size: clamp(1.7rem, 3vw, 2.25rem) !important;
+  font-weight: 700 !important; letter-spacing: 0 !important; line-height: 1.2 !important;
+  text-transform: none !important; color: #0c0b0a !important;
+}
+#panel-signal .times-lead-byline {
+  margin: 0 0 0.7rem !important; font-size: 1.125rem !important; font-style: italic !important;
+  font-weight: 500 !important; line-height: 1.4 !important; color: #0c0b0a !important;
+}
+#panel-signal .times-lead-byline time { font-style: normal !important; font-weight: 500 !important; }
+#panel-signal .is-lead .commune-feed-body { font-size: 1.25rem !important; line-height: 1.55 !important; }
 @media (max-width: 720px) {
-  #panel-signal .paper-title { white-space: normal; font-size: 2.6rem !important; }
+  #panel-signal .paper-title { white-space: normal; font-size: 1.85rem !important; line-height: 1.15 !important; }
+  #panel-signal .times-lead-headline { font-size: 1.65rem !important; }
   #panel-signal .commune-feed-list { grid-template-columns: minmax(0, 1fr) !important; }
 }
 

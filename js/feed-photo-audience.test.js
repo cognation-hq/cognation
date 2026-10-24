@@ -1,5 +1,6 @@
 /**
- * Feed photos are images, age-gated per photo. Composer audience is Personal | Professional.
+ * Feed photos are images, age-gated per photo. The composer has no Personal |
+ * Professional pill under Choose Files. Tower, Signal, and Echo tab pills stay.
  * Run: node js/feed-photo-audience.test.js
  */
 "use strict";
@@ -46,6 +47,8 @@ assert.strictEqual(added.post.authorProfileId, "pro-1");
 assert.strictEqual(added.post.handle, "alex-pro");
 var form = fs.readFileSync(path.join(root, "index.html"), "utf8");
 var choice = form.slice(form.indexOf('id="tower-files"'), form.indexOf("</form>", form.indexOf('id="tower-files"')));
-assert.ok(/data-tower-compose-kind="personal"/.test(choice) && /data-tower-compose-kind="professional"/.test(choice));
-assert.ok(/signal-subtab site-switch-side/.test(choice), "Personal | Professional tab style");
+assert.ok(!/data-tower-compose-audience|data-tower-compose-kind/.test(choice), "no Personal | Professional pill under Files");
+assert.ok(/data-tower-profile-kind="personal"/.test(form) && /data-tower-profile-kind="professional"/.test(form), "Tower pills stay");
+assert.ok(/data-signal-pane-btn="news"/.test(form) && /data-signal-pane-btn="feed"/.test(form), "Signal News | Feed stays");
+assert.ok(/data-commune-mode-btn="personal"/.test(form) && /data-commune-mode-btn="professional"/.test(form), "Echo pills stay");
 console.log("feed-photo-audience.test.js ok");

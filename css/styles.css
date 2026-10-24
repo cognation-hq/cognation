@@ -16395,3 +16395,63 @@ body.cgn-cal-page {
   text-shadow: none !important;
   align-self: center !important;
 }
+
+/* Echo card actions only. Pass and Keep stay side by side, much smaller,
+   with little space under them. The camera request and its count stay
+   small and clear of that row. Tab pills are unchanged. */
+#panel-commune .commune-swipe-shell {
+  padding-top: 0.15rem;
+  padding-bottom: 0.1rem;
+}
+#main .tabs-section:has(#panel-commune:not([hidden])) {
+  padding-bottom: 0.2rem;
+}
+#panel-commune .commune-swipe-actions {
+  gap: 0.4rem;
+  margin-bottom: 0;
+}
+#panel-commune .commune-swipe-dots {
+  margin-top: 0.3rem;
+  margin-bottom: 0;
+}
+#panel-commune .commune-swipe-btn {
+  min-height: 0;
+  padding: 0.14rem 0.55rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+#panel-commune .commune-swipe-status {
+  margin: 0.3rem 0 0;
+}
+#panel-commune .commune-card[data-card-type="chatroom"] .commune-card-body {
+  flex: 0 1 auto;
+}
+#panel-commune .commune-card[data-card-type="chatroom"] [data-chatroom-camera] {
+  flex: 0 0 auto;
+  align-self: center;
+  width: auto;
+  max-width: 100%;
+  min-height: 0;
+  margin: 0.2rem 0 0;
+  padding: 0.14rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+#panel-commune .commune-card[data-card-type="chatroom"] [data-chatroom-camera-count] {
+  flex: 0 0 auto;
+  align-self: center;
+  width: auto;
+  max-width: 100%;
+  margin: 0.28rem 0 0;
+  padding: 0.1rem 0.6rem;
+  border: 1px solid rgba(187, 244, 255, 0.44);
+  border-radius: 999px;
+  background: rgba(155, 235, 255, 0.1);
+  color: #f7f9ff;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+}

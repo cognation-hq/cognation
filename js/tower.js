@@ -9857,38 +9857,55 @@
     }
     if (!dlg || dlg.__cognationBound) return;
     dlg.__cognationBound = true;
+    /* Enter, or closing the box with words in it, places the quote. A blocked
+       quote stays open. Cancel and the backdrop close an empty box. */
+    function commitAddQuote() {
+      if (!isTowerOwner(TowerProfileStore.get())) return false;
+      var ta = dlg.querySelector("[data-tower-add-quote-text]");
+      var text = ta ? ta.value : "";
+      if (!String(text || "").trim()) {
+        closeAddWidgetDialog();
+        return true;
+      }
+      var added = addQuoteSticker(root, text);
+      var qStatus = dlg.querySelector("[data-tower-add-quote-status]");
+      if (added && added.blocked) {
+        /* Keep the dialog open with the words so the owner can change them. */
+        if (!qStatus && ta && ta.parentNode) {
+          qStatus = document.createElement("p");
+          qStatus.className = "commune-status is-error tower-add-quote-status";
+          qStatus.setAttribute("data-tower-add-quote-status", "");
+          qStatus.setAttribute("role", "status");
+          qStatus.setAttribute("aria-live", "polite");
+          ta.insertAdjacentElement("afterend", qStatus);
+        }
+        if (qStatus) { qStatus.hidden = false; qStatus.textContent = QUOTE_BLOCKED_MESSAGE; }
+        setProfileStatusOn(root, QUOTE_BLOCKED_MESSAGE, true);
+        return false;
+      }
+      if (qStatus) { qStatus.hidden = true; qStatus.textContent = ""; }
+      setProfileStatusOn(root, "Quote sticker added.", false);
+      closeAddWidgetDialog();
+      return true;
+    }
     dlg.addEventListener("click", function (ev) {
-      if (ev.target === dlg) closeAddWidgetDialog();
+      if (ev.target === dlg) commitAddQuote();
+    });
+    dlg.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        closeAddWidgetDialog();
+        return;
+      }
+      var box = ev.target && ev.target.closest ? ev.target.closest("[data-tower-add-quote-text]") : null;
+      if (!box || ev.key !== "Enter" || ev.shiftKey) return;
+      ev.preventDefault();
+      commitAddQuote();
     });
     var cancel = dlg.querySelector("[data-tower-add-widget-cancel]");
-    if (cancel) cancel.addEventListener("click", closeAddWidgetDialog);
-    var confirm = dlg.querySelector("[data-tower-add-quote-confirm]");
-    if (confirm) {
-      confirm.addEventListener("click", function () {
-        if (!isTowerOwner(TowerProfileStore.get())) return;
-        var ta = dlg.querySelector("[data-tower-add-quote-text]");
-        var text = ta ? ta.value : "";
-        var added = addQuoteSticker(root, text);
-        var qStatus = dlg.querySelector("[data-tower-add-quote-status]");
-        if (added && added.blocked) {
-            /* Keep the dialog open with the words so the owner can change them. */
-            if (!qStatus && ta && ta.parentNode) {
-              qStatus = document.createElement("p");
-              qStatus.className = "commune-status is-error tower-add-quote-status";
-              qStatus.setAttribute("data-tower-add-quote-status", "");
-              qStatus.setAttribute("role", "status");
-              qStatus.setAttribute("aria-live", "polite");
-              ta.insertAdjacentElement("afterend", qStatus);
-            }
-            if (qStatus) { qStatus.hidden = false; qStatus.textContent = QUOTE_BLOCKED_MESSAGE; }
-            setProfileStatusOn(root, QUOTE_BLOCKED_MESSAGE, true);
-            return;
-          }
-        if (qStatus) { qStatus.hidden = true; qStatus.textContent = ""; }
-        setProfileStatusOn(root, "Quote sticker added.", false);
-        closeAddWidgetDialog();
-      });
-    }
+    if (cancel) cancel.addEventListener("click", function () {
+      closeAddWidgetDialog();
+    });
 
     /* Empty canvas click on personal public page → offer add */
     var stage = root.querySelector("[data-tower-scrapbook]");

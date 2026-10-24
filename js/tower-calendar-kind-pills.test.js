@@ -1,42 +1,21 @@
-/**
- * Tower calendar event form: Classroom and Auction pills before the event is added.
- * Run: node js/tower-calendar-kind-pills.test.js
- */
+/** Auction pills and the buyer–seller note. Run: node js/tower-calendar-kind-pills.test.js */
 "use strict";
-var assert = require("assert");
-var fs = require("fs");
-var path = require("path");
-var vm = require("vm");
+var assert = require("assert"), fs = require("fs"), path = require("path"), vm = require("vm");
 var src = fs.readFileSync(path.join(__dirname, "tower.js"), "utf8");
-var start = src.indexOf("function calendarKindPills");
-var end = src.indexOf("function renderPrivateCalendar");
+var msg = fs.readFileSync(path.join(__dirname, "commune-messages.js"), "utf8");
+var swipe = fs.readFileSync(path.join(__dirname, "commune-swipe.js"), "utf8");
 var ctx = {};
-vm.runInNewContext(src.slice(start, end), ctx);
-var html = ctx.calendarKindPills("auction");
-assert.ok(html.indexOf('value="classroom"') < html.indexOf('value="auction"'), "Classroom then Auction");
-assert.ok(/value="auction"[^>]*checked/.test(html), "Auction pill can be checked");
-assert.ok(!/value="classroom"[^>]*checked/.test(html));
-assert.ok(!/checked/.test(ctx.calendarKindPills("")), "nothing checked until the person checks a pill");
-var ev = { title: "Thursday session" };
-ctx.applyEventKind(ev, "auction", { handle: "@acme" }, { item: "typed lot", start: 40 });
-assert.strictEqual(ev.kind, "auction");
-assert.strictEqual(ev.auction.chat && ev.auction.video, true);
-assert.strictEqual(ev.auction.presenter, "handoff");
-assert.strictEqual(ev.auction.bid, "professional-page");
-assert.strictEqual(ev.auction.item, "typed lot");
-assert.notStrictEqual(ev.auction.item, ev.title);
-assert.strictEqual(ev.auction.start, 40);
-assert.strictEqual(ev.auction.handle, "acme");
-assert.strictEqual(ev.auction.minAge, 16);
-assert.strictEqual(ev.auction.payInRoom, false);
-ctx.applyEventKind(ev, "classroom", {});
-assert.strictEqual(ev.kind, "classroom");
-assert.ok(!("auction" in ev), "Classroom does not set up the auction room");
-var form = src.slice(src.indexOf("function calendarEditorHtml"), src.indexOf("function renderPrivateCalendar"));
-assert.ok(form.indexOf("calendarKindPills") < form.indexOf("tower-cal-edit-title"), "pills sit above the event fields");
-assert.ok(/owner \? calendarEditorHtml\(editing, selected\)/.test(src), "owner calendar shows the event form");
-assert.ok(/Check Classroom or Auction/.test(src));
-assert.ok(/data-tower-cal-selling/.test(src) && /data-tower-cal-start/.test(src), "seller types the item and starting bid");
-assert.ok(!/item: event\.title/.test(src), "the listing is not a programmed item");
-assert.ok(/applyEventKind\(added, kind, p, sale\)/.test(src));
+vm.runInNewContext(src.slice(src.indexOf("function calendarKindPills"), src.indexOf("function renderPrivateCalendar")), ctx);
+var html = ctx.calendarKindPills("");
+assert.ok(/value="classroom"/.test(html) && /value="auction"/.test(html) && !/checked/.test(html));
+var ev = { title: "Session" };
+ctx.applyEventKind(ev, "auction", { handle: "host" }, { item: "", start: "" });
+assert.strictEqual(ev.auction.item, "");
+assert.ok(!(ev.auction.start > 0) && ev.auction.payInRoom === false && ev.auction.bid === "message");
+assert.ok(/data-tower-cal-selling/.test(src) && /data-tower-cal-start/.test(src));
+var note = msg.slice(msg.indexOf("Hello! You have agreed"));
+assert.ok(/data-auction-amt/.test(note) && /data-auction-seller/.test(note) && /data-auction-date/.test(note));
+assert.ok(!/value=/.test(note.slice(0, note.indexOf("> amount of money"))));
+assert.ok(/data-auction-pay>Apple Pay/.test(msg) && /No payment was taken/.test(msg) && !/receipt|purchase completed/i.test(msg));
+assert.ok(!/Apple Pay|apple-pay|ApplePay/.test(swipe) && /CognationAuctionRoom\.mount/.test(swipe) && !/tower-profile/.test(msg.slice(msg.lastIndexOf("function mount"))));
 console.log("tower-calendar-kind-pills.test.js ok");

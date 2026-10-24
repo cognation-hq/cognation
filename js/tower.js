@@ -7764,7 +7764,7 @@
     }
     return '<div class="tower-cal-pills" data-tower-cal-pills role="group" aria-label="Event kind">' +
       one("classroom", "Classroom") + one("auction", "Auction") +
-      '<p class="form-hint">Check one before the event is added. Auction sets up a chat room with video, a presenter who can hand the live spot to another speaker and take it back, and a Bid button that pays on the seller’s professional page. No one under 16 can bid.</p></div>';
+      '<p class="form-hint">Check one before the event is added. Auction opens a chat room with video and a presenter who can hand off the live spot and take it back. No one under 16 can bid.</p></div>';
   }
   function auctionSaleFields(editing) {
     var sale = (editing && editing.auction) || {};
@@ -7780,7 +7780,7 @@
     if (event.kind !== "auction") { delete event.auction; return; }
     sale = sale || {};
     event.auction = {
-      chat: true, video: true, presenter: "handoff", bid: "professional-page",
+      chat: true, video: true, presenter: "handoff", bid: "message",
       item: String(sale.item || "").trim(), start: Number(sale.start),
       handle: String((profile && profile.handle) || "").replace(/^@/, ""),
       minAge: 16, payInRoom: false,

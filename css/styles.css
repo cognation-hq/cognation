@@ -4497,6 +4497,23 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .tower-social-btn--venmo { background: #008cff; color: #fff; border-color: #0074d4; }
 
 .tower-social-btn--linktree { background: #43e55e; color: #111; border-color: #2ecc71; }
+.tower-pro-links { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin: 0.35rem 0 0; } .tower-pro-links[hidden], .tower-pro-pay-confirm[hidden], .tower-pro-pay-note[hidden] { display: none !important; }
+.tower-pro-link {
+  appearance: none; display: inline-flex; align-items: center; margin: 0; padding: 0.22rem 0.5rem;
+  border: 1px solid rgba(183, 246, 255, 0.72); border-radius: 999px; background: transparent;
+  color: #f7f9ff; font-family: "Oswald", system-ui, sans-serif; font-size: 0.68rem; font-weight: 700;
+  letter-spacing: 0.04em; line-height: 1; text-transform: uppercase; text-decoration: none;
+  white-space: nowrap; cursor: pointer;
+}
+.tower-pro-link:hover, .tower-pro-link:focus-visible { color: #fff; outline: none; box-shadow: 0 0 0 1px rgba(183, 246, 255, 0.72); }
+#panel-tower .tower-pro-link, #panel-tower .tower-pro-link:hover { color: #f7f9ff !important; }
+.tower-pro-pay-confirm { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin-top: 0.35rem; }
+.tower-pro-pay-confirm input {
+  flex: 1; min-width: 8rem; font: inherit; font-size: 0.75rem; padding: 0.22rem 0.4rem;
+  border-radius: 0.35rem; border: 1px solid rgba(183, 246, 255, 0.45);
+  background: rgba(5, 8, 28, 0.55); color: #f7f9ff;
+}
+.tower-pro-pay-note { margin: 0.3rem 0 0; font-size: 0.75rem; color: #f7f9ff; }
 /* Pro money links (Venmo, Pay for services, Buy ads): quiet secondary buttons in the muted widget chrome. */
 .tower-social-btn.is-quiet { background: transparent; color: var(--cgn-text-muted); border: 1px solid var(--cgn-border); border-radius: 0.5rem; padding: 0.3rem 0.75rem; width: auto; height: auto; font-size: 0.8rem; font-weight: 400; white-space: nowrap; }
 .tower-social-btn.is-quiet:hover, .tower-social-btn.is-quiet:focus-visible { color: inherit; }
@@ -8612,6 +8629,15 @@ body { padding-top: 0 !important; }
   margin-top: 0.45rem;
   align-self: flex-start;
 }
+.tower-cal-pills { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.65rem; }
+.tower-cal-pill {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  border: 1px solid rgba(220, 246, 255, 0.35); border-radius: 999px;
+  padding: 0.28rem 0.75rem; font-size: 0.85rem; cursor: pointer;
+}
+.tower-cal-pill:has(input:checked) { outline: 2px solid #7fd6ff; background: rgba(127, 214, 255, 0.14); }
+.tower-cal-pills .form-hint { flex: 1 0 100%; margin: 0.15rem 0 0; }
+[data-tower-cal-auction-fields][hidden] { display: none; }
 .tower-cal-editor,
 .tower-cal-google {
   margin-top: 0.75rem;
@@ -12919,6 +12945,16 @@ a.site-switch-side:focus-visible {
 .commune-type-mark[data-type-mark="field"] { --mark: #c9d4ff; }
 .commune-type-mark[data-type-mark="popculture"] { --mark: #fff3a8; }
 .commune-type-mark[data-type-mark="business"] { --mark: #9ad7ff; }
+.commune-type-mark[data-type-mark="ai-work"] { --mark: #9ee7ff; }
+.commune-room-line:has([data-ai-work-report]) { display: flex; gap: 0.4rem; align-items: center; justify-content: space-between; }
+.commune-room-line [data-ai-work-report] { width: auto; flex: none; }
+.commune-type-mark[data-type-mark="doctoral"] { --mark: #c4b5fd; }
+.commune-room-line [data-doctoral-report] { width: auto; margin-left: 0.45rem; }
+.commune-type-mark[data-type-mark="industry"] { --mark: #8fd6c4; }
+.commune-room-line:has([data-industry-report]) { display: flex; gap: 0.4rem; align-items: center; justify-content: space-between; }
+.commune-room-line [data-industry-report] { width: auto; flex: none; }
+.commune-type-mark[data-type-mark="licensure"] { --mark: #d7c4ff; }
+.commune-type-mark[data-type-mark="ethics"] { --mark: #c5b4ff; }
 .commune-card-why {
   font-size: 0.78rem;
 }
@@ -13114,6 +13150,17 @@ a.site-switch-side:focus-visible {
 .login-age-block { text-align: center; padding: 1.5rem 0.5rem; }
 .login-age-block[hidden] { display: none; }
 .login-age-block p { font-size: 1.1rem; margin: 0; }
+.login-area-block {
+  margin: 0.75rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: 0.7rem;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  color: #e8fcff;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.login-area-block[hidden] { display: none; }
 
 /* Default spawn spots (tower-default-layout LOOK lock): CSS grid when nothing
    is owner-dragged. Absolute free x/y only after a user drag. Gap 24px. */
@@ -14480,6 +14527,86 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   pointer-events: none !important;
 }
 
+/* Crisp lettering on the dark navy theme.
+   Bloom shadows (blur, no offset) rasterize glyphs, and the masthead
+   hover scales that bitmap. Muted ink was 66% and 48% white, so names,
+   "Mutual friends", and placeholders sank into the navy. */
+:root {
+  --cgn-ink: #ffffff;
+  --cgn-text: #ffffff;
+  --cgn-muted: rgba(247, 249, 255, 0.92);
+  --cgn-text-muted: rgba(247, 249, 255, 0.94);
+  --cgn-text-soft: rgba(247, 249, 255, 0.82);
+}
+
+.cognation-masthead-kicker,
+.cognation-masthead-home,
+.cognation-masthead-home:hover,
+.cognation-masthead-home:focus-visible,
+.login-gate--splash .login-gate-brand--splash .login-gate-brand-name,
+.login-gate-tagline,
+.login-gate-brand--splash .login-gate-tagline,
+.login-gate-eyebrow,
+.logo,
+.logo:hover,
+.tower-title,
+.commune-swipe-title,
+.pages-title,
+.paper-title,
+.circle-page-title,
+#panel-commune .commune-swipe-header .commune-swipe-title {
+  text-shadow: none !important;
+}
+
+.cognation-masthead-home,
+.cognation-masthead-home:hover,
+.cognation-masthead-home:focus-visible {
+  transform: none !important;
+}
+
+.cognation-masthead-kicker,
+.login-gate-brand--splash .login-gate-tagline,
+.login-gate-eyebrow {
+  color: #f4f7ff !important;
+  opacity: 1 !important;
+  font-size: 0.82rem !important;
+  letter-spacing: 0.12em !important;
+}
+
+.login-form .form-hint,
+.login-demo-hint,
+.login-demo-storage-hint,
+.login-profile-picker-desc,
+.login-gate-desc {
+  color: var(--cgn-muted) !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--cgn-text-soft) !important;
+  opacity: 1 !important;
+}
+
+#panel-tower :is(.tower-profile-name, .tower-mutual-friends, .tower-handle-badge, .tower-widget-title) {
+  color: #f7f9ff !important;
+}
+
+#panel-tower .tower-mutual-friends,
+#panel-tower .tower-handle-badge {
+  font-size: 0.9rem !important;
+}
+
+/* Float the brain artwork without scaling the bitmap. */
+@keyframes masthead-brain-float {
+  from { transform: translateY(-3px); }
+  to { transform: translateY(6px); }
+}
+@keyframes login-brain-float {
+  from { transform: translateY(-3px); }
+  to { transform: translateY(5px); }
+}
 /* SIGNAL → Cognation Times. From the publication block down: broadsheet, not the NEWS card. */
 #panel-signal .commune-paper {
   background: #f4efe4 !important;
@@ -14700,6 +14827,11 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   }
 }
 
+.message-apple-pay { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin: 0; padding: 0 1rem 0.4rem; background: none; border: 0; color: #1a2144; font-size: 0.78rem; font-weight: 400; letter-spacing: 0.01em; }
+.message-apple-pay input { width: 3.5rem; margin: 0 0 0 0.28rem; padding: 0.04rem 0.32rem; border: 1px solid rgba(26, 33, 68, 0.28) !important; border-radius: 2px !important; background: rgba(255, 255, 255, 0.45) !important; color: #1a2144 !important; box-shadow: none !important; font: inherit; font-size: 0.78rem; line-height: 1.25; }
+.message-apple-pay input::placeholder { color: rgba(26, 33, 68, 0.55) !important; }
+.message-apple-pay [data-apple-pay] { margin: 0; padding: 0.04rem 0.4rem !important; border: 1px solid rgba(26, 33, 68, 0.28) !important; border-radius: 2px !important; background: transparent !important; color: #1a2144 !important; box-shadow: none !important; font: inherit; font-size: 0.78rem; font-weight: 500; line-height: 1.25; }
+.message-apple-pay [data-apple-pay-note] { flex: 1 1 100%; margin: 0; padding: 0; border: 0; background: none; font-size: 0.75rem; font-weight: 400; line-height: 1.35; color: #1a2144 !important; }
 
 /* pulse-background PR: Alexa's PULSE background (refs/alexa-final-2026-10-15.png),
    used as-is with only the five placeholder squares removed. WebP with a JPEG
@@ -14888,6 +15020,46 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   .circle-fall[data-pulse-bg] a.pulse-fall-circle,
   a.pulse-fall-circle { animation: none !important; transform: none !important; }
   .circle-fall[data-pulse-bg]::after { animation: none !important; transform: none !important; }
+  .circle-fall[data-pulse-bg] .circle-ring-spin,
+  .circle-fall[data-pulse-bg] .circle-ring-spin::before { animation: none; }
+}
+.circle-fall[data-pulse-bg] .circle-ring-spin { animation: pulse-halo-bob 4.4s ease-in-out infinite; }
+.circle-fall[data-pulse-bg] .circle-ring-spin::before {
+  content: ""; position: absolute; pointer-events: none; border-radius: 50%;
+  width: min(640px, 94vw); height: min(640px, 94vw);
+  left: calc(min(640px, 94vw) / -2); top: calc(min(640px, 94vw) / -2);
+  background: conic-gradient(#f7feff, #9cf6ff 10%, #3ecbff 22%, #6d78ff 40%, #b44bff 58%, #c5a6ff 78%, #3ecbff 92%, #f7feff);
+  -webkit-mask: radial-gradient(circle, #0000 63%, #000 70% 78%, #0000 86%);
+  mask: radial-gradient(circle, #0000 63%, #000 70% 78%, #0000 86%);
+  transform: rotateX(80deg);
+  animation: pulse-halo-3d 8s linear infinite, pulse-halo-ghost 4.8s ease-in-out infinite;
+}
+@keyframes pulse-halo-3d { to { transform: rotateX(80deg) rotateZ(1turn); } }
+@keyframes pulse-halo-ghost {
+  0%, 100% { opacity: 0.4; filter: drop-shadow(0 0 6px rgba(62, 203, 255, 0.32)) drop-shadow(0 0 14px rgba(180, 75, 255, 0.26)); }
+  50% { opacity: 1; filter: drop-shadow(0 0 22px rgba(62, 203, 255, 0.95)) drop-shadow(0 0 42px rgba(180, 75, 255, 0.72)); }
+}
+@keyframes pulse-halo-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-32px); } }
+.pulse-side-toggle {
+  position: absolute; z-index: 6; top: 8px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; pointer-events: auto;
+}
+.pulse-side-toggle button {
+  margin: 0; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(197, 166, 255, 0.45); background: rgba(18, 16, 38, 0.88);
+  color: #f7fbff; font: 600 13px/1 var(--cgn-ui, system-ui);
+}
+.pulse-side-toggle button[aria-pressed="true"] {
+  border-color: rgba(168, 244, 255, 0.95); box-shadow: 0 0 12px rgba(62, 203, 255, 0.45);
+}
+.pulse-fall-actions {
+  position: absolute; z-index: 4; display: flex; flex-direction: column; align-items: center;
+  gap: 1px; transform: translateX(-50%); pointer-events: auto;
+}
+.pulse-fall-act {
+  margin: 0; padding: 1px 4px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  border: 1px solid rgba(217, 210, 240, 0.5); background: rgba(18, 16, 38, 0.92);
+  color: #f7fbff; font: 600 10px/1.2 var(--cgn-ui, system-ui);
 }
 
 /* COGNATION | WAYMAKERS switch is hidden (index.html `hidden`) until Waymakers has a
@@ -15862,5 +16034,54 @@ body.cgn-cal-page {
   color: #d9d2f0 !important;
   opacity: 1;
 }
+[data-research-room] .research-line { display: flex; justify-content: space-between; gap: 0.45rem; align-items: flex-start; }
+[data-research-room] .research-line .news-report-option { width: auto; flex: none; }
 
+/* Header lockup only. A tight per-letter shadow. No ellipse, bloom,
+   or pink-and-blue wash behind the word or the brain. */
+.cognation-masthead {
+  background: linear-gradient(145deg, #10122b, #251839);
+}
+.cognation-masthead-home,
+.cognation-masthead-home:hover,
+.cognation-masthead-home:focus-visible {
+  text-shadow: 0 2px 2px rgba(6, 8, 22, 0.55);
+}
+.cognation-masthead-brain,
+.cognation-masthead-brain img {
+  filter: none;
+}
+.cognation-masthead-brain::before {
+  content: none;
+  background: none;
+  filter: none;
+  border-radius: 0;
+}
+.cognation-masthead-brain img {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.people-search-results .people-search-row {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #f7fbff !important;
+  border: 0 !important;
+}
+.people-search-results .people-search-name,
+.people-search-results .people-search-handle,
+.people-search-results .people-search-open {
+  color: #f7fbff !important;
+}
+.people-search-results .people-search-kind {
+  color: #a8f4ff !important;
+}
+.people-search-results .people-search-row[data-result-kind="professional"] .people-search-kind {
+  color: #ffd7a8 !important;
+}
+.people-search-results .people-search-row:hover,
+.people-search-results .people-search-row:focus {
+  background: rgba(255, 255, 255, 0.1) !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
 

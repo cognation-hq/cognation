@@ -2056,6 +2056,16 @@
           deck.push(card);
         });
       }
+      var lic = window.CognationLicensure;
+      /* No licensure interest: the card is not in the algorithm. */
+      if (lic && hasInterest(lic.INTERESTS)) {
+        omitPassed(lic.cards()).forEach(function (card) {
+          if (deck.length >= limit) return;
+          if (!professionalCardAllowed(card)) return;
+          if (deck.some(function (c) { return stableCardId(c.id) === stableCardId(card.id); })) return;
+          deck.push(card);
+        });
+      }
       var extra = omitPassed(proInterestCards()).filter(professionalCardAllowed);
       for (var xi = extra.length - 1; xi >= 0; xi--) {
         var add = extra[xi];
@@ -2382,11 +2392,15 @@
       var doctoralOff = card.type === PRO.DOCTORAL && !hasInterest(["doctoral degrees"]);
       var ethicsOff = card.type === PRO.ETHICS && !hasInterest(["ethics board"]);
       var businessOff = card.type === PRO.BUSINESS && !hasInterest(["business", "businesses"]);
-            var mergedOff = card.type === PRO.EXECUTIVES && !hasInterest(["executive", "executives"]);
-      if (card.why && !mergedOff && !industryOff && !doctoralOff && !ethicsOff && !businessOff) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
+      var executivesOff = card.type === PRO.EXECUTIVES && !hasInterest(["executive", "executives"]);
+      var licensureOff = card.type === "pro-licensure" && !hasInterest((window.CognationLicensure || {}).INTERESTS || []);
+      if (card.why && !executivesOff && !industryOff && !doctoralOff && !ethicsOff && !businessOff && !licensureOff) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
       if (card.type === PRO.RESEARCH) {
         html += '<button type="button" class="btn btn-primary" data-research-enter>Enter Research</button>';
         if (card.full) html += '<p class="commune-card-meta">Full — another Research card is open.</p>';
+      }
+      if (card.type === "pro-licensure") {
+        html += '<button type="button" class="btn btn-primary" data-licensure-open>Enter room</button>';
       }
       el.innerHTML = html;
       return el;
@@ -2612,6 +2626,11 @@
       wireClassroomCardClick(el, card, openAiAtWork);
     }
     if (card.type === PRO.BUSINESS) wireClassroomCardClick(el, card, openBusiness);
+    if (card.type === "pro-licensure") {
+      var openLic = el.querySelector("[data-licensure-open]");
+      if (openLic) openLic.addEventListener("click", function (ev) { ev.stopPropagation(); openLicensure(card.id); });
+      wireClassroomCardClick(el, card, openLicensure);
+    }
     if ((card.type === TYPE.KNOW || card.type === TYPE.FRIEND) && (card.profileId || card.handle)) {
       el.setAttribute("data-commune-opens-profile", "");
       wireClassroomCardClick(el, card, function () { openPersonTower(card); });
@@ -3388,6 +3407,24 @@
     return true;
   }
 
+  function openLicensure(cardOrId) {
+    var api = window.CognationLicensure;
+    var panel = roomEl();
+    var id = cardOrId && cardOrId.id ? cardOrId.id : String(cardOrId || "");
+    if (!api || !panel || !id || !state.shell) return false;
+    var me = currentProfileId();
+    var joined = api.join(id, me);
+    if (joined && joined.kicked) { setStatus("You were removed from this chatroom."); return false; }
+    closeClassroom();
+    ensureRoomHeader(panel);
+    api.paint(panel, id, me);
+    showRoom(true);
+    state.roomId = id;
+    state.licensureRoom = true;
+    state.liveRoom = false;
+    return true;
+  }
+
   function openAiAtWork(cardOrId) {
     var api = window.CognationAiAtWork;
     var panel = roomEl();
@@ -3551,6 +3588,7 @@
     state.liveRoom = false;
     state.industryRoom = false;
     state.aiAtWorkRoom = false;
+    state.licensureRoom = false;
     state.roomSqlId = "";
     state.liveMessages = [];
     showRoom(false);
@@ -4228,6 +4266,9 @@
       if (state.industryRoom && window.CognationIndustry && window.CognationIndustry.onClick(ev, {
         panel: roomPanel, roomId: state.roomId, me: currentProfileId(), status: setStatus
       })) return;
+      if (state.licensureRoom && window.CognationLicensure && window.CognationLicensure.onClick(ev, {
+        panel: roomPanel, roomId: state.roomId, me: currentProfileId(), status: setStatus
+      })) return;
       var moreBtn = ev.target && ev.target.closest("[data-commune-room-more]");
       if (moreBtn && roomPanel.contains(moreBtn)) {
         ev.preventDefault();
@@ -4346,6 +4387,14 @@
           if (input) input.value = "";
           window.CognationEchoExecutives.paint(roomEl(), state.roomId);
           setStatus(executivesSent && executivesSent.ok ? "Sent." : (executivesSent && executivesSent.message) || "Couldn't send.");
+          return;
+        }
+        if (state.licensureRoom && window.CognationLicensure) {
+          var licApi = window.CognationLicensure;
+          var licRes = licApi.comment(state.roomId, currentProfileId(), viewerDisplayName(), body);
+          if (input) input.value = "";
+          licApi.paint(roomEl(), state.roomId, currentProfileId());
+          setStatus(licRes && licRes.kicked ? "You were removed from this chatroom." : "Sent.");
           return;
         }
         if (state.liveRoom && state.roomSqlId) {

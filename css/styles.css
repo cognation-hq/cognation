@@ -14887,25 +14887,26 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   .circle-fall[data-pulse-bg] a.pulse-fall-circle,
   a.pulse-fall-circle { animation: none !important; transform: none !important; }
   .circle-fall[data-pulse-bg]::after { animation: none !important; transform: none !important; }
+  .circle-fall[data-pulse-bg] .circle-ring-spin,
   .circle-fall[data-pulse-bg] .circle-ring-spin::before { animation: none; }
 }
+.circle-fall[data-pulse-bg] .circle-ring-spin { animation: pulse-halo-bob 4.4s ease-in-out infinite; }
 .circle-fall[data-pulse-bg] .circle-ring-spin::before {
-  content: "";
-  position: absolute;
-  width: min(640px, 94vw);
-  height: min(640px, 94vw);
-  left: calc(min(640px, 94vw) / -2);
-  top: calc(min(640px, 94vw) / -2);
-  border-radius: 50%;
-  background: conic-gradient(#3ecbff, #b44bff, #a8f4ff, #c5a6ff, #3ecbff);
+  content: ""; position: absolute; pointer-events: none; border-radius: 50%;
+  width: min(640px, 94vw); height: min(640px, 94vw);
+  left: calc(min(640px, 94vw) / -2); top: calc(min(640px, 94vw) / -2);
+  background: conic-gradient(#f7feff, #9cf6ff 10%, #3ecbff 22%, #6d78ff 40%, #b44bff 58%, #c5a6ff 78%, #3ecbff 92%, #f7feff);
   -webkit-mask: radial-gradient(circle, #0000 63%, #000 70% 78%, #0000 86%);
   mask: radial-gradient(circle, #0000 63%, #000 70% 78%, #0000 86%);
   transform: rotateX(80deg);
-  animation: pulse-halo-3d 18s linear infinite;
-  filter: drop-shadow(0 0 10px rgba(62, 203, 255, 0.8)) drop-shadow(0 0 16px rgba(180, 75, 255, 0.7));
-  pointer-events: none;
+  animation: pulse-halo-3d 8s linear infinite, pulse-halo-ghost 4.8s ease-in-out infinite;
 }
 @keyframes pulse-halo-3d { to { transform: rotateX(80deg) rotateZ(1turn); } }
+@keyframes pulse-halo-ghost {
+  0%, 100% { opacity: 0.4; filter: drop-shadow(0 0 6px rgba(62, 203, 255, 0.32)) drop-shadow(0 0 14px rgba(180, 75, 255, 0.26)); }
+  50% { opacity: 1; filter: drop-shadow(0 0 22px rgba(62, 203, 255, 0.95)) drop-shadow(0 0 42px rgba(180, 75, 255, 0.72)); }
+}
+@keyframes pulse-halo-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-32px); } }
 .pulse-side-toggle {
   position: absolute; z-index: 6; top: 8px; left: 50%; transform: translateX(-50%);
   display: flex; gap: 6px; pointer-events: auto;

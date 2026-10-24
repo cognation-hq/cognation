@@ -10252,6 +10252,9 @@ body.tower-messages-page [data-tower-follow-row],
 .news-comment-submit { font-size: 0.72rem !important; padding: 0.18rem 0.5rem !important; }
 /* Sending: same lock as Save (no spinner, no text change). */
 .news-comment-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.news-comment-edit { display: inline-flex; gap: 0.3rem; align-items: center; max-width: 100%; }
+.news-comment-edit-input { font: inherit; font-size: 0.78rem; width: 9rem; max-width: 100%; padding: 0 0.15rem; border: 0; border-bottom: 1px solid currentColor; border-radius: 0; background: transparent; color: inherit; }
+.news-comment-edit-save { font: inherit; font-size: 0.68rem; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; }
 
 /* CGN-011 fact cards */
 .commune-card[data-card-type="random-fact"],
@@ -13721,25 +13724,24 @@ a.site-switch-side:focus-visible {
 /* ⋯ more menu: Report then Block (Designer — muted 22px trigger). */
 .news-comment-item .news-report-menu {
   flex-direction: column;
-  align-items: stretch;
-  position: absolute;
-  top: 22px;
-  right: 0;
+  align-items: flex-start;
+  position: static;
   z-index: 5;
-  min-width: 7rem;
-  padding: 0.25rem;
-  background: rgba(16, 19, 48, 0.97);
+  width: max-content;
+  margin: 0.2rem 0 0 auto;
+  padding: 0.15rem;
+  background: #101330;
   border: 1px solid var(--cgn-border, rgba(255,255,255,.2));
-  border-radius: 0.5rem;
+  border-radius: 0.45rem;
 }
 
 /* Dark shell: mute pink News .news-report-option pills so Report/Block match (Designer LOOK nit). */
 .news-comment-item .news-report-option {
   border: 1px solid rgba(185, 191, 224, 0.35);
-  background: rgba(16, 19, 48, 0.85);
+  background: #101330;
   color: var(--cgn-text, #f7f9ff);
   border-radius: 999px;
-  width: 100%;
+  width: auto;
   text-align: left;
   padding: 0.18rem 0.45rem;
   font-size: 0.68rem;

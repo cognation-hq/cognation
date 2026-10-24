@@ -9,9 +9,9 @@ function fn(name) {
 }
 var room = fn("webinarRoomHtml"), limits = fn("webinarLimits"), editor = fn("calendarEditorHtml");
 assert.ok(/data-tower-cal-webinar/.test(editor) && /> Webinar</.test(editor) && /on \? " checked" : ""/.test(editor));
-assert.ok(/Check Webinar\./.test(tower));
+assert.ok(/Check Webinar\./.test(tower) && /Not posted\. No YouTube connection/.test(tower) && /Export first\. Not posted/.test(tower));
 assert.ok(/Up to 200,000 viewers/.test(room) && /Up to 50 live/.test(room) && /Main presenter/.test(room) && /Raise your hand/.test(room) && /Join on video/.test(room));
-assert.ok(/data-webinar-record/.test(room) && /Record internally/.test(room) && /Saved on Cognation only/.test(room));
-assert.ok(!/<textarea|type="text"|comment|Apple Pay|Bid|data-auction|watching|youtube/i.test(room) && !/youtube/i.test(limits));
+assert.ok(/data-webinar-record/.test(room) && /Record internally/.test(room) && /Saved on Cognation only/.test(room) && /data-webinar-export/.test(room) && />Export</.test(room) && /Post on YouTube/.test(room));
+assert.ok(!/<textarea|type="text"|comment|Apple Pay|Bid|data-auction|watching|youtube\.com|Uploaded/i.test(room) && !/youtube/i.test(limits));
 assert.ok(/viewers: 200000/.test(limits) && /live: 50/.test(limits) && /presenters: 1/.test(limits) && /comments: false/.test(limits) && /record: record \? "internal" : ""/.test(limits));
 console.log("tower-webinar-event.test.js ok");

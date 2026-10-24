@@ -7780,7 +7780,9 @@
       '<button type="button" class="btn btn-secondary" data-webinar-hand>Raise your hand</button></p>' +
       '<p class="tower-webinar-speak">Join on video, then raise your hand to speak.</p>' +
       '<label class="tower-cal-pill"><input type="checkbox" data-webinar-record' + (record ? " checked" : "") + "> Record internally</label>" +
-      '<p class="tower-webinar-record-note">Saved on Cognation only.</p>';
+      '<p class="tower-webinar-record-note">Saved on Cognation only.</p>' +
+      '<p class="tower-webinar-actions"><button type="button" class="btn btn-secondary" data-webinar-export>Export</button> ' +
+      '<button type="button" class="btn btn-secondary" data-webinar-post>Post on YouTube</button></p>';
   }
 
   function calendarEditorHtml(editing, selected) {
@@ -8098,6 +8100,22 @@
         if (line) line.textContent = up ? "Your hand is raised." : "Join on video, then raise your hand to speak.";
         return;
       }
+      var share = t.closest("[data-webinar-export], [data-webinar-post]");
+      if (share) {
+        ev.preventDefault();
+        var roomX = share.closest("[data-webinar-room]");
+        var noteX = roomX && roomX.querySelector(".tower-webinar-record-note");
+        var recorded = roomX && roomX.querySelector("[data-webinar-record]:checked");
+        if (!recorded) { if (noteX) noteX.textContent = "Saved on Cognation only."; return; }
+        if (share.hasAttribute("data-webinar-export")) {
+          roomX.setAttribute("data-webinar-exported", "1");
+          if (noteX) noteX.textContent = "Exported. Not posted.";
+          return;
+        }
+        if (roomX.getAttribute("data-webinar-exported") !== "1") { if (noteX) noteX.textContent = "Export first. Not posted."; return; }
+        if (noteX) noteX.textContent = "Not posted. No YouTube connection.";
+        return;
+      }
 
       var prev = t.closest("[data-tower-cal-prev]");
       var next = t.closest("[data-tower-cal-next]");
@@ -8312,7 +8330,7 @@
       var viewG = getCalendarViewState(root, "public");
       viewG.schedulerOpen = true;
       refreshTowerCalendars(root);
-    });
+    }, true);
 
     root.addEventListener("change", function (ev) {
       var box = ev.target && ev.target.matches && ev.target.matches("[data-tower-cal-webinar]") ? ev.target : null;

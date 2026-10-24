@@ -2876,6 +2876,14 @@ body.login-gate-open .app-topbar {
   color: var(--color-text);
 }
 
+.tower-post-invite { margin: 0.35rem 0 0.15rem; }
+.tower-post-invite p { margin: 0 0 0.15rem; }
+.tower-feed[data-tower-feed] :is(.tower-invite-where, .tower-invite-tag) {
+  color: #f7f9ff;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 .tower-attachments {
   list-style: none;
   margin: 0;
@@ -2901,6 +2909,19 @@ body.login-gate-open .app-topbar {
   font-size: 0.65rem;
   margin-right: 0.25rem;
   color: var(--color-heading);
+}
+
+.tower-feed-photo {
+  display: block;
+  width: 100%;
+  max-height: 22rem;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  flex: 1 0 100%;
+}
+
+.tower-compose-audience {
+  margin: 0.4rem 0 0;
 }
 
 
@@ -8638,6 +8659,14 @@ body { padding-top: 0 !important; }
 .tower-cal-pill:has(input:checked) { outline: 2px solid #7fd6ff; background: rgba(127, 214, 255, 0.14); }
 .tower-cal-pills .form-hint { flex: 1 0 100%; margin: 0.15rem 0 0; }
 [data-tower-cal-auction-fields][hidden] { display: none; }
+.tower-webinar { margin: 0 0 0.65rem; }
+.tower-webinar[hidden] { display: none !important; }
+.tower-webinar-stage { position: relative; height: 7.5rem; margin: 0 0 0.4rem; background: #14141c; border-radius: 0.45rem; overflow: hidden; }
+.tower-webinar-stage::before { content: ""; position: absolute; left: 50%; top: 1.15rem; width: 2.3rem; height: 2.3rem; margin-left: -1.15rem; border-radius: 50%; background: #d7d0ea; }
+.tower-webinar-stage::after { content: ""; position: absolute; left: 50%; top: 3.65rem; width: 4.4rem; height: 2.8rem; margin-left: -2.2rem; border-radius: 1.3rem 1.3rem 0 0; background: #9b93b0; }
+.tower-webinar-stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; }
+.tower-webinar-stage video[data-webinar-live] { opacity: 1; }
+.tower-webinar-stage .tower-webinar-name { position: absolute; left: 0.45rem; bottom: 0.35rem; z-index: 1; color: #fff !important; -webkit-text-fill-color: #fff !important; font-size: 0.75rem; }
 .tower-cal-editor,
 .tower-cal-google {
   margin-top: 0.75rem;
@@ -8686,13 +8715,6 @@ body { padding-top: 0 !important; }
   font-size: clamp(1.6rem, 4vw, 2rem);
   letter-spacing: 0.08em;
   color: var(--color-navy);
-}
-
-.commune-swipe-dek {
-  margin: 0;
-  color: var(--color-muted);
-  font-size: 0.98rem;
-  line-height: 1.45;
 }
 
 .commune-swipe-hint {
@@ -9484,14 +9506,14 @@ body.tower-messages-page [data-tower-follow-row],
 }
 .tower-add-widget-dialog[hidden] { display: none !important; }
 .tower-add-widget-dialog-card {
-  width: min(24rem, 100%);
+  width: min(16rem, 100%);
   background: #fff5f9;
   border: 1px solid rgba(74, 44, 58, 0.2);
   border-radius: 0.85rem;
-  padding: 1rem 1.1rem 1.1rem;
+  padding: 0.7rem 0.8rem 0.75rem;
   box-shadow: 0 1rem 2.5rem rgba(40, 20, 30, 0.25);
 }
-.tower-add-widget-title { margin: 0 0 0.35rem; font-size: 1.1rem; color: #4a2c3a; }
+.tower-add-widget-title { display: block; margin: 0 0 0.35rem; font-size: 1.1rem; color: #4a2c3a; }
 .tower-add-widget-choices { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0 0.75rem; }
 .tower-add-widget-choices .is-selected,
 .tower-add-widget-choices [data-tower-add-choice].is-selected {
@@ -12944,6 +12966,17 @@ a.site-switch-side:focus-visible {
 .commune-type-mark[data-type-mark="podcast"] { --mark: #ffb8d9; }
 .commune-type-mark[data-type-mark="field"] { --mark: #c9d4ff; }
 .commune-type-mark[data-type-mark="popculture"] { --mark: #fff3a8; }
+.commune-type-mark[data-type-mark="college"] { --mark: #9ad7ff; }
+.commune-room-line:has([data-college-report]) { display: flex; gap: 0.4rem; align-items: center; justify-content: space-between; }
+.commune-room-line [data-college-report] { width: auto; flex: none; }
+.commune-type-mark[data-type-mark="creator"] { --mark: #f0c8ff; }
+.commune-type-mark[data-type-mark="peer-review"] { --mark: #9ee7c4; }
+.commune-room[data-peer-review] .commune-room-line { display: flex; flex-wrap: wrap; gap: 0.35rem 0.6rem; align-items: baseline; }
+.commune-room[data-peer-review] .news-report-option { margin-left: auto; }
+.commune-type-mark[data-type-mark="mogul"] { --mark: #f0c36a; }
+.commune-type-mark[data-type-mark="licensure"] { --mark: #d7c4ff; }
+.commune-room-line:has([data-licensure-report]) { display: flex; gap: 0.4rem; align-items: center; justify-content: space-between; }
+.commune-room-line [data-licensure-report] { width: auto; flex: none; }
 .commune-type-mark[data-type-mark="executives"] { --mark: #d6c6ff; }
 .commune-type-mark[data-type-mark="business"] { --mark: #9ad7ff; }
 .commune-type-mark[data-type-mark="ai-work"] { --mark: #9ee7ff; }
@@ -14528,6 +14561,52 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   pointer-events: none !important;
 }
 
+/* Profile notices float and leave; they do not sit as brown boxes in the page. */
+[data-tower-profile-status],
+[data-tower-add-profile-status] {
+  display: none !important;
+}
+.status-popup-host {
+  position: fixed;
+  z-index: 13000;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(26rem, calc(100vw - 2rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  pointer-events: none;
+}
+.status-popup {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.7rem 0.85rem;
+  border-radius: 14px;
+  background: #1b1e38;
+  color: #f7f9ff;
+  border: 1px solid rgba(183, 246, 255, 0.55);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.48);
+  font-family: var(--cgn-ui, "Oswald", system-ui, sans-serif);
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+.status-popup.is-error { border-color: rgba(248, 113, 113, 0.75); }
+.status-popup-text { margin: 0; flex: 1 1 auto; }
+.status-popup-undo {
+  flex: none;
+  border: 0;
+  border-radius: 999px;
+  background: #f4efe4;
+  color: #1c140c;
+  font: inherit;
+  font-weight: 700;
+  padding: 0.3rem 0.75rem;
+  cursor: pointer;
+}
 /* Crisp lettering on the dark navy theme.
    Bloom shadows (blur, no offset) rasterize glyphs, and the masthead
    hover scales that bitmap. Muted ink was 66% and 48% white, so names,
@@ -14610,17 +14689,17 @@ textarea::placeholder {
 }
 /* SIGNAL → Cognation Times. From the publication block down: broadsheet, not the NEWS card. */
 #panel-signal .commune-paper {
-  background: #f4efe4 !important;
-  color: #16120c !important;
-  border: 1px solid #16120c !important;
+  background: #fbf8f2 !important;
+  color: #0c0b0a !important;
+  border: 1px solid #1a140f !important;
   border-radius: 0 !important;
   padding: 0.7rem 1rem 1.25rem !important;
   box-shadow: none !important;
 }
 #panel-signal .commune-paper,
 #panel-signal .commune-paper * {
-  font-family: "Old Standard TT", Georgia, "Times New Roman", serif !important;
-  color: #16120c !important;
+  font-family: "Source Serif 4", Inter, Georgia, "Liberation Serif", "Times New Roman", serif !important;
+  color: #0c0b0a !important;
 }
 #panel-signal .paper-eyebrow,
 #panel-signal .paper-subtitle,
@@ -14649,15 +14728,15 @@ textarea::placeholder {
   text-align: center !important;
 }
 #panel-signal .paper-title {
-  margin: 0 0 0.4rem !important;
-  font-family: Oswald, Impact, "Arial Narrow", sans-serif !important;
-  font-size: clamp(3.4rem, 8.6vw, 6.6rem) !important;
+  margin: 0.2rem 0 0.65rem !important;
+  font-family: "Source Serif 4", Inter, Georgia, "Liberation Serif", "Times New Roman", serif !important;
+  font-size: clamp(1.9rem, 4.2vw, 3.05rem) !important;
   font-weight: 700 !important;
-  letter-spacing: 0.045em !important;
-  line-height: 0.78 !important;
+  letter-spacing: 0.01em !important;
+  line-height: 1.15 !important;
   text-align: center !important;
   text-transform: uppercase !important;
-  color: #111 !important;
+  color: #0c0b0a !important;
   text-shadow: none !important;
   white-space: nowrap;
 }
@@ -14665,20 +14744,23 @@ textarea::placeholder {
 #panel-signal .paper-volume,
 #panel-signal .paper-price,
 #panel-signal .paper-date {
-  color: #111 !important;
-  font-family: "Special Elite", "Courier New", monospace !important;
-  font-size: 0.72rem !important;
-  letter-spacing: 0.14em !important;
+  color: #0c0b0a !important;
+  font-family: "Source Serif 4", Inter, Georgia, "Liberation Serif", "Times New Roman", serif !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+  line-height: 1.4 !important;
+  text-transform: none !important;
 }
 #panel-signal .paper-dateline {
   display: flex !important;
   justify-content: space-between !important;
   gap: 0.6rem !important;
-  border-block: 4px double #111 !important;
+  border-block: 4px double #1a140f !important;
   margin: 0 !important;
   padding: 0.28rem 0.2rem !important;
 }
-#panel-signal .paper-rule { background: #111 !important; width: 1.5rem !important; height: 2px !important; }
+#panel-signal .paper-rule { background: #1a140f !important; width: 1.5rem !important; height: 2px !important; }
 #panel-signal .paper-grid,
 #panel-signal .paper-col,
 #panel-signal .paper-section,
@@ -14704,8 +14786,8 @@ textarea::placeholder {
   margin: 0.85rem 0 0 !important;
   padding: 0 !important;
   border: 0 !important;
-  border-top: 1px solid #16120c !important;
-  border-left: 1px solid #16120c !important;
+  border-top: 1px solid #1a140f !important;
+  border-left: 1px solid #1a140f !important;
   border-radius: 0 !important;
   background: transparent !important;
 }
@@ -14717,11 +14799,11 @@ textarea::placeholder {
   min-height: 9.1rem !important;
   box-sizing: border-box !important;
   margin: 0 !important;
-  padding: 0.65rem 0.75rem !important;
+  padding: 0.85rem 0.95rem !important;
   overflow: hidden !important;
   border: 0 !important;
-  border-right: 1px solid #16120c !important;
-  border-bottom: 1px solid #16120c !important;
+  border-right: 1px solid #1a140f !important;
+  border-bottom: 1px solid #1a140f !important;
   background: transparent !important;
   box-shadow: none !important;
   text-align: left !important;
@@ -14731,25 +14813,68 @@ textarea::placeholder {
   justify-content: space-between !important;
   gap: 0.45rem !important;
   align-items: baseline !important;
-  font-family: "Special Elite", "Courier New", monospace !important;
-  font-size: 0.68rem !important;
-  letter-spacing: 0.06em !important;
-  text-transform: uppercase;
-  margin: 0 0 0.3rem !important;
+  font-family: "Source Serif 4", Inter, Georgia, "Liberation Serif", "Times New Roman", serif !important;
+  font-size: 1.05rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.01em !important;
+  line-height: 1.35 !important;
+  text-transform: none !important;
+  margin: 0 0 0.45rem !important;
+}
+#panel-signal .commune-feed-author,
+#panel-signal .commune-feed-author a,
+#panel-signal .commune-feed-meta time {
+  font-family: "Source Serif 4", Inter, Georgia, "Liberation Serif", "Times New Roman", serif !important;
+  font-size: 1.05rem !important;
+  letter-spacing: 0.005em !important;
+  line-height: 1.35 !important;
+  text-transform: none !important;
+  color: #0c0b0a !important;
+}
+#panel-signal .commune-feed-author,
+#panel-signal .commune-feed-author a {
+  font-weight: 600 !important;
+}
+#panel-signal .commune-feed-meta time {
+  font-weight: 500 !important;
+}
+#panel-signal .commune-profile-link,
+#panel-signal .commune-at-link {
+  color: #0c0b0a !important;
+  font-weight: 600 !important;
+  text-decoration-color: #0c0b0a;
+  text-underline-offset: 0.14em;
 }
 #panel-signal .commune-feed-body,
 #panel-signal .is-lead .commune-feed-body {
   margin: 0 !important;
-  font-family: "Old Standard TT", Georgia, "Times New Roman", serif !important;
-  font-size: 0.92rem !important;
+  font-family: "Source Serif 4", Inter, Georgia, "Liberation Serif", "Times New Roman", serif !important;
+  font-size: 1.125rem !important;
   font-weight: 400 !important;
-  line-height: 1.35 !important;
+  line-height: 1.55 !important;
   letter-spacing: 0 !important;
   text-transform: none !important;
   text-align: left !important;
+  color: #0c0b0a !important;
 }
+#panel-signal .commune-feed-item.is-lead {
+  grid-column: 1 / -1 !important; height: auto !important; overflow: visible !important;
+  padding: 1.15rem 1.25rem 1.3rem !important;
+}
+#panel-signal .times-lead-headline {
+  margin: 0 0 0.35rem !important; font-size: clamp(1.7rem, 3vw, 2.25rem) !important;
+  font-weight: 700 !important; letter-spacing: 0 !important; line-height: 1.2 !important;
+  text-transform: none !important; color: #0c0b0a !important;
+}
+#panel-signal .times-lead-byline {
+  margin: 0 0 0.7rem !important; font-size: 1.125rem !important; font-style: italic !important;
+  font-weight: 500 !important; line-height: 1.4 !important; color: #0c0b0a !important;
+}
+#panel-signal .times-lead-byline time { font-style: normal !important; font-weight: 500 !important; }
+#panel-signal .is-lead .commune-feed-body { font-size: 1.25rem !important; line-height: 1.55 !important; }
 @media (max-width: 720px) {
-  #panel-signal .paper-title { white-space: normal; font-size: 2.6rem !important; }
+  #panel-signal .paper-title { white-space: normal; font-size: 1.85rem !important; line-height: 1.15 !important; }
+  #panel-signal .times-lead-headline { font-size: 1.65rem !important; }
   #panel-signal .commune-feed-list { grid-template-columns: minmax(0, 1fr) !important; }
 }
 
@@ -15371,6 +15496,17 @@ body.cgn-cal-page {
 #panel-tower [data-tower-edit-calendar] :is(.tower-cal-public-title, .tower-cal-day-heading) {
   font-weight: 680 !important;
 }
+.ce-presenter { min-height: 8.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 1rem; background: linear-gradient(160deg, #2a3a68, #7a4a96); color: #f7f9ff; font: 600 2rem/1 Oswald, sans-serif; }
+.ce-presenter small { margin-top: .35rem; font: 600 .72rem/1.2 "Noto Sans", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: #d9d2f0; }
+[data-tower-edit-calendar] .tower-cal-editor label:not(.tower-cal-pill) { display: block; margin: .35rem 0 .15rem; }
+#panel-tower .tower-profile-edit-dropdown .tower-cal-pill { width: fit-content !important; }
+#panel-tower .tower-profile-edit-dropdown .tower-cal-pill input { width: auto !important; margin: 0 !important; padding: 0 !important; border: 0 !important; min-height: 0 !important; }
+.ce-limits, .ce-line, .ce-note, .ce-status { margin: .3rem 0; color: #f7f9ff !important; text-align: left; font-size: .9rem; }
+.ce-log { text-align: left; padding: .35rem .6rem; border: 1px solid rgba(217,210,240,.35); border-radius: .6rem; }
+.ce-saved, .ce-yt { margin-top: .45rem; padding: .55rem .7rem; text-align: left; border: 1px solid rgba(143,227,240,.5); border-radius: .75rem; }
+.ce-kicker, .ce-train { margin: 0; color: #8fe3f0 !important; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.ce-train { font-size: 1.05rem; }
+.ce-saved h5, .ce-yt h5 { margin: .15rem 0; color: #f7f9ff; }
 .tower-visitor-calendar .tower-cal-cell { background: rgba(18,16,38,.92); color: #f7f9ff; border-color: rgba(209,241,255,.28); }
 .tower-visitor-calendar .tower-cal-cell.is-today, .tower-visitor-calendar .tower-cal-cell.is-selected { border-color: rgba(197,166,255,.85); box-shadow: 0 0 0 1px rgba(197,166,255,.45) inset; }
 .tower-visitor-calendar .tower-visitor-cal-link { color: #c5a6ff; }
@@ -15587,7 +15723,7 @@ body.cgn-cal-page {
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(217, 210, 240, 0.4) !important;
   border-radius: 0.65rem;
-  padding: 0.55rem 0.65rem;
+  padding: 0.55rem 1.5rem 0.7rem 0.65rem;
   color: #f7f9ff !important;
   font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif) !important;
 }
@@ -15625,12 +15761,8 @@ body.cgn-cal-page {
    unselected tab and Cancel were near-white on near-white.
    - Card: site glass rgba(18,16,38,.92), 12px blur, 1px #d9d2f0 at 40%.
    - Title and label #f7f9ff, hint #d9d2f0.
-   - Unselected tab and Cancel: transparent, 1px #d9d2f0 at 40%, #f7f9ff text.
-   - Selected tab and Add sticker: the same gradient pill, laid on #f7f9ff so it
-     keeps its light look on the dark card, with ink #1c1630 text. The selected
-     tab follows the dialog's data-add-choice (the choice Add sticker uses), so
-     picking Slogan card moves the pill to it. The accent-colour selection
-     ring and textarea focus ring become #d9d2f0.
+   - Unselected tab: transparent, 1px #d9d2f0 at 40%, #f7f9ff text.
+   - Cancel is plain text, not a pill. The textarea focus ring is #d9d2f0.
    - Textarea rgba(255,255,255,.06), #f7f9ff text, #d9d2f0 placeholder.
    - Blocked-quote line: #fbe3e6, #1c1630 text, 1px #e88a99. */
 .tower-add-widget-dialog .tower-add-widget-dialog-card {
@@ -15647,8 +15779,7 @@ body.cgn-cal-page {
 .tower-add-widget-dialog .tower-add-widget-dialog-card .form-hint {
   color: #d9d2f0 !important;
 }
-.tower-add-widget-dialog .tower-add-widget-choices [data-tower-add-choice],
-.tower-add-widget-dialog .form-actions [data-tower-add-widget-cancel] {
+.tower-add-widget-dialog .tower-add-widget-choices [data-tower-add-choice] {
   background: transparent !important;
   background-image: none !important;
   border: 1px solid rgba(217, 210, 240, 0.4) !important;
@@ -15656,14 +15787,27 @@ body.cgn-cal-page {
   box-shadow: none !important;
   outline: none;
 }
-.tower-add-widget-dialog:not([data-add-choice="slogan"]) .tower-add-widget-choices [data-tower-add-choice="quote"],
-.tower-add-widget-dialog[data-add-choice="slogan"] .tower-add-widget-choices [data-tower-add-choice="slogan"],
-.tower-add-widget-dialog .form-actions [data-tower-add-quote-confirm] {
-  background-color: #f7f9ff !important;
-  background-image: linear-gradient(100deg, rgba(139, 237, 255, 0.42), rgba(204, 161, 255, 0.38)) !important;
-  border: 1px solid rgba(208, 249, 255, 0.72) !important;
-  color: #1c1630 !important;
-  box-shadow: 0 0 21px rgba(142, 234, 255, 0.2) !important;
+.tower-add-widget-dialog [data-tower-add-widget-cancel] {
+  display: inline;
+  width: auto;
+  min-width: 0;
+  margin: 0.15rem 0 0;
+  padding: 0 !important;
+  border: 0 !important;
+  border-color: transparent !important;
+  border-radius: 0 !important;
+  background: none !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: #d9d2f0 !important;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  text-decoration: underline;
+  appearance: none;
 }
 .tower-add-widget-dialog .tower-add-widget-choices [data-tower-add-choice]:focus-visible,
 .tower-add-widget-dialog .form-actions .btn:focus-visible {
@@ -16102,6 +16246,11 @@ body.cgn-cal-page {
 [data-research-room] .research-line { display: flex; justify-content: space-between; gap: 0.45rem; align-items: flex-start; }
 [data-research-room] .research-line .news-report-option { width: auto; flex: none; }
 
+.chatroom-log { display: grid; gap: 0.35rem; margin: 0; padding: 0.5rem 0.65rem; border-radius: 0.5rem; background: rgba(16, 19, 48, 0.06); }
+.chatroom-line { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin: 0; }
+.chatroom-report { margin-left: 0.35rem; padding: 0.12rem 0.55rem; border: 1px solid currentColor; border-radius: 999px; background: transparent; color: inherit; font: inherit; font-size: 0.75rem; font-weight: 700; cursor: pointer; }
+[data-chatroom-kick] { font-weight: 700; }
+
 /* Header lockup only. A tight per-letter shadow. No ellipse, bloom,
    or pink-and-blue wash behind the word or the brain. */
 .cognation-masthead {
@@ -16150,3 +16299,99 @@ body.cgn-cal-page {
   background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
+/* Signal composer: one Add song control. The list stays closed until it opens.
+   Same pill as the other composer controls. A song that is not opted in stays dim. */
+#panel-signal .tower-compose [data-signal-featured-songs] {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+#panel-signal .tower-compose [data-signal-featured-songs] .btn {
+  background: rgba(16, 19, 48, 0.55) !important;
+  color: #f7f9ff !important;
+  -webkit-text-fill-color: #f7f9ff !important;
+  border: 1px solid rgba(209, 241, 255, 0.4) !important;
+  border-radius: 999px !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.12) !important;
+  font-size: 0.82rem !important;
+  font-weight: 400 !important;
+  line-height: 1.25 !important;
+  padding: 0.28rem 0.75rem !important;
+  min-height: 0;
+  justify-content: flex-start;
+}
+#panel-signal .tower-compose [data-signal-song-list] {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+#panel-signal .tower-compose [data-signal-song-list][hidden] {
+  display: none !important;
+}
+#panel-signal .tower-compose [data-signal-song-list] .btn {
+  width: 100%;
+}
+#panel-signal .tower-compose [data-signal-song]:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Tab pills: each side is its own capsule. Selected side is a light fill;
+   the other side is an outline. A | sits between the words. Tower Personal |
+   Professional, SIGNAL News | Feed, and ECHO Personal | Professional. */
+#panel-tower .tower-profile-kind-toggle,
+:is(#panel-signal, #panel-commune) .signal-subtabs.site-switch {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  gap: 0.55rem !important;
+  border-radius: 0 !important;
+  align-items: center !important;
+}
+#panel-tower .tower-kind-btn,
+#panel-tower .tower-kind-btn:hover,
+#panel-tower .tower-kind-btn:focus-visible,
+:is(#panel-signal, #panel-commune) .signal-subtabs.site-switch > .signal-subtab.site-switch-side,
+:is(#panel-signal, #panel-commune) .signal-subtabs.site-switch > .signal-subtab.site-switch-side:hover,
+:is(#panel-signal, #panel-commune) .signal-subtabs.site-switch > .signal-subtab.site-switch-side:focus-visible {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #fff !important;
+  border: 2px solid #fff !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  text-transform: none !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.01em !important;
+  padding: 0.5rem 1.2rem !important;
+  line-height: 1.1 !important;
+}
+#panel-tower .tower-kind-btn.is-selected,
+#panel-tower .tower-kind-btn[aria-selected="true"],
+#panel-tower .tower-kind-btn.is-selected:hover,
+#panel-tower .tower-kind-btn[aria-selected="true"]:hover,
+#panel-tower .tower-kind-btn.is-selected:focus-visible,
+#panel-tower .tower-kind-btn[aria-selected="true"]:focus-visible,
+:is(#panel-signal, #panel-commune) .signal-subtabs.site-switch > .signal-subtab.site-switch-side:is(.is-active, .is-selected, [aria-selected="true"]),
+:is(#panel-signal, #panel-commune) .signal-subtabs.site-switch > .signal-subtab.site-switch-side:is(.is-active, .is-selected, [aria-selected="true"]):hover,
+:is(#panel-signal, #panel-commune) .signal-subtabs.site-switch > .signal-subtab.site-switch-side:is(.is-active, .is-selected, [aria-selected="true"]):focus-visible {
+  background: #fff !important;
+  background-color: #fff !important;
+  color: #141228 !important;
+  border-color: #fff !important;
+  text-shadow: none !important;
+  box-shadow: none !important;
+}
+:is(#panel-tower, #panel-signal, #panel-commune) .signal-subtab-sep {
+  color: #fff !important;
+  text-shadow: none !important;
+  align-self: center !important;
+}

@@ -415,6 +415,14 @@
     /* Phone ignores saved x/y entirely (it is the website's layout). */
     var layout = phone ? {} : getWidgetLayout(p) || {};
     var rows = spawnRowsFor(p).slice();
+    var printListed = {};
+    rows.forEach(function (r) { r.forEach(function (id) { printListed[id] = true; }); });
+    stage.querySelectorAll("[data-tower-polaroid-extra]").forEach(function (el) {
+      var wid = el.getAttribute("data-tower-widget");
+      if (!wid || printListed[wid] || el.hidden || el.classList.contains("is-widget-off")) return;
+      printListed[wid] = true;
+      rows.push([wid]);
+    });
     if (phone) {
       /* Widgets outside the spec order (emoji, quotes, extra prints) follow in DOM order. */
       var listed = {};
@@ -8917,21 +8925,9 @@
       else hideCam();
       return;
     }
-    if (!prints.length) {
-      nodes.forEach(function (el) {
-        el.hidden = true;
-        el.classList.add("is-widget-off");
-      });
-      stage.querySelectorAll("[data-tower-polaroid-extra]").forEach(function (el) {
-        el.hidden = true;
-        el.classList.add("is-widget-off");
-      });
-      showCam();
-      return;
-    }
     while (nodes.length > 1) {
-      var extra = nodes.pop();
-      if (extra && extra.parentNode) extra.parentNode.removeChild(extra);
+      var dup = nodes.pop();
+      if (dup && dup.parentNode) dup.parentNode.removeChild(dup);
     }
     var el = nodes[0];
     if (!el) {
@@ -8942,11 +8938,14 @@
       el.innerHTML = polaroidMarkup();
       stage.appendChild(el);
     }
-    el.hidden = false;
-    el.classList.remove("is-widget-off");
-    applyPolaroidPrintScale(el, prints[0] && prints[0].scale);
+    var showShell = !!owner;
+    el.hidden = !showShell;
+    el.classList.toggle("is-widget-off", !showShell);
+    if (showShell) el.setAttribute("title", "Upload a photo");
+    paintPolaroidPhoto(el.querySelector("[data-tower-polaroid-photo]"), "");
+    applyPolaroidPrintScale(el, 1);
     showCam();
-    var needed = Math.max(0, prints.length - 1);
+    var needed = prints.length;
     var extras = Array.prototype.slice.call(stage.querySelectorAll("[data-tower-polaroid-extra]"));
     while (extras.length > needed) {
       var gone = extras.pop();
@@ -8966,8 +8965,8 @@
       }
       printEl.hidden = false;
       printEl.classList.remove("is-widget-off");
-      paintPolaroidPhoto(printEl.querySelector("[data-tower-polaroid-photo]"), prints[i + 1].url);
-      applyPolaroidPrintScale(printEl, prints[i + 1].scale);
+      paintPolaroidPhoto(printEl.querySelector("[data-tower-polaroid-photo]"), prints[i].url);
+      applyPolaroidPrintScale(printEl, prints[i].scale);
     }
   }
 
@@ -9184,7 +9183,8 @@
         var next = normalizePolaroidScale(sticker.getAttribute("data-polaroid-scale") || startScale);
         var wid = sticker.getAttribute("data-tower-widget");
         var extra = sticker.getAttribute("data-tower-polaroid-extra");
-        var idx = wid === "polaroid" ? 0 : (parseInt(extra, 10) + 1);
+        if (wid === "polaroid" || extra == null || extra === "") return;
+        var idx = parseInt(extra, 10);
         var cur = TowerProfileStore.get();
         var prints = polaroidPrintList(cur);
         if (!prints[idx]) return;
@@ -10601,6 +10601,12 @@
         var instaxFile = root.querySelector("[data-tower-instax-file]");
         if (!justDragged && instaxFile) instaxFile.click();
       }
+      var polaroidShell = ev.target.closest('[data-tower-widget="polaroid"]');
+      if (polaroidShell && !polaroidShell.hasAttribute("data-tower-polaroid-extra") && stage.contains(polaroidShell) && !polaroidShell.hidden && !ev.target.closest("[data-tower-polaroid-resize], a, button, input, textarea, select, label, summary")) {
+        var justDraggedPol = polaroidShell.__cognationDraggedAt && Date.now() - polaroidShell.__cognationDraggedAt < 700;
+        var polFile = root.querySelector("[data-tower-instax-file]");
+        if (!justDraggedPol && polFile && !polFile.disabled) { polFile.click(); return; }
+      }
       var handleClick = ev.target.closest("[data-tower-sticker-handle]");
       if (handleClick) {
         var handleSticker = handleClick.closest("[data-tower-widget]");
@@ -11591,10 +11597,9 @@
         avatar.textContent = loading ? "" : initials(p.displayName);
       }
     }
-    var polaroidPrints = polaroidPrintList(p);
     var primaryPhoto = root.querySelector('[data-tower-widget="polaroid"] [data-tower-polaroid-photo]');
     if (primaryPhoto && document.activeElement !== primaryPhoto) {
-      paintPolaroidPhoto(primaryPhoto, (polaroidPrints[0] && polaroidPrints[0].url) || "");
+      paintPolaroidPhoto(primaryPhoto, "");
     }
     var bgHint = root.querySelector("[data-tower-bg-image-status]");
     if (bgHint && !(p.backgroundImageDataUrl && document.activeElement && document.activeElement.matches && document.activeElement.matches("[data-tower-bg-image]"))) {
@@ -12038,10 +12043,15 @@
       (statusFn || setProfileStatus)(okMsg, false);
     }
 
-    function readImageFile(file, statusFn, onUrl) {
-      if (!file) return;
+    function readImageFile(file, statusFn, onUrl, onSettled) {
+      function finish(url) {
+        if (url && onUrl) onUrl(url);
+        if (onSettled) onSettled();
+      }
+      if (!file) { finish(); return; }
       if (file.type && !looksLikeImage(file)) {
         (statusFn || setProfileStatus)("Choose an image file.", true);
+        finish();
         return;
       }
       var reader = new FileReader();
@@ -12068,16 +12078,20 @@
             maxEdge = Math.max(160, Math.round(maxEdge * 0.7));
             quality = Math.max(0.5, quality - 0.08);
           }
-          onUrl(dataUrl || raw);
+          finish(dataUrl || raw);
         };
         img.onerror = function () {
-          if (raw.indexOf("data:image/") === 0) onUrl(raw);
-          else (statusFn || setProfileStatus)("Could not read that image.", true);
+          if (raw.indexOf("data:image/") === 0) finish(raw);
+          else {
+            (statusFn || setProfileStatus)("Could not read that image.", true);
+            finish();
+          }
         };
         img.src = raw;
       };
       reader.onerror = function () {
         (statusFn || setProfileStatus)("Could not read that image.", true);
+        finish();
       };
       reader.readAsDataURL(file);
     }
@@ -12088,9 +12102,10 @@
       });
     }
 
-    function applyInstaxFile(file, statusFn) {
+    function applyInstaxFile(file, statusFn, done) {
       if (!isTowerOwner(TowerProfileStore.get())) {
         (statusFn || setProfileStatus)("Only the profile owner can add Polaroids.", true);
+        if (done) done();
         return;
       }
       readImageFile(file, statusFn, function (dataUrl) {
@@ -12115,7 +12130,25 @@
           p.polaroidPrints = normalized;
           p.polaroidRemoved = false;
         });
-      });
+      }, done);
+    }
+
+    function applyInstaxFiles(files, statusFn) {
+      var list = Array.prototype.slice.call(files || []).filter(Boolean);
+      var i = 0;
+      function next() {
+        if (i >= list.length) return;
+        applyInstaxFile(list[i], statusFn, function () { i += 1; next(); });
+      }
+      next();
+    }
+
+    function pullChosenPolaroids(input) {
+      if (!input || !input.files || !input.files.length) return;
+      var files = Array.prototype.slice.call(input.files);
+      if (input.__cognationAppliedFile === files[0]) return;
+      input.__cognationAppliedFile = files[0];
+      applyInstaxFiles(files, setProfileStatus);
     }
 
     function pullChosenImage(input, applyFn) {
@@ -12155,7 +12188,7 @@
         setTimeout(function () {
           pullChosenImage(root.querySelector("[data-tower-avatar-file]"), applyAvatarFile);
           pullChosenImage(root.querySelector("[data-tower-avatar-file-panel]"), applyAvatarFile);
-          pullChosenImage(root.querySelector("[data-tower-instax-file]"), applyInstaxFile);
+          pullChosenPolaroids(root.querySelector("[data-tower-instax-file]"));
         }, 0);
       });
     }
@@ -12163,7 +12196,7 @@
       if (input.__cognationInstaxBound) return;
       input.__cognationInstaxBound = true;
       input.addEventListener("change", function () {
-        pullChosenImage(input, applyInstaxFile);
+        pullChosenPolaroids(input);
         input.value = "";
       });
     });

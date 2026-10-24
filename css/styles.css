@@ -8616,7 +8616,7 @@ body { padding-top: 0 !important; }
 .tower-cal-pill {
   display: inline-flex; align-items: center; gap: 0.35rem;
   border: 1px solid rgba(220, 246, 255, 0.55); border-radius: 999px;
-  padding: 0.22rem 0.7rem; font-size: 0.85rem; cursor: pointer;
+  padding: 0.22rem 0.7rem; font-size: 0.85rem; cursor: pointer; white-space: nowrap;
 }
 .tower-cal-pill:has(input:checked) { outline: 2px solid #d6b8ff; background: #3a246e; }
 .tower-webinar { margin: 0 0 0.65rem; }

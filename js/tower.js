@@ -7255,7 +7255,7 @@
     if (ev.hostHandle) normalized.hostHandle = String(ev.hostHandle).replace(/^@/, "").slice(0, 80);
     if (ev.kind === "webinar") {
       normalized.kind = "webinar";
-      normalized.webinar = webinarLimits();
+      normalized.webinar = webinarLimits(ev.webinar && ev.webinar.record === "internal");
     }
     return normalized;
   }
@@ -7468,7 +7468,7 @@
             "</div>" +
             actions +
             (e.kind === "webinar"
-              ? '<div class="tower-webinar" data-webinar-room>' + webinarRoomHtml() + "</div>"
+              ? '<div class="tower-webinar" data-webinar-room>' + webinarRoomHtml(e.webinar && e.webinar.record === "internal") + "</div>"
               : "") +
             "</li>"
           );
@@ -7530,7 +7530,7 @@
       return e && e.status !== "pending";
     }).map(function (e) {
       if (e.kind === "webinar") {
-        return { id: e.id, date: e.date, time: e.time || "", title: e.title, notes: "", status: "accepted", source: "owner", kind: "webinar", webinar: webinarLimits() };
+        return { id: e.id, date: e.date, time: e.time || "", title: e.title, notes: "", status: "accepted", source: "owner", kind: "webinar", webinar: webinarLimits(e.webinar && e.webinar.record === "internal") };
       }
       return {
         id: "busy-" + e.id,
@@ -7769,16 +7769,18 @@
   }
 
   /* Capacity only. Not a count of people watching. */
-  function webinarLimits() {
-    return { viewers: 200000, live: 50, presenters: 1, comments: false, speak: "raise-hand" };
+  function webinarLimits(record) {
+    return { viewers: 200000, live: 50, presenters: 1, comments: false, speak: "raise-hand", record: record ? "internal" : "" };
   }
 
-  function webinarRoomHtml() {
+  function webinarRoomHtml(record) {
     return '<div class="tower-webinar-stage"><video data-webinar-presenter muted playsinline></video><span class="tower-webinar-name">Main presenter</span></div>' +
       '<p class="tower-webinar-limits">Up to 200,000 viewers · Up to 50 live</p>' +
       '<p class="tower-webinar-actions"><button type="button" class="btn btn-secondary" data-webinar-join>Join on video</button> ' +
       '<button type="button" class="btn btn-secondary" data-webinar-hand>Raise your hand</button></p>' +
-      '<p class="tower-webinar-speak">Join on video, then raise your hand to speak.</p>';
+      '<p class="tower-webinar-speak">Join on video, then raise your hand to speak.</p>' +
+      '<label class="tower-cal-pill"><input type="checkbox" data-webinar-record' + (record ? " checked" : "") + "> Record internally</label>" +
+      '<p class="tower-webinar-record-note">Saved on Cognation only.</p>';
   }
 
   function calendarEditorHtml(editing, selected) {
@@ -7791,7 +7793,7 @@
       "<h5>" + (editing ? "Edit event" : "Add event") + "</h5>" +
       '<div class="tower-cal-pills" role="group" aria-label="Event kind"><label class="tower-cal-pill"><input type="checkbox" name="eventKind" value="webinar" data-tower-cal-webinar' +
       (on ? " checked" : "") + "> Webinar</label></div>" +
-      '<div class="tower-webinar" data-webinar-room' + (on ? "" : " hidden") + ">" + webinarRoomHtml() + "</div>" +
+      '<div class="tower-webinar" data-webinar-room' + (on ? "" : " hidden") + ">" + webinarRoomHtml(editing && editing.webinar && editing.webinar.record === "internal") + "</div>" +
       (editing ? '<input type="hidden" name="id" value="' + escapeHtml(editing.id) + '" data-tower-cal-edit-id>' : "") +
       '<div class="form-group"><label for="tower-cal-edit-title">Title</label>' +
       '<input id="tower-cal-edit-title" name="title" type="text" maxlength="120" required value="' + escapeHtml(formTitle) + '" data-tower-cal-edit-title></div>' +
@@ -8359,7 +8361,7 @@
         saveCalendarToProfile(function (p) {
           function applyWebinar(e) {
             e.kind = "webinar";
-            e.webinar = webinarLimits();
+            e.webinar = webinarLimits(!!form.querySelector("[data-webinar-record]:checked"));
           }
           if (editId) {
             var found = false;

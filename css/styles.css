@@ -16049,6 +16049,11 @@ body.cgn-cal-page {
 [data-research-room] .research-line { display: flex; justify-content: space-between; gap: 0.45rem; align-items: flex-start; }
 [data-research-room] .research-line .news-report-option { width: auto; flex: none; }
 
+.chatroom-log { display: grid; gap: 0.35rem; margin: 0; padding: 0.5rem 0.65rem; border-radius: 0.5rem; background: rgba(16, 19, 48, 0.06); }
+.chatroom-line { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin: 0; }
+.chatroom-report { margin-left: 0.35rem; padding: 0.12rem 0.55rem; border: 1px solid currentColor; border-radius: 999px; background: transparent; color: inherit; font: inherit; font-size: 0.75rem; font-weight: 700; cursor: pointer; }
+[data-chatroom-kick] { font-weight: 700; }
+
 /* Header lockup only. A tight per-letter shadow. No ellipse, bloom,
    or pink-and-blue wash behind the word or the brain. */
 .cognation-masthead {

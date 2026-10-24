@@ -125,9 +125,41 @@
         });
       });
       return fetchProfiles(client, ids).then(function (profiles) {
-        return { viewerId: id, friends: friendsFromRows(id, friendships, profiles), profiles: profiles };
+        return followsFor(client, id, profiles).then(function (extra) {
+          var all = profiles.concat(extra.profiles || []);
+          return { viewerId: id, friends: friendsFromRows(id, friendships, all), profiles: all, follows: extra.follows || [] };
+        });
       });
     }).then(null, function () { return none; });
+  }
+
+  function proFromFollows(follows, profiles) {
+    var byId = {};
+    (profiles || []).forEach(function (p) { if (p && p.id) byId[String(p.id)] = p; });
+    var out = [], seen = {};
+    (follows || []).forEach(function (row) {
+      var p = byId[String(row && row.profile_id || "")];
+      if (!p || p.kind !== "professional" || !p.user_id || seen[p.user_id]) return;
+      seen[p.user_id] = 1;
+      out.push({ userId: String(p.user_id), name: p.display_name || "Pro", handle: p.handle || "", photoUrl: p.photo_url || "", profileId: String(p.id) });
+    });
+    return out;
+  }
+
+  function followsFor(client, id, profiles) {
+    return Promise.resolve().then(function () {
+      return client.rest("follows", { query: "select=follower_user_id,profile_id&follower_user_id=eq." + id + "&limit=" + PAGE });
+    }).then(function (rows) {
+      rows = Array.isArray(rows) ? rows : [];
+      var have = {};
+      (profiles || []).forEach(function (p) { if (p && p.id) have[String(p.id)] = 1; });
+      var miss = [];
+      rows.forEach(function (r) { var pid = r && String(r.profile_id || ""); if (pid && !have[pid]) miss.push(pid); });
+      if (!miss.length) return { follows: rows, profiles: [] };
+      return client.rest("profiles", { query: "select=" + BASE_COLS + ",photo_url&id=in.(" + miss.join(",") + ")&limit=" + PAGE }).then(function (more) {
+        return { follows: rows, profiles: Array.isArray(more) ? more : [] };
+      }, function () { return { follows: rows, profiles: [] }; });
+    }, function () { return { follows: [], profiles: [] }; });
   }
 
   /* ---------- Engagement (public activity only; DMs never read) ---------- */
@@ -301,18 +333,22 @@
   function loadRanked(client, id) {
     client = client || (root && root.CognationSupabase);
     return loadRoster(client, id).then(function (roster) {
-      if (!roster.friends.length) return { halo: [], fall: [], scores: {}, gaps: [] };
-      return fetchEngagement(client, roster).then(function (e) {
-        var r = rank(roster.friends, e.scores);
-        r.scores = e.scores;
-        r.gaps = e.gaps;
+      var pro = proFromFollows(roster.follows, roster.profiles);
+      if (!roster.friends.length && !pro.length) return { halo: [], fall: [], scores: {}, gaps: [], professional: { halo: [], fall: [] } };
+      var seen = {}, merged = roster.friends.slice();
+      roster.friends.forEach(function (f) { seen[f.userId] = 1; });
+      pro.forEach(function (f) { if (!seen[f.userId]) merged.push(f); });
+      var scoreRoster = { viewerId: roster.viewerId, friends: merged, profiles: roster.profiles };
+      function pack(scores, gaps) {
+        var r = rank(roster.friends, scores);
+        r.scores = scores;
+        r.gaps = gaps;
+        r.professional = rank(pro, scores);
         return r;
-      }, function () {
-        var r = rank(roster.friends, {});
-        r.scores = {};
-        r.gaps = ["engagement"];
-        return r;
-      });
+      }
+      return fetchEngagement(client, scoreRoster).then(function (e) {
+        return pack(e.scores, e.gaps);
+      }, function () { return pack({}, ["engagement"]); });
     });
   }
 
@@ -420,6 +456,60 @@
     return { size: size, gap: f.gap, cols: f.cols, slots: slots };
   }
 
+  function layoutBottom(count, width, height) {
+    count = Math.max(0, Math.min(PULSE_FALL_CAP, count | 0));
+    width = Math.max(200, width || 390);
+    height = Math.max(160, height || 700);
+    var size = width <= 600 ? 28 : 36, pitch = 86, label = 26;
+    var cols = Math.max(1, Math.floor((width - 12) / pitch));
+    var rows = Math.ceil(count / cols);
+    var y0 = Math.max(8, height - 8 - rows * (size + label));
+    var slots = [], i, r, c, n, x0;
+    for (i = 0; i < count; i++) {
+      r = Math.floor(i / cols); c = i % cols;
+      n = Math.min(cols, count - r * cols);
+      x0 = (width - ((n - 1) * pitch + size)) / 2;
+      slots.push({ x: Math.round(x0 + c * pitch), y: Math.round(y0 + r * (size + label)) });
+    }
+    return { size: size, slots: slots };
+  }
+
+  function removeLink(friend, el, box) {
+    var client = root && root.CognationSupabase;
+    var id = viewerId();
+    var gone = function () {
+      if (el.parentNode) el.parentNode.removeChild(el);
+      if (box.parentNode) box.parentNode.removeChild(box);
+    };
+    if (!client || !id || typeof client.rpc !== "function") return;
+    var call = friend.profileId
+      ? client.rpc("toggle_profile_follow", { target_profile_id: friend.profileId })
+      : client.rpc("unfriend_user", { other_user_id: friend.userId });
+    Promise.resolve(call).then(gone, function () {});
+  }
+
+  function fallActions(friend, el, opts) {
+    var box = document.createElement("span");
+    box.className = "pulse-fall-actions";
+    box.style.left = (parseFloat(el.style.left) + parseFloat(el.style.width) / 2) + "px";
+    box.style.top = (parseFloat(el.style.top) + parseFloat(el.style.height) + 2) + "px";
+    [["Unfriend", function () { removeLink(friend, el, box); }], ["Check in", function () {
+      if (typeof opts.open === "function") opts.open(friend.handle, friend);
+    }]].forEach(function (pair) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "pulse-fall-act";
+      b.textContent = pair[0];
+      b.addEventListener("click", function (ev) {
+        if (ev && ev.preventDefault) ev.preventDefault();
+        if (ev && ev.stopPropagation) ev.stopPropagation();
+        pair[1]();
+      });
+      box.appendChild(b);
+    });
+    return box;
+  }
+
   function render(layer, friends, opts) {
     opts = opts || {};
     if (!layer || typeof document === "undefined") return null;
@@ -444,9 +534,12 @@
     var vw = root && root.innerWidth ? root.innerWidth : 0;
     if (vw && (!w || vw < w)) w = vw; /* never wider than the screen */
     var h = opts.height || layer.clientHeight || 0;
+    if (!opts.height && root && root.innerHeight && layer.getBoundingClientRect) {
+      var seen = root.innerHeight - layer.getBoundingClientRect().top;
+      if (seen > 160 && seen < h) h = seen;
+    }
     if (opts.center) centerGroup(layer, friends.length, w, h, opts);
-    var band = opts.band || (typeof opts.avoid === "function" ? opts.avoid() : null);
-    var L = layoutOutside(friends.length, w, h, band, { topLimit: opts.topLimit });
+    var L = layoutBottom(friends.length, w, h);
     var inner = document.createElement("div");
     inner.className = "pulse-fall-inner";
     stack.appendChild(inner);
@@ -465,8 +558,8 @@
       el.style.left = s.x + "px";
       el.style.top = s.y + "px";
       el.style.fontSize = Math.max(9, Math.round(L.size * 0.36)) + "px";
-      /* short drop into place with a bounce: a long fall would cross the ring */
-      el.style.setProperty("--pulse-fall-from", "-10px"); /* inside the 14px pad */
+      /* From the top of the page down to the bottom dock. */
+      el.style.setProperty("--pulse-fall-from", "-100vh");
       /* drop in, then breathe; staggered so the field never pulses in unison */
       el.style.animationDelay = Math.min(i * 40, 1200) + "ms, " + (1100 + Math.min(i * 40, 1200) + (i % 5) * 230) + "ms";
       if (typeof opts.paint === "function") {
@@ -482,6 +575,7 @@
         if (typeof opts.open === "function") opts.open(friend.handle, friend);
       });
       inner.appendChild(el);
+      inner.appendChild(fallActions(friend, el, opts));
     });
     layer.insertBefore(stack, layer.firstChild);
     return stack;
@@ -513,6 +607,7 @@
   }
 
   var last = null;
+  var shown = "personal";
 
   function paintHalo(halo, opts) {
     var people = haloSpots(halo || []);
@@ -528,15 +623,48 @@
     return render(layer, list, o);
   }
 
+  function applyPack(layer, pack, opts) {
+    paintHalo(pack.halo, opts);
+    placeFalling(layer, pack.fall, opts);
+    if (last) last.fall = pack.fall;
+  }
+
+  function sideToggle(layer) {
+    if (!layer || !layer.querySelector || layer.querySelector("[data-pulse-side-toggle]")) return;
+    var bar = document.createElement("div");
+    bar.className = "pulse-side-toggle";
+    bar.setAttribute("data-pulse-side-toggle", "");
+    ["personal", "professional"].forEach(function (name) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("data-pulse-side", name);
+      b.setAttribute("aria-pressed", name === shown ? "true" : "false");
+      b.textContent = name === "personal" ? "Personal" : "Professional";
+      b.addEventListener("click", function () {
+        shown = name;
+        var packs = last && last.packs;
+        if (packs && last.layer) applyPack(last.layer, packs[name], last.opts);
+        var all = bar.querySelectorAll ? bar.querySelectorAll("button") : [];
+        for (var i = 0; i < all.length; i++) all[i].setAttribute("aria-pressed", all[i].getAttribute("data-pulse-side") === shown ? "true" : "false");
+      });
+      bar.appendChild(b);
+    });
+    layer.appendChild(bar);
+  }
+
   function mount(layer, opts) {
     opts = opts || {};
+    sideToggle(layer);
     render(layer, [], opts); /* quiet empty until the server answers */
     return loadRanked(opts.client, opts.viewerId).then(function (r) {
       if (!layer.parentNode && !opts.detached) return r;
-      paintHalo(r.halo, opts);
+      var packs = {
+        personal: { halo: r.halo, fall: r.fall },
+        professional: r.professional || { halo: [], fall: [] }
+      };
+      last = { layer: layer, fall: (packs[shown] || packs.personal).fall, opts: opts, packs: packs };
+      applyPack(layer, packs[shown] || packs.personal, opts);
       if (r.gaps && r.gaps.length && layer.setAttribute) layer.setAttribute("data-pulse-engagement-gaps", r.gaps.join(" "));
-      placeFalling(layer, r.fall, opts);
-      last = { layer: layer, fall: r.fall, opts: opts };
       return r;
     });
   }

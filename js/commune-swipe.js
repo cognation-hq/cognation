@@ -34,6 +34,9 @@
   var NOTICES_KEY = "cognation.commune.notices.v1";
   var SHARES_KEY = "cognation.commune.friend-shares.v1";
   var BIDS_KEY = "cognation.commune.market.bids.v1";
+  var HIGH_KEY = "cognation.commune.market.high.v1";
+  var PAID_KEY = "cognation.commune.market.paid.v1";
+  var BID_MS = 86400000;
   var FADE_LEFT_THRESHOLD = 3;
   var OFF_INTEREST_FRIEND_RATIO = 6;
   var ROOMS_KEY = "cognation.commune.site-rooms.v1";
@@ -128,19 +131,28 @@
     RESEARCH: "pro-research",
     AUCTION: "pro-auction",
     PODCAST: "pro-podcast",
+    ETHICS: "pro-ethics",
     FIELD: "pro-field",
     POP: "pro-popculture",
+    DOCTORAL: "pro-doctoral",
+    BUSINESS: "pro-business",
     EXECUTIVES: "pro-executives",
   };
-  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.EXECUTIVES, PRO.FIELD, PRO.POP];
+  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.ETHICS, PRO.DOCTORAL, PRO.BUSINESS, PRO.EXECUTIVES, PRO.FIELD, PRO.POP];
   var PRO_MARK = {};
   PRO_MARK[PRO.WEBINAR] = "Webinar";
   PRO_MARK[PRO.KNOW] = "Professionals you might know";
   PRO_MARK[PRO.RESEARCH] = "Research";
   PRO_MARK[PRO.AUCTION] = "Auction";
   PRO_MARK[PRO.PODCAST] = "Podcast";
+  PRO_MARK[PRO.ETHICS] = "Ethics board";
   PRO_MARK[PRO.FIELD] = "Field";
   PRO_MARK[PRO.POP] = "Pop-culture";
+  PRO_MARK[PRO.DOCTORAL] = "Doctoral degrees";
+  PRO_MARK["pro-industry"] = "Industry";
+  PRO_MARK["pro-licensure"] = "Licensure";
+  PRO_MARK["pro-ai-work"] = "AI at work";
+  PRO_MARK[PRO.BUSINESS] = "Business";
   PRO_MARK[PRO.EXECUTIVES] = "Executives";
   /* Podcast cards stay, with no Demo badge (Alexa 2026-10-22 11:46 AM CT, via SeedOps:
      "this will also be a card when cognation goes live but doesnt need to be a demo"). */
@@ -1335,6 +1347,64 @@
     var age = getMemberAge();
     return typeof age === "number" && age >= 16;
   }
+  function marketAsk(text) {
+    var m = String(text || "").match(/\$\s*(\d{1,7}(?:,\d{3})*(?:\.\d{1,2})?)/);
+    if (!m) return null;
+    var n = Number(String(m[1]).replace(/,/g, ""));
+    return isFinite(n) && n >= 0 ? n : null;
+  }
+  function marketMoney(amount) {
+    var n = Number(amount);
+    if (!isFinite(n) || n < 0) return "";
+    var whole = Math.abs(n - Math.round(n)) < 0.001;
+    return "$" + (whole ? String(Math.round(n)) : n.toFixed(2));
+  }
+  function marketBidLabel(card) {
+    var price = marketMoney(card && card.ask);
+    return price ? "Bid " + price : "Bid";
+  }
+  var MARKET_MILES = 20;
+  var LOC_KEY = "cognation.member.location.v1";
+  function asPoint(obj) {
+    if (!obj || typeof obj !== "object") return null;
+    var lat = Number(obj.lat != null ? obj.lat : obj.latitude);
+    var lng = Number(obj.lng != null ? obj.lng : (obj.longitude != null ? obj.longitude : obj.lon));
+    if (!isFinite(lat) || !isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    return { lat: lat, lng: lng };
+  }
+  function milesApart(a, b) {
+    var r = 3958.7613;
+    var dLat = (b.lat - a.lat) * Math.PI / 180;
+    var dLng = (b.lng - a.lng) * Math.PI / 180;
+    var s1 = Math.sin(dLat / 2);
+    var s2 = Math.sin(dLng / 2);
+    var h = s1 * s1 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * s2 * s2;
+    return 2 * r * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+  function viewerPoint() {
+    var member = getMemberProfile() || {};
+    return asPoint(member) || asPoint(member.location) || asPoint(readJson(localStorage, LOC_KEY, null));
+  }
+  function sellerPoint(post) {
+    var direct = asPoint(post) || asPoint(post && post.location);
+    if (direct) return direct;
+    var atts = post && post.attachments;
+    var i;
+    if (Array.isArray(atts)) {
+      for (i = 0; i < atts.length; i++) {
+        var found = asPoint(atts[i]);
+        if (found) return found;
+      }
+    }
+    var rec = post && post.authorProfileId ? profileById(post.authorProfileId) : null;
+    return asPoint(rec) || asPoint(rec && rec.location);
+  }
+  function marketLocal(post) {
+    var viewer = viewerPoint();
+    var seller = sellerPoint(post);
+    if (!viewer || !seller) return false;
+    return milesApart(viewer, seller) <= MARKET_MILES;
+  }
   function marketPictures(post) {
     var out = [];
     (post && Array.isArray(post.attachments) ? post.attachments : []).forEach(function (a) {
@@ -1395,6 +1465,7 @@
     var out = [];
     posts.forEach(function (post) {
       if (!post || !marketTagged((post.body || "") + " " + (post.title || ""))) return;
+      if (!marketLocal(post) || marketPaid(post)) return;
       var body = String(post.body || "").replace(/(^|[^a-z0-9])#market(?![a-z0-9])/ig, "$1").replace(/\s+/g, " ").trim();
       out.push({
         id: "market-" + (post.id || out.length),
@@ -1405,6 +1476,7 @@
         handle: String(post.handle || "").replace(/^@/, ""),
         profileId: post.authorProfileId || "",
         pictures: marketPictures(post),
+        ask: marketAsk((post.body || "") + " " + (post.title || "")),
       });
     });
     return out;
@@ -1414,14 +1486,92 @@
     var row = doc[currentProfileId()];
     return !!(row && row[cardId]);
   }
-  function optInToBid(cardId) {
+  function optInToBid(cardId, amount) {
     if (!marketCanBid()) return false;
     var doc = readJson(localStorage, BIDS_KEY, {});
     var mine = currentProfileId();
     if (!doc[mine] || typeof doc[mine] !== "object") doc[mine] = {};
-    doc[mine][cardId] = Date.now();
+    var start = Number(amount);
+    doc[mine][cardId] = { at: Date.now(), amount: isFinite(start) && start >= 0 ? start : null };
     writeJson(localStorage, BIDS_KEY, doc);
     return true;
+  }
+  function marketPaid(post) {
+    var doc = readJson(localStorage, PAID_KEY, {});
+    var id = post && (post.id || post);
+    return !!(doc && (doc[id] || doc["market-" + id]));
+  }
+  function liveHigh(cardId) {
+    var row = readJson(localStorage, HIGH_KEY, {})[cardId];
+    if (!row || !isFinite(Number(row.amount)) || !row.at) return null;
+    if (Date.now() - Number(row.at) > BID_MS) return null;
+    return row;
+  }
+  function raiseBid(cardId, amount, ask) {
+    if (!marketCanBid()) return false;
+    var n = Number(amount);
+    var floor = Number(ask);
+    if (!isFinite(n) || (isFinite(floor) && n < floor)) return false;
+    var cur = liveHigh(cardId);
+    if (cur && n <= Number(cur.amount)) return false;
+    var doc = readJson(localStorage, HIGH_KEY, {});
+    doc[cardId] = { bidderId: currentProfileId(), amount: n, at: Date.now() };
+    writeJson(localStorage, HIGH_KEY, doc);
+    return optInToBid(cardId, n);
+  }
+  function settleMarketPayment(cardId, body) {
+    if (!body || body.paid !== true) return false;
+    var doc = readJson(localStorage, PAID_KEY, {});
+    doc[cardId] = Date.now();
+    var postId = String(cardId || "").replace(/^market-/, "");
+    if (postId) doc[postId] = doc[cardId];
+    writeJson(localStorage, PAID_KEY, doc);
+    return true;
+  }
+  function payHighBid(card) {
+    var high = card && liveHigh(card.id);
+    var notSet = { ok: false, paid: false, message: "Apple Pay isn't set up. No payment was taken." };
+    if (!marketCanBid() || !high || String(high.bidderId) !== String(currentProfileId())) {
+      return Promise.resolve({ ok: false, paid: false, message: "Only the current high bidder can pay." });
+    }
+    var c = window.CognationConfig || {};
+    var merchant = String(c.applePayMerchantId || "").trim();
+    var processor = String(c.applePayProcessor || "").trim().replace(/\/$/, "");
+    var Session = window.ApplePaySession;
+    if (!merchant || !/^https:\/\//.test(processor) || typeof Session !== "function") return Promise.resolve(notSet);
+    var amount = (Math.round(Number(high.amount) * 100) / 100).toFixed(2);
+    return new Promise(function (resolve) {
+      var session, done = false;
+      function finish(result) { if (!done) { done = true; resolve(result); } }
+      function fail(msg) {
+        try { if (session) session.completePayment(Session.STATUS_FAILURE); } catch (e1) {}
+        finish({ ok: false, paid: false, message: msg || "Payment didn't go through. Nothing was charged." });
+      }
+      function post(path, payload) {
+        return fetch(processor + path, { method: "POST", credentials: "omit", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) }).then(function (res) { return res.json(); });
+      }
+      try {
+        session = new Session(3, { countryCode: "US", currencyCode: "USD", merchantCapabilities: ["supports3DS"], supportedNetworks: ["visa", "masterCard", "amex", "discover"], total: { label: "Cognation", amount: amount } });
+      } catch (eOpen) { finish(notSet); return; }
+      session.onvalidatemerchant = function (ev) {
+        var url = ev && ev.validationURL;
+        if (!/^https:\/\//.test(url || "")) { fail(); return; }
+        post("/apple-pay/merchant-session", { validationURL: url, merchantId: merchant, amount: amount }).then(function (body) {
+          if (body && body.merchantSession) session.completeMerchantValidation(body.merchantSession); else fail();
+        }).catch(function () { fail(); });
+      };
+      session.onpaymentauthorized = function (ev) {
+        var token = ev && ev.payment && ev.payment.token;
+        if (!token) { fail(); return; }
+        post("/apple-pay/pay", { token: token, amount: amount, cardId: card.id }).then(function (body) {
+          if (!settleMarketPayment(card.id, body)) { fail(); return; }
+          try { session.completePayment(Session.STATUS_SUCCESS); } catch (eOk) {}
+          finish({ ok: true, paid: true, message: "Paid with Apple Pay." });
+        }).catch(function () { fail(); });
+      };
+      session.oncancel = function () { finish({ ok: false, paid: false, message: "Payment cancelled. Nothing was charged." }); };
+      try { session.begin(); } catch (eBegin) { finish(notSet); }
+    });
   }
   function marketCardHtml(card) {
     var html = "";
@@ -1432,12 +1582,18 @@
     if (!marketCanBid()) {
       return html + '<p class="commune-card-meta" data-market-bid-note>Bidding is for ages 16 and up.</p>';
     }
+    var price = marketMoney(card.ask);
+    var high = liveHigh(card.id);
     var opted = marketOptedIn(card.id);
+    var note = (price ? "Starts at " + price + ". " : "") + "Opt in only. Nothing is charged.";
+    if (high) note = "High bid " + marketMoney(high.amount) + ". Pay with Apple Pay within 24 hours. Nothing is charged until then.";
+    else if (opted) note = "You're opted in" + (price ? " at " + price : "") + ". Nothing is charged.";
     return html +
       '<button type="button" class="btn btn-primary" data-market-bid aria-pressed="' + (opted ? "true" : "false") + '">' +
-      (opted ? "Opted in" : "Bid") + "</button>" +
-      '<p class="commune-card-meta" data-market-bid-note>' +
-      (opted ? "You're opted in to bid. Nothing is charged." : "Opt in only. Nothing is charged.") + "</p>";
+      escapeHtml(marketBidLabel(card)) + "</button>" +
+      '<input data-market-raise inputmode="decimal" maxlength="8" aria-label="Raise bid" placeholder="Raise">' +
+      '<button type="button" class="btn btn-secondary" data-market-pay>Apple Pay</button>' +
+      '<p class="commune-card-meta" data-market-bid-note>' + escapeHtml(note) + "</p>";
   }
 
   function ageSafeFeaturedCard(card) {
@@ -1783,6 +1939,27 @@
     return [];
   }
 
+  function doctoralCards() {
+    var api = window.CognationEchoDoctoral;
+    return api && typeof api.cards === "function" ? api.cards(viewerInterestTokens()) : [];
+  }
+
+  function ethicsCards() {
+    var api = window.CognationEchoEthics;
+    return api && typeof api.cards === "function" ? api.cards(viewerInterestTokens()) : [];
+  }
+
+  function researchRoomCards() {
+    var api = window.CognationResearchRoom;
+    if (!api || typeof api.cards !== "function" || !hasInterest(["research"])) return [];
+    return api.cards();
+  }
+
+  function businessCards() {
+    var api = window.CognationEchoBusiness;
+    return api && typeof api.cards === "function" ? api.cards(viewerInterestTokens()) : [];
+  }
+
   function executivesCards() {
     var api = window.CognationEchoExecutives;
     return api && typeof api.cards === "function" ? api.cards(viewerInterestTokens()) : [];
@@ -1798,9 +1975,12 @@
       return { id: w.id, type: PRO.PODCAST, title: w.title, body: w.body,
         why: "Picked by topic: ethics, async work, continuing education.", rating: "G", minAge: 0, keepOnly: true };
     });
+    lanes[PRO.DOCTORAL] = doctoralCards();
+    lanes[PRO.ETHICS] = ethicsCards();
+    /* Research chat only if this person lists research. Field and Pop culture stay empty. */
+    lanes[PRO.RESEARCH] = researchRoomCards();
+    lanes[PRO.BUSINESS] = businessCards();
     lanes[PRO.EXECUTIVES] = executivesCards();
-    /* Research, Field update and Pop culture have no real feed: no cards. */
-    lanes[PRO.RESEARCH] = [];
     lanes[PRO.FIELD] = [];
     lanes[PRO.POP] = [];
     Object.keys(lanes).forEach(function (type) {
@@ -1836,9 +2016,53 @@
     return out;
   }
 
+  function proInterestCards() {
+    var api = window.CognationProInterest;
+    if (!api || typeof api.cards !== "function") return [];
+    var mine = {};
+    viewerIds().forEach(function (id) { mine[String(id)] = true; });
+    var session = currentSession();
+    var user = session && session.username ? String(session.username) : "";
+    var people = [];
+    eachProfile(function (rec) {
+      if (!rec || rec.kind !== "professional" || mine[String(rec.id)]) return;
+      if (user && rec.accountUsername && String(rec.accountUsername) === user) return;
+      if (profileLooksSeed(rec) !== (resolveViewerSeedStatus() === true)) return;
+      people.push(rec);
+    });
+    return api.cards(people, Object.keys(mine));
+  }
+
   function sampleDeck(count, mode) {
     if ((mode || getMode()) === MODE.PROFESSIONAL) {
-      return paceProfessional(buildProfessionalLanes(), count || 18);
+      var limit = count || 18;
+      var deck = paceProfessional(buildProfessionalLanes(), limit);
+      var industry = window.CognationIndustry;
+      /* No Industry interest: the card is not in the algorithm. */
+      if (industry && hasInterest(industry.INTERESTS)) {
+        omitPassed(industry.cards()).filter(professionalCardAllowed).forEach(function (card) {
+          if (deck.some(function (c) { return stableCardId(c.id) === stableCardId(card.id); })) return;
+          deck.unshift(card);
+        });
+        if (deck.length > limit) deck.length = limit;
+      }
+      var aiWork = window.CognationAiAtWork;
+      /* No AI at work interest: the card is not in the algorithm. */
+      if (aiWork && hasInterest(aiWork.INTERESTS)) {
+        omitPassed(aiWork.cards()).forEach(function (card) {
+          if (deck.length >= limit) return;
+          if (!professionalCardAllowed(card)) return;
+          if (deck.some(function (c) { return stableCardId(c.id) === stableCardId(card.id); })) return;
+          deck.push(card);
+        });
+      }
+      var extra = omitPassed(proInterestCards()).filter(professionalCardAllowed);
+      for (var xi = extra.length - 1; xi >= 0; xi--) {
+        var add = extra[xi];
+        if (deck.some(function (c) { return stableCardId(c.id) === stableCardId(add.id); })) continue;
+        deck.unshift(add);
+      }
+      return deck.length > limit ? deck.slice(0, limit) : deck;
     }
     var built = buildLanes();
     return paceDeck(built.lanes, built.dating, count || 18);
@@ -2146,7 +2370,24 @@
         });
         html += "</ul>";
       }
-      if (card.why && (card.type !== PRO.EXECUTIVES || hasInterest(["executive", "executives"]))) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
+      if (card.type === "pro-ai-work" && window.CognationAiAtWork) {
+        card.why = window.CognationAiAtWork.displayWhy(card.why, hasInterest(window.CognationAiAtWork.INTERESTS));
+      }
+      if (card.type === "pro-industry") {
+        html += '<button type="button" class="btn btn-primary" data-industry-open>Enter room</button>';
+      }
+      if (card.type === "pro-ai-work") html += '<button type="button" class="btn btn-primary" data-ai-work-open>Enter room</button>';
+      /* Shown without the interest: do not claim they listed it. */
+      var industryOff = card.type === "pro-industry" && !hasInterest((window.CognationIndustry || {}).INTERESTS || []);
+      var doctoralOff = card.type === PRO.DOCTORAL && !hasInterest(["doctoral degrees"]);
+      var ethicsOff = card.type === PRO.ETHICS && !hasInterest(["ethics board"]);
+      var businessOff = card.type === PRO.BUSINESS && !hasInterest(["business", "businesses"]);
+            var mergedOff = card.type === PRO.EXECUTIVES && !hasInterest(["executive", "executives"]);
+      if (card.why && !mergedOff && !industryOff && !doctoralOff && !ethicsOff && !businessOff) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
+      if (card.type === PRO.RESEARCH) {
+        html += '<button type="button" class="btn btn-primary" data-research-enter>Enter Research</button>';
+        if (card.full) html += '<p class="commune-card-meta">Full — another Research card is open.</p>';
+      }
       el.innerHTML = html;
       return el;
     }
@@ -2184,8 +2425,14 @@
         }
       }
       if (card.type === TYPE.CLASSROOM) {
-        html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
-        html += '<p class="commune-card-meta">Life skills · ~18+</p>';
+        var cast = window.CognationLive && window.CognationLive.professionalBroadcast && window.CognationLive.professionalBroadcast();
+        if (cast) {
+          html += '<p class="commune-card-meta">' + escapeHtml(cast.name) + " is live</p>";
+          html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Join live</button>';
+        } else {
+          html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
+          html += '<p class="commune-card-meta">Life skills · ~18+</p>';
+        }
       }
       if (card.type === TYPE.CONTENT) html += '<span class="commune-card-badge">Live</span>';
       if (card.type === TYPE.AD) html += '<span class="commune-card-badge commune-card-badge--ad">Ad</span>';
@@ -2194,6 +2441,20 @@
     return el;
   }
 
+  function wireMarketPay(el, card) {
+    var btn = el && el.querySelector("[data-market-pay]");
+    if (!btn || btn.getAttribute("data-market-pay-wired")) return;
+    btn.setAttribute("data-market-pay-wired", "1");
+    btn.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      payHighBid(card).then(function (res) {
+        var note = el.querySelector("[data-market-bid-note]");
+        if (note) note.textContent = (res && res.message) || "Apple Pay isn't set up. No payment was taken.";
+        if (res && res.paid === true) rebuildDeck();
+      });
+    });
+  }
   function clockLabel(ms) {
     if (!ms) return "";
     try { return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; }
@@ -2287,11 +2548,22 @@
     if (bidBtn) bidBtn.addEventListener("click", function (ev) {
       ev.preventDefault();
       ev.stopPropagation();
-      if (!optInToBid(card.id)) return;
-      bidBtn.textContent = "Opted in";
+      var raise = el.querySelector("[data-market-raise]");
+      var typed = raise && String(raise.value || "").trim();
+      if (!raiseBid(card.id, typed ? Number(typed) : card.ask, card.ask)) return;
+      bidBtn.textContent = marketBidLabel(card);
       bidBtn.setAttribute("aria-pressed", "true");
       var note = el.querySelector("[data-market-bid-note]");
-      if (note) note.textContent = "You're opted in to bid. Nothing is charged.";
+      var high = liveHigh(card.id);
+      if (note && high) note.textContent = "High bid " + marketMoney(high.amount) + ". Pay with Apple Pay within 24 hours. Nothing is charged until then.";
+    });
+    wireMarketPay(el, card);
+    var joinLive = el.querySelector("[data-live-echo-join]");
+    if (joinLive) joinLive.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      var tab = document.getElementById("tab-tower");
+      if (tab) tab.click();
+      if (window.CognationLive && window.CognationLive.open) window.CognationLive.open();
     });
     var sim = el.querySelector("[data-commune-enter-sim]");
     if (sim) sim.addEventListener("click", function (ev) { ev.stopPropagation(); openRoom(card.id, true); });
@@ -2312,11 +2584,34 @@
     } else if (card.type === PRO.AUCTION) {
       wireClassroomCardClick(el, card, function () { openAuction(card, true); });
     }
+    if (card.type === PRO.DOCTORAL) wireClassroomCardClick(el, card, openDoctoral);
+    if (card.type === PRO.ETHICS) wireClassroomCardClick(el, card, openEthics);
     if (card.type === PRO.EXECUTIVES) wireClassroomCardClick(el, card, openExecutives);
     /* Alexa's rule: an ECHO card opens its own full-screen window or a Tower profile, nothing else. */
     if (card.type === TYPE.CHAT) {
       wireClassroomCardClick(el, card, function () { openRoom(card.id, true); });
     }
+    if (card.type === "pro-industry") {
+      var openIndustryBtn = el.querySelector("[data-industry-open]");
+      if (openIndustryBtn) openIndustryBtn.addEventListener("click", function (ev) { ev.stopPropagation(); openIndustry(card.id); });
+      wireClassroomCardClick(el, card, openIndustry);
+    }
+
+    if (card.type === PRO.RESEARCH) {
+      var openResearch = function () {
+        var api = window.CognationResearchRoom;
+        if (api && api.open) api.open(card.id);
+      };
+      var researchBtn = el.querySelector("[data-research-enter]");
+      if (researchBtn) researchBtn.addEventListener("click", function (ev) { ev.stopPropagation(); openResearch(); });
+      wireClassroomCardClick(el, card, openResearch);
+    }
+    if (card.type === "pro-ai-work") {
+      var openAi = el.querySelector("[data-ai-work-open]");
+      if (openAi) openAi.addEventListener("click", function (ev) { ev.stopPropagation(); openAiAtWork(card.id); });
+      wireClassroomCardClick(el, card, openAiAtWork);
+    }
+    if (card.type === PRO.BUSINESS) wireClassroomCardClick(el, card, openBusiness);
     if ((card.type === TYPE.KNOW || card.type === TYPE.FRIEND) && (card.profileId || card.handle)) {
       el.setAttribute("data-commune-opens-profile", "");
       wireClassroomCardClick(el, card, function () { openPersonTower(card); });
@@ -3017,6 +3312,9 @@
     if (members) { members.hidden = true; members.textContent = ""; }
     ensureRoomHeader(panel);
     wireRoomSwipe(panel);
+    if (window.CognationEchoDoctoral) window.CognationEchoDoctoral.clearChrome(panel);
+    if (window.CognationEchoEthics) window.CognationEchoEthics.clearChrome(panel);
+    if (window.CognationEchoBusiness) window.CognationEchoBusiness.clearChrome(panel);
     if (window.CognationEchoExecutives) window.CognationEchoExecutives.clearChrome(panel);
     if (log) paintLiveLog(opts.messages || state.liveMessages || []);
     showRoom(true);
@@ -3072,7 +3370,44 @@
     });
   }
 
+  function openIndustry(cardOrId) {
+    var api = window.CognationIndustry;
+    var panel = roomEl();
+    var id = cardOrId && cardOrId.id ? cardOrId.id : String(cardOrId || "");
+    if (!api || !panel || !id || !state.shell) return false;
+    var me = currentProfileId();
+    var joined = api.join(id, me);
+    if (joined && joined.kicked) { setStatus("You were removed from this chatroom."); return false; }
+    closeClassroom();
+    ensureRoomHeader(panel);
+    api.paint(panel, id, me);
+    showRoom(true);
+    state.roomId = id;
+    state.industryRoom = true;
+    state.liveRoom = false;
+    return true;
+  }
+
+  function openAiAtWork(cardOrId) {
+    var api = window.CognationAiAtWork;
+    var panel = roomEl();
+    var id = cardOrId && cardOrId.id ? cardOrId.id : String(cardOrId || "");
+    if (!api || !panel || !id || !state.shell) return false;
+    var me = currentProfileId();
+    var joined = api.join(id, me);
+    if (joined && joined.kicked) { setStatus("You were removed from this chatroom."); return false; }
+    closeClassroom();
+    ensureRoomHeader(panel);
+    api.paint(panel, id, me);
+    showRoom(true);
+    state.roomId = id;
+    state.aiAtWorkRoom = true;
+    state.liveRoom = false;
+    return true;
+  }
+
   function openRoom(roomId, scroll) {
+    state.industryRoom = false;
     roomId = String(roomId || "");
     var rooms = ensureSiteRooms();
     var room = null;
@@ -3099,6 +3434,34 @@
     }
     return liveRoomUnavailable(supabaseLiveSession() ? "Live rooms aren't ready yet. Try again soon." : "Sign in to join live rooms.");
   }
+  function openDoctoral(cardId) {
+    var api = window.CognationEchoDoctoral;
+    var card = null;
+    [state.cards, doctoralCards()].forEach(function (list) {
+      (list || []).forEach(function (c) {
+        if (!card && c && (c.id === cardId || c.roomId === cardId)) card = c;
+      });
+    });
+    if (!api || !card || !roomEl()) return false;
+    var joined = api.join(card.roomId);
+    if (!joined.ok) {
+      setStatus(joined.message || "That Doctoral degrees room is not available.");
+      if (joined.full) rebuildDeck();
+      return false;
+    }
+    var panel = roomEl();
+    state.roomId = card.roomId;
+    state.liveRoom = false;
+    state.roomSqlId = "";
+    ensureRoomHeader(panel);
+    wireRoomSwipe(panel);
+    api.paint(panel, card.roomId);
+    showRoom(true);
+    setStatus("You're in the Doctoral degrees chatroom.");
+    return true;
+  }
+
+
   function openExecutives(cardId) {
     var api = window.CognationEchoExecutives;
     var card = null;
@@ -3125,6 +3488,48 @@
     setStatus("You're in the Executives chatroom.");
     return true;
   }
+
+  function openEthics(cardId) {
+    var api = window.CognationEchoEthics;
+    var card = null;
+    [state.cards, ethicsCards()].forEach(function (list) {
+      (list || []).forEach(function (c) {
+        if (!card && c && (c.id === cardId || c.roomId === cardId)) card = c;
+      });
+    });
+    if (!api || !card || !roomEl()) return false;
+    var joined = api.join(card.roomId);
+    if (!joined.ok) {
+      setStatus(joined.message || "That Ethics board room is not available.");
+      if (joined.full) rebuildDeck();
+      return false;
+    }
+    var panel = roomEl();
+    state.roomId = card.roomId;
+    state.liveRoom = false;
+    state.roomSqlId = "";
+    ensureRoomHeader(panel);
+    wireRoomSwipe(panel);
+    api.paint(panel, card.roomId);
+    showRoom(true);
+    setStatus("You're in the Ethics board chatroom.");
+    return true;
+  }
+
+  function openBusiness(cardId) {
+    var api = window.CognationEchoBusiness, card = null, panel = roomEl();
+    [state.cards, businessCards()].forEach(function (list) {
+      (list || []).forEach(function (c) { if (!card && c && (c.id === cardId || c.roomId === cardId)) card = c; });
+    });
+    if (!api || !card || !panel) return false;
+    var joined = api.join(card.roomId);
+    if (!joined.ok) { setStatus(joined.message || "That Business room is not available."); if (joined.full) rebuildDeck(); return false; }
+    state.roomId = card.roomId; state.liveRoom = false; state.roomSqlId = "";
+    ensureRoomHeader(panel); wireRoomSwipe(panel); api.paint(panel, card.roomId); showRoom(true);
+    setStatus("You're in the Business chatroom.");
+    setStatus("You're in the Executives chatroom.");
+    return true;
+  }
   function clearPointer() {
     var el = state.pointer && state.pointer.el;
     if (el) {
@@ -3136,11 +3541,16 @@
 
   function releaseRoomSurface() {
     /* Drop open-room lock and restore deck/actions so the card can swipe again. */
+    if (window.CognationEchoDoctoral) window.CognationEchoDoctoral.clearChrome(roomEl());
+    if (window.CognationEchoEthics) window.CognationEchoEthics.clearChrome(roomEl());
+    if (window.CognationEchoBusiness) window.CognationEchoBusiness.clearChrome(roomEl());
     if (window.CognationEchoExecutives) window.CognationEchoExecutives.clearChrome(roomEl());
     var wasLive = state.liveRoom;
     var sqlId = state.roomSqlId;
     state.roomId = "";
     state.liveRoom = false;
+    state.industryRoom = false;
+    state.aiAtWorkRoom = false;
     state.roomSqlId = "";
     state.liveMessages = [];
     showRoom(false);
@@ -3203,6 +3613,7 @@
     closeClassroom();
     releaseRoomSurface();
     if (!paintCardView("auction", card, card.why || "")) return false;
+    if (window.CognationAuctionRoom) window.CognationAuctionRoom.mount(roomEl(), card, getMemberAge());
     state.auctionId = card.id;
     friction("begin", "auction", "auction:" + card.id);
     if (scroll && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
@@ -3274,6 +3685,14 @@
     if (!classroomAllowed()) {
       setStatus("Classroom is for members 18+. Update your age in your profile to join.");
       return false;
+    }
+    var cast = window.CognationLive && window.CognationLive.professionalBroadcast && window.CognationLive.professionalBroadcast();
+    if (cast && cast.handle) {
+      var tab = document.getElementById("tab-tower");
+      if (tab) tab.click();
+      if (window.CognationTowerOpenProfile) window.CognationTowerOpenProfile(cast.handle);
+      if (window.CognationLive.open) window.CognationLive.open();
+      return true;
     }
     var sessions = classroomCatalog();
     var session = null;
@@ -3612,6 +4031,8 @@
     }
     if (PRO_MARK[card.type]) {
       like(card);
+      /* Right swipe shows interest. Left already returned as a pass. */
+      if (card.interest && window.CognationProInterest) window.CognationProInterest.note(card.interest);
       if (card.type === PRO.KNOW && card.profileId && !card.people) {
         if (!isFollowing(card.profileId)) toggleFollow(card.profileId);
         setStatus("Following this professional page.");
@@ -3801,6 +4222,12 @@
     (roomEl() || shell).addEventListener("click", function (ev) {
       var roomPanel = roomEl();
       if (!roomPanel || roomPanel.hidden) return;
+      if (state.aiAtWorkRoom && window.CognationAiAtWork && window.CognationAiAtWork.onClick(ev, {
+        panel: roomPanel, roomId: state.roomId, me: currentProfileId(), status: setStatus
+      })) return;
+      if (state.industryRoom && window.CognationIndustry && window.CognationIndustry.onClick(ev, {
+        panel: roomPanel, roomId: state.roomId, me: currentProfileId(), status: setStatus
+      })) return;
       var moreBtn = ev.target && ev.target.closest("[data-commune-room-more]");
       if (moreBtn && roomPanel.contains(moreBtn)) {
         ev.preventDefault();
@@ -3875,6 +4302,45 @@
         var body = input ? String(input.value || "").trim() : "";
         if (!body || !state.roomId) return;
         body = body.slice(0, 500);
+        if (window.CognationEchoDoctoral && window.CognationEchoDoctoral.isRoom(state.roomId)) {
+          var doctoralSent = window.CognationEchoDoctoral.post(state.roomId, body);
+          if (input) input.value = "";
+          window.CognationEchoDoctoral.paint(roomEl(), state.roomId);
+          setStatus(doctoralSent && doctoralSent.ok ? "Sent." : (doctoralSent && doctoralSent.message) || "Couldn't send.");
+          return;
+        }
+
+        if (state.industryRoom && window.CognationIndustry) {
+          var industryApi = window.CognationIndustry;
+          var industryRes = industryApi.comment(state.roomId, currentProfileId(), viewerDisplayName(), body);
+          if (input) input.value = "";
+          industryApi.paint(roomEl(), state.roomId, currentProfileId());
+          setStatus(industryRes && industryRes.kicked ? "You were removed from this chatroom." : "Sent.");
+          return;
+        }
+
+        if (window.CognationEchoEthics && window.CognationEchoEthics.isRoom(state.roomId)) {
+          var ethicsSent = window.CognationEchoEthics.post(state.roomId, body);
+          if (input) input.value = "";
+          window.CognationEchoEthics.paint(roomEl(), state.roomId);
+          setStatus(ethicsSent && ethicsSent.ok ? "Sent." : (ethicsSent && ethicsSent.message) || "Couldn't send.");
+          return;
+        }
+        if (state.aiAtWorkRoom && window.CognationAiAtWork) {
+          var aiApi = window.CognationAiAtWork;
+          var aiRes = aiApi.comment(state.roomId, currentProfileId(), viewerDisplayName(), body);
+          if (input) input.value = "";
+          aiApi.paint(roomEl(), state.roomId, currentProfileId());
+          setStatus(aiRes && aiRes.kicked ? "You were removed from this chatroom." : "Sent.");
+          return;
+        }
+        if (window.CognationEchoBusiness && window.CognationEchoBusiness.isRoom(state.roomId)) {
+          var sent = window.CognationEchoBusiness.post(state.roomId, body);
+          if (input) input.value = "";
+          window.CognationEchoBusiness.paint(roomEl(), state.roomId);
+          setStatus(sent && sent.ok ? "Sent." : (sent && sent.message) || "Couldn't send.");
+          return;
+        }
         if (window.CognationEchoExecutives && window.CognationEchoExecutives.isRoom(state.roomId)) {
           var executivesSent = window.CognationEchoExecutives.post(state.roomId, body);
           if (input) input.value = "";
@@ -4036,6 +4502,11 @@
     towerLiveContentCards: towerLiveContentCards,
     marketplaceCards: marketplaceCards,
     marketCanBid: marketCanBid,
+    marketBidLabel: marketBidLabel,
+    raiseBid: raiseBid,
+    liveHigh: liveHigh,
+    payHighBid: payHighBid,
+    settleMarketPayment: settleMarketPayment,
     optInToBid: optInToBid,
     featuredFamily: featuredFamily,
     getMode: getMode,

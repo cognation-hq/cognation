@@ -1,0 +1,21 @@
+/** Auction pills and the buyer–seller note. Run: node js/tower-calendar-kind-pills.test.js */
+"use strict";
+var assert = require("assert"), fs = require("fs"), path = require("path"), vm = require("vm");
+var src = fs.readFileSync(path.join(__dirname, "tower.js"), "utf8");
+var msg = fs.readFileSync(path.join(__dirname, "commune-messages.js"), "utf8");
+var swipe = fs.readFileSync(path.join(__dirname, "commune-swipe.js"), "utf8");
+var ctx = {};
+vm.runInNewContext(src.slice(src.indexOf("function calendarKindPills"), src.indexOf("function renderPrivateCalendar")), ctx);
+var html = ctx.calendarKindPills("");
+assert.ok(/value="classroom"/.test(html) && /value="auction"/.test(html) && !/checked/.test(html));
+var ev = { title: "Session" };
+ctx.applyEventKind(ev, "auction", { handle: "host" }, { item: "", start: "" });
+assert.strictEqual(ev.auction.item, "");
+assert.ok(!(ev.auction.start > 0) && ev.auction.payInRoom === false && ev.auction.bid === "message");
+assert.ok(/data-tower-cal-selling/.test(src) && /data-tower-cal-start/.test(src));
+var note = msg.slice(msg.indexOf("Hello! You have agreed"));
+assert.ok(/data-auction-amt/.test(note) && /data-auction-seller/.test(note) && /data-auction-date/.test(note));
+assert.ok(!/value=/.test(note.slice(0, note.indexOf("> amount of money"))));
+assert.ok(/data-auction-draft/.test(msg) && /Buyer connected/.test(msg) && /data-auction-send>Send/.test(msg) && /Please keep a copy of this message for your records/.test(msg) && /data-auction-pay>Apple Pay/.test(msg) && /No payment was taken/.test(msg) && !/receipt|purchase completed/i.test(msg));
+assert.ok(!/Apple Pay|apple-pay|ApplePay/.test(swipe) && /CognationAuctionRoom\.mount/.test(swipe) && !/tower-profile/.test(msg.slice(msg.lastIndexOf("function mount"))));
+console.log("tower-calendar-kind-pills.test.js ok");

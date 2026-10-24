@@ -12944,6 +12944,7 @@ a.site-switch-side:focus-visible {
 .commune-type-mark[data-type-mark="podcast"] { --mark: #ffb8d9; }
 .commune-type-mark[data-type-mark="field"] { --mark: #c9d4ff; }
 .commune-type-mark[data-type-mark="popculture"] { --mark: #fff3a8; }
+.commune-type-mark[data-type-mark="mogul"] { --mark: #f0c36a; }
 .commune-type-mark[data-type-mark="licensure"] { --mark: #d7c4ff; }
 .commune-room-line:has([data-licensure-report]) { display: flex; gap: 0.4rem; align-items: center; justify-content: space-between; }
 .commune-room-line [data-licensure-report] { width: auto; flex: none; }

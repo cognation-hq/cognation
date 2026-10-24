@@ -137,8 +137,9 @@
     DOCTORAL: "pro-doctoral",
     BUSINESS: "pro-business",
     EXECUTIVES: "pro-executives",
+    MOGUL: "pro-mogul",
   };
-  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.ETHICS, PRO.DOCTORAL, PRO.BUSINESS, PRO.EXECUTIVES, PRO.FIELD, PRO.POP];
+  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.ETHICS, PRO.DOCTORAL, PRO.BUSINESS, PRO.EXECUTIVES, PRO.MOGUL, PRO.FIELD, PRO.POP];
   var PRO_MARK = {};
   PRO_MARK[PRO.WEBINAR] = "Webinar";
   PRO_MARK[PRO.KNOW] = "Professionals you might know";
@@ -154,6 +155,7 @@
   PRO_MARK["pro-ai-work"] = "AI at work";
   PRO_MARK[PRO.BUSINESS] = "Business";
   PRO_MARK[PRO.EXECUTIVES] = "Executives";
+  PRO_MARK[PRO.MOGUL] = "Mogul";
   /* Podcast cards stay, with no Demo badge (Alexa 2026-10-22 11:46 AM CT, via SeedOps:
      "this will also be a card when cognation goes live but doesnt need to be a demo"). */
   var PRO_PODCASTS = [
@@ -1939,6 +1941,11 @@
     return [];
   }
 
+  function mogulCards() {
+    var api = window.CognationEchoMogul;
+    return api && typeof api.cards === "function" ? api.cards(viewerInterestTokens()) : [];
+  }
+
   function doctoralCards() {
     var api = window.CognationEchoDoctoral;
     return api && typeof api.cards === "function" ? api.cards(viewerInterestTokens()) : [];
@@ -1975,6 +1982,7 @@
       return { id: w.id, type: PRO.PODCAST, title: w.title, body: w.body,
         why: "Picked by topic: ethics, async work, continuing education.", rating: "G", minAge: 0, keepOnly: true };
     });
+    lanes[PRO.MOGUL] = mogulCards();
     lanes[PRO.DOCTORAL] = doctoralCards();
     lanes[PRO.ETHICS] = ethicsCards();
     /* Research chat only if this person lists research. Field and Pop culture stay empty. */
@@ -2394,7 +2402,8 @@
       var businessOff = card.type === PRO.BUSINESS && !hasInterest(["business", "businesses"]);
       var executivesOff = card.type === PRO.EXECUTIVES && !hasInterest(["executive", "executives"]);
       var licensureOff = card.type === "pro-licensure" && !hasInterest((window.CognationLicensure || {}).INTERESTS || []);
-      if (card.why && !executivesOff && !industryOff && !doctoralOff && !ethicsOff && !businessOff && !licensureOff) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
+      var mogulOff = card.type === PRO.MOGUL && !hasInterest(["mogul", "moguls"]);
+      if (card.why && !executivesOff && !industryOff && !doctoralOff && !ethicsOff && !businessOff && !licensureOff && !mogulOff) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
       if (card.type === PRO.RESEARCH) {
         html += '<button type="button" class="btn btn-primary" data-research-enter>Enter Research</button>';
         if (card.full) html += '<p class="commune-card-meta">Full — another Research card is open.</p>';
@@ -2598,6 +2607,7 @@
     } else if (card.type === PRO.AUCTION) {
       wireClassroomCardClick(el, card, function () { openAuction(card, true); });
     }
+    if (card.type === PRO.MOGUL) wireClassroomCardClick(el, card, openMogul);
     if (card.type === PRO.DOCTORAL) wireClassroomCardClick(el, card, openDoctoral);
     if (card.type === PRO.ETHICS) wireClassroomCardClick(el, card, openEthics);
     if (card.type === PRO.EXECUTIVES) wireClassroomCardClick(el, card, openExecutives);
@@ -3331,6 +3341,7 @@
     if (members) { members.hidden = true; members.textContent = ""; }
     ensureRoomHeader(panel);
     wireRoomSwipe(panel);
+    if (window.CognationEchoMogul) window.CognationEchoMogul.clearChrome(panel);
     if (window.CognationEchoDoctoral) window.CognationEchoDoctoral.clearChrome(panel);
     if (window.CognationEchoEthics) window.CognationEchoEthics.clearChrome(panel);
     if (window.CognationEchoBusiness) window.CognationEchoBusiness.clearChrome(panel);
@@ -3471,6 +3482,33 @@
     }
     return liveRoomUnavailable(supabaseLiveSession() ? "Live rooms aren't ready yet. Try again soon." : "Sign in to join live rooms.");
   }
+  function openMogul(cardId) {
+    var api = window.CognationEchoMogul;
+    var card = null;
+    [state.cards, mogulCards()].forEach(function (list) {
+      (list || []).forEach(function (c) {
+        if (!card && c && (c.id === cardId || c.roomId === cardId)) card = c;
+      });
+    });
+    if (!api || !card || !roomEl()) return false;
+    var joined = api.join(card.roomId);
+    if (!joined.ok) {
+      setStatus(joined.message || "That Mogul room is not available.");
+      if (joined.full) rebuildDeck();
+      return false;
+    }
+    var panel = roomEl();
+    state.roomId = card.roomId;
+    state.liveRoom = false;
+    state.roomSqlId = "";
+    ensureRoomHeader(panel);
+    wireRoomSwipe(panel);
+    api.paint(panel, card.roomId);
+    showRoom(true);
+    setStatus("You're in the Mogul chatroom.");
+    return true;
+  }
+
   function openDoctoral(cardId) {
     var api = window.CognationEchoDoctoral;
     var card = null;
@@ -3578,6 +3616,7 @@
 
   function releaseRoomSurface() {
     /* Drop open-room lock and restore deck/actions so the card can swipe again. */
+    if (window.CognationEchoMogul) window.CognationEchoMogul.clearChrome(roomEl());
     if (window.CognationEchoDoctoral) window.CognationEchoDoctoral.clearChrome(roomEl());
     if (window.CognationEchoEthics) window.CognationEchoEthics.clearChrome(roomEl());
     if (window.CognationEchoBusiness) window.CognationEchoBusiness.clearChrome(roomEl());
@@ -4343,6 +4382,13 @@
         var body = input ? String(input.value || "").trim() : "";
         if (!body || !state.roomId) return;
         body = body.slice(0, 500);
+        if (window.CognationEchoMogul && window.CognationEchoMogul.isRoom(state.roomId)) {
+          var mogulSent = window.CognationEchoMogul.post(state.roomId, body);
+          if (input) input.value = "";
+          window.CognationEchoMogul.paint(roomEl(), state.roomId);
+          setStatus(mogulSent && mogulSent.ok ? "Sent." : (mogulSent && mogulSent.message) || "Couldn't send.");
+          return;
+        }
         if (window.CognationEchoDoctoral && window.CognationEchoDoctoral.isRoom(state.roomId)) {
           var doctoralSent = window.CognationEchoDoctoral.post(state.roomId, body);
           if (input) input.value = "";

@@ -140,6 +140,7 @@
   PRO_MARK[PRO.PODCAST] = "Podcast";
   PRO_MARK[PRO.FIELD] = "Field";
   PRO_MARK[PRO.POP] = "Pop-culture";
+  PRO_MARK["pro-licensure"] = "Licensure";
   /* Podcast cards stay, with no Demo badge (Alexa 2026-10-22 11:46 AM CT, via SeedOps:
      "this will also be a card when cognation goes live but doesnt need to be a demo"). */
   var PRO_PODCASTS = [
@@ -1830,7 +1831,18 @@
 
   function sampleDeck(count, mode) {
     if ((mode || getMode()) === MODE.PROFESSIONAL) {
-      return paceProfessional(buildProfessionalLanes(), count || 18);
+      var deck = paceProfessional(buildProfessionalLanes(), count || 18);
+      var lic = window.CognationLicensure;
+      /* No licensure interest: the card is not in the algorithm. */
+      if (lic && hasInterest(lic.INTERESTS)) {
+        omitPassed(lic.cards()).forEach(function (card) {
+          if (deck.length >= (count || 18)) return;
+          if (!professionalCardAllowed(card)) return;
+          if (deck.some(function (c) { return stableCardId(c.id) === stableCardId(card.id); })) return;
+          deck.push(card);
+        });
+      }
+      return deck;
     }
     var built = buildLanes();
     return paceDeck(built.lanes, built.dating, count || 18);
@@ -2139,6 +2151,9 @@
         html += "</ul>";
       }
       if (card.why) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
+      if (card.type === "pro-licensure") {
+        html += '<button type="button" class="btn btn-primary" data-licensure-open>Enter room</button>';
+      }
       el.innerHTML = html;
       return el;
     }
@@ -2307,6 +2322,11 @@
     /* Alexa's rule: an ECHO card opens its own full-screen window or a Tower profile, nothing else. */
     if (card.type === TYPE.CHAT) {
       wireClassroomCardClick(el, card, function () { openRoom(card.id, true); });
+    }
+    if (card.type === "pro-licensure") {
+      var openLic = el.querySelector("[data-licensure-open]");
+      if (openLic) openLic.addEventListener("click", function (ev) { ev.stopPropagation(); openLicensure(card.id); });
+      wireClassroomCardClick(el, card, openLicensure);
     }
     if ((card.type === TYPE.KNOW || card.type === TYPE.FRIEND) && (card.profileId || card.handle)) {
       el.setAttribute("data-commune-opens-profile", "");
@@ -3062,6 +3082,24 @@
     });
   }
 
+  function openLicensure(cardOrId) {
+    var api = window.CognationLicensure;
+    var panel = roomEl();
+    var id = cardOrId && cardOrId.id ? cardOrId.id : String(cardOrId || "");
+    if (!api || !panel || !id || !state.shell) return false;
+    var me = currentProfileId();
+    var joined = api.join(id, me);
+    if (joined && joined.kicked) { setStatus("You were removed from this chatroom."); return false; }
+    closeClassroom();
+    ensureRoomHeader(panel);
+    api.paint(panel, id, me);
+    showRoom(true);
+    state.roomId = id;
+    state.licensureRoom = true;
+    state.liveRoom = false;
+    return true;
+  }
+
   function openRoom(roomId, scroll) {
     roomId = String(roomId || "");
     var rooms = ensureSiteRooms();
@@ -3104,6 +3142,7 @@
     var sqlId = state.roomSqlId;
     state.roomId = "";
     state.liveRoom = false;
+    state.licensureRoom = false;
     state.roomSqlId = "";
     state.liveMessages = [];
     showRoom(false);
@@ -3764,6 +3803,9 @@
     (roomEl() || shell).addEventListener("click", function (ev) {
       var roomPanel = roomEl();
       if (!roomPanel || roomPanel.hidden) return;
+      if (state.licensureRoom && window.CognationLicensure && window.CognationLicensure.onClick(ev, {
+        panel: roomPanel, roomId: state.roomId, me: currentProfileId(), status: setStatus
+      })) return;
       var moreBtn = ev.target && ev.target.closest("[data-commune-room-more]");
       if (moreBtn && roomPanel.contains(moreBtn)) {
         ev.preventDefault();
@@ -3838,6 +3880,14 @@
         var body = input ? String(input.value || "").trim() : "";
         if (!body || !state.roomId) return;
         body = body.slice(0, 500);
+        if (state.licensureRoom && window.CognationLicensure) {
+          var licApi = window.CognationLicensure;
+          var licRes = licApi.comment(state.roomId, currentProfileId(), viewerDisplayName(), body);
+          if (input) input.value = "";
+          licApi.paint(roomEl(), state.roomId, currentProfileId());
+          setStatus(licRes && licRes.kicked ? "You were removed from this chatroom." : "Sent.");
+          return;
+        }
         if (state.liveRoom && state.roomSqlId) {
           var sqlId = state.roomSqlId;
           setStatus("Sending…");

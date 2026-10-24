@@ -797,3 +797,50 @@
     boot();
   }
 })();
+(function () {
+  var NOT = "Apple Pay isn't set up. No payment was taken.";
+  function pay(note, amountText) {
+    var c = window.CognationConfig || {}, Session = window.ApplePaySession;
+    var merchant = String((c.applePayMerchantId) || "").trim(), processor = String(c.applePayProcessor || "").trim();
+    var n = Number(String(amountText || "").replace(/[$,]/g, ""));
+    if (!merchant || !/^https:\/\//.test(processor) || typeof Session !== "function" || !(n > 0)) { note.textContent = NOT; return; }
+    try {
+      var session = new Session(3, { countryCode: "US", currencyCode: "USD", merchantCapabilities: ["supports3DS"], supportedNetworks: ["visa", "masterCard", "amex", "discover"], total: { label: "Cognation", amount: n.toFixed(2) } });
+      session.oncancel = function () { note.textContent = "Payment cancelled. Nothing was charged."; };
+      session.begin();
+    } catch (eOpen) { note.textContent = NOT; }
+  }
+  function mount(panel, card, age) {
+    if (!panel || panel.querySelector("[data-auction-room]")) return;
+    var box = document.createElement("div"); box.setAttribute("data-auction-room", "");
+    var can = typeof age === "number" && age >= 16;
+    var blank = 'style="width:4.5rem;border:0;border-bottom:1px solid #9cf;background:transparent;color:inherit"';
+    box.innerHTML = '<div style="display:flex;gap:.5rem;align-items:center"><video data-auction-video muted playsinline style="width:8rem;height:5rem;background:#111;border-radius:.4rem"></video><div><p data-auction-who style="margin:0"></p><button type="button" class="btn btn-secondary" data-auction-hand>Hand live spot</button> <button type="button" class="btn btn-secondary" data-auction-back>Take presenter back</button></div></div><div data-auction-log></div><form data-auction-chat action="#"><input data-auction-chat-input maxlength="200" aria-label="Chat"> <button class="btn btn-secondary" type="submit">Send</button></form>' + (can ? '<button type="button" class="btn btn-primary" data-auction-bid>Bid</button>' : '<p>Bidding is for ages 16 and up.</p>') + '<p data-auction-pay-note role="status"></p>';
+    var log = panel.querySelector("[data-commune-room-log]");
+    (log ? log.parentNode.insertBefore(box, log.nextSibling) : panel.appendChild(box));
+    var people = ["Presenter", "Speaker"], at = 0, who = box.querySelector("[data-auction-who]");
+    function show() { who.textContent = people[at] + " · 10 min"; }
+    show();
+    box.querySelector("[data-auction-hand]").onclick = function () { at = at ? 0 : 1; show(); };
+    box.querySelector("[data-auction-back]").onclick = function () { at = 0; show(); };
+    box.querySelector("[data-auction-chat]").onsubmit = function (ev) {
+      ev.preventDefault();
+      var input = box.querySelector("[data-auction-chat-input]"), text = String(input.value || "").trim(), line;
+      if (!text) return;
+      line = document.createElement("p");
+      line.textContent = people[at] + ": " + text;
+      box.querySelector("[data-auction-log]").appendChild(line);
+      input.value = "";
+    };
+    var bid = box.querySelector("[data-auction-bid]");
+    if (bid) bid.onclick = function () {
+      if (box.querySelector("[data-auction-draft]")) return;
+      var msg = document.createElement("div"); msg.setAttribute("data-auction-draft", "");
+      msg.innerHTML = '<p data-auction-draft-label style="margin:0">Seller draft</p><p data-auction-buyer style="margin:.2rem 0">Buyer connected</p><p data-auction-note>Hello! You have agreed to purchase <input data-auction-amt aria-label="Amount of money" ' + blank + '> amount of money from <input data-auction-seller aria-label="Seller" ' + blank + '> seller during a live auction through Cognation on <input data-auction-date aria-label="Date" ' + blank + '> date. If this has been reported in error, please notify the seller at this time. If this transaction is correct, please find the Apple Pay button below to complete your purchase, and exchange the necessary information with the seller and the buyer to finish the rest of the exchange. Thank you for participating in Cognation\'s auction, and best of luck with your new purchase! Please keep a copy of this message for your records.</p><button type="button" class="btn btn-primary" data-auction-send>Send</button> <button type="button" class="btn btn-primary" data-auction-pay>Apple Pay</button>';
+      box.querySelector("[data-auction-log]").appendChild(msg);
+      msg.querySelector("[data-auction-pay]").onclick = function () { pay(box.querySelector("[data-auction-pay-note]"), msg.querySelector("[data-auction-amt]").value); };
+      msg.querySelector("[data-auction-send]").onclick = function () { var sent = document.createElement("p"); sent.setAttribute("data-auction-sent", ""); sent.textContent = msg.querySelector("[data-auction-note]").innerText; msg.appendChild(sent); this.disabled = true; };
+    };
+  }
+  window.CognationAuctionRoom = { mount: mount };
+})();

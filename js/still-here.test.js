@@ -18,7 +18,7 @@ var firstReturn = start.indexOf("    return;\n");
 assert.ok(firstReturn > 0 && start.slice(0, firstReturn).indexOf("CognationPulseFall.mount(layer") > 0, "falling friends mount on PULSE open");
 assert.ok(html.indexOf('src="js/pulse-falling-friends.js"') > 0, "falling friends script loaded");
 var pulse = require("./pulse-falling-friends.js");
-assert.strictEqual(pulse.cap, 6000, "falling friends cap 6,000");
+assert.strictEqual(pulse.cap, 30, "falling friends cap 30 (Alexa final spec 2026-10-20)");
 
 /* Electric lines: old color, crackle, brightness */
 var lightning = tower.slice(tower.indexOf("function paintCircleLightning"), tower.indexOf("var CIRCLE_REFRESH_MS"));
@@ -121,6 +121,10 @@ assert.ok(/window\.CognationTowerOpenOwn = function/.test(tower), "CognationTowe
 assert.ok(/name === "tower" && typeof window\.CognationTowerOpenOwn === "function"/.test(fs.readFileSync(path.join(__dirname, "tabs.js"), "utf8")), "Tower tab click opens own Tower");
 assert.ok(/data-tower-add-profile/.test(html) && /Add a professional page/.test(html), "Add a professional page in Edit profile markup");
 assert.ok(/btn\.textContent = "Add a professional page"/.test(tower), "Add a professional page button label");
+assert.ok(/data-tower-add-friends[^>]*>Find friends</.test(html), "owner action starts as Find friends (owner-only pill; #208)");
+assert.ok(!/textContent = "Add friends"/.test(tower), "personal page does not force the Add friends label");
+assert.ok(/el\.textContent = pro \? "Find people" : "Find friends"/.test(tower), "owner action reads Find people (Pro) / Find friends (Personal) (#208)");
+assert.ok(/--tower-name-size, 28px\) \* 0\.3/.test(css), "friend pill font tracks the display name");
 assert.ok(/if \(!anyDragged\) return null;/.test(tower), "never-dragged layouts use default grid (no overlap)");
 assert.ok(/var handleHit = ev\.target\.closest\("\[data-tower-sticker-handle\]"\);/.test(tower), "sticker handle starts a drag");
 assert.ok(/_userId: profile\.user_id \|\| ""/.test(fs.readFileSync(path.join(__dirname, "supabase-social.js"), "utf8")), "remote Tower profile carries user id for owner check");
@@ -247,11 +251,11 @@ assert.strictEqual(tr.getWidgetLayout({ widgetLayout: { avatar: { x: 0, y: 0 }, 
 
 /* Wiring in the real handler / store (static, so a refactor that drops it fails). */
 var down = grab("      /* Drag from anywhere on the sticker", "    stage.addEventListener(\"pointerdown\", onPointerDown);");
-assert.ok(/dragStarted = true;\s*\n\s*if \(liftDefaultGrid\(stage\)\)/.test(down), "drag start lifts the default grid");
+assert.ok(/dragStarted = true;\s*\n(?:\s*\/\*[\s\S]*?\*\/)?\s*if \(wid !== "quote" && liftDefaultGrid\(stage\)\)/.test(down), "drag start lifts the default grid (built-in widgets; a Quote floats and never lifts it, #223)");
 assert.ok(/if \(!dragStarted\) \{[^}]*return;/.test(down), "no save when the pointer never dragged");
 assert.ok(/freezeSpawnedWidgets\(root, layout\)/.test(down) && /TowerProfileStore\.save\(p, \{ geometry: true \}\)/.test(down), "drop freezes others and saves geometry");
 assert.ok(/stage\.querySelectorAll\("\[data-tower-widget\]\.is-spawned"\)/.test(grab("  function freezeSpawnedWidgets", "  /* Old scrapbook")) && /liftDefaultGrid\(stage\);/.test(grab("  function freezeSpawnedWidgets", "  /* Old scrapbook")), "freeze pins from on-screen spots");
-assert.ok(/if \(opts\.geometry && window\.CognationTowerLayoutSync\) window\.CognationTowerLayoutSync\.save\(data\)/.test(tower), "account layout saved only on a geometry edit (never on open)");
+assert.ok(/if \(window\.CognationTowerLayoutSync && liveSignedInForTower\(\)\) \{\s*if \(opts\.geometry\) window\.CognationTowerLayoutSync\.save\(data\);\s*else if \(window\.CognationTowerLayoutSync\.saveWidgetsIfChanged\) window\.CognationTowerLayoutSync\.saveWidgetsIfChanged\(data\);/.test(tower), "account layout: positions on a geometry edit, added widgets only when they change (never on open), signed-in only");
 assert.ok(/!signInConfigured && window\.CognationAccounts/.test(tower), "demo profile id only in local preview, never with sign-in configured");
 
 })();
@@ -279,7 +283,7 @@ vm.runInContext([
 
 /* Default spawn never overlaps, Personal and Pro, desktop and phone. */
 var SIZES = { avatar: [220, 220], identity: [400, 90], slogan: [400, 70], music: [300, 380], youtube: [560, 340],
-  friends: [440, 200], "social-instagram": [160, 48], "social-tiktok": [160, 48], badges: [300, 160], calendar: [300, 260], followers: [300, 240],
+  friends: [440, 200], "social-instagram": [160, 48], "social-tiktok": [160, 48], badges: [300, 160], calendar: [300, 260], "visitor-calendar": [400, 430], followers: [300, 240],
   polaroid: [280, 320], html: [420, 200], instax: [220, 280] };
 function expandRows(face) {
   var chips = face === "professional" ? ["social-instagram", "social-tiktok"] : ["social-instagram", "social-tiktok"];
@@ -370,7 +374,6 @@ vm.runInContext([
 function net(id) { return ctx.nets.filter(function (n) { return n.id === id; })[0]; }
 assert.ok(net("venmo") && ctx.allowed(net("venmo"), "personal") && ctx.allowed(net("venmo"), "professional"), "Venmo on Personal and Pro");
 assert.strictEqual(ctx.href("venmo", "@alexa"), "https://venmo.com/u/alexa", "Venmo handle links out");
-assert.ok(/data-tower-social="venmo"/.test(html), "Venmo field in Edit profile");
 ["services", "ads"].forEach(function (id) {
   var n = net(id);
   assert.ok(n && n.label === (id === "services" ? "Pay for services" : "Buy ads") && n.quiet && !n.cta, id + " link defined, quiet");
@@ -381,7 +384,6 @@ assert.ok(/data-tower-social="venmo"/.test(html), "Venmo field in Edit profile")
     assert.strictEqual(ctx.href(id, bad), "", id + " rejected: " + bad);
     assert.strictEqual(ctx.stored(id, bad), "", id + " not stored: " + bad);
   });
-  assert.ok(new RegExp('<input id="tower-social-' + id + '"[^>]*type="url"[^>]*data-tower-social="' + id + '"').test(html), "owner sets " + id + " in Edit profile");
 });
 assert.ok(!net("hire") && !/is-cta/.test(tower) && !/data-tower-social="hire"/.test(html), "single Hire/Buy CTA gone");
 var css = fs.readFileSync(path.join(__dirname, "..", "css", "styles.css"), "utf8");

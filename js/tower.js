@@ -7456,9 +7456,21 @@
       normalized.signupFriendIds = ev.signupFriendIds.map(function (id) { return String(id || ""); }).filter(Boolean);
     }
     if (ev.hostHandle) normalized.hostHandle = String(ev.hostHandle).replace(/^@/, "").slice(0, 80);
+    if (ev.kind === "classroom") normalized.kind = "classroom";
     if (ev.kind === "webinar") {
       normalized.kind = "webinar";
       normalized.webinar = webinarLimits(ev.webinar && ev.webinar.record === "internal");
+    }
+    if (ev.kind === "auction" && ev.auction) {
+      var sale = ev.auction;
+      normalized.kind = "auction";
+      normalized.auction = {
+        chat: true, video: true, presenter: "handoff", bid: "message",
+        item: String(sale.item || "").trim().slice(0, 120),
+        start: Number(sale.start),
+        handle: String(sale.handle || "").replace(/^@/, "").slice(0, 80),
+        minAge: 16, payInRoom: false,
+      };
     }
     return normalized;
   }
@@ -7662,6 +7674,7 @@
             "</span>" +
             '<span class="tower-cal-event-title">' +
             escapeHtml(e.title) +
+            (e.kind === "classroom" ? " · Classroom" : "") +
             "</span>" +
             badge +
             who +
@@ -8065,6 +8078,7 @@
       "<h5>" + (editing ? "Edit event" : "Add event") + "</h5>" +
       calendarKindPills(editing && editing.kind) +
       auctionSaleFields(editing) +
+      (window.CognationClassroomEvent ? window.CognationClassroomEvent.pillHtml(!!(editing && editing.kind === "classroom")) : "") +
       '<div class="tower-cal-pills" role="group" aria-label="Event kind"><label class="tower-cal-pill"><input type="checkbox" name="eventKind" value="webinar" data-tower-cal-webinar' +
       (on ? " checked" : "") + "> Webinar</label></div>" +
       '<div class="tower-webinar" data-webinar-room' + (on ? "" : " hidden") + ">" + webinarRoomHtml(editing && editing.webinar && editing.webinar.record === "internal") + "</div>" +
@@ -8138,6 +8152,19 @@
       return String(iso);
     }
     return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  }
+
+  /* Owner Add event on the Edit profile calendar. Classroom is checked before that event is a classroom. */
+  function classroomAddFormHtml(selected) {
+    if (!window.CognationClassroomEvent) return "";
+    return '<form class="tower-cal-editor" data-tower-cal-editor action="#" method="post"><h5>Add event</h5>' +
+      window.CognationClassroomEvent.pillHtml(false) +
+      '<label for="tower-cal-add-title">Title</label>' +
+      '<input id="tower-cal-add-title" type="text" maxlength="120" required data-tower-cal-edit-title>' +
+      '<label for="tower-cal-add-date">Date</label>' +
+      '<input id="tower-cal-add-date" type="date" required value="' + escapeHtml(selected || "") + '" data-tower-cal-edit-date>' +
+      '<div class="form-actions"><button type="submit" class="btn btn-primary">Add event</button></div>' +
+      '<p class="commune-status" data-tower-cal-editor-status hidden role="status" aria-live="polite"></p></form>';
   }
 
   function renderPublicCalendar(root) {
@@ -8463,8 +8490,11 @@
             return e.id !== did;
           });
         });
+        if (window.CognationClassroomEvent) window.CognationClassroomEvent.drop(did);
         var ph = root.querySelector("[data-tower-cal-public]");
         if (ph && ph.getAttribute("data-editing-id") === did) ph.removeAttribute("data-editing-id");
+        var phPrivate = root.querySelector("[data-tower-cal-private]");
+        if (phPrivate && phPrivate.getAttribute("data-editing-id") === did) phPrivate.removeAttribute("data-editing-id");
         refreshTowerCalendars(root);
         return;
       }
@@ -8570,6 +8600,8 @@
       var form = box.form;
       if (!form) return;
       form.querySelectorAll("[data-tower-cal-kind]").forEach(function (el) { el.checked = false; });
+      var classPill = form.querySelector("[data-tower-cal-classroom]");
+      if (classPill) classPill.checked = false;
       var saleFields = form.querySelector("[data-tower-cal-auction-fields]");
       if (saleFields) saleFields.hidden = true;
     });
@@ -8587,6 +8619,29 @@
       if (webinarBox) webinarBox.checked = false;
       var webinarRoom = formK && formK.querySelector("[data-webinar-room]");
       if (webinarRoom) webinarRoom.hidden = true;
+      var classPill = formK && formK.querySelector("[data-tower-cal-classroom]");
+      if (classPill) classPill.checked = box.value === "classroom";
+    });
+    root.addEventListener("change", function (ev) {
+      var box = ev.target && ev.target.matches && ev.target.matches("[data-tower-cal-classroom]") ? ev.target : null;
+      if (!box || !root.contains(box)) return;
+      var formC = box.form;
+      if (!formC) return;
+      if (box.checked) {
+        var webinarBox = formC.querySelector("[data-tower-cal-webinar]");
+        if (webinarBox) webinarBox.checked = false;
+        var webinarRoom = formC.querySelector("[data-webinar-room]");
+        if (webinarRoom) webinarRoom.hidden = true;
+        formC.querySelectorAll("[data-tower-cal-kind]").forEach(function (el) {
+          el.checked = el.value === "classroom";
+        });
+        var saleFields = formC.querySelector("[data-tower-cal-auction-fields]");
+        if (saleFields) saleFields.hidden = true;
+      } else {
+        formC.querySelectorAll("[data-tower-cal-kind]").forEach(function (el) {
+          if (el.value === "classroom") el.checked = false;
+        });
+      }
     });
     root.addEventListener("submit", function (ev) {
       var form = ev.target;
@@ -8603,6 +8658,7 @@
         var date = dateEl ? dateEl.value : "";
         var time = timeEl ? timeEl.value : "";
         var notes = notesEl ? notesEl.value.trim().slice(0, 240) : "";
+        var classroomOn = !!(form.querySelector("[data-tower-cal-classroom]") || {}).checked;
         var statusEl = form.querySelector("[data-tower-cal-editor-status]");
         function setEdStatus(msg, isError) {
           if (!statusEl) return;
@@ -8621,17 +8677,20 @@
         }
         var webinarOn = !!form.querySelector("[data-tower-cal-webinar]:checked");
         var kindBox = form.querySelector("[data-tower-cal-kind]:checked");
-        var kind = kindBox ? kindBox.value : "";
-        if (webinarOn && (kind === "classroom" || kind === "auction")) {
-          setEdStatus("Check Webinar.", true);
+        var picked = kindBox ? kindBox.value : "";
+        if (classroomOn && picked !== "auction") picked = "classroom";
+        if ((classroomOn || picked === "classroom") && !time) time = "12:00";
+        var families = (webinarOn ? 1 : 0) + (picked === "auction" ? 1 : 0) + (picked === "classroom" || classroomOn ? 1 : 0);
+        if (families > 1) {
+          setEdStatus(webinarOn ? "Check Webinar." : "Check Classroom or Auction.", true);
           return;
         }
-        if (!webinarOn && kind !== "classroom" && kind !== "auction") {
+        if (!families) {
           setEdStatus("Check Classroom or Auction.", true);
           return;
         }
         var sale = {};
-        if (!webinarOn && kind === "auction") {
+        if (picked === "auction") {
           var sellEl = form.querySelector("[data-tower-cal-selling]");
           var startEl = form.querySelector("[data-tower-cal-start]");
           sale.item = sellEl ? sellEl.value.trim().slice(0, 120) : "";
@@ -8642,10 +8701,21 @@
           }
         }
         var editId = idEl ? idEl.value : "";
+        var madeId = editId || newCalendarEventId();
         saveCalendarToProfile(function (p) {
           function applyWebinar(e) {
             e.kind = "webinar";
+            delete e.auction;
             e.webinar = webinarLimits(!!form.querySelector("[data-webinar-record]:checked"));
+          }
+          function applyChosen(e) {
+            if (webinarOn) applyWebinar(e);
+            else if (picked === "auction") applyEventKind(e, "auction", p, sale);
+            else {
+              e.kind = "classroom";
+              delete e.auction;
+              delete e.webinar;
+            }
           }
           if (editId) {
             var found = false;
@@ -8655,24 +8725,25 @@
                 e.date = date;
                 e.time = time;
                 e.notes = notes;
-                if (webinarOn) applyWebinar(e);
-                else applyEventKind(e, kind, p, sale);
+                applyChosen(e);
                 found = true;
               }
             });
             if (!found) {
               var revived = { id: editId, title: title, date: date, time: time, notes: notes, status: "accepted", source: "owner" };
-              if (webinarOn) applyWebinar(revived);
-              else applyEventKind(revived, kind, p, sale);
+              applyChosen(revived);
               p.calendarEvents.push(revived);
             }
           } else {
-            var added = { id: newCalendarEventId(), title: title, date: date, time: time, notes: notes, status: "accepted", source: "owner" };
-            if (webinarOn) applyWebinar(added);
-            else applyEventKind(added, kind, p, sale);
+            var added = { id: madeId, title: title, date: date, time: time, notes: notes, status: "accepted", source: "owner" };
+            applyChosen(added);
             p.calendarEvents.push(added);
           }
         });
+        if (window.CognationClassroomEvent) {
+          if (!webinarOn && picked === "classroom") window.CognationClassroomEvent.publish({ id: madeId, title: title, date: date, time: time, notes: notes });
+          else if (editId) window.CognationClassroomEvent.drop(editId);
+        }
         var priv3 = root.querySelector("[data-tower-cal-public]");
         if (priv3) priv3.removeAttribute("data-editing-id");
         var view3 = getCalendarViewState(root, "public");
@@ -8680,7 +8751,7 @@
         var dp = date.split("-");
         view3.year = parseInt(dp[0], 10);
         view3.month0 = parseInt(dp[1], 10) - 1;
-        setEdStatus(editId ? "Event updated." : "Event added.", false);
+        setEdStatus(classroomOn ? "Classroom added to the Cognation calendar. Echo card ready." : (editId ? "Event updated." : "Event added."), false);
         refreshTowerCalendars(root);
         return;
       }

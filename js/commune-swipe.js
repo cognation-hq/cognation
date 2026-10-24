@@ -972,7 +972,13 @@
   /* A live session is a Classroom (Personal deck) or a Webinar (Professional deck).
      A live page with no session kind fills both, as #193 did. */
   function classroomCatalog() {
-    return liveProPages().filter(function (page) { return page.sessionKind !== "webinar"; }).map(classroomCard);
+    var live = liveProPages().filter(function (page) { return page.sessionKind !== "webinar"; }).map(classroomCard);
+    var extra = [];
+    try {
+      var api = window.CognationClassroomEvent;
+      if (api && api.echoCards) extra = api.echoCards() || [];
+    } catch (eEv) {}
+    return live.concat(extra);
   }
 
   function visibleClassroomSessions() {
@@ -2520,13 +2526,17 @@
         if (!liveChatEligible()) html += '<p class="commune-card-meta">Live group chat — sign in to join (up to 100 people).</p>';
       }
       if (card.type === TYPE.CLASSROOM) {
-        var cast = window.CognationLive && window.CognationLive.professionalBroadcast && window.CognationLive.professionalBroadcast();
-        if (cast) {
-          html += '<p class="commune-card-meta">' + escapeHtml(cast.name) + " is live</p>";
-          html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Join live</button>';
-        } else {
+        if (card.classroomEvent) {
           html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
-          html += '<p class="commune-card-meta">Life skills · ~18+</p>';
+        } else {
+          var cast = window.CognationLive && window.CognationLive.professionalBroadcast && window.CognationLive.professionalBroadcast();
+          if (cast) {
+            html += '<p class="commune-card-meta">' + escapeHtml(cast.name) + " is live</p>";
+            html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Join live</button>';
+          } else {
+            html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
+            html += '<p class="commune-card-meta">Life skills · ~18+</p>';
+          }
         }
       }
       if (card.type === TYPE.CONTENT) html += '<span class="commune-card-badge">Live</span>';
@@ -3838,13 +3848,18 @@
   }
 
   function paintClassroom(session) {
-    var notesText =
-      "Live session on this Professional page.";
+    var ce = window.CognationClassroomEvent;
+    var eventRoom = !!(session && session.classroomEvent && ce);
+    var notesText = eventRoom ? "" : "Live session on this Professional page.";
     if (paintCardView("classroom", {
       title: session && session.title || "Classroom",
-      body: (session && session.topic ? "Topic · " + session.topic + " — " : "") + (session && session.body || CLASSROOM_BODY),
+      body: eventRoom ? (session.body || "") : ((session && session.topic ? "Topic · " + session.topic + " — " : "") + (session && session.body || CLASSROOM_BODY)),
     }, notesText)) {
       state.classroomId = session.id;
+      if (eventRoom) {
+        var log = roomEl() && roomEl().querySelector("[data-commune-room-log]");
+        if (log) log.innerHTML = ce.stageHtml(session.eventId || session.id);
+      }
       return;
     }
     var panel = state.shell && state.shell.querySelector(CLASSROOM_PANEL_SEL);
@@ -4670,6 +4685,10 @@
     document.addEventListener("cognation:tower-updated", function () { rebuildDeck(); });
     document.addEventListener("cognation:echo-group-notice", function () { renderNotices(); });
     document.addEventListener("cognation:classroom-sessions-updated", onLiveSessionsUpdated);
+    document.addEventListener("cognation:classroom-event", function () {
+      if (state.roomId || state.classroomId) return;
+      rebuildDeck();
+    });
     refreshSeedGates();
   }
 

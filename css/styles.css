@@ -15431,6 +15431,17 @@ body.cgn-cal-page {
 #panel-tower [data-tower-edit-calendar] :is(.tower-cal-public-title, .tower-cal-day-heading) {
   font-weight: 680 !important;
 }
+.ce-presenter { min-height: 8.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 1rem; background: linear-gradient(160deg, #2a3a68, #7a4a96); color: #f7f9ff; font: 600 2rem/1 Oswald, sans-serif; }
+.ce-presenter small { margin-top: .35rem; font: 600 .72rem/1.2 "Noto Sans", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: #d9d2f0; }
+[data-tower-edit-calendar] .tower-cal-editor label:not(.tower-cal-pill) { display: block; margin: .35rem 0 .15rem; }
+#panel-tower .tower-profile-edit-dropdown .tower-cal-pill { width: fit-content !important; }
+#panel-tower .tower-profile-edit-dropdown .tower-cal-pill input { width: auto !important; margin: 0 !important; padding: 0 !important; border: 0 !important; min-height: 0 !important; }
+.ce-limits, .ce-line, .ce-note, .ce-status { margin: .3rem 0; color: #f7f9ff !important; text-align: left; font-size: .9rem; }
+.ce-log { text-align: left; padding: .35rem .6rem; border: 1px solid rgba(217,210,240,.35); border-radius: .6rem; }
+.ce-saved, .ce-yt { margin-top: .45rem; padding: .55rem .7rem; text-align: left; border: 1px solid rgba(143,227,240,.5); border-radius: .75rem; }
+.ce-kicker, .ce-train { margin: 0; color: #8fe3f0 !important; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.ce-train { font-size: 1.05rem; }
+.ce-saved h5, .ce-yt h5 { margin: .15rem 0; color: #f7f9ff; }
 .tower-visitor-calendar .tower-cal-cell { background: rgba(18,16,38,.92); color: #f7f9ff; border-color: rgba(209,241,255,.28); }
 .tower-visitor-calendar .tower-cal-cell.is-today, .tower-visitor-calendar .tower-cal-cell.is-selected { border-color: rgba(197,166,255,.85); box-shadow: 0 0 0 1px rgba(197,166,255,.45) inset; }
 .tower-visitor-calendar .tower-visitor-cal-link { color: #c5a6ff; }

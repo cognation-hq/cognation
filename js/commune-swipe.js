@@ -136,8 +136,9 @@
     POP: "pro-popculture",
     DOCTORAL: "pro-doctoral",
     BUSINESS: "pro-business",
+    EXECUTIVES: "pro-executives",
   };
-  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.ETHICS, PRO.DOCTORAL, PRO.BUSINESS, PRO.FIELD, PRO.POP];
+  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.ETHICS, PRO.DOCTORAL, PRO.BUSINESS, PRO.EXECUTIVES, PRO.FIELD, PRO.POP];
   var PRO_MARK = {};
   PRO_MARK[PRO.WEBINAR] = "Webinar";
   PRO_MARK[PRO.KNOW] = "Professionals you might know";
@@ -152,6 +153,7 @@
   PRO_MARK["pro-licensure"] = "Licensure";
   PRO_MARK["pro-ai-work"] = "AI at work";
   PRO_MARK[PRO.BUSINESS] = "Business";
+  PRO_MARK[PRO.EXECUTIVES] = "Executives";
   /* Podcast cards stay, with no Demo badge (Alexa 2026-10-22 11:46 AM CT, via SeedOps:
      "this will also be a card when cognation goes live but doesnt need to be a demo"). */
   var PRO_PODCASTS = [
@@ -1958,6 +1960,11 @@
     return api && typeof api.cards === "function" ? api.cards(viewerInterestTokens()) : [];
   }
 
+  function executivesCards() {
+    var api = window.CognationEchoExecutives;
+    return api && typeof api.cards === "function" ? api.cards(viewerInterestTokens()) : [];
+  }
+
   function buildProfessionalLanes() {
     var lanes = {};
     /* Webinar cards only while a Professional page is live. None live: lane empty. */
@@ -1973,6 +1980,7 @@
     /* Research chat only if this person lists research. Field and Pop culture stay empty. */
     lanes[PRO.RESEARCH] = researchRoomCards();
     lanes[PRO.BUSINESS] = businessCards();
+    lanes[PRO.EXECUTIVES] = executivesCards();
     lanes[PRO.FIELD] = [];
     lanes[PRO.POP] = [];
     Object.keys(lanes).forEach(function (type) {
@@ -2374,7 +2382,8 @@
       var doctoralOff = card.type === PRO.DOCTORAL && !hasInterest(["doctoral degrees"]);
       var ethicsOff = card.type === PRO.ETHICS && !hasInterest(["ethics board"]);
       var businessOff = card.type === PRO.BUSINESS && !hasInterest(["business", "businesses"]);
-      if (card.why && !industryOff && !doctoralOff && !ethicsOff && !businessOff) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
+            var mergedOff = card.type === PRO.EXECUTIVES && !hasInterest(["executive", "executives"]);
+      if (card.why && !mergedOff && !industryOff && !doctoralOff && !ethicsOff && !businessOff) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
       if (card.type === PRO.RESEARCH) {
         html += '<button type="button" class="btn btn-primary" data-research-enter>Enter Research</button>';
         if (card.full) html += '<p class="commune-card-meta">Full — another Research card is open.</p>';
@@ -2577,6 +2586,7 @@
     }
     if (card.type === PRO.DOCTORAL) wireClassroomCardClick(el, card, openDoctoral);
     if (card.type === PRO.ETHICS) wireClassroomCardClick(el, card, openEthics);
+    if (card.type === PRO.EXECUTIVES) wireClassroomCardClick(el, card, openExecutives);
     /* Alexa's rule: an ECHO card opens its own full-screen window or a Tower profile, nothing else. */
     if (card.type === TYPE.CHAT) {
       wireClassroomCardClick(el, card, function () { openRoom(card.id, true); });
@@ -3305,6 +3315,7 @@
     if (window.CognationEchoDoctoral) window.CognationEchoDoctoral.clearChrome(panel);
     if (window.CognationEchoEthics) window.CognationEchoEthics.clearChrome(panel);
     if (window.CognationEchoBusiness) window.CognationEchoBusiness.clearChrome(panel);
+    if (window.CognationEchoExecutives) window.CognationEchoExecutives.clearChrome(panel);
     if (log) paintLiveLog(opts.messages || state.liveMessages || []);
     showRoom(true);
     state.roomId = room.id;
@@ -3450,6 +3461,34 @@
     return true;
   }
 
+
+  function openExecutives(cardId) {
+    var api = window.CognationEchoExecutives;
+    var card = null;
+    [state.cards, executivesCards()].forEach(function (list) {
+      (list || []).forEach(function (c) {
+        if (!card && c && (c.id === cardId || c.roomId === cardId)) card = c;
+      });
+    });
+    if (!api || !card || !roomEl()) return false;
+    var joined = api.join(card.roomId);
+    if (!joined.ok) {
+      setStatus(joined.message || "That Executives room is not available.");
+      if (joined.full) rebuildDeck();
+      return false;
+    }
+    var panel = roomEl();
+    state.roomId = card.roomId;
+    state.liveRoom = false;
+    state.roomSqlId = "";
+    ensureRoomHeader(panel);
+    wireRoomSwipe(panel);
+    api.paint(panel, card.roomId);
+    showRoom(true);
+    setStatus("You're in the Executives chatroom.");
+    return true;
+  }
+
   function openEthics(cardId) {
     var api = window.CognationEchoEthics;
     var card = null;
@@ -3488,6 +3527,7 @@
     state.roomId = card.roomId; state.liveRoom = false; state.roomSqlId = "";
     ensureRoomHeader(panel); wireRoomSwipe(panel); api.paint(panel, card.roomId); showRoom(true);
     setStatus("You're in the Business chatroom.");
+    setStatus("You're in the Executives chatroom.");
     return true;
   }
   function clearPointer() {
@@ -3504,6 +3544,7 @@
     if (window.CognationEchoDoctoral) window.CognationEchoDoctoral.clearChrome(roomEl());
     if (window.CognationEchoEthics) window.CognationEchoEthics.clearChrome(roomEl());
     if (window.CognationEchoBusiness) window.CognationEchoBusiness.clearChrome(roomEl());
+    if (window.CognationEchoExecutives) window.CognationEchoExecutives.clearChrome(roomEl());
     var wasLive = state.liveRoom;
     var sqlId = state.roomSqlId;
     state.roomId = "";
@@ -4298,6 +4339,13 @@
           if (input) input.value = "";
           window.CognationEchoBusiness.paint(roomEl(), state.roomId);
           setStatus(sent && sent.ok ? "Sent." : (sent && sent.message) || "Couldn't send.");
+          return;
+        }
+        if (window.CognationEchoExecutives && window.CognationEchoExecutives.isRoom(state.roomId)) {
+          var executivesSent = window.CognationEchoExecutives.post(state.roomId, body);
+          if (input) input.value = "";
+          window.CognationEchoExecutives.paint(roomEl(), state.roomId);
+          setStatus(executivesSent && executivesSent.ok ? "Sent." : (executivesSent && executivesSent.message) || "Couldn't send.");
           return;
         }
         if (state.liveRoom && state.roomSqlId) {

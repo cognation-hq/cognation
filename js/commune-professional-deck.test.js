@@ -88,7 +88,7 @@ assert.strictEqual(api.FEATURED_ORDER.join(","), "classroom,ad,chatroom,dating,c
 assert.strictEqual(api.AD_MAX_MS, 3000, "ads max 3s");
 assert.strictEqual(
   api.PRO_ORDER.join(","),
-  "pro-webinar,pro-know,pro-research,pro-auction,pro-podcast,pro-ethics,pro-doctoral,pro-business,pro-field,pro-popculture",
+"pro-webinar,pro-know,pro-research,pro-auction,pro-podcast,pro-ethics,pro-doctoral,pro-business,pro-field,pro-popculture",
   "Professional types"
 );
 var marks = api.PRO_ORDER.map(function (t) { return api.PRO_MARK[t]; });

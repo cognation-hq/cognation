@@ -52,8 +52,8 @@ var store = { bag: {}, getItem: function (k) { return this.bag[k] || null; } };
 store.bag["cognation.profiles.v1"] = JSON.stringify({ profiles: {
   a: { id: "a", displayName: "Ada", calendarEvents: [{ date: "2026-10-19", signupFriendIds: ["a", "b"] }] },
   b: { id: "b", displayName: "Leo" },
-  c: { id: "c", displayName: "Mia", goingLive: { what: "OU TX", when: "2026-10-18T18:00" } },
-  d: { id: "d", displayName: "Noah", goingLive: { what: "OU TX", when: "2026-10-18T19:00" } }
+  c: { id: "c", displayName: "Mia", goingLive: { what: "OU TX", when: "2026-10-17T18:00" } },
+  d: { id: "d", displayName: "Noah", goingLive: { what: "OU TX", when: "2026-10-17T19:00" } }
 } });
 assert.strictEqual(api.localRows(store)[0].activity, "They are going to the same event.");
 store.bag["cognation.profiles.v1"] = JSON.stringify({ profiles: {
@@ -66,4 +66,26 @@ store.bag["cognation.commune.friend-shares.v1"] = JSON.stringify([
   { adId: "clip", swiperId: "b", sharerName: "Leo", at: Date.parse("2026-11-02") }
 ]);
 assert.strictEqual(api.localRows(store)[0].activity, "They shared the same content.");
+/* Calendar days are local dates: the evening before is not a tie in any time zone. */
+store.bag["cognation.commune.friend-shares.v1"] = "[]";
+store.bag["cognation.profiles.v1"] = JSON.stringify({ profiles: {
+  a: { id: "a", displayName: "Ada", calendarEvents: [{ date: "2026-10-19", signupFriendIds: ["a", "b"] }] },
+  b: { id: "b", displayName: "Leo" },
+  c: { id: "c", displayName: "Mia", goingLive: { what: "OU TX", when: "2026-10-18T18:00" } },
+  d: { id: "d", displayName: "Noah", goingLive: { what: "OU TX", when: "2026-10-18T19:00" } }
+} });
+assert.strictEqual(api.localRows(store)[0].activity, "They are going to the same event.", "calendar day after the live posts wins");
+assert.strictEqual(api.localRows(store)[0].acted_at, new Date(2026, 9, 19).toISOString(), "calendar day starts at local midnight");
+store.bag["cognation.profiles.v1"] = JSON.stringify({ profiles: {
+  a: { id: "a", displayName: "Ada", calendarEvents: [{ date: "2026-10-19", signupFriendIds: ["a", "b"] }] },
+  b: { id: "b", displayName: "Leo" },
+  c: { id: "c", displayName: "Mia", goingLive: { what: "OU TX", when: "2026-10-19T08:00" } },
+  d: { id: "d", displayName: "Noah", goingLive: { what: "OU TX", when: "2026-10-19T09:00" } }
+} });
+assert.strictEqual(api.localRows(store)[0].activity, "They posted about the same event.", "live posts later that same day win");
+store.bag["cognation.profiles.v1"] = JSON.stringify({ profiles: {
+  a: { id: "a", displayName: "Ada", calendarEvents: [{ date: "not a date", signupFriendIds: ["a", "b"] }] },
+  b: { id: "b", displayName: "Leo" }
+} });
+assert.strictEqual(api.localRows(store)[0].acted_at, "", "unreadable dates stay undated");
 console.log("pulse-mutual.test.js ok");

@@ -4347,7 +4347,11 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   right: 0;
   top: calc(100% + 0.35rem);
   width: min(20rem, 92vw);
-  background: var(--color-surface);
+  /* Solid site glass: the wordmark / brain behind the header no longer show
+     through, so names, @handles and Demo pills read clearly. */
+  background: rgba(18, 16, 38, 0.92);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
@@ -4398,6 +4402,13 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+/* Name + Demo pill on one line (seedops-badge.js badges seed / ops rows here). */
+.people-search-name-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .people-search-name {
@@ -4486,6 +4497,23 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .tower-social-btn--venmo { background: #008cff; color: #fff; border-color: #0074d4; }
 
 .tower-social-btn--linktree { background: #43e55e; color: #111; border-color: #2ecc71; }
+.tower-pro-links { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; margin: 0.35rem 0 0; } .tower-pro-links[hidden], .tower-pro-pay-confirm[hidden], .tower-pro-pay-note[hidden] { display: none !important; }
+.tower-pro-link {
+  appearance: none; display: inline-flex; align-items: center; margin: 0; padding: 0.22rem 0.5rem;
+  border: 1px solid rgba(183, 246, 255, 0.72); border-radius: 999px; background: transparent;
+  color: #f7f9ff; font-family: "Oswald", system-ui, sans-serif; font-size: 0.68rem; font-weight: 700;
+  letter-spacing: 0.04em; line-height: 1; text-transform: uppercase; text-decoration: none;
+  white-space: nowrap; cursor: pointer;
+}
+.tower-pro-link:hover, .tower-pro-link:focus-visible { color: #fff; outline: none; box-shadow: 0 0 0 1px rgba(183, 246, 255, 0.72); }
+#panel-tower .tower-pro-link, #panel-tower .tower-pro-link:hover { color: #f7f9ff !important; }
+.tower-pro-pay-confirm { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin-top: 0.35rem; }
+.tower-pro-pay-confirm input {
+  flex: 1; min-width: 8rem; font: inherit; font-size: 0.75rem; padding: 0.22rem 0.4rem;
+  border-radius: 0.35rem; border: 1px solid rgba(183, 246, 255, 0.45);
+  background: rgba(5, 8, 28, 0.55); color: #f7f9ff;
+}
+.tower-pro-pay-note { margin: 0.3rem 0 0; font-size: 0.75rem; color: #f7f9ff; }
 /* Pro money links (Venmo, Pay for services, Buy ads): quiet secondary buttons in the muted widget chrome. */
 .tower-social-btn.is-quiet { background: transparent; color: var(--cgn-text-muted); border: 1px solid var(--cgn-border); border-radius: 0.5rem; padding: 0.3rem 0.75rem; width: auto; height: auto; font-size: 0.8rem; font-weight: 400; white-space: nowrap; }
 .tower-social-btn.is-quiet:hover, .tower-social-btn.is-quiet:focus-visible { color: inherit; }
@@ -4837,6 +4865,7 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 
 /* ===== TOWER avatar photo ornaments (above/below, not over face) ===== */
 .tower-avatar-stack {
+  --tower-name-size: 28px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -5019,6 +5048,68 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 }
 .tower-scrapbook-bar[hidden] {
   display: none !important;
+}
+/* Remove notice: in flow at the toolbar's end, so it never sits over a widget
+   or the tab bar. It wraps to its own toolbar line on narrow screens. */
+#panel-tower .tower-scrapbook-bar.tower-scrapbook-bar .tower-hidden-widget-notice.tower-stage-notice {
+  /* Taller than the toolbar buttons; -5px top and bottom keeps the bar's
+     height (no jump in the stage) when it fits on the button row. */
+  margin: -5px 0 -5px auto !important;
+  max-width: 100%;
+}
+#panel-tower .tower-stage-notice[hidden],
+[data-tower-app]:not([data-tower-is-owner="true"]) [data-tower-stage-notice] {
+  display: none !important;
+}
+/* Below 768px (Designer LOOK on #247): out of the toolbar flow, a fixed notice
+   at the bottom of the viewport, so the stage and toolbar never move. It may sit
+   over the lower stage for its 4s. 160ms fade and slide in and out. While it
+   shows, tower.js moves it to the Tower app root (the public side's
+   backdrop-filter would otherwise pin "fixed" to that section). */
+@media (max-width: 767.98px) {
+  #panel-tower [data-tower-app] > .tower-hidden-widget-notice.tower-stage-notice {
+    position: fixed !important;
+    left: 50%;
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    z-index: 1200;
+    width: max-content;
+    max-width: calc(100% - 32px);
+    margin: 0 !important;
+    box-sizing: border-box;
+    opacity: 0;
+    transform: translate(-50%, 8px);
+    transition: opacity 160ms ease, transform 160ms ease;
+    pointer-events: none !important;
+  }
+  /* Never blocks a tap: neither the notice nor anything inside it. */
+  #panel-tower [data-tower-app] > .tower-hidden-widget-notice.tower-stage-notice * {
+    pointer-events: none !important;
+  }
+  #panel-tower [data-tower-app] > .tower-hidden-widget-notice.tower-stage-notice.is-in {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  /* When the bottom band would sit over Mutual friends, Go live or the Messages
+     envelope, tower.js puts it at the top (below the tab bar when on screen),
+     same look; it slides in from above. */
+  #panel-tower [data-tower-app] > .tower-hidden-widget-notice.tower-stage-notice.is-top {
+    top: var(--tower-stage-notice-top, calc(16px + env(safe-area-inset-top)));
+    bottom: auto;
+    transform: translate(-50%, -8px);
+  }
+  #panel-tower [data-tower-app] > .tower-hidden-widget-notice.tower-stage-notice.is-top.is-in {
+    transform: translate(-50%, 0);
+  }
+}
+@media (max-width: 767.98px) and (prefers-reduced-motion: reduce) {
+  #panel-tower [data-tower-app] > .tower-hidden-widget-notice.tower-stage-notice {
+    transition: none;
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  #panel-tower [data-tower-app] > .tower-hidden-widget-notice.tower-stage-notice.is-top {
+    transform: translate(-50%, 0);
+  }
 }
 .tower-emoji-bar {
   display: flex;
@@ -8538,6 +8629,15 @@ body { padding-top: 0 !important; }
   margin-top: 0.45rem;
   align-self: flex-start;
 }
+.tower-cal-pills { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.65rem; }
+.tower-cal-pill {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  border: 1px solid rgba(220, 246, 255, 0.35); border-radius: 999px;
+  padding: 0.28rem 0.75rem; font-size: 0.85rem; cursor: pointer;
+}
+.tower-cal-pill:has(input:checked) { outline: 2px solid #7fd6ff; background: rgba(127, 214, 255, 0.14); }
+.tower-cal-pills .form-hint { flex: 1 0 100%; margin: 0.15rem 0 0; }
+[data-tower-cal-auction-fields][hidden] { display: none; }
 .tower-cal-editor,
 .tower-cal-google {
   margin-top: 0.75rem;
@@ -8872,19 +8972,23 @@ body.tower-messages-page [data-tower-follow-row],
   min-width: min-content;
   min-height: 0;
   width: max-content;
-  padding: 0.08rem 0.38rem;
+  /* ~28px tall, ~10px sides at the 12px floor; em so it grows with the scaled size. */
+  padding: 0.5em 0.83em;
   border-radius: 999px;
   border: 1px solid var(--color-accent);
   background: var(--color-accent);
   color: var(--color-navy);
   font: inherit;
-  font-size: 0.68rem;
-  font-weight: 700;
-  line-height: 1.15;
+  /* A fraction of the display name (#186), never below a readable 12px. */
+  font-size: max(12px, calc(var(--tower-name-size, 28px) * 0.3));
+  font-weight: 650;
+  line-height: 1;
   letter-spacing: 0;
   white-space: nowrap;
   cursor: pointer;
   box-shadow: none;
+  flex: 0 0 auto;
+  align-self: center;
   transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
@@ -9025,6 +9129,12 @@ body.tower-messages-page [data-tower-follow-row],
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.commune-market-photos { display: flex; gap: .4rem; overflow: hidden; }
+.commune-market-photo {
+  width: 7.5rem; height: 7.5rem; object-fit: cover; border-radius: 12px;
+  border: 2px solid var(--color-border); background: var(--color-surface-2);
 }
 
 .commune-dating-rate {
@@ -10901,7 +11011,6 @@ body {
   width: min(100%, 25rem);
   aspect-ratio: 16 / 8.1;
   margin: 0.3rem auto 0;
-  overflow: hidden;
   filter: drop-shadow(0 0 20px rgba(125, 239, 255, 0.8)) drop-shadow(0 0 48px rgba(199, 140, 255, 0.52));
   animation: login-brain-float 7s ease-in-out infinite alternate;
 }
@@ -10921,7 +11030,6 @@ body {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  mix-blend-mode: screen;
   -webkit-mask-image: radial-gradient(ellipse 60% 70% at 50% 49%, #000 48%, transparent 88%);
   mask-image: radial-gradient(ellipse 60% 70% at 50% 49%, #000 48%, transparent 88%);
 }
@@ -11031,7 +11139,6 @@ body {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  mix-blend-mode: screen;
   -webkit-mask-image: radial-gradient(ellipse 60% 70% at 50% 49%, #000 48%, transparent 88%);
   mask-image: radial-gradient(ellipse 60% 70% at 50% 49%, #000 48%, transparent 88%);
 }
@@ -11096,6 +11203,18 @@ body {
 #panel-signal :is(p, li, td, th, small, time, figcaption),
 #panel-commune :is(p, li, td, th, small, time, figcaption) {
   color: var(--cgn-text-muted) !important;
+}
+
+/* SIGNAL Feed empty state contrast (Oct 22). The text was meant to be
+   var(--cgn-text) (#f7f9ff), but the `#panel-signal :is(p, …)` rule just above made it
+   --cgn-text-muted (#e8f0ff at 66%). The grey .tower-feed wash
+   rgba(255,255,255,.28) also showed as pale corners around the rounded dark panel.
+   SIGNAL Feed empty state only; copy unchanged. */
+#panel-signal .signal-feed-host .tower-feed[data-tower-feed] > .commune-empty {
+  color: #f7f9ff !important;
+}
+#panel-signal .signal-feed-host .tower-feed[data-tower-feed]:has(> .commune-empty) {
+  background-color: transparent !important;
 }
 
 #panel-tower :is(a, .tower-post-author, .tower-friends-browse-heading, .tower-personal-calendar-heading),
@@ -11824,8 +11943,11 @@ body.is-circle-open {
   padding-top: 0;
   overflow-y: auto;
 }
+/* The masthead line should meet this bar. Section padding plus a positive
+   margin left a dark band above TOWER · SIGNAL · ECHO · PULSE. */
 body.is-circle-open #main .tabs-section {
-  margin-top: 0.75rem;
+  margin-top: 0;
+  padding-top: 0;
 }
 body.is-circle-open .app-topbar {
   position: relative;
@@ -11890,7 +12012,7 @@ a.circle-fall-portrait {
 .circle-ring-spin {
   position: absolute;
   left: 50%;
-  top: 48%;
+  top: var(--pulse-ring-y, 48%);
   width: 0;
   height: 0;
 }
@@ -12277,8 +12399,12 @@ a.circle-fall-portrait {
   pointer-events: auto;
   cursor: default;
 }
+/* PULSE empty halo frame (fewer than 5 friends): the locked glass empty-frame
+   look from the pulse-falling-friends spec (Alexa 2026-10-20, PM + Designer),
+   glass rgba(18,16,38,0.92) with a thin #d9d2f0 ring. Same 1px width as before. */
 .circle-spot.is-empty {
-  background: #070b16;
+  background: rgba(18, 16, 38, 0.92);
+  border-color: #d9d2f0;
 }
 .circle-spot.has-caption { overflow: visible; }
 .circle-spot-caption {
@@ -12481,6 +12607,12 @@ a.circle-fall-portrait {
   border: 1px solid #c47a3a;
   line-height: 1.2;
   white-space: nowrap;
+}
+
+/* Beats the global `span { color: var(--cgn-ink) !important }` (dark-shell ink) so the
+   Demo text stays dark on its peach pill site-wide. Must stay below that rule. */
+.seedops-demo-badge {
+  color: #4a1d12 !important;
 }
 
 .seedops-demo-badge[data-account-kind="ops"] {
@@ -12815,6 +12947,141 @@ a.site-switch-side:focus-visible {
 .commune-card-why {
   font-size: 0.78rem;
 }
+/* Professionals you might know: up to 3 rows, each opens that Pro page. */
+.commune-pro-know-list {
+  list-style: none;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+  min-width: 0;
+}
+.commune-pro-know-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.commune-pro-know-open,
+.commune-pro-know-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(232, 214, 245, 0.35);
+  background: rgba(232, 214, 245, 0.08);
+  color: var(--cgn-text, #f7f9ff);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.commune-pro-know-open {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+/* Designer v2: #ED9300 ring (existing --color-accent) on hover or keyboard focus. */
+.commune-pro-know-open:hover,
+.commune-pro-know-open:focus-visible {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent);
+  background: rgba(232, 214, 245, 0.12);
+  outline: none;
+}
+.commune-pro-know-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.commune-pro-know-person {
+  display: block;
+}
+/* Job title (only when the row has one): its own line, one line max. */
+.commune-pro-know-title {
+  display: block;
+  max-width: 100%;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.3;
+  color: #d9d2f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
+}
+@media (max-width: 390px) {
+  .commune-pro-know-title { font-size: 13px; }
+}
+.commune-pro-know-chevron {
+  flex: 0 0 auto;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: #d9d2f0;
+  opacity: 0.6;
+}
+/* The panel-wide #panel-commune text colors are !important; these two keep #d9d2f0. */
+#panel-commune .commune-pro-know-title,
+#panel-commune .commune-pro-know-chevron {
+  color: #d9d2f0 !important;
+}
+#panel-commune .commune-pro-know-open:hover,
+#panel-commune .commune-pro-know-open:focus-visible {
+  border-color: var(--color-accent) !important;
+}
+/* Designer v2: the people card hugs its rows with 20px padding (no fixed-height slab). */
+.commune-swipe-stage:has(.commune-card[data-card-type="pro-know"]),
+.commune-swipe-deck:has(.commune-card[data-card-type="pro-know"]) {
+  min-height: 0;
+}
+#panel-commune .commune-card[data-card-type="pro-know"] {
+  position: relative;
+  inset: auto;
+  padding: 20px;
+}
+/* Designer v2 deck end: centered note; Pass / Keep and the status line hide. */
+.commune-swipe-end {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  text-align: center;
+  padding: 0 1rem;
+}
+.commune-swipe-end .commune-swipe-empty {
+  margin: 0;
+}
+.commune-swipe-end .commune-swipe-end-title {
+  color: #f7f9ff;
+  font-size: 16px;
+  font-weight: 600;
+}
+.commune-swipe-end .commune-swipe-end-sub {
+  margin: 0;
+  color: #d9d2f0;
+  font-size: 14px;
+}
+#panel-commune .commune-swipe-end .commune-swipe-end-title {
+  color: #f7f9ff !important;
+  font-size: 16px !important;
+}
+#panel-commune .commune-swipe-end .commune-swipe-end-sub {
+  color: #d9d2f0 !important;
+  font-size: 14px !important;
+}
+.is-deck-end .commune-swipe-actions,
+.is-deck-end [data-commune-swipe-status] {
+  display: none !important;
+}
 
 
 /* ===== Shared pipe-switch sides: SIGNAL News | Feed + COMMUNE Personal | Professional ===== */
@@ -12872,6 +13139,17 @@ a.site-switch-side:focus-visible {
 .login-age-block { text-align: center; padding: 1.5rem 0.5rem; }
 .login-age-block[hidden] { display: none; }
 .login-age-block p { font-size: 1.1rem; margin: 0; }
+.login-area-block {
+  margin: 0.75rem 0 0;
+  padding: 0.85rem 1rem;
+  border-radius: 0.7rem;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  color: #e8fcff;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.login-area-block[hidden] { display: none; }
 
 /* Default spawn spots (tower-default-layout LOOK lock): CSS grid when nothing
    is owner-dragged. Absolute free x/y only after a user drag. Gap 24px. */
@@ -13638,6 +13916,69 @@ body.is-circle-open .circle-spot.is-filled {
   padding-left: 2.2rem;
 }
 
+/* Venmo / Pay for services / Buy ads (Pro): one card, stacked pills, 12px gap
+   (Designer spec, PM confirmed). Same width each: 240px on the website, the full
+   card width minus 16px each side on a phone. Orange ring on hover/focus only. */
+.tower-layout--scrapbook .tower-sticker--pay-links,
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--pay-links.is-spawned {
+  padding: 16px;
+  box-sizing: border-box;
+  /* Same card chrome as the default-grid widgets, also on a saved layout. */
+  background: rgba(16, 19, 48, 0.42);
+  border: 1px solid rgba(209, 241, 255, 0.28);
+  border-radius: 1rem;
+}
+.tower-pay-links {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.tower-pay-links .tower-pay-pill {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 240px;
+  max-width: 100%;
+  min-height: 44px;
+  height: auto;
+  margin: 0;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: rgba(18, 16, 38, 0.92);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(217, 210, 240, 0.4);
+  color: #f7f9ff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-decoration: none;
+  outline: none;
+  box-shadow: none;
+}
+.tower-pay-links .tower-pay-pill:hover,
+.tower-pay-links .tower-pay-pill:focus-visible {
+  color: #f7f9ff;
+  border-color: rgba(217, 210, 240, 0.4);
+  box-shadow: 0 0 0 2px #ED9300;
+}
+.tower-layout--scrapbook.is-phone-stack .tower-pay-links .tower-pay-pill {
+  width: 100%;
+}
+@media (max-width: 767px) {
+  .tower-pay-links .tower-pay-pill { width: 100%; }
+}
+/* The panel-wide accent link colour (!important) would turn the text cyan. */
+#panel-tower .tower-pay-links .tower-pay-pill,
+#panel-tower .tower-pay-links .tower-pay-pill:hover,
+#panel-tower .tower-pay-links .tower-pay-pill:focus-visible {
+  color: #f7f9ff !important;
+}
+
 /* Tower "Message" action next to Add friend (another member's personal page). */
 .tower-follow-row .tower-message-btn { margin-left: 0.5rem; }
 .tower-follow-row .tower-message-status { margin: 0.35rem 0 0; flex-basis: 100%; }
@@ -14204,9 +14545,7 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 #panel-signal .commune-feed-sentinel,
 #panel-signal .commune-feed-loading,
 #panel-signal .paper-rule-block,
-#panel-signal .commune-feed-source,
-#panel-signal .news-story-comments,
-#panel-signal .news-report-bar {
+#panel-signal .commune-feed-source {
   display: none !important;
 }
 #panel-signal .paper-masthead {
@@ -14266,7 +14605,7 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 #panel-signal .commune-feed-list.is-endless {
   display: grid !important;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-auto-rows: 9.1rem;
+  grid-auto-rows: minmax(9.1rem, auto); /* rows grow for each story's Report + comments */
   align-items: stretch;
   max-height: none !important;
   overflow: visible !important;
@@ -14282,7 +14621,8 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   display: flex !important;
   flex-direction: column;
   width: auto !important;
-  height: 9.1rem !important;
+  height: auto !important;
+  min-height: 9.1rem !important;
   box-sizing: border-box !important;
   margin: 0 !important;
   padding: 0.65rem 0.75rem !important;
@@ -14374,6 +14714,17 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
     ) !important;
   box-shadow: none !important;
 }
+.commune-card[data-card-type="group"] { overflow: auto; }
+.echo-group-comments { display: grid; gap: 0.35rem; }
+.echo-group-comment { margin: 0; font-size: 0.92rem; }
+.echo-group-comment-name { font-weight: 700; }
+.echo-group-form { display: flex; gap: 0.4rem; }
+.echo-group-form input {
+  flex: 1; min-width: 0; padding: 0.4rem 0.55rem;
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  font: inherit; background: #fff; color: var(--color-heading);
+}
+
 @media (max-width: 640px) {
   #panel-tower .tower-kind-btn {
     font-size: 0.65rem !important;
@@ -14390,3 +14741,1256 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
 .message-apple-pay input::placeholder { color: rgba(26, 33, 68, 0.55) !important; }
 .message-apple-pay [data-apple-pay] { margin: 0; padding: 0.04rem 0.4rem !important; border: 1px solid rgba(26, 33, 68, 0.28) !important; border-radius: 2px !important; background: transparent !important; color: #1a2144 !important; box-shadow: none !important; font: inherit; font-size: 0.78rem; font-weight: 500; line-height: 1.25; }
 .message-apple-pay [data-apple-pay-note] { flex: 1 1 100%; margin: 0; padding: 0; border: 0; background: none; font-size: 0.75rem; font-weight: 400; line-height: 1.35; color: #1a2144 !important; }
+
+/* pulse-background PR: Alexa's PULSE background (refs/alexa-final-2026-10-15.png),
+   used as-is with only the five placeholder squares removed. WebP with a JPEG
+   fallback; phones load the 760px file. Strands drift gently; off for reduced motion. */
+.circle-fall[data-pulse-bg] {
+  --pulse-bg-k: 0.954;            /* image px -> screen px (ring ~1040px wide) */
+  --pulse-bg-w: calc(1190px * var(--pulse-bg-k));
+  --pulse-bg-h: calc(600px * var(--pulse-bg-k));
+  /* Cap 250 halo kept, blended over the image's page colour. */
+  background:
+    radial-gradient(ellipse at 50% 44%, rgba(168, 244, 255, 0.16), transparent 42%),
+    radial-gradient(ellipse at 52% 52%, rgba(197, 166, 255, 0.2), transparent 58%),
+    #1b1545;
+}
+.circle-fall[data-pulse-bg]::before,
+.circle-fall[data-pulse-bg]::after {
+  content: "";
+  position: absolute;
+  /* ring centre in the image is (605, 262); pin it to the ring centre (50%, 48%) */
+  left: calc(50% - 605px * var(--pulse-bg-k));
+  top: calc(var(--pulse-ring-y, 48%) - 262px * var(--pulse-bg-k));
+  width: var(--pulse-bg-w);
+  height: var(--pulse-bg-h);
+  background-image: url("../assets/pulse/pulse-bg-1190.jpg");
+  background-image: image-set(url("../assets/pulse/pulse-bg-1190.webp") type("image/webp"), url("../assets/pulse/pulse-bg-1190.jpg") type("image/jpeg"));
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 0;
+}
+.circle-fall[data-pulse-bg]::before {
+  /* soft edge so the image melts into the page colour */
+  -webkit-mask-image: radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+  mask-image: radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+}
+.circle-fall[data-pulse-bg]::after {
+  /* drift layer: the same strands, masked to the ring band, shifted slowly */
+  opacity: 0.42;
+  mix-blend-mode: screen;
+  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 51% 44%, transparent 58%, #000 76%, #000 90%, transparent 100%);
+  mask-image: radial-gradient(ellipse 50% 50% at 51% 44%, transparent 58%, #000 76%, #000 90%, transparent 100%);
+  transform-origin: 51% 44%;
+  will-change: transform;
+  animation: pulse-strand-drift 12s ease-in-out infinite;
+}
+/* cgn-strands-1280 v2 (Designer LOOK): wide screens. The image is drawn at k 0.954
+   here (0.31 on phones), so a 3-5px shift sat inside a strand's own width and
+   read as still. One strand layer only (no extra copies): a 12s ease-in-out loop
+   through four points with ~13px drift, a slow 1.5% scale breathe, and the
+   layer's opacity breathing between 100% and 80% of its 0.42. Phones keep
+   pulse-strand-drift-phone; reduced motion stops it (below). */
+@keyframes pulse-strand-drift {
+  0%, 100% { transform: translate3d(-10px, 5px, 0) rotate(-0.3deg) scale(1); opacity: 0.42; }
+  25% { transform: translate3d(8px, -5px, 0) rotate(0.15deg) scale(1.0075); opacity: 0.378; }
+  50% { transform: translate3d(13px, 5px, 0) rotate(0.33deg) scale(1.015); opacity: 0.336; }
+  75% { transform: translate3d(-3px, 8px, 0) rotate(-0.08deg) scale(1.0075); opacity: 0.378; }
+}
+/* Painted lightning + bolt stay on (still-here list), toned down and blended
+   so they sit with the image strands instead of doubling them. */
+.circle-fall[data-pulse-bg] .circle-lightning,
+.circle-fall[data-pulse-bg] svg.circle-bolt { display: none; } /* r4 (Designer + PM): hidden on PULSE, they doubled up with Alexa's image strands; code stays */
+/* Halo glow over the image (the image is opaque, so the page halo alone is hidden). */
+.circle-fall[data-pulse-bg] .circle-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(ellipse at 50% 44%, rgba(168, 244, 255, 0.16), transparent 42%),
+    radial-gradient(ellipse at 52% 52%, rgba(197, 166, 255, 0.2), transparent 58%);
+}
+.circle-fall[data-pulse-bg] .circle-ring { z-index: 2; }
+/* real friend circles sit on top of the background and the ring */
+.circle-fall[data-pulse-bg] .pulse-fall-stack { z-index: 3; }
+@media (max-width: 600px) {
+  .circle-fall[data-pulse-bg] { --pulse-bg-k: 0.31; }
+  .circle-fall[data-pulse-bg]::before,
+  .circle-fall[data-pulse-bg]::after {
+    background-image: url("../assets/pulse/pulse-bg-760.jpg");
+    background-image: image-set(url("../assets/pulse/pulse-bg-760.webp") type("image/webp"), url("../assets/pulse/pulse-bg-760.jpg") type("image/jpeg"));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .circle-fall[data-pulse-bg]::after { animation: none; transform: none; }
+}
+/* pulse-background r2 (Designer LOOK-NO): no faint top edge behind the list. */
+.circle-fall[data-pulse-bg]::before {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 16%, #000 86%, transparent 100%), radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 16%, #000 86%, transparent 100%), radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+  mask-composite: intersect;
+}
+/* Letters on the small friend circles: light, readable on the dark background. */
+.circle-fall[data-pulse-bg] a.pulse-fall-circle { color: #f7f9ff !important; }
+/* Desktop: the friends list sits above the ring, capped at 3 lines with a fade
+   (6 lines can't clear the ring). Phone layout (≤600px) is unchanged. */
+@media (min-width: 601px) {
+  .circle-fall[data-pulse-bg] .circle-relations {
+    margin-top: 1rem;
+    max-height: 6.9rem;
+    overflow-y: auto;
+    scrollbar-width: none;
+    background: none;
+    -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 62%, transparent 100%);
+  }
+  .circle-fall[data-pulse-bg] .circle-relations::-webkit-scrollbar { display: none; }
+  .circle-fall[data-pulse-bg] .circle-relations li { margin: 0.6rem 0; }
+}
+.circle-fall[data-pulse-bg]::after {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 16%, #000 86%, transparent 100%), radial-gradient(ellipse 50% 50% at 51% 44%, transparent 58%, #000 76%, #000 90%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 16%, #000 86%, transparent 100%), radial-gradient(ellipse 50% 50% at 51% 44%, transparent 58%, #000 76%, #000 90%, transparent 100%);
+  mask-composite: intersect;
+}
+/* pulse-background r6 (Designer 390 fix): on phones the halo is an oval shaped to
+   the ring (about 1.4x the ring's width and height, centred on the ring), not a tall
+   column over the whole panel. Ring in the image: 1123 x 414 image px. The width is
+   capped at the panel so the glow fades out at the edges instead of being cut off. */
+@media (max-width: 600px) {
+  .circle-fall[data-pulse-bg] {
+    background:
+      radial-gradient(min(calc(786px * var(--pulse-bg-k)), calc(50vw - 16px)) calc(290px * var(--pulse-bg-k)) at 50% var(--pulse-ring-y, 48%), rgba(168, 244, 255, 0.16), transparent 100%),
+      radial-gradient(min(calc(786px * var(--pulse-bg-k)), calc(50vw - 16px)) calc(290px * var(--pulse-bg-k)) at 50% var(--pulse-ring-y, 48%), rgba(197, 166, 255, 0.2), transparent 100%),
+      #1b1545;
+  }
+  .circle-fall[data-pulse-bg] .circle-ring::before {
+    background:
+      radial-gradient(min(calc(786px * var(--pulse-bg-k)), calc(50vw - 16px)) calc(290px * var(--pulse-bg-k)) at 50% var(--pulse-ring-y, 48%), rgba(168, 244, 255, 0.16), transparent 100%),
+      radial-gradient(min(calc(786px * var(--pulse-bg-k)), calc(50vw - 16px)) calc(290px * var(--pulse-bg-k)) at 50% var(--pulse-ring-y, 48%), rgba(197, 166, 255, 0.2), transparent 100%);
+  }
+}
+
+/* PULSE friends by engagement (Alexa final spec 2026-10-20).
+   Halo frames: the five friends you engage with most, name only.
+   Falling circles: the friends you engage with least (cap 30). They sit outside
+   the ring and the frames (placed in js/pulse-falling-friends.js), smaller and
+   lighter than the frame photos, and breathe in place (no orbit). Still for
+   prefers-reduced-motion. */
+.circle-fall[data-pulse-bg] .pulse-fall-stack { opacity: 0.8; }
+.circle-fall[data-pulse-bg] a.pulse-fall-circle {
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 4px 12px rgba(12, 16, 40, 0.22);
+  background-color: rgba(7, 11, 22, 0.45);
+  animation:
+    pulse-fall-drop 1.1s cubic-bezier(0.32, 0.02, 0.4, 1.18) both,
+    pulse-fall-breathe 3.4s ease-in-out infinite alternate;
+}
+@keyframes pulse-fall-breathe {
+  from { transform: translateY(0) scale(1); }
+  to { transform: translateY(-3px) scale(1.06); }
+}
+/* Halo frame names (Designer r3): name only, Oswald 12px (11px on phones), set
+   fully below the photo with a 6px gap, light shadow so it reads on the halo.
+   Each frame is scaled (--pulse-spot-s, set in js/tower.js), so sizes are divided
+   by that scale to land at true screen px. */
+.circle-fall[data-pulse-bg] .circle-spot-caption {
+  --pulse-name-px: 12px;
+  top: calc(100% + 6px / var(--pulse-spot-s, 1));
+  transform: translateX(-50%);
+  font-family: "Oswald", system-ui, sans-serif;
+  font-size: calc(var(--pulse-name-px) / var(--pulse-spot-s, 1));
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  text-shadow: 0 calc(1px / var(--pulse-spot-s, 1)) calc(2px / var(--pulse-spot-s, 1)) rgba(6, 10, 30, 0.55);
+}
+@media (max-width: 600px) {
+  .circle-fall[data-pulse-bg] .circle-spot-caption { --pulse-name-px: 11px; }
+  /* Strands drift visibly at 390 (live check: 0.2% of pixels changed in 4s vs
+     0.7-0.8% at 1280). Phones loop through four drift points instead of easing
+     back and forth, so no 4s stretch ever sits still at a turnaround. */
+  .circle-fall[data-pulse-bg]::after {
+    animation: pulse-strand-drift-phone 12s ease-in-out infinite;
+  }
+}
+@keyframes pulse-strand-drift-phone {
+  0%, 100% { transform: translate3d(-3px, 1.5px, 0) rotate(-0.3deg) scale(1.003); }
+  25% { transform: translate3d(2.5px, -1.5px, 0) rotate(0.15deg) scale(1.009); }
+  50% { transform: translate3d(4px, 1.5px, 0) rotate(0.33deg) scale(0.998); }
+  75% { transform: translate3d(-1px, 2.5px, 0) rotate(-0.08deg) scale(1.006); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .circle-fall[data-pulse-bg] a.pulse-fall-circle,
+  a.pulse-fall-circle { animation: none !important; transform: none !important; }
+  .circle-fall[data-pulse-bg]::after { animation: none !important; transform: none !important; }
+  .circle-fall[data-pulse-bg] .circle-ring-spin,
+  .circle-fall[data-pulse-bg] .circle-ring-spin::before { animation: none; }
+}
+.circle-fall[data-pulse-bg] .circle-ring-spin { animation: pulse-halo-bob 4.4s ease-in-out infinite; }
+.circle-fall[data-pulse-bg] .circle-ring-spin::before {
+  content: ""; position: absolute; pointer-events: none; border-radius: 50%;
+  width: min(640px, 94vw); height: min(640px, 94vw);
+  left: calc(min(640px, 94vw) / -2); top: calc(min(640px, 94vw) / -2);
+  background: conic-gradient(#f7feff, #9cf6ff 10%, #3ecbff 22%, #6d78ff 40%, #b44bff 58%, #c5a6ff 78%, #3ecbff 92%, #f7feff);
+  -webkit-mask: radial-gradient(circle, #0000 63%, #000 70% 78%, #0000 86%);
+  mask: radial-gradient(circle, #0000 63%, #000 70% 78%, #0000 86%);
+  transform: rotateX(80deg);
+  animation: pulse-halo-3d 8s linear infinite, pulse-halo-ghost 4.8s ease-in-out infinite;
+}
+@keyframes pulse-halo-3d { to { transform: rotateX(80deg) rotateZ(1turn); } }
+@keyframes pulse-halo-ghost {
+  0%, 100% { opacity: 0.4; filter: drop-shadow(0 0 6px rgba(62, 203, 255, 0.32)) drop-shadow(0 0 14px rgba(180, 75, 255, 0.26)); }
+  50% { opacity: 1; filter: drop-shadow(0 0 22px rgba(62, 203, 255, 0.95)) drop-shadow(0 0 42px rgba(180, 75, 255, 0.72)); }
+}
+@keyframes pulse-halo-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-32px); } }
+.pulse-side-toggle {
+  position: absolute; z-index: 6; top: 8px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; pointer-events: auto;
+}
+.pulse-side-toggle button {
+  margin: 0; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(197, 166, 255, 0.45); background: rgba(18, 16, 38, 0.88);
+  color: #f7fbff; font: 600 13px/1 var(--cgn-ui, system-ui);
+}
+.pulse-side-toggle button[aria-pressed="true"] {
+  border-color: rgba(168, 244, 255, 0.95); box-shadow: 0 0 12px rgba(62, 203, 255, 0.45);
+}
+.pulse-fall-actions {
+  position: absolute; z-index: 4; display: flex; flex-direction: column; align-items: center;
+  gap: 1px; transform: translateX(-50%); pointer-events: auto;
+}
+.pulse-fall-act {
+  margin: 0; padding: 1px 4px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  border: 1px solid rgba(217, 210, 240, 0.5); background: rgba(18, 16, 38, 0.92);
+  color: #f7fbff; font: 600 10px/1.2 var(--cgn-ui, system-ui);
+}
+
+/* COGNATION | WAYMAKERS switch is hidden (index.html `hidden`) until Waymakers has a
+   full design. .site-switch sets display: inline-flex, so honour [hidden] here.
+   Only the top-bar switch; the SIGNAL / ECHO pipe switches reuse .site-switch and stay. */
+.app-topbar-actions [data-site-switch][hidden] { display: none !important; }
+/* Without the switch the actions column can get narrower than "Log out" on phones;
+   keep the label on one line (it was one line with the switch). */
+.app-topbar-actions [data-site-switch][hidden] ~ .app-logout-btn { white-space: nowrap; }
+
+/* Cognation Times: story comments start closed (js/commune.js wireTimesCommentsToggle).
+   One small ink text line in the Times serif opens and closes each thread. */
+#panel-signal .commune-feed-item:not([data-times-comments-open]) .news-story-comments { display: none !important; }
+#panel-signal .times-comments-toggle {
+  appearance: none;
+  display: block;
+  align-self: flex-start;
+  text-align: left !important;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  color: #16120c !important;
+  font-family: "Old Standard TT", Georgia, "Times New Roman", serif !important;
+  font-size: 0.8rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+}
+#panel-signal .times-comments-toggle[hidden] { display: none !important; }
+#panel-signal .times-comments-toggle:focus-visible { outline: 2px solid #16120c; outline-offset: 2px; }
+
+/* Cognation Times layout (Alexa, Oct 20): 1 headliner across the full width, then
+   9 stories in three rows of three; 10 slots at most (TIMES_SLOTS in commune.js).
+   No blank filler boxes when there are fewer stories. Phones (<=720px) stay one column. */
+#panel-signal .commune-feed-item.is-lead { grid-column: 1 / -1; }
+#panel-signal .commune-feed-item.is-lead .commune-feed-body {
+  font-size: 1.35rem !important;
+  line-height: 1.25 !important;
+}
+#panel-signal .times-column-pad { display: none !important; }
+
+
+/* ---- Classroom sessions + public Cognation Calendar (Designer comp classroom-live) ----
+   Site colors only, no amber: glass rgba(18,16,38,.92), text #f7f9ff / #d9d2f0,
+   lilac rim rgba(197,166,255,.85) for LIVE / Today / Join, the topbar lilac ombre on
+   the Join button, cyan #8fe3f0 (Classroom), lilac #d6b8ff (Webinar). */
+.cgn-live-pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: rgba(197,166,255,.14); border: 1px solid rgba(197,166,255,.75); color: #c5a6ff;
+  font: 600 11px/1 "Oswald", system-ui, sans-serif; letter-spacing: .16em;
+  padding: 5px 10px 5px 8px; border-radius: 999px; white-space: nowrap;
+}
+.cgn-live-dot {
+  position: relative; width: 8px; height: 8px; border-radius: 50%; background: #c5a6ff;
+  box-shadow: 0 0 0 3px rgba(197,166,255,.25), 0 0 10px rgba(197,166,255,.9);
+  animation: cgn-live-pulse 1.6s ease-in-out infinite;
+}
+@keyframes cgn-live-pulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.35); opacity: .6; } }
+@media (prefers-reduced-motion: reduce) { .cgn-live-dot { animation: none; } }
+.cgn-cal-tag {
+  font: 500 10.5px/1 "Oswald", system-ui, sans-serif; letter-spacing: .14em; text-transform: uppercase;
+  padding: 5px 8px; border-radius: 6px; border: 1px solid; white-space: nowrap;
+}
+.cgn-cal-tag--classroom { color: #8fe3f0; border-color: rgba(143,227,240,.45); background: rgba(143,227,240,.08); }
+.cgn-cal-tag--webinar { color: #d6b8ff; border-color: rgba(214,184,255,.45); background: rgba(214,184,255,.08); }
+.cgn-cal-join {
+  display: inline-block; background: linear-gradient(90deg, #e4dcf6, #f3d9e8); color: #1a1230 !important; text-decoration: none;
+  font: 600 12px/1 "Oswald", system-ui, sans-serif; letter-spacing: .1em; text-transform: uppercase;
+  padding: 9px 14px; border-radius: 999px;
+}
+
+/* ECHO live Classroom / Webinar card: same footprint as other ECHO cards. */
+.commune-card.commune-card--live-session {
+  border-color: rgba(197,166,255,.45);
+  background:
+    radial-gradient(420px 260px at 85% 0%, rgba(197,166,255,.13), transparent 70%),
+    radial-gradient(400px 300px at 30% 100%, rgba(90,60,160,.35), transparent 70%),
+    rgba(18,16,38,.92);
+  box-shadow: 0 0 0 1px rgba(197,166,255,.12), 0 18px 50px rgba(0,0,0,.45), 0 0 40px rgba(197,166,255,.10);
+  color: #f7f9ff;
+  gap: 0.5rem;
+  padding: 1.1rem 1.1rem 1rem;
+  overflow: hidden;
+}
+.commune-card--live-session > * { margin: 0 !important; }
+.commune-live-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.commune-live-kind { font: 700 11px/1 "Noto Sans", system-ui, sans-serif; letter-spacing: .16em; text-transform: uppercase; color: #8fe3f0; }
+.commune-live-kind[data-live-kind="webinar"] { color: #d6b8ff; }
+.commune-live-started { margin-left: auto; font-size: 12px; color: #d9d2f0; }
+.commune-card--live-session .commune-live-title {
+  font-family: "Oswald", system-ui, sans-serif; font-weight: 600; font-size: 1.5rem; line-height: 1.12;
+  color: #f7f9ff; overflow-wrap: anywhere;
+}
+.commune-live-host {
+  display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 14px;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(217,210,240,.16); color: #f7f9ff; text-decoration: none;
+}
+.commune-live-avatar, .cgn-cal-avatar {
+  width: 44px; height: 44px; border-radius: 50%; flex: none; object-fit: cover;
+  border: 1.5px solid rgba(217,210,240,.55); box-shadow: 0 0 0 3px rgba(18,16,38,.9);
+}
+.commune-live-avatar--blank, .cgn-cal-avatar--blank {
+  display: inline-flex; align-items: center; justify-content: center; font-weight: 700; color: #f7f9ff;
+  background: linear-gradient(135deg, #5b7fd6, #a35bc4);
+}
+.commune-live-host-text { display: flex; flex-direction: column; min-width: 0; }
+.commune-live-host-name { font-weight: 600; font-size: 15px; }
+.commune-live-host-sub { font-size: 12px; color: #d9d2f0; margin-top: 2px; }
+.commune-live-host-cta { color: #c5a6ff; }
+.commune-live-host .commune-live-avatar { width: 36px; height: 36px; }
+.commune-live-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: #d9d2f0; }
+.commune-card--live-session .commune-live-join {
+  display: block; width: 100%; margin-top: 8px !important; border-radius: 999px; border: 0;
+  background: linear-gradient(90deg, #e4dcf6, #f3d9e8); color: #1a1230; font: 600 16px/1 "Oswald", system-ui, sans-serif; letter-spacing: .08em;
+  text-transform: uppercase; padding: 12px; box-shadow: 0 8px 24px rgba(197,166,255,.35), inset 0 1px 0 rgba(255,255,255,.35);
+}
+.commune-live-quiet { text-align: center; font-size: 12.5px; color: #d9d2f0; }
+.commune-card--live-session .commune-live-foot { margin-top: auto !important; }
+.commune-live-foot {
+  padding-top: .5rem; border-top: 1px solid rgba(217,210,240,.16);
+  font-size: 11.5px; color: #d9d2f0; opacity: .8; text-align: right;
+}
+
+/* Public Cognation Calendar page (calendar.html) */
+body.cgn-cal-page {
+  min-height: 100vh; margin: 0; color: #f7f9ff;
+  background:
+    radial-gradient(520px 380px at 22% 14%, rgba(40,120,150,.45), transparent 70%),
+    radial-gradient(560px 420px at 82% 12%, rgba(120,60,130,.42), transparent 70%),
+    linear-gradient(180deg, #1b1838, #16132c 60%, #1a1532);
+}
+.cgn-cal-topbar {
+  display: flex; justify-content: center; gap: 26px; align-items: center; height: 44px;
+  width: min(880px, calc(100% - 32px)); margin: 0 auto;
+  background: linear-gradient(90deg, #e4dcf6, #f3d9e8);
+}
+.cgn-cal-topbar a { color: #1a1230 !important; text-decoration: none; font: 600 11px/1 "Noto Sans", system-ui, sans-serif; letter-spacing: .12em; text-transform: uppercase; }
+.cgn-cal-wrap {
+  width: min(760px, calc(100% - 32px)); margin: 0 auto; padding: 28px 28px 40px; box-sizing: border-box;
+  min-height: calc(100vh - 44px);
+  background: linear-gradient(180deg, rgba(30,24,64,.86), rgba(22,18,46,.9));
+  border: 1px solid rgba(217,210,240,.28); border-top: 0;
+}
+.cgn-cal-head { text-align: center; }
+.cgn-cal-h1 { font-family: "Oswald", system-ui, sans-serif !important; font-size: 40px; font-weight: 600; letter-spacing: .02em; margin: 0; color: #f7f9ff; }
+.cgn-cal-lede { color: #d9d2f0; font-size: 14px; max-width: 440px; margin: 8px auto 0; }
+.cgn-cal-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.cgn-cal-chips { display: flex; gap: 8px; }
+.cgn-cal-chip {
+  padding: 8px 14px; border-radius: 999px; cursor: pointer; background: transparent;
+  font: 500 12px/1 "Oswald", system-ui, sans-serif; letter-spacing: .12em; text-transform: uppercase;
+  color: #d9d2f0; border: 1px solid rgba(217,210,240,.3);
+}
+.cgn-cal-chip.is-active { background: linear-gradient(90deg, #e4dcf6, #f3d9e8) !important; color: #1a1230 !important; border-color: rgba(197,166,255,.85) !important; }
+.cgn-cal-zone { font-size: 11.5px; color: #d9d2f0; opacity: .8; }
+.cgn-cal-day {
+  margin-top: 22px; background: rgba(18,16,38,.92); border: 1px solid rgba(217,210,240,.22);
+  border-radius: 18px; overflow: hidden;
+}
+.cgn-cal-day-head { display: flex; align-items: baseline; justify-content: space-between; padding: 14px 22px 12px; }
+.cgn-cal-day-label { font-family: "Oswald", system-ui, sans-serif; font-size: 15px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: #f7f9ff; }
+.cgn-cal-day-label.is-today { color: #c5a6ff; }
+.cgn-cal-day-date { font-size: 12.5px; color: #d9d2f0; }
+.cgn-cal-rows { list-style: none; margin: 0; padding: 0; }
+.cgn-cal-row {
+  display: grid; grid-template-columns: 96px minmax(0,1fr) 170px 80px; align-items: center; gap: 18px;
+  padding: 18px 22px; border-top: 1px solid rgba(217,210,240,.16);
+}
+.cgn-cal-row.is-live { background: linear-gradient(90deg, rgba(197,166,255,.10), transparent 60%); }
+.cgn-cal-when { display: flex; flex-direction: column; }
+.cgn-cal-time { font-family: "Oswald", system-ui, sans-serif; font-size: 20px; font-weight: 500; white-space: nowrap; }
+.cgn-cal-len { font-size: 12px; color: #d9d2f0; margin-top: 3px; }
+.cgn-cal-tags { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.cgn-cal-title { font-family: "Oswald", system-ui, sans-serif; font-size: 19px; font-weight: 500; margin: 8px 0 0; color: #f7f9ff; letter-spacing: .01em; }
+.cgn-cal-host { display: flex; align-items: center; gap: 10px; color: #f7f9ff; text-decoration: none; min-width: 0; }
+.cgn-cal-host .cgn-cal-avatar { width: 36px; height: 36px; }
+.cgn-cal-host-text { display: flex; flex-direction: column; min-width: 0; }
+.cgn-cal-host-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cgn-cal-host-cta { font-size: 11.5px; color: #c5a6ff; }
+.cgn-cal-action { text-align: right; }
+.cgn-cal-empty {
+  margin-top: 22px; padding: 28px 22px; text-align: center; border-radius: 18px;
+  background: rgba(18,16,38,.92); border: 1px solid rgba(217,210,240,.22);
+}
+.cgn-cal-empty-title { font-family: "Oswald", system-ui, sans-serif; font-size: 20px; margin: 0; color: #f7f9ff; }
+.cgn-cal-empty-sub { color: #d9d2f0; font-size: 13.5px; margin: 8px 0 0; }
+.cgn-cal-hint { text-align: center; color: #d9d2f0; opacity: .8; font-size: 12px; margin-top: 22px; }
+@media (max-width: 600px) {
+  .cgn-cal-wrap { padding: 28px 16px 40px; }
+  .cgn-cal-h1 { font-size: 34px; }
+  .cgn-cal-day-head { padding: 14px 16px 12px; }
+  .cgn-cal-row {
+    grid-template-columns: 72px minmax(0,1fr) auto; grid-template-areas: "when what what" "when host action";
+    gap: 10px 14px; padding: 16px;
+  }
+  .cgn-cal-when { grid-area: when; }
+  .cgn-cal-what { grid-area: what; min-width: 0; }
+  .cgn-cal-host { grid-area: host; }
+  .cgn-cal-action { grid-area: action; }
+  .cgn-cal-time { font-size: 17px; }
+  .cgn-cal-title { font-size: 18px; }
+  .cgn-cal-host .cgn-cal-avatar { width: 28px; height: 28px; }
+  .cgn-cal-host-cta { display: none; }
+}
+
+/* Tower: visitor Calendar (restored) + owner Classroom sessions */
+#panel-tower [data-tower-is-owner="true"] [data-tower-visitor-calendar] { display: none !important; }
+.tower-visitor-calendar {
+  width: min(28rem, 100%); margin: .75rem auto 0; padding: .9rem 1rem 1rem; box-sizing: border-box;
+  background: rgba(18,16,38,.92); border: 1px solid rgba(217,210,240,.22); border-radius: 18px; color: #f7f9ff;
+}
+.tower-visitor-calendar .tower-cal-public-title { margin: 0 0 .5rem; color: #f7f9ff; }
+.tower-visitor-calendar :is(.tower-cal-dow, .tower-cal-event-time, .form-hint, .tower-cal-empty, .tower-cal-day-heading) { color: #d9d2f0; }
+.tower-visitor-sessions-title, .tower-sessions-list-title { margin: .25rem 0 .5rem; font-size: .85rem; letter-spacing: .08em; text-transform: uppercase; color: #d9d2f0; }
+.tower-visitor-session-list, .tower-sessions-list { list-style: none; margin: 0 0 .75rem; padding: 0; display: flex; flex-direction: column; gap: .5rem; }
+.tower-visitor-session, .tower-sessions-item {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .6rem; padding: .55rem .7rem; border-radius: 12px;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(217,210,240,.16);
+}
+.tower-visitor-session.is-live, .tower-sessions-item.is-live { background: linear-gradient(90deg, rgba(197,166,255,.10), transparent 70%); }
+.tower-visitor-session-title, .tower-sessions-item-title { font-weight: 600; flex: 1 1 10rem; min-width: 0; }
+.tower-visitor-session-time, .tower-sessions-item-time { font-size: .78rem; color: #d9d2f0; flex-basis: 100%; }
+.tower-visitor-cal-link { display: inline-block; margin-top: .6rem; font-size: .82rem; color: #c5a6ff; text-decoration: none; }
+.tower-golive-status { font-size: .78rem; color: #d9d2f0; text-align: center; max-width: 18rem; margin: .25rem auto 0; }
+.tower-sessions-form .tower-sessions-kind { border: 0; padding: 0; margin: 0 0 .5rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+.tower-sessions-form .tower-sessions-kind legend { font-size: .82rem; margin-bottom: .3rem; }
+.tower-sessions-when { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; }
+@media (max-width: 420px) { .tower-sessions-when { grid-template-columns: 1fr 1fr; } }
+.tower-visitor-calendar :is(.tower-cal-month, .tower-cal-label, .tower-cal-day-heading) { color: #f7f9ff !important; font-family: "Oswald", system-ui, sans-serif; }
+/* Edit profile > Calendar (owner): the month label and weekday row in Oswald,
+   the site's header family (already loaded; no new font). The "Calendar" title
+   and the day heading stay in the body sans, at 680 to match the visitor
+   Calendar card (Designer, 2026-10-22). The visitor card is the reference and
+   is not changed here. */
+#panel-tower [data-tower-edit-calendar] :is(.tower-cal-label, .tower-cal-dow) {
+  font-family: "Oswald", system-ui, sans-serif !important;
+}
+#panel-tower [data-tower-edit-calendar] :is(.tower-cal-public-title, .tower-cal-day-heading) {
+  font-weight: 680 !important;
+}
+.tower-visitor-calendar .tower-cal-cell { background: rgba(18,16,38,.92); color: #f7f9ff; border-color: rgba(209,241,255,.28); }
+.tower-visitor-calendar .tower-cal-cell.is-today, .tower-visitor-calendar .tower-cal-cell.is-selected { border-color: rgba(197,166,255,.85); box-shadow: 0 0 0 1px rgba(197,166,255,.45) inset; }
+.tower-visitor-calendar .tower-visitor-cal-link { color: #c5a6ff; }
+/* Calendar is its own card directly under the bio card (data-tower-widget="visitor-calendar"):
+   same width as the bio card, same widget gap, same calendar colours as before. */
+#panel-tower .tower-layout--scrapbook.is-sticker-stage > .tower-sticker--visitor-calendar {
+  width: var(--visitor-cal-w, min(28rem, 100%));
+  max-width: 100%;
+  margin: 0;
+  padding: .9rem 1rem 1rem;
+  box-sizing: border-box;
+  background: rgba(18,16,38,.92);
+  border: 1px solid rgba(217,210,240,.22);
+  border-radius: 18px;
+  color: #f7f9ff;
+}
+#panel-tower .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker--visitor-calendar.is-spawned {
+  order: 0;
+  width: auto;
+  max-width: none;
+  padding: .9rem 1rem 1rem;
+  background: rgba(18,16,38,.92);
+  border: 1px solid rgba(217,210,240,.22);
+  border-radius: 18px;
+}
+#panel-tower .tower-sticker--visitor-calendar[hidden] { display: none !important; }
+/* Bio card order for visitors on a saved (free) layout, same as the default grid:
+   photo, name, + follow, then Mutual friends and the message button. The owner's
+   r143 row (actions | Edit profile) is unchanged. */
+#panel-tower [data-tower-is-owner="false"] .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-sticker--identity { grid-row: 2; grid-column: 1 / -1; }
+#panel-tower [data-tower-is-owner="false"] .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-profile-actions { grid-row: 3; grid-column: 1 / -1; justify-self: center; }
+#panel-tower [data-tower-is-owner="false"] .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-under-photo { grid-row: 4; grid-column: 1 / -1; }
+#panel-tower [data-tower-is-owner="false"] .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-live-panel { grid-row: 5; }
+
+/* Cream follow-up (PM + Designer, Oct 21). Website colours only: Times ink #16120c,
+   cream #fbf7ec, muted ink #6b6458. */
+/* 1. Cognation Times comment box: cream field, 1px ink border, muted-ink placeholder;
+   the story and thread dividers are ink at 20% (were pink #f5b6d0). Times only. */
+#panel-signal .news-story-comments .news-comment-composer input[data-news-comment-input] {
+  background: #fbf7ec !important;
+  border: 1px solid #16120c !important;
+  color: #16120c !important;
+  box-shadow: none !important;
+}
+#panel-signal .news-story-comments .news-comment-composer input[data-news-comment-input]::placeholder {
+  color: #6b6458 !important;
+  opacity: 1;
+}
+#panel-signal .news-story-comments[data-news-comments],
+#panel-signal .news-report-bar[data-news-report] {
+  border-top-color: rgba(22, 18, 12, 0.2) !important;
+}
+@media (max-width: 640px) {
+  /* 3a. Log out pill: 10px in from the bar's right edge and 12px clear of PULSE
+     (it sat flush on the edge, 5.6px from PULSE). The tabs keep their order and
+     size and sit in the space left of the pill. */
+  .app-topbar {
+    grid-template-columns: minmax(0, 1fr) auto auto !important;
+    column-gap: 12px;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+}
+@media (max-width: 720px) {
+  /* 3b. COGNATION / TIMES masthead wraps to two lines on phones: open the line
+     height so the lines no longer touch (ink gap was -2.6px at 390). */
+  #panel-signal .paper-title { line-height: 1 !important; }
+}
+/* 5. Tower header: the visitor action row (+ friend / + follow / Message) is hidden
+   on your own Tower; collapse the empty row so owner and visitor, Personal and Pro
+   all read name -> pill ~30px and pill -> Mutual friends ~16px. */
+#panel-tower .tower-avatar-stack > .tower-profile-actions:not(:has(> .tower-follow-row:not([hidden]))) {
+  display: none;
+}
+#panel-tower .tower-avatar-stack > .tower-profile-actions:not(:has(> .tower-follow-row:not([hidden]))) ~ .tower-under-photo {
+  margin-top: 0.15rem;
+}
+#panel-tower .tower-avatar-stack > .tower-profile-actions:not(:has(> .tower-follow-row:not([hidden]))) ~ .tower-under-photo [data-tower-add-friends] {
+  margin-bottom: 0.82rem;
+}
+
+/* Cream follow-up 2 (Oct 21): 390 dateline. Below 600px the date always takes its
+   own line, and the rule after "Cognation" (which pointed at the wrapped date)
+   is hidden, so no stray dash dangles at the end of the first line. */
+@media (max-width:600px){
+  #panel-signal .paper-dateline{flex-wrap:wrap !important}
+  #panel-signal .paper-dateline > .paper-rule:has(+ .paper-date){display:none !important}
+  #panel-signal .paper-dateline > .paper-date{flex-basis:100% !important;text-align:left !important}
+}
+/* Reported / blocked Times story: hidden for you, collapsed to its report line so
+   the status text stays readable (it used to vanish with the story). */
+#panel-signal [data-news-post][data-news-reported-hidden] > :not([data-news-report]){display:none !important}
+#panel-signal [data-news-post][data-news-reported-hidden] [data-news-report] > :not([data-news-report-status]){display:none !important}
+#panel-signal [data-news-post][data-news-reported-hidden] [data-news-report]{border-top:0 !important;margin-top:0 !important;padding-top:0 !important}
+
+/* Tower header name (Designer follow-up): centred under the avatar and #f7f9ff.
+   Scoped to the stacked header (.tower-avatar-stack); the desktop strip layout, where
+   the name sits beside the avatar, keeps its left alignment. The 10ch name box stays
+   (stable while loading); only the text inside it is centred. */
+#panel-tower .tower-avatar-stack .tower-profile-name-wrap .tower-profile-name {
+  text-align: center;
+  color: #f7f9ff !important;
+}
+
+/* Designer (Oct 21), after #214.
+   1. Log out on the lilac top bar reads like the tab labels: #1c1630 text, 1px
+      #1c1630 border at 40%, no fill, no text-shadow (was white text on a white
+      18% fill). The lilac ombre is the only top-bar theme (TOWER, SIGNAL, ECHO,
+      PULSE and under the login gate all use it), so this is not scoped further.
+      Hover/focus: full #1c1630 border, still no fill (tab hover is the same ink). */
+.app-topbar-actions .app-logout-btn {
+  color: #1c1630 !important;
+  border: 1px solid rgba(28, 22, 48, 0.4) !important;
+  background: transparent !important;
+  text-shadow: none !important;
+}
+.app-topbar-actions .app-logout-btn:hover,
+.app-topbar-actions .app-logout-btn:focus-visible {
+  color: #1c1630 !important;
+  border-color: #1c1630 !important;
+  background: transparent !important;
+}
+/* 2. Times story hidden for you (reported / blocked): the status line sits in the
+      middle of the story's slot, italic, #1c1630 at 70%. */
+#panel-signal [data-news-post][data-news-reported-hidden] {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+#panel-signal [data-news-post][data-news-reported-hidden] [data-news-report] {
+  width: 100%;
+  display: flex !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+#panel-signal [data-news-post][data-news-reported-hidden] [data-news-report-status] {
+  font-style: italic !important;
+  color: rgba(28, 22, 48, 0.7) !important;
+}
+/* 3. Times "Couldn't send report, try again" (story and comment): full #1c1630,
+      left padding matching the chips above it, no red tint or box. */
+#panel-signal [data-news-report-status][data-news-report-failed] {
+  color: #1c1630 !important;
+  padding-left: 0.5rem !important; /* .news-report-option */
+}
+#panel-signal .news-comment-item [data-news-comment-report-error] {
+  color: #1c1630 !important;
+  background: transparent !important;
+  border: 0 !important;
+  margin: 0.3rem 0 0 !important; /* was 0 1rem 0.5rem (boxed status) */
+  padding: 0 0 0 0.45rem !important; /* .news-comment-item .news-report-option */
+  font-size: 0.75rem !important; /* same size as the story-level line (.news-report-status); was 0.88rem from .commune-status */
+}
+
+/* Feed photos (P1, Oct 21): a post's picture fills the card width, rounded, in the
+   existing border colour; no pill around it. Posts that saved only a file name keep
+   the pill with a "photo wasn't uploaded" note. */
+.tower-attachments > .tower-attach.tower-attach--image {
+  flex: 1 1 100%;
+  max-width: 100%;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+}
+.tower-attach-img {
+  display: block;
+  width: auto;
+  max-width: 100%; /* never wider than the card; saved photos are 480px, not upscaled */
+  height: auto;
+  max-height: 32rem;
+  object-fit: contain;
+  border-radius: 12px;
+  border: 1px solid var(--cgn-border, var(--color-border));
+  background: rgba(16, 19, 48, 0.42);
+}
+.tower-attach-note {
+  font-size: 0.72rem;
+  opacity: 0.85;
+}
+/* Designer nit on #218: the "photo wasn't uploaded" chip was a flat grey slab
+   (--color-surface-2 with a black border). Transparent, 1px #d9d2f0 at 40%,
+   PHOTO label #f7f9ff, file name and note #d9d2f0. Radius and padding unchanged. */
+.tower-attachments > .tower-attach.tower-attach--missing {
+  background: transparent !important;
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  color: #d9d2f0 !important;
+}
+.tower-attach--missing .tower-attach-kind {
+  color: #f7f9ff !important;
+}
+.tower-attach--missing .tower-attach-name,
+.tower-attach--missing .tower-attach-note {
+  color: #d9d2f0 !important;
+  opacity: 1;
+}
+
+/* Quote sticker = one glass pill (Designer LOOK NO on #223). The old look was a
+   translucent white card in Georgia #4a2c3a inside a faint panel. Every quote
+   (just added, after reload, owner or visitor) renders through
+   renderQuoteStickers with these rules: glass rgba(18,16,38,.92), 12px blur,
+   1px #d9d2f0 at 40%, #f7f9ff text in the site sans. The card keeps its radius
+   (0.65rem) and padding (0.55rem 0.65rem); the wrapper is no longer a second box. */
+.tower-layout--scrapbook.is-sticker-stage > .tower-sticker.tower-sticker--quote {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  padding: 0 !important;
+}
+.tower-layout--scrapbook.is-sticker-stage > .tower-sticker--quote .tower-quote-card {
+  background: rgba(18, 16, 38, 0.92) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  border-radius: 0.65rem;
+  padding: 0.55rem 0.65rem;
+  color: #f7f9ff !important;
+  font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif) !important;
+}
+
+/* ===== Pro job title field (Edit profile) =====
+   Same grid and type as the Social links rows above it. Owner's own Pro page only. */
+#panel-tower .tower-profile-edit-dropdown .tower-job-title-fields {
+  display: grid;
+  grid-template-columns: 5.1rem minmax(0, 1fr);
+  column-gap: 0.35rem;
+  row-gap: 0.22rem;
+  align-items: center;
+}
+#panel-tower .tower-profile-edit-dropdown .tower-job-title-fields[hidden] {
+  display: none !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-job-title-fields label {
+  display: block;
+  margin: 0 !important;
+  font-size: 0.8rem !important;
+  font-weight: 700 !important;
+  line-height: 1.1 !important;
+  color: var(--cgn-text-muted, rgba(232, 240, 255, 0.66)) !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-job-title-fields .tower-job-title-hint {
+  grid-column: 1 / -1;
+  margin: 0 !important;
+  font-size: 0.72rem !important;
+  line-height: 1.2 !important;
+  color: var(--cgn-text-soft, rgba(232, 240, 255, 0.48)) !important;
+}
+
+/* Add widget dialog contrast (Designer spec, Oct 22). Style only. The card was
+   #fff5f9 with the site's light text on it, so the title, labels, hint,
+   unselected tab and Cancel were near-white on near-white.
+   - Card: site glass rgba(18,16,38,.92), 12px blur, 1px #d9d2f0 at 40%.
+   - Title and label #f7f9ff, hint #d9d2f0.
+   - Unselected tab and Cancel: transparent, 1px #d9d2f0 at 40%, #f7f9ff text.
+   - Selected tab and Add sticker: the same gradient pill, laid on #f7f9ff so it
+     keeps its light look on the dark card, with ink #1c1630 text. The selected
+     tab follows the dialog's data-add-choice (the choice Add sticker uses), so
+     picking Slogan card moves the pill to it. The accent-colour selection
+     ring and textarea focus ring become #d9d2f0.
+   - Textarea rgba(255,255,255,.06), #f7f9ff text, #d9d2f0 placeholder.
+   - Blocked-quote line: #fbe3e6, #1c1630 text, 1px #e88a99. */
+.tower-add-widget-dialog .tower-add-widget-dialog-card {
+  background: rgba(18, 16, 38, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(217, 210, 240, 0.4);
+  color: #f7f9ff;
+}
+.tower-add-widget-dialog .tower-add-widget-title,
+.tower-add-widget-dialog .tower-add-widget-label {
+  color: #f7f9ff !important;
+}
+.tower-add-widget-dialog .tower-add-widget-dialog-card .form-hint {
+  color: #d9d2f0 !important;
+}
+.tower-add-widget-dialog .tower-add-widget-choices [data-tower-add-choice],
+.tower-add-widget-dialog .form-actions [data-tower-add-widget-cancel] {
+  background: transparent !important;
+  background-image: none !important;
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  color: #f7f9ff !important;
+  box-shadow: none !important;
+  outline: none;
+}
+.tower-add-widget-dialog:not([data-add-choice="slogan"]) .tower-add-widget-choices [data-tower-add-choice="quote"],
+.tower-add-widget-dialog[data-add-choice="slogan"] .tower-add-widget-choices [data-tower-add-choice="slogan"],
+.tower-add-widget-dialog .form-actions [data-tower-add-quote-confirm] {
+  background-color: #f7f9ff !important;
+  background-image: linear-gradient(100deg, rgba(139, 237, 255, 0.42), rgba(204, 161, 255, 0.38)) !important;
+  border: 1px solid rgba(208, 249, 255, 0.72) !important;
+  color: #1c1630 !important;
+  box-shadow: 0 0 21px rgba(142, 234, 255, 0.2) !important;
+}
+.tower-add-widget-dialog .tower-add-widget-choices [data-tower-add-choice]:focus-visible,
+.tower-add-widget-dialog .form-actions .btn:focus-visible {
+  outline: 2px solid #d9d2f0;
+  outline-offset: 2px;
+}
+.tower-add-widget-dialog [data-tower-add-quote-text] {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #f7f9ff !important;
+}
+.tower-add-widget-dialog [data-tower-add-quote-text]:focus,
+.tower-add-widget-dialog [data-tower-add-quote-text]:focus-visible {
+  border-color: rgba(217, 210, 240, 0.4) !important;
+  outline: 2px solid #d9d2f0 !important;
+  outline-offset: 1px;
+  box-shadow: none !important;
+}
+.tower-add-widget-dialog [data-tower-add-quote-text]::placeholder {
+  color: #d9d2f0 !important;
+  opacity: 1;
+}
+.tower-add-widget-dialog-card .tower-add-quote-status {
+  margin: 0 0 0.75rem;
+  background: #fbe3e6 !important;
+  border: 1px solid #e88a99 !important;
+  color: #1c1630 !important;
+}
+
+/* SIGNAL Feed "Send a signal": PERSONAL | PROFESSIONAL post-as switch
+   (Designer spec, Oct 22). Same line as the heading, right edge; under-tab pipe
+   style: Oswald, the side you post as lit #f7f9ff, the other #d9d2f0 at 60%,
+   pipe #d9d2f0 at 40%. Hidden unless the member owns a Professional page
+   (js/signal-post-as.js). One line at 390. */
+#panel-signal .signal-feed-host .signal-compose-head[data-signal-compose-head] {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+  min-width: 0;
+  margin: 0 0 0.35rem;
+}
+#panel-signal .signal-feed-host .signal-compose-head[data-signal-compose-head] > .tower-block-heading {
+  margin: 0;
+  min-width: 0;
+  white-space: nowrap;
+}
+#panel-signal .signal-feed-host .signal-post-as[data-signal-post-as] {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  flex: 0 0 auto;
+  margin: 0 0 0 auto;
+  white-space: nowrap;
+}
+#panel-signal .signal-feed-host .signal-post-as[data-signal-post-as][hidden] {
+  display: none;
+}
+#panel-signal .signal-feed-host .signal-post-as-side[data-signal-post-as-btn] {
+  appearance: none;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0;
+  min-height: 0;
+  font-family: "Oswald", system-ui, sans-serif !important;
+  font-weight: 800 !important;
+  font-size: clamp(0.72rem, 1.6vw, 0.92rem) !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase;
+  line-height: 1.1;
+  text-shadow: none;
+  color: rgba(217, 210, 240, 0.6) !important;
+  cursor: pointer;
+}
+#panel-signal .signal-feed-host .signal-post-as-side[data-signal-post-as-btn][aria-checked="true"] {
+  color: #f7f9ff !important;
+  cursor: default;
+}
+#panel-signal .signal-feed-host .signal-post-as-side[data-signal-post-as-btn]:focus-visible {
+  outline: 1px solid rgba(217, 210, 240, 0.6);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+#panel-signal .signal-feed-host .signal-post-as-sep {
+  font-family: "Oswald", system-ui, sans-serif !important;
+  font-weight: 700 !important;
+  font-size: clamp(0.72rem, 1.6vw, 0.92rem) !important;
+  color: rgba(217, 210, 240, 0.4) !important;
+  user-select: none;
+}
+@media (max-width: 640px) {
+  #panel-signal .signal-feed-host .signal-post-as-side[data-signal-post-as-btn],
+  #panel-signal .signal-feed-host .signal-post-as-sep {
+    font-size: 0.65rem !important;
+  }
+  #panel-signal .signal-feed-host .signal-post-as[data-signal-post-as] {
+    gap: 0.22rem;
+  }
+}
+
+/* Send a signal status box: failures only (Alexa, Oct 22 11:45 AM CT: no
+   "Posted to Feed." notice on success; the post at the top of the Feed and the
+   cleared composer confirm it). Designer spec: site glass rgba(18,16,38,.92),
+   1px #e88a99 at 70%, #f7f9ff text; 12px blur, 12px radius, 14px site sans,
+   10px 14px padding, left edge on the Share field, 12px above and below (the
+   form is a grid with a 0.35rem row gap, so the margin tops that up). No slab,
+   no warm accent, no icon. */
+#panel-signal .signal-feed-host .tower-compose[data-tower-compose] .commune-status[data-tower-status] {
+  margin: calc(12px - 0.35rem) 0 !important;
+  padding: 10px 14px !important;
+  background: rgba(18, 16, 38, 0.92) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(232, 138, 153, 0.7) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+  color: #f7f9ff !important;
+  font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif) !important;
+  font-size: 14px !important;
+  line-height: 1.45;
+  max-width: none;
+  width: auto;
+}
+#panel-signal .signal-feed-host .tower-compose[data-tower-compose] .commune-status[data-tower-status][hidden] {
+  display: none !important;
+}
+
+/* Feed card byline: the page that posted (Personal or Professional) with its
+   picture or initials, linking to that page. */
+.tower-post-meta .tower-author-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.tower-post-meta .tower-author-link:hover .tower-author-name,
+.tower-post-meta .tower-author-link:focus-visible .tower-author-name {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.tower-post-meta .tower-author-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(18, 16, 38, 0.92);
+  border: 1px solid rgba(217, 210, 240, 0.4);
+  color: #f7f9ff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.tower-post-meta .tower-author-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Send a signal Post button while a post is in flight: disabled (no double
+   posts), shown dimmed so the wait reads; back to normal on success or error. */
+#panel-signal [data-tower-compose] [data-tower-post-submit]:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+/* Feed card timestamp (Designer, Oct 22): the date fell back to a serif face.
+   Site body sans in #d9d2f0, 13px (12px at 390), right-aligned on the name line. */
+#panel-signal .tower-feed[data-tower-feed] .tower-post-meta {
+  align-items: center;
+}
+#panel-signal .tower-feed[data-tower-feed] .tower-post-meta > time {
+  margin-left: auto;
+  flex: 0 0 auto;
+  text-align: right;
+  white-space: nowrap;
+  font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif) !important;
+  font-size: 13px !important;
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: normal;
+  line-height: 1.3;
+  color: #d9d2f0 !important;
+}
+@media (max-width: 640px) {
+  #panel-signal .tower-feed[data-tower-feed] .tower-post-meta > time {
+    font-size: 12px !important;
+  }
+}
+
+/* Designer nits (follow-up to #228/#232).
+   (a) Followers "Search followers" is a glass input spanning the full card width. */
+#panel-tower .tower-sticker--followers .tower-followers {
+  max-width: none;
+}
+#panel-tower .tower-sticker--followers .tower-followers-find {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(18, 16, 38, 0.92) !important;
+  color: #f7f9ff !important;
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+}
+#panel-tower .tower-sticker--followers .tower-followers-find::placeholder {
+  color: #d9d2f0 !important;
+  opacity: 1;
+}
+/* (b) The empty YouTube box fills the card width at 16:9 at every width
+   (#234 desktop; #235 extends it below 768px to match the full-width link field). */
+#panel-tower .tower-sticker--youtube .tower-pro-youtube {
+  width: 100%;
+}
+#panel-tower .tower-sticker--youtube .tower-pro-youtube-screen {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 0;
+  height: auto;
+}
+
+/* Saved side-column (free) layout at 1280: the YouTube card is absolutely placed and
+   shrink-to-fit, so the 100% widths above had nothing to resolve against and the card
+   collapsed to its padding (21.5x16.8). It takes its column width (--yt-col-w, set by
+   the layout pass) with an 18.5rem floor, capped at the stage; a saved width
+   (data-sticker-w) still wins but never drops below the floor. Grid layouts and phone
+   (always the grid) are unchanged. */
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--youtube {
+  min-width: min(18.5rem, 100%);
+  box-sizing: border-box;
+}
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--youtube:not([data-sticker-w]) {
+  width: max(18.5rem, var(--yt-col-w, 18.5rem));
+  max-width: 100%;
+}
+
+/* Designer nits 2 (follow-up to #234), TOWER Professional page.
+   (a) Owner "Paste a YouTube link": same glass input as Search followers, full card
+       width, 8px below the video box. Font size and padding match Search followers
+       (0.82rem, 0.28rem 0.45rem); radius unchanged. */
+#panel-tower .tower-sticker--youtube .tower-pro-youtube-owner {
+  width: 100%;
+  max-width: none;
+  margin-top: 8px;
+}
+#panel-tower .tower-sticker--youtube .tower-pro-youtube-owner .tower-music-url-label input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(18, 16, 38, 0.92) !important;
+  color: #f7f9ff !important;
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  font-size: 0.82rem;
+  padding: 0.28rem 0.45rem;
+}
+#panel-tower .tower-sticker--youtube .tower-pro-youtube-owner .tower-music-url-label input::placeholder {
+  color: #d9d2f0 !important;
+  opacity: 1;
+}
+/* (b) Owner Followers title: the drag-dot gutter (r4/postlive149) is unused because
+   #panel-tower hides every .tower-sticker-handle, so the title starts at the card
+   padding like "No followers yet." Calendar keeps its rule. */
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker--followers .tower-widget-title {
+  margin-left: 0;
+  padding-left: 0;
+}
+
+/* Designer (Oct 22): owner-only music player link field ("Paste a YouTube link"
+   under the Personal music player) uses the same glass input as Search followers
+   and the Pro YouTube link field: dark glass, 1px lilac border, light text and
+   placeholder, Search followers' font size and padding (0.82rem, 0.28rem 0.45rem)
+   and so its height, full card width. The look buttons keep their 18.5rem row. */
+#panel-tower .tower-sticker--music .tower-music-owner {
+  width: 100%;
+  max-width: none;
+}
+#panel-tower .tower-sticker--music .tower-music-owner .tower-music-looks {
+  width: 18.5rem;
+  max-width: 100%;
+}
+#panel-tower .tower-sticker--music .tower-music-owner .tower-music-url-label input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(18, 16, 38, 0.92) !important;
+  color: #f7f9ff !important;
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  font-size: 0.82rem;
+  padding: 0.28rem 0.45rem;
+}
+#panel-tower .tower-sticker--music .tower-music-owner .tower-music-url-label input::placeholder {
+  color: #d9d2f0 !important;
+  opacity: 1;
+}
+
+/* Edit profile title + Pro setup notice (Designer, Oct 22).
+   (a) The "Edit profile" sheet title fell back to a serif face. Body sans at
+       weight 600, the same fix as the SIGNAL Feed timestamp. */
+#panel-tower .tower-profile-edit-sheet-title {
+  font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif) !important;
+  font-weight: 600 !important;
+  font-style: normal;
+  letter-spacing: normal;
+}
+/* (b) "Your professional page is set up." (shown once, right after the first
+   Pro setup): dark glass notice, white text, 1px lilac border. No brown. */
+#panel-tower .tower-add-profile-row .commune-status.tower-pro-setup-notice {
+  margin: 0;
+  background: rgba(18, 16, 38, 0.92) !important;
+  color: #f7f9ff !important;
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  box-shadow: none !important;
+}
+
+/* Edit profile > Show hidden widgets (#242 follow-up). Owner only, quiet:
+   muted label, one row per hidden widget, small secondary Show button.
+   Existing tokens only. The section is fully hidden when nothing is hidden. */
+#panel-tower .tower-profile-edit-dropdown .tower-hidden-widgets-fields[hidden] { display: none !important; }
+#panel-tower .tower-profile-edit-dropdown .tower-hidden-widgets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+#panel-tower .tower-profile-edit-dropdown .tower-hidden-widget-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-width: 0;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-hidden-widget-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--cgn-text-muted, rgba(232, 240, 255, 0.66)) !important;
+}
+#panel-tower .tower-profile-edit-dropdown .tower-hidden-widget-show {
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.2;
+}
+
+/* Show hidden widgets notice (Designer LOOK on #244): the #237 dark glass
+   notice, in the section where the shown row was. The same notice carries a
+   Remove line at the end of the owner-only toolbar above the stage. */
+#panel-tower .tower-stage-notice.tower-hidden-widget-notice,
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .tower-hidden-widget-notice {
+  margin: 0 !important;
+  padding: 10px 12px !important;
+  background: rgba(18, 16, 38, 0.92) !important;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  color: #f7f9ff !important;
+  font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif);
+  font-size: 14px !important;
+  line-height: 1.35 !important;
+}
+/* Edit profile's own status line ([data-tower-profile-status]: Save, Remove
+   lines) took the site-wide .commune-status accent-dim tint, which reads brown on the
+   dark sheet. Same dark glass here only; .commune-status elsewhere is unchanged. */
+#panel-tower .tower-profile-edit-dropdown .commune-status[data-tower-profile-status]:not(.is-error) {
+  background: rgba(18, 16, 38, 0.92) !important;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  color: #f7f9ff !important;
+}
+
+/* Edit profile status glass (pairs with #244). Inside Edit profile only:
+   the Add a professional page status box and the Calendar booking and
+   editor lines. Same dark glass as the #237 / #244 notice. Error lines keep the glass with
+   a soft rose border. The shared .commune-status rule is left as it is. */
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .commune-status[data-tower-add-profile-status],
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .commune-status[data-tower-cal-book-status],
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .commune-status[data-tower-cal-editor-status] {
+  margin: 0;
+  padding: 10px 12px !important;
+  background: rgba(18, 16, 38, 0.92) !important;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(217, 210, 240, 0.4) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  color: #f7f9ff !important;
+  -webkit-text-fill-color: #f7f9ff !important;
+  font-family: var(--cgn-ui, ui-sans-serif, system-ui, sans-serif) !important;
+  font-size: 14px !important;
+  line-height: 1.35 !important;
+}
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .commune-status.is-error[data-tower-add-profile-status],
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .commune-status.is-error[data-tower-cal-book-status],
+#panel-tower .tower-profile-edit-dropdown.tower-profile-edit-dropdown .commune-status.is-error[data-tower-cal-editor-status] {
+  border: 1px solid rgba(232, 138, 153, 0.7) !important;
+}
+
+/* TOWER Feed contrast (Designer follow-up). TOWER Feed only (.tower-feed[data-tower-feed]
+   and the "Send a signal" composer in the same Feed panel):
+   - post cards use the site glass rgba(18,16,38,.92) so the existing body text reads
+     (about 6.6:1, was about 1.9:1 on the grey card), with 12px inner padding so text
+     and dates don't touch the card edge, and an 8px gap between cards;
+   - no outer border on the Feed list (it had the global hard black panel border);
+   - the composer uses the same glass; its placeholder moves to #d9d2f0 so it reads on
+     the glass. Buttons and behaviour unchanged.
+   The Times, the Demo badge and other panels are untouched. */
+.tower-feed[data-tower-feed] {
+  border: 0 !important;
+  gap: 8px !important;
+}
+.tower-feed[data-tower-feed] .tower-post {
+  background: rgba(18, 16, 38, 0.92) !important;
+  padding: 12px !important;
+}
+#panel-signal .signal-feed-host .tower-compose[data-tower-compose] {
+  background: rgba(18, 16, 38, 0.92) !important;
+}
+#panel-signal .signal-feed-host .tower-compose[data-tower-compose] textarea::placeholder {
+  color: #d9d2f0 !important;
+  opacity: 1;
+}
+[data-research-room] .research-line { display: flex; justify-content: space-between; gap: 0.45rem; align-items: flex-start; }
+[data-research-room] .research-line .news-report-option { width: auto; flex: none; }
+
+/* Header lockup only. A tight per-letter shadow. No ellipse, bloom,
+   or pink-and-blue wash behind the word or the brain. */
+.cognation-masthead {
+  background: linear-gradient(145deg, #10122b, #251839);
+}
+.cognation-masthead-home,
+.cognation-masthead-home:hover,
+.cognation-masthead-home:focus-visible {
+  text-shadow: 0 2px 2px rgba(6, 8, 22, 0.55);
+}
+.cognation-masthead-brain,
+.cognation-masthead-brain img {
+  filter: none;
+}
+.cognation-masthead-brain::before {
+  content: none;
+  background: none;
+  filter: none;
+  border-radius: 0;
+}
+.cognation-masthead-brain img {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.people-search-results .people-search-row {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #f7fbff !important;
+  border: 0 !important;
+}
+.people-search-results .people-search-name,
+.people-search-results .people-search-handle,
+.people-search-results .people-search-open {
+  color: #f7fbff !important;
+}
+.people-search-results .people-search-kind {
+  color: #a8f4ff !important;
+}
+.people-search-results .people-search-row[data-result-kind="professional"] .people-search-kind {
+  color: #ffd7a8 !important;
+}
+.people-search-results .people-search-row:hover,
+.people-search-results .people-search-row:focus {
+  background: rgba(255, 255, 255, 0.1) !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+

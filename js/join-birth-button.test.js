@@ -15,7 +15,7 @@ const css = fs.readFileSync(path.join(__dirname, "..", "css", "styles.css"), "ut
 assert.ok(/\[data-tower-is-owner="true"\] \[data-tower-follow-row\] \{ display: none/.test(css), "css guard");
 assert.ok(/if \(!classroomAllowed\(\) && !liveBirthMissing\(\)\) return \[\];/.test(swipe), "classroom card stays visible with no birth row");
 assert.ok(/openLiveRoom\(session, scroll, \{ classroom: true \}\)/.test(swipe), "classroom joins live");
-assert.ok(/sqlId: "a2000000-0000-4000-8000-000000000001"/.test(swipe), "classroom has a real room id");
+assert.ok(/sqlId: page\.roomSqlId \|\| ""/.test(swipe), "live classroom carries its real room id");
 assert.ok(/\["under_18", /.test(swipe), "under_18 mapped");
 assert.ok(/function isOwnHandleOrFriendId/.test(follow) && /isOwnHandleOrFriendId\(p\)\) return true/.test(follow), "own Tower by handle");
 const bp = fs.readFileSync(path.join(__dirname, "birth-prompt.js"), "utf8");

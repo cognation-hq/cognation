@@ -148,7 +148,7 @@ assert.strictEqual(stores.session.getItem(adult.MODE_KEY), "professional", "mode
    Pop culture: the real "you might know" pages and the four Podcast cards show, each once, 1:1. */
 var proDeck = adult.sampleDeck(18);
 assert.strictEqual(proDeck.map(function (c) { return c.type; }).join(","),
-  "pro-know,pro-podcast,pro-podcast,pro-podcast,pro-podcast", "one people card, then the Podcast cards, no filler: " + proDeck.map(function (c) { return c.id; }));
+  "pro-know,pro-podcast,pro-podcast,pro-podcast", "one people card, then the Podcast cards, no filler: " + proDeck.map(function (c) { return c.id; }));
 assert.ok(proDeck.every(function (c) { return c.type !== "pro-webinar"; }), "no Webinar card while nothing is live");
 var banned = ["dating", "know", "friend", "ad", "classroom", "chatroom", "fact", "wellness", "event", "content"];
 proDeck.forEach(function (c) {
@@ -172,7 +172,7 @@ assert.strictEqual(know[0].people.map(function (r) { return r.profileId; }).join
 assert.strictEqual(know[0].why, "Matched to your field and interests.", "why line (Designer v2)");
 
 var podcasts = lanes0["pro-podcast"].map(function (c) { return c.title + " " + c.body; }).join(" ");
-assert.ok(/not only Cognation experts/.test(podcasts) && /Ethical/i.test(podcasts) && /async/i.test(podcasts) && /Continuing education/i.test(podcasts), "podcast topics");
+assert.ok(/not only Cognation experts/.test(podcasts) && /Ethical/i.test(podcasts) && /Continuing education/i.test(podcasts), "podcast topics");
 assert.ok(!/Demo · placeholder/.test(swipeSrc) && !/proPlaceholder/.test(swipeSrc), "no placeholder card builder or label");
 assert.ok(/data-type-mark=/.test(swipeSrc) && /Why you see this:/.test(swipeSrc), "type mark + why line rendered");
 

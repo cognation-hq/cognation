@@ -103,27 +103,27 @@ function assertReal(deck, label) {
   ids.forEach(function (id, i) { assert.strictEqual(ids.indexOf(id), i, label + ": no repeated card " + id); });
 }
 
-/* 3. Podcast stays, without the Demo label: copy and why line kept, no button or link. */
+/* 3. Podcast stays, without the Demo label: copy and why line kept. Enter room joins that chat. */
 var sess = memoryStorage(); sess.setItem("cognation.commune.mode", "professional");
 var none = loadSwipe(adultStores([]), sess);
 var lanes = none.buildProfessionalLanes();
 var pods = lanes["pro-podcast"];
 assert.strictEqual(pods.map(function (c) { return c.title; }).join("|"),
-  "Top industry performers|Ethical collaboration|Async by default|Continuing education", "four Podcast cards kept");
+  "Top industry performers|Ethical collaboration|Continuing education", "Podcast cards kept");
 assert.strictEqual(pods[0].body, "Talks with leading people across industries, not only Cognation experts.", "copy kept");
 pods.forEach(function (c) {
   assert.ok(!c.demo, "Podcast not flagged demo: " + c.id);
   assert.strictEqual(c.why, "Picked by topic: ethics, async work, continuing education.", "why line kept");
   assert.ok(!c.handle && !c.url && !c.href, "Podcast card has no destination to link to: " + c.id);
 });
-assert.ok(!/PRO\.PODCAST[\s\S]{0,200}<(button|a)\b/.test(swipe), "no Podcast button or link that leads nowhere");
+assert.ok(/data-podcast-join/.test(swipe) && /function openPodcast/.test(swipe), "Podcast Enter room joins that chat");
 
 /* 4. Lanes with no real data are empty; the deck skips them and never spins. */
 ["pro-webinar", "pro-know", "pro-research", "pro-auction", "pro-field", "pro-popculture"].forEach(function (t) {
   assert.strictEqual(lanes[t].length, 0, "empty lane " + t);
 });
 var only = none.sampleDeck(18);
-assert.strictEqual(only.length, 4, "only the four Podcast cards, each once");
+assert.strictEqual(only.length, 3, "only the Podcast cards, each once");
 assertReal(only, "podcast-only");
 var t0 = Date.now();
 assert.strictEqual(none.paceProfessional({}, 50).length, 0, "all lanes empty -> empty deck");
@@ -140,7 +140,7 @@ var sess2 = memoryStorage(); sess2.setItem("cognation.commune.mode", "profession
 var real = loadSwipe(adultStores(pages), sess2, { CognationProLive: { livePages: function () { return live; } } });
 var deck = real.sampleDeck(18);
 assert.strictEqual(deck.map(function (c) { return c.type; }).join(","),
-  "pro-webinar,pro-know,pro-podcast,pro-podcast,pro-podcast,pro-podcast",
+  "pro-webinar,pro-know,pro-podcast,pro-podcast,pro-podcast",
   "1:1 across real lanes; an exhausted lane drops out: " + deck.map(function (c) { return c.id; }));
 assertReal(deck, "mixed");
 

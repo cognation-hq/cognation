@@ -164,7 +164,6 @@
   var PRO_PODCASTS = [
     { id: "pro-podcast-leaders", title: "Top industry performers", body: "Talks with leading people across industries, not only Cognation experts." },
     { id: "pro-podcast-ethics", title: "Ethical collaboration", body: "How strong teams share credit and work through disagreement." },
-    { id: "pro-podcast-async", title: "Async by default", body: "Episodes on remote and async craft. Listen on your own schedule." },
     { id: "pro-podcast-ce", title: "Continuing education", body: "Episodes that pair with continuing-education goals." },
   ];
   /* The legacy classroom panel. Not the deck's classroom CARD (it also carries
@@ -2027,10 +2026,12 @@
     lanes[PRO.WEBINAR] = liveWebinarCards();
     lanes[PRO.KNOW] = professionalsYouMightKnow();
     lanes[PRO.AUCTION] = scheduledAuctionCards();
-    lanes[PRO.PODCAST] = PRO_PODCASTS.map(function (w) {
+    var podcastCards = PRO_PODCASTS.map(function (w) {
       return { id: w.id, type: PRO.PODCAST, title: w.title, body: w.body,
         why: "Picked by topic: ethics, async work, continuing education.", rating: "G", minAge: 0, keepOnly: true };
     });
+    var podcastApi = window.CognationEchoPodcast;
+    lanes[PRO.PODCAST] = podcastApi && podcastApi.present ? podcastApi.present(podcastCards) : podcastCards;
     lanes[PRO.MOGUL] = mogulCards();
     lanes[PRO.DOCTORAL] = doctoralCards();
     lanes[PRO.ETHICS] = ethicsCards();
@@ -2495,6 +2496,7 @@
       if (card.type === "pro-college") {
         html += '<button type="button" class="btn btn-primary" data-college-open>Enter room</button>';
       }
+      if (card.type === PRO.PODCAST) html += '<button type="button" class="btn btn-primary" data-podcast-join>Enter room</button>';
       el.innerHTML = html;
       return el;
     }
@@ -2737,6 +2739,11 @@
       wireClassroomCardClick(el, card, openAiAtWork);
     }
     if (card.type === PRO.BUSINESS) wireClassroomCardClick(el, card, openBusiness);
+    if (card.type === PRO.PODCAST) {
+      var joinPod = el.querySelector("[data-podcast-join]");
+      if (joinPod) joinPod.addEventListener("click", function (ev) { ev.stopPropagation(); openPodcast(card.id); });
+      wireClassroomCardClick(el, card, openPodcast);
+    }
     if (card.type === "pro-licensure") {
       var openLic = el.querySelector("[data-licensure-open]");
       if (openLic) openLic.addEventListener("click", function (ev) { ev.stopPropagation(); openLicensure(card.id); });
@@ -3463,6 +3470,7 @@
     if (window.CognationEchoEthics) window.CognationEchoEthics.clearChrome(panel);
     if (window.CognationEchoBusiness) window.CognationEchoBusiness.clearChrome(panel);
     if (window.CognationEchoExecutives) window.CognationEchoExecutives.clearChrome(panel);
+    if (window.CognationEchoPodcast) window.CognationEchoPodcast.clearChrome(panel);
     if (log) paintLiveLog(opts.messages || state.liveMessages || []);
     showRoom(true);
     state.roomId = room.id;
@@ -3749,6 +3757,19 @@
     setStatus("You're in the Executives chatroom.");
     return true;
   }
+  function openPodcast(cardId) {
+    var api = window.CognationEchoPodcast, card = null, panel = roomEl();
+    function take(list) { (list || []).forEach(function (c) { if (!card && c && (c.id === cardId || c.roomId === cardId)) card = c; }); }
+    take(state.cards);
+    take(buildProfessionalLanes()[PRO.PODCAST]);
+    if (!api || !card || !panel) return false;
+    var joined = api.join(card.roomId || card.id, card);
+    if (!joined.ok) { setStatus(joined.message || "That podcast room is not available."); if (joined.full) rebuildDeck(); return false; }
+    state.roomId = joined.roomId || card.roomId; state.liveRoom = false; state.roomSqlId = "";
+    ensureRoomHeader(panel); wireRoomSwipe(panel); api.paint(panel, state.roomId); showRoom(true);
+    setStatus("You're in this podcast's chatroom.");
+    return true;
+  }
   function clearPointer() {
     var el = state.pointer && state.pointer.el;
     if (el) {
@@ -3765,6 +3786,7 @@
     if (window.CognationEchoEthics) window.CognationEchoEthics.clearChrome(roomEl());
     if (window.CognationEchoBusiness) window.CognationEchoBusiness.clearChrome(roomEl());
     if (window.CognationEchoExecutives) window.CognationEchoExecutives.clearChrome(roomEl());
+    if (window.CognationEchoPodcast) window.CognationEchoPodcast.clearChrome(roomEl());
     var wasLive = state.liveRoom;
     var sqlId = state.roomSqlId;
     state.roomId = "";
@@ -4606,6 +4628,13 @@
           setStatus(executivesSent && executivesSent.ok ? "Sent." : (executivesSent && executivesSent.message) || "Couldn't send.");
           return;
         }
+        if (window.CognationEchoPodcast && window.CognationEchoPodcast.isRoom(state.roomId)) {
+          var podcastSent = window.CognationEchoPodcast.post(state.roomId, body);
+          if (input) input.value = "";
+          window.CognationEchoPodcast.paint(roomEl(), state.roomId);
+          setStatus(podcastSent && podcastSent.ok ? "Sent." : (podcastSent && podcastSent.message) || "Couldn't send.");
+          return;
+        }
         if (state.licensureRoom && window.CognationLicensure) {
           var licApi = window.CognationLicensure;
           var licRes = licApi.comment(state.roomId, currentProfileId(), viewerDisplayName(), body);
@@ -4713,6 +4742,7 @@
   window.CognationCommuneSwipe = {
     rebuild: rebuildDeck,
     openRoom: openRoom,
+    openPodcast: openPodcast,
     liveChatEligible: liveChatEligible,
     mapChatRoomError: mapChatRoomError,
     openClassroom: openClassroom,

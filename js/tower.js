@@ -3517,7 +3517,17 @@
   function syncOwnerPeoplePill(root, profile, owner) {
     if (!root) return;
     var pro = profileIsProfessional(profile);
+    var houseHandle = String((profile && profile.handle) || "").replace(/^@/, "").toLowerCase();
+    var housePage = pro && (
+      String((profile && (profile._profileId || profile.id)) || "") === "prof-alexa-professional" ||
+      houseHandle === "alexa-pro" ||
+      houseHandle === "cognation"
+    );
     root.querySelectorAll("[data-tower-add-friends]").forEach(function (el) {
+      if (housePage) {
+        el.hidden = true;
+        return;
+      }
       if (owner) {
         el.textContent = pro ? "Find people" : "Find friends";
         el.setAttribute("aria-label", pro ? "Find people to follow" : "Find friends");
@@ -5764,6 +5774,35 @@
     return !!(p && (p._profileKind === "professional" || p.kind === "professional"));
   }
 
+  function houseProfessional(p) {
+    if (!profileIsProfessional(p)) return false;
+    var id = String((p && (p._profileId || p.id)) || "");
+    var handle = String((p && p.handle) || "").replace(/^@/, "").toLowerCase();
+    return id === "prof-alexa-professional" || handle === "alexa-pro" || handle === "cognation";
+  }
+
+  function personalNameOnPro(name) {
+    var folded = String(name || "").trim().toLowerCase().replace(/\s+/g, " ");
+    return folded === "alexa" || folded === "alexa thomas" || folded === "alexa j thomas" || folded === "alexa j. thomas";
+  }
+
+  /* Professional pages keep their own name. The personal name stays off that page. */
+  function publicProfileName(p) {
+    var name = String((p && p.displayName) || "").trim();
+    if (!profileIsProfessional(p)) return name || "You";
+    if (personalNameOnPro(name) || (houseProfessional(p) && (!name || name.toLowerCase() === "you"))) {
+      return houseProfessional(p) ? "Cognation" : "";
+    }
+    return name;
+  }
+
+  function housePersonal(p) {
+    if (!p || profileIsProfessional(p)) return false;
+    var id = String(p._profileId || p.id || "");
+    var handle = String(p.handle || "").replace(/^@/, "").toLowerCase();
+    return id === "prof-alexa-personal" || handle === "alexa";
+  }
+
   function recordIsSeed(rec) {
     if (!rec) return false;
     if (window.CognationSeedOps && typeof window.CognationSeedOps.classify === "function") {
@@ -5852,7 +5891,11 @@
     }
     function allow(id) {
       if (!keep(id)) return false;
+      var idKey = String(id || "").toLowerCase();
+      /* Cognation is a friend on the personal page, not a top-friend pin and not a follower. */
+      if (idKey === "cognation" || idKey === "alexa-pro" || idKey === "prof-alexa-professional") return false;
       var rec = lookupFriendRecord(id);
+      if (rec && (rec.kind === "professional" || rec._profileKind === "professional")) return false;
       var seed = recordIsSeed(rec) || (!rec && recordIsSeed({ id: id, handle: id }));
       var ops = recordIsOps(rec) || (!rec && recordIsOps({ id: id, handle: id }));
       if (seedPage) return seed && !ops;
@@ -5877,7 +5920,7 @@
   function removeTopFriendPin(p, friendId) {
     if (!p || profileIsProfessional(p)) return false;
     friendId = String(friendId || "");
-    if (!friendId) return false;
+    if (!friendId || friendId.toLowerCase() === "cognation") return false;
     p.featuredFriendIds = resolveTopFriendIds(p).filter(function (id) { return id !== friendId; });
     if (!Array.isArray(p.removedFriendPinIds)) p.removedFriendPinIds = [];
     if (p.removedFriendPinIds.indexOf(friendId) < 0) p.removedFriendPinIds.push(friendId);
@@ -5998,6 +6041,11 @@
   function addTowerFriend(id) {
     id = String(id || "");
     if (!id || id === "alexa-thomas") return { ok: false, error: "self" };
+    var idKey = id.toLowerCase();
+    /* Cognation is added at signup. There is no button that adds or removes it. */
+    if (idKey === "cognation" || idKey === "alexa-pro" || idKey === "prof-alexa-professional") {
+      return { ok: false, error: "not-a-friend" };
+    }
     var personal = viewerPersonalRecord();
     if (!personal || personal.kind === "professional") return { ok: false, error: "not-personal" };
     /* SeedOps: real ↛ seed/ops */
@@ -6231,9 +6279,11 @@
     }
     if (list) list.innerHTML = "";
     if (note) {
-      note.textContent = edges.length
-        ? edges.length + (edges.length === 1 ? " follower" : " followers")
-        : "No followers yet.";
+      note.textContent = houseProfessional(p)
+        ? "134k followers"
+        : edges.length
+          ? edges.length + (edges.length === 1 ? " follower" : " followers")
+          : "No followers yet.";
     }
     if (mutual) {
       var subject = String((p && (p.displayName || p.handle)) || "this person").trim() || "this person";
@@ -6246,6 +6296,7 @@
       var id = String(edge.id || "");
       var face = normalizeFollowerFace(edge.face);
       var label = followerDisplayName(id) || id;
+      if (personalNameOnPro(label)) return;
       var li = document.createElement("li");
       li.className = "tower-followers-hit";
       li.setAttribute("data-follower-face", face);
@@ -8858,7 +8909,7 @@
         phone: phone,
         kind: kind,
         handle: kind === "professional" ? handleBase + "-pro" : handleBase,
-        displayName: kind === "professional" ? "Alexa J Thomas" : "Alexa",
+        displayName: kind === "professional" ? "Cognation" : "Alexa",
       });
       if (!result.ok) {
         try { console.warn("[tower] add page failed", result.error); } catch (eLog) {}
@@ -11648,13 +11699,38 @@
       /* Placeholder: the slot keeps the default label's width and height, but
          its text is hidden (css .is-loading) so no name shows. */
       nameEl.classList.toggle("is-loading", loading);
-      nameEl.textContent = loading ? "You" : p.displayName || "You";
+      nameEl.textContent = loading ? "You" : publicProfileName(p) || "You";
     }
     applyDisplayNameSize(root, p.displayNameSize || 28);
+    var mutual = root.querySelector("[data-tower-mutual-friends]");
+    if (mutual) {
+      var cognationFriend = mutual.parentNode && mutual.parentNode.querySelector("[data-cognation-friend]");
+      if (profileIsProfessional(p)) {
+        mutual.hidden = !houseProfessional(p);
+        if (houseProfessional(p)) mutual.textContent = "Following";
+        if (cognationFriend) cognationFriend.hidden = true;
+      } else {
+        mutual.hidden = false;
+        if (housePersonal(p)) mutual.textContent = "400 friends";
+        if (!cognationFriend && mutual.parentNode) {
+          cognationFriend = document.createElement("p");
+          cognationFriend.className = "tower-mutual-friends";
+          cognationFriend.setAttribute("data-cognation-friend", "");
+          mutual.parentNode.insertBefore(cognationFriend, mutual.nextSibling);
+        }
+        if (cognationFriend) {
+          cognationFriend.hidden = false;
+          cognationFriend.textContent = "Cognation";
+        }
+      }
+    }
     initDisplayNameResize(root);
     var handleBadge = root.querySelector("[data-tower-handle-badge]");
     var handleVal = normalizeHandle(p.handle || "");
-    if (handleBadge && document.activeElement !== handleBadge) {
+    if (handleBadge && houseProfessional(p) && !isTowerOwner(p)) {
+      handleBadge.hidden = true;
+      handleBadge.textContent = "";
+    } else if (handleBadge && document.activeElement !== handleBadge) {
       var ownerEditing = !loading && isTowerOwner(p) && root.getAttribute("data-tower-side") === "public";
       handleBadge.classList.toggle("is-owner-editable", ownerEditing);
       if (handleVal) {
@@ -11707,7 +11783,7 @@
       } else {
         avatar.style.removeProperty("background-image");
         if (avatarPhoto) avatarPhoto.remove();
-        avatar.textContent = loading ? "" : initials(p.displayName);
+        avatar.textContent = loading ? "" : initials(publicProfileName(p));
       }
     }
     var polaroidPrints = polaroidPrintList(p);

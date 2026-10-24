@@ -1781,6 +1781,12 @@
     return [];
   }
 
+  function researchRoomCards() {
+    var api = window.CognationResearchRoom;
+    if (!api || typeof api.cards !== "function" || !hasInterest(["research"])) return [];
+    return api.cards();
+  }
+
   function buildProfessionalLanes() {
     var lanes = {};
     /* Webinar cards only while a Professional page is live. None live: lane empty. */
@@ -1791,8 +1797,8 @@
       return { id: w.id, type: PRO.PODCAST, title: w.title, body: w.body,
         why: "Picked by topic: ethics, async work, continuing education.", rating: "G", minAge: 0, keepOnly: true };
     });
-    /* Research, Field update and Pop culture have no real feed: no cards. */
-    lanes[PRO.RESEARCH] = [];
+    /* Research chat only if this person lists research. Field and Pop culture stay empty. */
+    lanes[PRO.RESEARCH] = researchRoomCards();
     lanes[PRO.FIELD] = [];
     lanes[PRO.POP] = [];
     Object.keys(lanes).forEach(function (type) {
@@ -2139,6 +2145,10 @@
         html += "</ul>";
       }
       if (card.why) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
+      if (card.type === PRO.RESEARCH) {
+        html += '<button type="button" class="btn btn-primary" data-research-enter>Enter Research</button>';
+        if (card.full) html += '<p class="commune-card-meta">Full — another Research card is open.</p>';
+      }
       el.innerHTML = html;
       return el;
     }
@@ -2307,6 +2317,15 @@
     /* Alexa's rule: an ECHO card opens its own full-screen window or a Tower profile, nothing else. */
     if (card.type === TYPE.CHAT) {
       wireClassroomCardClick(el, card, function () { openRoom(card.id, true); });
+    }
+    if (card.type === PRO.RESEARCH) {
+      var openResearch = function () {
+        var api = window.CognationResearchRoom;
+        if (api && api.open) api.open(card.id);
+      };
+      var researchBtn = el.querySelector("[data-research-enter]");
+      if (researchBtn) researchBtn.addEventListener("click", function (ev) { ev.stopPropagation(); openResearch(); });
+      wireClassroomCardClick(el, card, openResearch);
     }
     if ((card.type === TYPE.KNOW || card.type === TYPE.FRIEND) && (card.profileId || card.handle)) {
       el.setAttribute("data-commune-opens-profile", "");

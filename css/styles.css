@@ -15861,5 +15861,7 @@ body.cgn-cal-page {
   color: #d9d2f0 !important;
   opacity: 1;
 }
+[data-research-room] .research-line { display: flex; justify-content: space-between; gap: 0.45rem; align-items: flex-start; }
+[data-research-room] .research-line .news-report-option { width: auto; flex: none; }
 
 

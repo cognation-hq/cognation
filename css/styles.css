@@ -15862,20 +15862,18 @@ body.cgn-cal-page {
   opacity: 1;
 }
 
-/* Header lockup only. A little shade, and a plain white light that
-   follows the letter shapes. No ellipse behind the word or the brain. */
+/* Header lockup only. A tight per-letter shadow. No ellipse, bloom,
+   or pink-and-blue wash behind the word or the brain. */
 .cognation-masthead {
-  background: none;
+  background: linear-gradient(145deg, #10122b, #251839);
 }
 .cognation-masthead-home,
 .cognation-masthead-home:hover,
 .cognation-masthead-home:focus-visible {
-  text-shadow:
-    0 4px 7px rgba(8, 10, 24, 0.48),
-    0 0 4px #fff,
-    0 0 9px rgba(255, 255, 255, 0.88);
+  text-shadow: 0 2px 2px rgba(6, 8, 22, 0.55);
 }
-.cognation-masthead-brain {
+.cognation-masthead-brain,
+.cognation-masthead-brain img {
   filter: none;
 }
 .cognation-masthead-brain::before {
@@ -15885,7 +15883,6 @@ body.cgn-cal-page {
   border-radius: 0;
 }
 .cognation-masthead-brain img {
-  filter: drop-shadow(0 8px 12px rgba(6, 8, 22, 0.38));
   -webkit-mask-image: none;
   mask-image: none;
 }

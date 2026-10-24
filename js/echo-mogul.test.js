@@ -11,7 +11,7 @@ function load(local, session) {
   var w = {};
   vm.runInContext(src("js/echo-mogul.js") + "\n" + src("js/commune-swipe.js"), vm.createContext({
     window: w, localStorage: local, sessionStorage: session, console: console,
-    document: { readyState: "complete", querySelector: function () { return null; }, addEventListener: function () {}, dispatchEvent: function () {} },
+    document: { readyState: "complete", querySelector: function () { return null; }, addEventListener: function () {}, dispatchEvent: function () {}, createElement: function () { return { setAttribute: function () {}, classList: { add: function () {} } }; } },
     CustomEvent: function (n, i) { this.type = n; this.detail = i && i.detail; },
     setTimeout: setTimeout, isFinite: isFinite, parseInt: parseInt, Date: Date, Math: Math, JSON: JSON, Object: Object, Array: Array, String: String, Number: Number,
   }));
@@ -26,11 +26,11 @@ session.setItem("cognation.commune.mode", "professional");
 var win = load(local, session), api = win.CognationCommuneSwipe, mogul = win.CognationEchoMogul;
 assert.strictEqual(api.siteRoomCatalog().length, 16);
 profile(local, ["insurance"], 30); who(local, "ada");
-assert.strictEqual(api.buildProfessionalLanes()["pro-mogul"].length, 0);
+assert.ok(api.buildProfessionalLanes()["pro-mogul"].length === 0 && api.renderCard({ id: "pro-mogul-stray", type: "pro-mogul", title: "Mogul", why: "Your interests include Mogul.", body: "chat" }).innerHTML.indexOf("Your interests include Mogul") < 0);
 api.settleSwipe({ id: "pro-mogul-stray", type: "pro-mogul" }, "left");
 assert.strictEqual(api.omitPassed([{ id: "pro-mogul-stray" }]).length, 0);
 profile(local, ["mogul"], 30);
-assert.ok(api.sampleDeck(24).some(function (c) { return c.type === "pro-mogul" && c.presenter === false && c.calendar === false; }));
+assert.ok(api.sampleDeck(24).some(function (c) { return c.type === "pro-mogul" && c.presenter === false && c.calendar === false; }) && api.renderCard({ id: "pro-mogul-1", type: "pro-mogul", title: "Mogul", why: "Your interests include Mogul.", body: "chat" }).innerHTML.indexOf("Your interests include Mogul") >= 0);
 api.setMode("personal");
 assert.ok(api.sampleDeck(12).every(function (c) { return c.type !== "pro-mogul"; }));
 api.setMode("professional"); profile(local, ["mogul"], 12);

@@ -2146,7 +2146,7 @@
         });
         html += "</ul>";
       }
-      if (card.why) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
+      if (card.why && (card.type !== PRO.MOGUL || hasInterest(["mogul", "moguls"]))) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
       el.innerHTML = html;
       return el;
     }

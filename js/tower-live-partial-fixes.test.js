@@ -52,10 +52,10 @@ assert.ok(parseFloat(m[1]) >= 0.35 + 1.6, "padding clears the 1.6rem handle at 0
 assert.ok(/var handleHit = ev\.target\.closest\("\[data-tower-sticker-handle\]"\);[\s\S]{0,200}ev\.target\.closest\("a, button/.test(tower), "pointerdown on a link never starts a drag (link keeps its click)");
 assert.ok(/a\.target = "_blank";/.test(tower) && /a\.href = href;/.test(tower), "chip link opens in a new tab");
 
-/* (3) Suggested hangouts hidden (fixed times, not saved data); Book stays off. */
-assert.ok(/var HANGOUT_SUGGESTIONS_LIVE = false;/.test(tower), "suggestions flag off");
-assert.ok(/if \(!HANGOUT_SUGGESTIONS_LIVE\) schedulerHtml = "";/.test(tower), "scheduler panel not rendered");
-assert.ok(/var HANGOUT_BOOKING_LIVE = false;/.test(tower), "Book stays off");
+/* (3) Suggested hangouts and Book write a calendar event. */
+assert.ok(!/HANGOUT_SUGGESTIONS_LIVE/.test(tower), "suggested hangouts stay visible");
+assert.ok(!/HANGOUT_BOOKING_LIVE/.test(tower), "Book is not switched off");
+assert.ok(/function addScheduledHangout\(/.test(tower), "booking writes a calendar event");
 
 /* PULSE friend tap → THAT friend's Tower, on main without #135 (live PASS on d4ff0f6). */
 (function () {

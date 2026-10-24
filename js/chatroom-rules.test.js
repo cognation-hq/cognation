@@ -1,0 +1,30 @@
+"use strict";
+var assert = require("assert"), fs = require("fs"), path = require("path"), vm = require("vm");
+function mem() { var d = {}; return { getItem: function (k) { return k in d ? d[k] : null; }, setItem: function (k, v) { d[k] = String(v); }, removeItem: function (k) { delete d[k]; } }; }
+var ctx = vm.createContext({ localStorage: mem(), document: { addEventListener: function () {} }, window: {} });
+vm.runInContext(fs.readFileSync(path.join(__dirname, "chatroom-rules.js"), "utf8"), ctx);
+var rules = ctx.window.CognationChatroomRules;
+var card = { id: "room-site-tech-ai", title: "Tech/AI", topic: "tech/ai", type: "chatroom" };
+assert.strictEqual(rules.setOccupancy(card.id, 100), true);
+var cards = rules.expand([card]);
+assert.strictEqual(cards[1].topic, "tech/ai");
+assert.strictEqual(cards[1].sqlId, "");
+var i, res;
+for (i = 0; i < 9; i++) res = rules.noteReport(card.id, "m1", "author", "r" + i, "Keep it kind");
+assert.strictEqual(res.kicked, false);
+res = rules.noteReport(card.id, "m1", "author", "r9", "Keep it kind");
+assert.strictEqual(res.kicked, true);
+assert.strictEqual(res.count, 10);
+assert.strictEqual(rules.noteReport("room-site-21", "m1", "author", "r0", "Keep it kind").kicked, false);
+var html = rules.extrasHtml(cards[0], function (s) { return String(s); });
+["Report", "kicked from this room", "Full · 100 / 100", "No presenter. No calendar event.", "Request to join on camera", "Chat log", "tech/ai"].forEach(function (bit) {
+  assert.ok(html.indexOf(bit) !== -1, bit);
+});
+assert.ok(rules.extrasHtml(cards[1], function (s) { return String(s); }).indexOf("New room · same topic") !== -1);
+for (i = 0; i < 15; i++) rules.requestCamera(card.id, "c" + i);
+assert.strictEqual(rules.requestCamera(card.id, "overflow").full, true);
+var src = fs.readFileSync(path.join(__dirname, "commune-swipe.js"), "utf8");
+var sql = fs.readFileSync(path.join(__dirname, "..", "supabase/migrations/20261024_chatroom_cap_report_kick.sql"), "utf8");
+assert.ok(/class="chatroom-report"/.test(src) && /max_members between 2 and 100/.test(sql) && /delete from public\.chat_room_members/.test(sql));
+assert.ok(!/block_user/.test(sql) && !/blockUser/.test(fs.readFileSync(path.join(__dirname, "chatroom-rules.js"), "utf8")));
+console.log("chatroom-rules tests passed");

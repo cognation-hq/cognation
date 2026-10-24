@@ -87,7 +87,7 @@ assert.ok(!/yellow|#ff[cd]|#fe[0-9a-f]{4}/i.test(rule), "no yellow");
 assert.ok(/data-news-report-toggle>Report</.test(commune), "Report unchanged");
 /* Exactly 10 story slots: 1 headliner across the full width + 9 in rows of three. */
 assert.ok(/var TIMES_SLOTS = 10;/.test(commune), "hard cap constant is 10");
-assert.ok(/var printed = posts\.slice\(0, TIMES_SLOTS\);\s*printed\.forEach\(function \(post, idx\) \{\s*appendPostEl\(post, \{ lead: idx === 0 \}\);/.test(commune), "front page renders at most TIMES_SLOTS stories, first is the headliner");
+assert.ok(/var printed = posts\.slice\(0, TIMES_SLOTS\);[\s\S]*postScore\(post\)[\s\S]*appendPostEl\(printed\[leadAt\], \{ lead: true \}\);/.test(commune), "front page caps at TIMES_SLOTS and leads with the highest score");
 assert.ok(/var spare = \(3 - \(printed\.length % 3\)\) % 3;/.test(commune), "filler loop counts the capped list");
 assert.ok(/#panel-signal \.commune-feed-item\.is-lead \{ grid-column: 1 \/ -1; \}/.test(css), "headliner spans the full width");
 assert.ok(/#panel-signal \.commune-feed-item\.is-lead \.commune-feed-body \{\s*font-size: 1\.35rem !important;/.test(css), "headliner is bigger");
@@ -110,7 +110,12 @@ var feedSrc = fnSource("renderFeed");
 var block = /var printed = posts\.slice\(0, TIMES_SLOTS\);[\s\S]*?var spare = [^;]*;/.exec(feedSrc)[0];
 function printFeed(posts) {
   var rendered = [];
-  var spare = new Function("posts", "TIMES_SLOTS", "appendPostEl", block + "\nreturn spare;")(posts, 10, function (p, o) { rendered.push([p.id, o.lead]); });
+  var spare = new Function("posts", "TIMES_SLOTS", "appendPostEl", "postScore", block + "\nreturn spare;")(posts, 10, function (p, o) { rendered.push([p.id, o.lead]); }, function (post) {
+    var score = Number(post && post.likes) || 0;
+    var reactions = post && post.reactions;
+    if (reactions && typeof reactions === "object") Object.keys(reactions).forEach(function (face) { if (Array.isArray(reactions[face])) score += reactions[face].length; });
+    return score;
+  });
   return { rendered: rendered, spare: spare };
 }
 var front = printFeed(fourteen("p"));

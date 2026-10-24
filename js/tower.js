@@ -13456,8 +13456,9 @@
     if (!circleFallState) return;
     var spots = document.querySelectorAll("[data-circle-ring] [data-circle-spot]");
     if (!spots.length) return;
-    if (pinCircleSpotsToBackground(spots)) return;
-    var shift = ((performance.now() - circleFallState.ringStarted) / 28000) * CIRCLE_SPOTS.length;
+    pinCircleSpotsToBackground(spots);
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var shift = reduce ? 0 : ((performance.now() - circleFallState.ringStarted) / 28000) * CIRCLE_SPOTS.length;
     var i;
     var front = 0;
     var frontScale = -1;
@@ -13465,17 +13466,20 @@
       var pos = circleSpotAt(i + shift);
       var depth = pos.s / CIRCLE_SCALE;
       var scale = 0.8 + Math.max(0, depth - 0.68) * 0.4;
+      var bob = reduce ? 0 : Math.sin(performance.now() / 360 + i * 1.2) * 18;
       var size = 5.6;
       spots[i].style.width = size.toFixed(2) + "rem";
       spots[i].style.height = size.toFixed(2) + "rem";
       spots[i].style.transform =
-        "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + pos.y.toFixed(1) + "px) scale(" + scale.toFixed(3) + ")";
+        "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + (pos.y + bob).toFixed(1) + "px) scale(" + scale.toFixed(3) + ")";
       spots[i].style.zIndex = String(Math.round(pos.s * 100));
+      spots[i].style.setProperty("--pulse-spot-s", scale.toFixed(3));
       if (scale > frontScale) { frontScale = scale; front = i; }
     }
     for (i = 0; i < spots.length; i++) {
       var cap = spots[i].querySelector("[data-circle-caption]");
       if (cap) cap.hidden = i !== front;
+      if (i === front) spots[i].style.zIndex = "30";
     }
   }
 
@@ -13619,8 +13623,7 @@
       var st = circleFallState;
       if (!st || !st.shellOnly) return;
       placeCircleSpots();
-      /* Pinned spots on the background are still: no per-frame loop (light on phones). */
-      if (layer.hasAttribute("data-pulse-bg")) { st.raf = 0; return; }
+      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { st.raf = 0; return; }
       st.raf = requestAnimationFrame(frameShell);
     }
     if (!window.__cognationPulseBgResize) {

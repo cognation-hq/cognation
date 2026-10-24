@@ -137,8 +137,10 @@
     DOCTORAL: "pro-doctoral",
     BUSINESS: "pro-business",
     EXECUTIVES: "pro-executives",
+    MOGUL: "pro-mogul",
+    CREATOR: "pro-creator",
   };
-  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.ETHICS, PRO.DOCTORAL, PRO.BUSINESS, PRO.EXECUTIVES, PRO.FIELD, PRO.POP];
+  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.ETHICS, PRO.DOCTORAL, PRO.BUSINESS, PRO.EXECUTIVES, PRO.MOGUL, PRO.FIELD, PRO.POP, PRO.CREATOR];
   var PRO_MARK = {};
   PRO_MARK[PRO.WEBINAR] = "Webinar";
   PRO_MARK[PRO.KNOW] = "Professionals you might know";
@@ -154,6 +156,9 @@
   PRO_MARK["pro-ai-work"] = "AI at work";
   PRO_MARK[PRO.BUSINESS] = "Business";
   PRO_MARK[PRO.EXECUTIVES] = "Executives";
+  PRO_MARK[PRO.MOGUL] = "Mogul";
+  PRO_MARK[PRO.CREATOR] = "Content Creator";
+  PRO_MARK["pro-college"] = "College programs";
   /* Podcast cards stay, with no Demo badge (Alexa 2026-10-22 11:46 AM CT, via SeedOps:
      "this will also be a card when cognation goes live but doesnt need to be a demo"). */
   var PRO_PODCASTS = [
@@ -967,7 +972,13 @@
   /* A live session is a Classroom (Personal deck) or a Webinar (Professional deck).
      A live page with no session kind fills both, as #193 did. */
   function classroomCatalog() {
-    return liveProPages().filter(function (page) { return page.sessionKind !== "webinar"; }).map(classroomCard);
+    var live = liveProPages().filter(function (page) { return page.sessionKind !== "webinar"; }).map(classroomCard);
+    var extra = [];
+    try {
+      var api = window.CognationClassroomEvent;
+      if (api && api.echoCards) extra = api.echoCards() || [];
+    } catch (eEv) {}
+    return live.concat(extra);
   }
 
   function visibleClassroomSessions() {
@@ -1726,7 +1737,9 @@
 
   function ensureSiteRooms() {
     writeJson(localStorage, ROOMS_KEY, { host: "Cognation", rooms: SITE_ROOMS });
-    return SITE_ROOMS.filter(roomVisible).map(roomCard);
+    var cards = SITE_ROOMS.filter(roomVisible).map(roomCard);
+    var rules = window.CognationChatroomRules;
+    return rules && rules.expand ? rules.expand(cards) : cards;
   }
 
   function groupLane() {
@@ -1939,6 +1952,49 @@
     return [];
   }
 
+  /* Shown only with a Content Creator interest. A left swipe still passes it. */
+  function contentCreatorCards() {
+    var api = window.CognationContentCreator;
+    if (!api || typeof api.cards !== "function") return [];
+    return api.cards(hasInterest(api.INTERESTS));
+  }
+
+  function openContentCreator(card) {
+    var api = window.CognationContentCreator;
+    var panel = roomEl();
+    if (!api || !panel || !card) return false;
+    var res = api.enter(card.id, currentProfileId());
+    if (!res.ok) {
+      setStatus(res.error === "kicked" ? "You were removed from this chatroom." : "This room is full. Another Content Creator card is in the deck.");
+      if (res.error === "full") rebuildDeck();
+      return false;
+    }
+    closeClassroom();
+    panel.setAttribute("data-creator-room", card.id);
+    api.bind(panel, { me: currentProfileId, after: function (out) { creatorAfter(panel, out); } });
+    api.paint(panel, res.room);
+    ensureRoomHeader(panel);
+    state.roomId = card.id;
+    state.liveRoom = false;
+    showRoom(true);
+    setStatus("Content Creator chatroom. Camera requests only — no live video.");
+    return true;
+  }
+  function creatorAfter(panel, out) {
+    var api = window.CognationContentCreator;
+    if (!out || !out.ok) {
+      setStatus(out && out.error === "camera_full" ? "15 people already asked to join on camera." : "Couldn't do that.");
+      return;
+    }
+    if (api) api.paint(panel, out.room);
+    setStatus(out.kicked ? "10 reports. Removed from this chatroom only." : (out.count ? "Reported." : "Camera request saved. No live video."));
+  }
+
+  function mogulCards() {
+    var api = window.CognationEchoMogul;
+    return api && typeof api.cards === "function" ? api.cards(viewerInterestTokens()) : [];
+  }
+
   function doctoralCards() {
     var api = window.CognationEchoDoctoral;
     return api && typeof api.cards === "function" ? api.cards(viewerInterestTokens()) : [];
@@ -1975,6 +2031,7 @@
       return { id: w.id, type: PRO.PODCAST, title: w.title, body: w.body,
         why: "Picked by topic: ethics, async work, continuing education.", rating: "G", minAge: 0, keepOnly: true };
     });
+    lanes[PRO.MOGUL] = mogulCards();
     lanes[PRO.DOCTORAL] = doctoralCards();
     lanes[PRO.ETHICS] = ethicsCards();
     /* Research chat only if this person lists research. Field and Pop culture stay empty. */
@@ -1983,6 +2040,7 @@
     lanes[PRO.EXECUTIVES] = executivesCards();
     lanes[PRO.FIELD] = [];
     lanes[PRO.POP] = [];
+    lanes[PRO.CREATOR] = contentCreatorCards();
     Object.keys(lanes).forEach(function (type) {
       lanes[type] = omitPassed(lanes[type].filter(professionalCardAllowed));
     });
@@ -2056,12 +2114,38 @@
           deck.push(card);
         });
       }
+      var lic = window.CognationLicensure;
+      /* No licensure interest: the card is not in the algorithm. */
+      if (lic && hasInterest(lic.INTERESTS)) {
+        omitPassed(lic.cards()).forEach(function (card) {
+          if (deck.length >= limit) return;
+          if (!professionalCardAllowed(card)) return;
+          if (deck.some(function (c) { return stableCardId(c.id) === stableCardId(card.id); })) return;
+          deck.push(card);
+        });
+      }
+      var college = window.CognationCollegePrograms;
+      /* No College programs interest: the card is not in the algorithm. */
+      if (college && hasInterest(college.INTERESTS)) {
+        omitPassed(college.cards()).forEach(function (card) {
+          if (deck.length >= limit) return;
+          if (!professionalCardAllowed(card)) return;
+          if (deck.some(function (c) { return stableCardId(c.id) === stableCardId(card.id); })) return;
+          card.why = "You listed College programs.";
+          deck.push(card);
+        });
+      }
       var extra = omitPassed(proInterestCards()).filter(professionalCardAllowed);
       for (var xi = extra.length - 1; xi >= 0; xi--) {
         var add = extra[xi];
         if (deck.some(function (c) { return stableCardId(c.id) === stableCardId(add.id); })) continue;
         deck.unshift(add);
       }
+      var peer = window.CognationPeerReview, interests = viewerInterestPhrases();
+      var peerExtra = peer && peer.cards ? omitPassed((peer.cards({ field: interests[0] || "", interests: interests, age: getMemberProfile().age }) || []).filter(function (c) {
+        return !peer.forInterest || peer.forInterest(c, interests);
+      })) : [];
+      if (peerExtra.length) deck = peerExtra.concat(deck);
       return deck.length > limit ? deck.slice(0, limit) : deck;
     }
     var built = buildLanes();
@@ -2321,6 +2405,11 @@
     el.setAttribute("data-commune-card", "");
     el.setAttribute("data-card-type", card.type === TYPE.DATING ? "speed-dating" : card.type);
     el.setAttribute("data-card-id", card.id);
+    if (card.peerReview && window.CognationPeerReview && window.CognationPeerReview.cardHtml) {
+      el.setAttribute("data-professional-card", "");
+      el.innerHTML = window.CognationPeerReview.cardHtml(card);
+      return el;
+    }
     if (card.type === TYPE.CLASSROOM) {
       el.setAttribute("data-classroom", "card");
     }
@@ -2370,6 +2459,10 @@
         });
         html += "</ul>";
       }
+      if (card.roomKind === "content-creator") {
+        html += '<button type="button" class="btn btn-primary" data-creator-enter>Enter room</button>';
+        html += '<p class="commune-card-meta">Chatroom · 100 people · up to 15 camera requests · no presenter · no calendar</p>';
+      }
       if (card.type === "pro-ai-work" && window.CognationAiAtWork) {
         card.why = window.CognationAiAtWork.displayWhy(card.why, hasInterest(window.CognationAiAtWork.INTERESTS));
       }
@@ -2382,11 +2475,21 @@
       var doctoralOff = card.type === PRO.DOCTORAL && !hasInterest(["doctoral degrees"]);
       var ethicsOff = card.type === PRO.ETHICS && !hasInterest(["ethics board"]);
       var businessOff = card.type === PRO.BUSINESS && !hasInterest(["business", "businesses"]);
-            var mergedOff = card.type === PRO.EXECUTIVES && !hasInterest(["executive", "executives"]);
-      if (card.why && !mergedOff && !industryOff && !doctoralOff && !ethicsOff && !businessOff) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
+      var executivesOff = card.type === PRO.EXECUTIVES && !hasInterest(["executive", "executives"]);
+      var licensureOff = card.type === "pro-licensure" && !hasInterest((window.CognationLicensure || {}).INTERESTS || []);
+      var mogulOff = card.type === PRO.MOGUL && !hasInterest(["mogul", "moguls"]);
+      var creatorOff = card.roomKind === "content-creator" && !hasInterest((window.CognationContentCreator || {}).INTERESTS);
+      var collegeOff = card.type === "pro-college" && !hasInterest((window.CognationCollegePrograms || {}).INTERESTS || []);
+      if (card.why && !executivesOff && !industryOff && !doctoralOff && !ethicsOff && !businessOff && !licensureOff && !mogulOff && !creatorOff && !collegeOff) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
       if (card.type === PRO.RESEARCH) {
         html += '<button type="button" class="btn btn-primary" data-research-enter>Enter Research</button>';
         if (card.full) html += '<p class="commune-card-meta">Full — another Research card is open.</p>';
+      }
+      if (card.type === "pro-licensure") {
+        html += '<button type="button" class="btn btn-primary" data-licensure-open>Enter room</button>';
+      }
+      if (card.type === "pro-college") {
+        html += '<button type="button" class="btn btn-primary" data-college-open>Enter room</button>';
       }
       el.innerHTML = html;
       return el;
@@ -2415,23 +2518,25 @@
         html += '<p class="commune-card-meta">Book on the calendar, or follow this professional page.</p>';
       }
       if (card.type === TYPE.CHAT) {
-        if (liveChatEligible()) {
-          html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room</button>';
-          html += '<p class="commune-card-meta">Live group chat — up to 12 people. Keep it kind.</p>';
-        } else {
-          /* No local demo room (standing rule): live rooms only. */
-          html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room</button>';
-          html += '<p class="commune-card-meta">Live group chat — sign in to join (up to 12 people).</p>';
-        }
+        html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room</button>';
+        var roomRules = window.CognationChatroomRules;
+        html += roomRules && roomRules.extrasHtml
+          ? roomRules.extrasHtml(card, escapeHtml)
+          : '<p class="commune-card-meta">Live group chat — up to 100 people. Keep it kind.</p>';
+        if (!liveChatEligible()) html += '<p class="commune-card-meta">Live group chat — sign in to join (up to 100 people).</p>';
       }
       if (card.type === TYPE.CLASSROOM) {
-        var cast = window.CognationLive && window.CognationLive.professionalBroadcast && window.CognationLive.professionalBroadcast();
-        if (cast) {
-          html += '<p class="commune-card-meta">' + escapeHtml(cast.name) + " is live</p>";
-          html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Join live</button>';
-        } else {
+        if (card.classroomEvent) {
           html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
-          html += '<p class="commune-card-meta">Life skills · ~18+</p>';
+        } else {
+          var cast = window.CognationLive && window.CognationLive.professionalBroadcast && window.CognationLive.professionalBroadcast();
+          if (cast) {
+            html += '<p class="commune-card-meta">' + escapeHtml(cast.name) + " is live</p>";
+            html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Join live</button>';
+          } else {
+            html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
+            html += '<p class="commune-card-meta">Life skills · ~18+</p>';
+          }
         }
       }
       if (card.type === TYPE.CONTENT) html += '<span class="commune-card-badge">Live</span>';
@@ -2514,6 +2619,16 @@
   }
 
   function bindCard(el, card) {
+    if (card && card.peerReview && window.CognationPeerReview) {
+      var openPeer = function () { window.CognationPeerReview.open(card); };
+      el.addEventListener("click", function (ev) {
+        if (ev.target && ev.target.closest && ev.target.closest("button, a, input, textarea")) return;
+        if (Math.abs(state.lastDragDx || 0) < 10) openPeer();
+      });
+      var peerBtn = el.querySelector("[data-peer-open]");
+      if (peerBtn) peerBtn.addEventListener("click", function (ev) { ev.stopPropagation(); openPeer(); });
+      return;
+    }
     var liveJoin = el.querySelector("[data-live-session-join]");
     if (liveJoin) liveJoin.addEventListener("click", function (ev) {
       ev.stopPropagation();
@@ -2584,12 +2699,18 @@
     } else if (card.type === PRO.AUCTION) {
       wireClassroomCardClick(el, card, function () { openAuction(card, true); });
     }
+    if (card.type === PRO.MOGUL) wireClassroomCardClick(el, card, openMogul);
     if (card.type === PRO.DOCTORAL) wireClassroomCardClick(el, card, openDoctoral);
     if (card.type === PRO.ETHICS) wireClassroomCardClick(el, card, openEthics);
     if (card.type === PRO.EXECUTIVES) wireClassroomCardClick(el, card, openExecutives);
     /* Alexa's rule: an ECHO card opens its own full-screen window or a Tower profile, nothing else. */
     if (card.type === TYPE.CHAT) {
       wireClassroomCardClick(el, card, function () { openRoom(card.id, true); });
+    }
+    if (card.roomKind === "content-creator") {
+      var enterCreator = el.querySelector("[data-creator-enter]");
+      if (enterCreator) enterCreator.addEventListener("click", function (ev) { ev.stopPropagation(); openContentCreator(card); });
+      wireClassroomCardClick(el, card, function () { openContentCreator(card); });
     }
     if (card.type === "pro-industry") {
       var openIndustryBtn = el.querySelector("[data-industry-open]");
@@ -2612,6 +2733,16 @@
       wireClassroomCardClick(el, card, openAiAtWork);
     }
     if (card.type === PRO.BUSINESS) wireClassroomCardClick(el, card, openBusiness);
+    if (card.type === "pro-licensure") {
+      var openLic = el.querySelector("[data-licensure-open]");
+      if (openLic) openLic.addEventListener("click", function (ev) { ev.stopPropagation(); openLicensure(card.id); });
+      wireClassroomCardClick(el, card, openLicensure);
+    }
+    if (card.type === "pro-college") {
+      var openCollegeBtn = el.querySelector("[data-college-open]");
+      if (openCollegeBtn) openCollegeBtn.addEventListener("click", function (ev) { ev.stopPropagation(); openCollege(card.id); });
+      wireClassroomCardClick(el, card, openCollege);
+    }
     if ((card.type === TYPE.KNOW || card.type === TYPE.FRIEND) && (card.profileId || card.handle)) {
       el.setAttribute("data-commune-opens-profile", "");
       wireClassroomCardClick(el, card, function () { openPersonTower(card); });
@@ -2919,10 +3050,14 @@
     if (!state.liveRoom) return "";
     var uid = msg && msg.authorUserId ? String(msg.authorUserId) : "";
     if (!uid) return "";
-    var me = currentLiveUserId();
-    if (me && uid === me) return "";
     var mid = msg && msg.id ? String(msg.id) : "";
     var reported = !!(mid && state.roomReportedMsgIds[mid]);
+    var beside = reported
+      ? '<button type="button" class="chatroom-report" disabled>Reported</button>'
+      : '<button type="button" class="chatroom-report" data-commune-room-report data-message-id="' +
+        escapeHtml(mid) + '" data-author-user-id="' + escapeHtml(uid) + '">Report</button>';
+    var me = currentLiveUserId();
+    if (me && uid === me) return beside;
     var reportBtn = reported
       ? '<button type="button" class="news-report-option" disabled data-commune-room-reported>Reported</button>'
       : '<button type="button" class="news-report-option" data-commune-room-report data-message-id="' +
@@ -2934,7 +3069,7 @@
       '<button type="button" class="news-report-option" data-commune-room-block data-message-id="' +
       escapeHtml(mid) +
       '">Block</button>';
-    return (
+    return beside + (
       '<button type="button" class="commune-room-more" data-commune-room-more aria-haspopup="true" aria-expanded="false" aria-label="More for this message">⋯</button>' +
       '<div class="news-report-menu commune-room-report-menu" data-commune-room-menu hidden>' +
       reportBtn +
@@ -2987,7 +3122,14 @@
       /* Locked: human report hides for everyone — reporter sees it gone immediately. */
       if (hidden) hideLiveMessageLocally(msgId);
       else paintLiveLog(state.liveMessages);
-      return { ok: true, hidden: !!hidden };
+      var kicked = false;
+      var rules = window.CognationChatroomRules;
+      if (rules && typeof rules.noteReport === "function") {
+        var rec = rules.noteReport(state.roomId, msgId, authorUserId, currentLiveUserId() || "member", body);
+        kicked = !!(rec && rec.kicked);
+        if (kicked && authorUserId && authorUserId === currentLiveUserId()) closeRoom();
+      }
+      return { ok: true, hidden: !!hidden, kicked: kicked };
     }
 
     var sb = window.CognationSupabase;
@@ -3312,6 +3454,7 @@
     if (members) { members.hidden = true; members.textContent = ""; }
     ensureRoomHeader(panel);
     wireRoomSwipe(panel);
+    if (window.CognationEchoMogul) window.CognationEchoMogul.clearChrome(panel);
     if (window.CognationEchoDoctoral) window.CognationEchoDoctoral.clearChrome(panel);
     if (window.CognationEchoEthics) window.CognationEchoEthics.clearChrome(panel);
     if (window.CognationEchoBusiness) window.CognationEchoBusiness.clearChrome(panel);
@@ -3333,6 +3476,11 @@
       if (state.roomSqlId !== sqlId || !Array.isArray(rows)) return;
       el.textContent = rows.length === 1 ? "1 member here" : rows.length + " members here";
       el.hidden = false;
+      if (window.CognationChatroomRules && rows.length >= window.CognationChatroomRules.CAP) {
+        var roomId = "";
+        SITE_ROOMS.forEach(function (room) { if (room.sqlId === sqlId) roomId = room.id; });
+        if (roomId && window.CognationChatroomRules.setOccupancy(roomId, rows.length)) rebuildDeck();
+      }
     }, function () { el.hidden = true; });
   }
   /* No local demo fallback: if the live room can't open, say so and stay on the deck. */
@@ -3354,7 +3502,7 @@
         paintRoomMembers(sqlId);
         setStatus(isClass
           ? "You're in the " + (room.title || "classroom") + " classroom — live."
-          : "You're in " + (room.title || "the room") + " — live group chat (up to 12).");
+          : "You're in " + (room.title || "the room") + " — live group chat (up to 100).");
         friction("begin", isClass ? "classroom" : "chat", (isClass ? "classroom:" : "chatroom:") + room.id);
         if (scroll && state.shell && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
         return true;
@@ -3366,8 +3514,30 @@
       var mapped = mapChatRoomError(err);
       if (isClass && mapped.code === "room_not_found") mapped = { code: mapped.code, message: "Classrooms aren't live yet. Try again soon." };
       showJoinError(mapped);
+      if (mapped.code === "room_full" && window.CognationChatroomRules) {
+        window.CognationChatroomRules.setOccupancy(room.id, window.CognationChatroomRules.CAP);
+        rebuildDeck();
+      }
       return false;
     });
+  }
+
+  function openCollege(cardOrId) {
+    var api = window.CognationCollegePrograms;
+    var panel = roomEl();
+    var id = cardOrId && cardOrId.id ? cardOrId.id : String(cardOrId || "");
+    if (!api || !panel || !id || !state.shell) return false;
+    var me = currentProfileId();
+    var joined = api.join(id, me);
+    if (joined && joined.kicked) { setStatus("You were removed from this chatroom."); return false; }
+    closeClassroom();
+    ensureRoomHeader(panel);
+    api.paint(panel, id, me);
+    showRoom(true);
+    state.roomId = id;
+    state.collegeRoom = true;
+    state.liveRoom = false;
+    return true;
   }
 
   function openIndustry(cardOrId) {
@@ -3384,6 +3554,24 @@
     showRoom(true);
     state.roomId = id;
     state.industryRoom = true;
+    state.liveRoom = false;
+    return true;
+  }
+
+  function openLicensure(cardOrId) {
+    var api = window.CognationLicensure;
+    var panel = roomEl();
+    var id = cardOrId && cardOrId.id ? cardOrId.id : String(cardOrId || "");
+    if (!api || !panel || !id || !state.shell) return false;
+    var me = currentProfileId();
+    var joined = api.join(id, me);
+    if (joined && joined.kicked) { setStatus("You were removed from this chatroom."); return false; }
+    closeClassroom();
+    ensureRoomHeader(panel);
+    api.paint(panel, id, me);
+    showRoom(true);
+    state.roomId = id;
+    state.licensureRoom = true;
     state.liveRoom = false;
     return true;
   }
@@ -3434,6 +3622,33 @@
     }
     return liveRoomUnavailable(supabaseLiveSession() ? "Live rooms aren't ready yet. Try again soon." : "Sign in to join live rooms.");
   }
+  function openMogul(cardId) {
+    var api = window.CognationEchoMogul;
+    var card = null;
+    [state.cards, mogulCards()].forEach(function (list) {
+      (list || []).forEach(function (c) {
+        if (!card && c && (c.id === cardId || c.roomId === cardId)) card = c;
+      });
+    });
+    if (!api || !card || !roomEl()) return false;
+    var joined = api.join(card.roomId);
+    if (!joined.ok) {
+      setStatus(joined.message || "That Mogul room is not available.");
+      if (joined.full) rebuildDeck();
+      return false;
+    }
+    var panel = roomEl();
+    state.roomId = card.roomId;
+    state.liveRoom = false;
+    state.roomSqlId = "";
+    ensureRoomHeader(panel);
+    wireRoomSwipe(panel);
+    api.paint(panel, card.roomId);
+    showRoom(true);
+    setStatus("You're in the Mogul chatroom.");
+    return true;
+  }
+
   function openDoctoral(cardId) {
     var api = window.CognationEchoDoctoral;
     var card = null;
@@ -3541,6 +3756,7 @@
 
   function releaseRoomSurface() {
     /* Drop open-room lock and restore deck/actions so the card can swipe again. */
+    if (window.CognationEchoMogul) window.CognationEchoMogul.clearChrome(roomEl());
     if (window.CognationEchoDoctoral) window.CognationEchoDoctoral.clearChrome(roomEl());
     if (window.CognationEchoEthics) window.CognationEchoEthics.clearChrome(roomEl());
     if (window.CognationEchoBusiness) window.CognationEchoBusiness.clearChrome(roomEl());
@@ -3551,8 +3767,11 @@
     state.liveRoom = false;
     state.industryRoom = false;
     state.aiAtWorkRoom = false;
+    state.licensureRoom = false;
+    state.collegeRoom = false;
     state.roomSqlId = "";
     state.liveMessages = [];
+    if (roomEl()) roomEl().removeAttribute("data-creator-room");
     showRoom(false);
     clearPointer();
     try {
@@ -3565,6 +3784,7 @@
   }
 
   function closeRoom() {
+    try { if (window.CognationPeerReview && window.CognationPeerReview.owns()) window.CognationPeerReview.close(); } catch (ePeer) {}
     if (state.roomId) friction("abandon", "chat", "room_back");
     if (state.cardView) {
       if (state.cardView === "classroom" && state.classroomId) friction("abandon", "classroom", "classroom_back");
@@ -3628,13 +3848,18 @@
   }
 
   function paintClassroom(session) {
-    var notesText =
-      "Live session on this Professional page.";
+    var ce = window.CognationClassroomEvent;
+    var eventRoom = !!(session && session.classroomEvent && ce);
+    var notesText = eventRoom ? "" : "Live session on this Professional page.";
     if (paintCardView("classroom", {
       title: session && session.title || "Classroom",
-      body: (session && session.topic ? "Topic · " + session.topic + " — " : "") + (session && session.body || CLASSROOM_BODY),
+      body: eventRoom ? (session.body || "") : ((session && session.topic ? "Topic · " + session.topic + " — " : "") + (session && session.body || CLASSROOM_BODY)),
     }, notesText)) {
       state.classroomId = session.id;
+      if (eventRoom) {
+        var log = roomEl() && roomEl().querySelector("[data-commune-room-log]");
+        if (log) log.innerHTML = ce.stageHtml(session.eventId || session.id);
+      }
       return;
     }
     var panel = state.shell && state.shell.querySelector(CLASSROOM_PANEL_SEL);
@@ -4228,6 +4453,12 @@
       if (state.industryRoom && window.CognationIndustry && window.CognationIndustry.onClick(ev, {
         panel: roomPanel, roomId: state.roomId, me: currentProfileId(), status: setStatus
       })) return;
+      if (state.licensureRoom && window.CognationLicensure && window.CognationLicensure.onClick(ev, {
+        panel: roomPanel, roomId: state.roomId, me: currentProfileId(), status: setStatus
+      })) return;
+      if (state.collegeRoom && window.CognationCollegePrograms && window.CognationCollegePrograms.onClick(ev, {
+        panel: roomPanel, roomId: state.roomId, me: currentProfileId(), status: setStatus
+      })) return;
       var moreBtn = ev.target && ev.target.closest("[data-commune-room-more]");
       if (moreBtn && roomPanel.contains(moreBtn)) {
         ev.preventDefault();
@@ -4274,9 +4505,11 @@
             return;
           }
           setStatus(
-            res.hidden
-              ? "Reported — message hidden for the room until review."
-              : "Reported. Thanks for looking out for the room."
+            res.kicked
+              ? "Kicked from this room."
+              : res.hidden
+                ? "Reported — message hidden for the room until review."
+                : "Reported. Thanks for looking out for the room."
           );
         });
         return;
@@ -4300,8 +4533,29 @@
         ev.preventDefault();
         var input = roomEl() && roomEl().querySelector("[data-commune-room-input]");
         var body = input ? String(input.value || "").trim() : "";
+        if (window.CognationPeerReview && window.CognationPeerReview.owns()) {
+          if (body) window.CognationPeerReview.send(body);
+          if (input) input.value = "";
+          return;
+        }
         if (!body || !state.roomId) return;
         body = body.slice(0, 500);
+        var creatorPanel = roomEl();
+        if (creatorPanel && creatorPanel.getAttribute("data-creator-room") && window.CognationContentCreator) {
+          var sent = window.CognationContentCreator.send(creatorPanel.getAttribute("data-creator-room"), currentProfileId(), viewerDisplayName(), body);
+          if (input) input.value = "";
+          if (sent && sent.ok) { window.CognationContentCreator.paint(creatorPanel, sent.room); setStatus("Sent."); }
+          else setStatus(sent && sent.error === "kicked" ? "You were removed from this chatroom." : "This room is full. Another Content Creator card is in the deck.");
+          if (sent && sent.error === "full") rebuildDeck();
+          return;
+        }
+        if (window.CognationEchoMogul && window.CognationEchoMogul.isRoom(state.roomId)) {
+          var mogulSent = window.CognationEchoMogul.post(state.roomId, body);
+          if (input) input.value = "";
+          window.CognationEchoMogul.paint(roomEl(), state.roomId);
+          setStatus(mogulSent && mogulSent.ok ? "Sent." : (mogulSent && mogulSent.message) || "Couldn't send.");
+          return;
+        }
         if (window.CognationEchoDoctoral && window.CognationEchoDoctoral.isRoom(state.roomId)) {
           var doctoralSent = window.CognationEchoDoctoral.post(state.roomId, body);
           if (input) input.value = "";
@@ -4346,6 +4600,22 @@
           if (input) input.value = "";
           window.CognationEchoExecutives.paint(roomEl(), state.roomId);
           setStatus(executivesSent && executivesSent.ok ? "Sent." : (executivesSent && executivesSent.message) || "Couldn't send.");
+          return;
+        }
+        if (state.licensureRoom && window.CognationLicensure) {
+          var licApi = window.CognationLicensure;
+          var licRes = licApi.comment(state.roomId, currentProfileId(), viewerDisplayName(), body);
+          if (input) input.value = "";
+          licApi.paint(roomEl(), state.roomId, currentProfileId());
+          setStatus(licRes && licRes.kicked ? "You were removed from this chatroom." : "Sent.");
+          return;
+        }
+        if (state.collegeRoom && window.CognationCollegePrograms) {
+          var collegeApi = window.CognationCollegePrograms;
+          var collegeRes = collegeApi.comment(state.roomId, currentProfileId(), viewerDisplayName(), body);
+          if (input) input.value = "";
+          collegeApi.paint(roomEl(), state.roomId, currentProfileId());
+          setStatus(collegeRes && collegeRes.kicked ? "You were removed from this chatroom." : "Sent.");
           return;
         }
         if (state.liveRoom && state.roomSqlId) {
@@ -4404,6 +4674,7 @@
     bindInteractions(shell);
     liveSignature = liveSessionsSignature();
     rebuildDeck();
+    document.addEventListener("cognation:chatroom-rules", function () { if (state.deck) paintDeck(); });
     document.addEventListener("cognation:session-started", function () {
       refreshSeedGates().then(function () { rebuildDeck(); });
     });
@@ -4414,6 +4685,10 @@
     document.addEventListener("cognation:tower-updated", function () { rebuildDeck(); });
     document.addEventListener("cognation:echo-group-notice", function () { renderNotices(); });
     document.addEventListener("cognation:classroom-sessions-updated", onLiveSessionsUpdated);
+    document.addEventListener("cognation:classroom-event", function () {
+      if (state.roomId || state.classroomId) return;
+      rebuildDeck();
+    });
     refreshSeedGates();
   }
 

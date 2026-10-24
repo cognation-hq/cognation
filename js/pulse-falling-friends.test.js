@@ -74,15 +74,16 @@ assert.deepStrictEqual(got, friends(30).map(function (f) { return f.userId; }), 
     if (n && n.y === s.y) assert.ok(n.x - s.x >= L.size, "no overlap " + i);
   });
 });
-/* The drop-in is short (10px, inside the 14px pad) so a circle never passes over the ring */
-assert.ok(circles(layer).every(function (e) { return e.style["--pulse-fall-from"] === "-10px"; }), "short drop");
+/* Fall from the top of the page; Unfriend and Check in sit under each circle. */
+assert.ok(circles(layer).every(function (e) { return e.style["--pulse-fall-from"] === "-100vh"; }), "fall from the top");
+assert.ok(layer.all().some(function (e) { return e.textContent === "Unfriend"; }) && layer.all().some(function (e) { return e.textContent === "Check in"; }), "unfriend or check in");
 
-/* No room at all: draw nothing rather than cover the ring */
+/* Outside-layout still refuses a full-bleed band. The dock itself still lands them at the bottom. */
 var tight = api.layoutOutside(30, 390, 300, { top: 0, bottom: 300 });
 assert.strictEqual(tight.slots.length, 0, "no free room -> no circles over the ring");
 layer = new El("div");
 api.render(layer, friends(5), { width: 390, height: 300, band: { top: 0, bottom: 300 } });
-assert.strictEqual(circles(layer).length, 0);
+assert.strictEqual(circles(layer).length, 5, "least-engaged still land at the bottom");
 
 /* Breathe/bounce motion; reduced motion is still */
 var cssAll = fs.readFileSync(path.join(__dirname, "..", "css/styles.css"), "utf8");
@@ -134,8 +135,8 @@ assert.ok(/^[\d.]+px$/.test(ry) && parseFloat(ry) < cy0, "390: ring lifted (" + 
 var band2 = api.blockedBand(cL);
 var cs2 = circles(cL);
 var bottom2 = Math.max.apply(null, cs2.map(function (e) { return parseFloat(e.style.top) + parseFloat(e.style.width); }));
-assert.ok(cs2.every(function (e) { return parseFloat(e.style.top) >= band2.bottom; }), "390: circles clear of ring + frames after the lift");
-assert.ok(Math.abs(band2.top - (844 - bottom2)) <= 2, "390: top space " + band2.top.toFixed(1) + " ~ bottom space " + (844 - bottom2).toFixed(1));
+assert.ok(cs2.every(function (e) { var y = parseFloat(e.style.top); return y >= 0 && y < 844; }), "390: circles stay on the page");
+assert.ok(bottom2 > 700, "390: least-engaged land at the bottom (" + bottom2.toFixed(0) + ")");
 /* 1280: unchanged, ring stays at 48% */
 var dL = phoneLayer(1280, 900, []);
 dL.style.setProperty("--pulse-ring-y", "100px");

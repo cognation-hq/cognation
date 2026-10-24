@@ -1000,6 +1000,28 @@
       };
     }
 
+    function timesHeadline(body) {
+      var text = String(body || "").replace(/\s+/g, " ").trim().replace(/^(?:@[\w-]+\s*)+(?:[·•]\s*)?/, "");
+      var dash = text.search(/\s+[—–]\s+/);
+      var stop = text.search(/[.!?](?:\s|$)/);
+      if (dash > 0 && dash <= 90) text = text.slice(0, dash);
+      else if (stop > 0 && stop < 90 && stop < text.length - 1) text = text.slice(0, stop);
+      text = text.replace(/[.!?…]+$/, "").trim();
+      if (text.length > 84) text = text.slice(0, 81).replace(/\s+\S*$/, "").trim() + "…";
+      return text || "From the Feed";
+    }
+
+    function postScore(post) {
+      var score = Number(post && post.likes) || 0;
+      var reactions = post && post.reactions;
+      if (reactions && typeof reactions === "object") {
+        Object.keys(reactions).forEach(function (face) {
+          if (Array.isArray(reactions[face])) score += reactions[face].length;
+        });
+      }
+      return score;
+    }
+
     function appendPostEl(post, opts) {
       opts = opts || {};
       var postIdEarly = post.id || "";
@@ -1039,40 +1061,53 @@
             : "") +
           "</p>";
       }
+      var bodyText = String(post.body || "");
+      if (opts.lead && bodyText.length > 320) {
+        bodyText = bodyText.slice(0, 300).replace(/\s+\S*$/, "").trim() + "…";
+      }
+      var bodyHtml = (function () {
+        var safe = escapeHtml(bodyText);
+        if (editionId === "statewide" || editionId === "local") {
+          safe = safe.replace(/@([a-z0-9_-]+)/gi, function (_, h) {
+            var href =
+              h.toLowerCase() === "statewide"
+                ? "#tab-signal"
+                : "#tower-profile-" + h.toLowerCase();
+            return (
+              '<a class="commune-at-link" href="' +
+              href +
+              '">@' +
+              h +
+              "</a>"
+            );
+          });
+        }
+        return safe;
+      })();
+      var topHtml = opts.lead
+        ? '<h4 class="times-lead-headline">' + escapeHtml(timesHeadline(post.body)) + "</h4>" +
+          '<p class="times-lead-byline">By ' +
+          '<span class="commune-feed-author">' + authorHtml + "</span>" +
+          ' · <time datetime="' + escapeHtml(post.createdAt) + '">' +
+          escapeHtml(formatTime(post.createdAt)) +
+          "</time></p>"
+        : '<header class="commune-feed-meta">' +
+          '<span class="commune-social-kind">' +
+          escapeHtml(kind === "social" ? "Social" : kind === "wire" ? "Wire" : "Desk") +
+          "</span>" +
+          '<span class="commune-feed-author">' +
+          authorHtml +
+          "</span>" +
+          '<time datetime="' +
+          escapeHtml(post.createdAt) +
+          '">' +
+          escapeHtml(formatTime(post.createdAt)) +
+          "</time>" +
+          "</header>";
       article.innerHTML =
-        '<header class="commune-feed-meta">' +
-        '<span class="commune-social-kind">' +
-        escapeHtml(kind === "social" ? "Social" : kind === "wire" ? "Wire" : "Desk") +
-        "</span>" +
-        '<span class="commune-feed-author">' +
-        authorHtml +
-        "</span>" +
-        '<time datetime="' +
-        escapeHtml(post.createdAt) +
-        '">' +
-        escapeHtml(formatTime(post.createdAt)) +
-        "</time>" +
-        "</header>" +
+        topHtml +
         '<p class="commune-feed-body">' +
-        (function () {
-          var safe = escapeHtml(post.body);
-          if (editionId === "statewide" || editionId === "local") {
-            safe = safe.replace(/@([a-z0-9_-]+)/gi, function (_, h) {
-              var href =
-                h.toLowerCase() === "statewide"
-                  ? "#tab-signal"
-                  : "#tower-profile-" + h.toLowerCase();
-              return (
-                '<a class="commune-at-link" href="' +
-                href +
-                '">@' +
-                h +
-                "</a>"
-              );
-            });
-          }
-          return safe;
-        })() +
+        bodyHtml +
         "</p>" +
         sourceLine +
         '<footer class="news-report-bar" data-news-report>' +
@@ -1176,7 +1211,11 @@
       if (!window.CognationTowerStore || typeof window.CognationTowerStore.newsList !== "function") {
         return [];
       }
-      var list = window.CognationTowerStore.newsList();
+      /* Cognation Times places the top of the hidden like-ranked desk. */
+      var rate = window.CognationFeedRating;
+      var list = rate && typeof rate.forPaper === "function"
+        ? rate.forPaper()
+        : window.CognationTowerStore.newsList();
       return list.map(function (p) {
         var author = p.authorName || "Neighbor";
         /* Author link by profile id (handle only when there is no id), never by
@@ -1294,10 +1333,20 @@
       } else {
         if (feedEmpty) feedEmpty.hidden = true;
         var printed = posts.slice(0, TIMES_SLOTS);
+        var leadAt = 0;
+        var best = -1;
         printed.forEach(function (post, idx) {
-          appendPostEl(post, { lead: idx === 0 });
+          var score = postScore(post);
+          if (score > best) {
+            best = score;
+            leadAt = idx;
+          }
         });
-        /* Fill the last row so the three columns stay the same height. */
+        if (printed.length) appendPostEl(printed[leadAt], { lead: true });
+        printed.forEach(function (post, idx) {
+          if (idx !== leadAt) appendPostEl(post, { lead: false });
+        });
+        /* Fill the last row so the three columns stay the same height. The lead spans the page. */
         var spare = (3 - (printed.length % 3)) % 3;
         for (var pad = 0; pad < spare; pad++) {
           var blank = document.createElement("div");

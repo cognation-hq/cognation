@@ -292,6 +292,15 @@
     return isOwnProfileId(resolveProfileId(btn));
   }
 
+  function isCognationPage() {
+    var p = activeProfile();
+    if (!p) return false;
+    var handle = String(p.handle || "").replace(/^@/, "").toLowerCase();
+    var id = String(p._profileId || p.id || "");
+    var name = String(p.displayName || "").trim().toLowerCase();
+    return id === "prof-alexa-professional" || handle === "alexa-pro" || handle === "cognation" || name === "cognation";
+  }
+
   function syncButton(btn) {
     var api = swipeApi();
     var graph = socialApi();
@@ -299,7 +308,7 @@
     if (id) btn.setAttribute("data-profile-id", id);
     var row = btn.closest("[data-tower-follow-row]");
     /* Hidden (never relabeled "Unavailable") on your own profile. */
-    if (ownProfileOnScreen(btn)) {
+    if (ownProfileOnScreen(btn) || isCognationPage()) {
       if (row) row.hidden = true;
       btn.hidden = true;
       return;
@@ -366,7 +375,7 @@
   document.addEventListener("click", function (ev) {
     var btn = ev.target && ev.target.closest && ev.target.closest("[data-tower-follow]");
     if (!btn) return;
-    if (messagesSurface(btn)) {
+    if (messagesSurface(btn) || isCognationPage()) {
       ev.preventDefault();
       hideNoPage(btn);
       return;

@@ -1,0 +1,142 @@
+/** Professional Echo Business chatroom. Same limits as the other professional rooms. Interest-gated. Ten reports kick that person from that room only. */
+(function () {
+  "use strict";
+  var KEY = "cognation.echo.business.v1", CAP = 100, CAM = 15, KICK_AT = 10, NEED = ["business", "businesses"];
+  function read(key, fallback) { try { var raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch (e) { return fallback; } }
+  function write(data) { try { localStorage.setItem(KEY, JSON.stringify(data)); return true; } catch (e) { return false; } }
+  function store() { var d = read(KEY, null); return d && d.rooms ? d : { n: 0, rooms: {} }; }
+  function session() { return read("cognation.session.v2", {}) || {}; }
+  function me() { return String(session().activeProfileId || session().username || "you"); }
+  function myName() { return String(session().profileDisplayName || session().username || "Member").trim().slice(0, 80) || "Member"; }
+  function wants(tokens) { return NEED.some(function (n) { return (tokens || []).indexOf(n) >= 0; }); }
+  function blank(d) {
+    d.n += 1;
+    d.rooms["business-" + d.n] = { id: "business-" + d.n, members: [], kicked: [], cameras: [], messages: [] };
+    return d.rooms["business-" + d.n];
+  }
+  function openRoom(d) {
+    var found = null;
+    Object.keys(d.rooms).forEach(function (id) { if (d.rooms[id].members.length < CAP) found = d.rooms[id]; });
+    return found || blank(d);
+  }
+  function cardFor(r) {
+    var full = r.members.length >= CAP;
+    return {
+      id: "pro-" + r.id, type: "pro-business", roomId: r.id, title: "Business", topic: "business",
+      interests: ["business"], rating: "G", minAge: 0, keepOnly: true, business: true,
+      presenter: false, calendar: false, full: full, cap: CAP, cameraCap: CAM,
+      why: "You listed Business as an interest.",
+      body: full ? "This Business room is full. Another Business card is in the deck."
+        : "Up to 100 people. Chat log. Up to 15 camera requests. No presenter and no calendar event.",
+    };
+  }
+  function cards(tokens) {
+    if (!wants(tokens)) return [];
+    var d = store(), current = openRoom(d), viewer = me(), list = [];
+    write(d);
+    Object.keys(d.rooms).forEach(function (id) {
+      var r = d.rooms[id];
+      if (r.kicked.indexOf(viewer) < 0 && (r === current || r.members.indexOf(viewer) >= 0)) list.push(cardFor(r));
+    });
+    return list;
+  }
+  function join(roomId) {
+    var d = store(), r = d.rooms[roomId], id = me();
+    if (!r) return { ok: false, message: "That Business room is not available." };
+    if (r.kicked.indexOf(id) >= 0) return { ok: false, kicked: true, message: "You were removed from this Business room." };
+    if (r.members.indexOf(id) >= 0) return { ok: true };
+    if (r.members.length >= CAP) { openRoom(d); write(d); return { ok: false, full: true, message: "This Business room is full. Another Business card is in the deck." }; }
+    r.members.push(id);
+    if (r.members.length >= CAP) openRoom(d);
+    return write(d) ? { ok: true } : { ok: false };
+  }
+  function post(roomId, text) {
+    var body = String(text || "").trim().slice(0, 500), d = store(), r = d.rooms[roomId], id = me();
+    if (!body || !r || r.kicked.indexOf(id) >= 0 || r.members.indexOf(id) < 0) return { ok: false, message: "Join this Business room before posting." };
+    r.messages.push({ id: "m-" + Date.now().toString(36) + "-" + r.messages.length, authorId: id, authorName: myName(), body: body, reports: [] });
+    r.messages = r.messages.slice(-200);
+    return write(d) ? { ok: true } : { ok: false };
+  }
+  function report(roomId, messageId) {
+    var d = store(), r = d.rooms[roomId], reporter = me(), msg = null, kicked = false;
+    if (!r) return { ok: false };
+    r.messages.forEach(function (m) { if (m && m.id === messageId) msg = m; });
+    if (!msg || msg.authorId === reporter) return { ok: false };
+    if (msg.reports.indexOf(reporter) < 0) msg.reports.push(reporter);
+    if (msg.reports.length >= KICK_AT) {
+      r.members = r.members.filter(function (m) { return m !== msg.authorId; });
+      r.cameras = r.cameras.filter(function (m) { return m !== msg.authorId; });
+      if (r.kicked.indexOf(msg.authorId) < 0) r.kicked.push(msg.authorId);
+      kicked = true;
+    }
+    return write(d) ? { ok: true, kicked: kicked, reports: msg.reports.length } : { ok: false };
+  }
+  function requestCamera(roomId) {
+    var d = store(), r = d.rooms[roomId], id = me();
+    if (!r || r.kicked.indexOf(id) >= 0 || r.members.indexOf(id) < 0) return { ok: false };
+    if (r.cameras.indexOf(id) >= 0) return { ok: true, already: true, count: r.cameras.length };
+    if (r.cameras.length >= CAM) return { ok: false, full: true, message: "15 people have already requested a camera." };
+    r.cameras.push(id);
+    return write(d) ? { ok: true, count: r.cameras.length } : { ok: false };
+  }
+  function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+  function paint(panel, roomId) {
+    if (!panel || !panel.querySelector) return;
+    var r = store().rooms[roomId];
+    if (!r) return;
+    panel.setAttribute("data-business-room", roomId);
+    var note = r.kicked.indexOf(me()) >= 0 ? "You were removed from this Business room." : "No presenter. No calendar event. " + r.members.length + "/" + CAP + " people.";
+    var set = function (sel, val) { var n = panel.querySelector(sel); if (n) n.textContent = val; };
+    set(".commune-card-kicker", "Business · chatroom · hosted by Cognation");
+    set("[data-commune-room-title]", "Business");
+    set("[data-commune-room-topic]", note);
+    var members = panel.querySelector("[data-commune-room-members]");
+    var titles = panel.querySelector(".commune-room-head-titles");
+    if (!members && titles && document.createElement) {
+      members = document.createElement("p");
+      members.className = "commune-card-meta commune-room-members";
+      members.setAttribute("data-commune-room-members", "");
+      titles.appendChild(members);
+    }
+    if (members) { members.hidden = false; members.textContent = note; }
+    var log = panel.querySelector("[data-commune-room-log]");
+    var cam = panel.querySelector("[data-business-camera]");
+    if (!cam && log && document.createElement) {
+      cam = document.createElement("button");
+      cam.type = "button";
+      cam.className = "btn btn-secondary";
+      cam.setAttribute("data-business-camera", "");
+      if (log.parentNode && log.parentNode.insertBefore) log.parentNode.insertBefore(cam, log);
+    }
+    if (cam) cam.textContent = r.cameras.length >= CAM ? "Camera requests full" : "Request camera (" + r.cameras.length + "/" + CAM + ")";
+    if (log) {
+      var mine = me();
+      log.innerHTML = r.messages.map(function (m) {
+        return "<p class=\"commune-room-line\"><strong>" + esc(m.authorName) + "</strong> " + esc(m.body) +
+          " <button type=\"button\" data-business-report data-message-id=\"" + esc(m.id) + "\"" + (m.authorId === mine ? " disabled" : "") + ">Report</button></p>";
+      }).join("") || "<p class=\"commune-room-line\">Chat log is empty.</p>";
+    }
+    if (panel.getAttribute("data-business-wired")) return;
+    panel.setAttribute("data-business-wired", "1");
+    panel.addEventListener("click", function (ev) {
+      var t = ev.target && ev.target.closest && ev.target.closest("[data-business-report], [data-business-camera]");
+      if (!t || t.disabled) return;
+      ev.preventDefault();
+      var idNow = panel.getAttribute("data-business-room") || "";
+      if (t.hasAttribute("data-business-camera")) requestCamera(idNow);
+      else report(idNow, t.getAttribute("data-message-id"));
+      paint(panel, idNow);
+    });
+  }
+  window.CognationEchoBusiness = {
+    CAP: CAP, CAM: CAM, KICK_AT: KICK_AT, KEY: KEY, NEED: NEED, cards: cards, join: join, post: post,
+    report: report, requestCamera: requestCamera, paint: paint,
+    isRoom: function (id) { return String(id || "").indexOf("business-") === 0; },
+    clearChrome: function (panel) {
+      if (!panel || !panel.querySelector) return;
+      panel.removeAttribute("data-business-room");
+      var cam = panel.querySelector("[data-business-camera]");
+      if (cam && cam.remove) cam.remove();
+    },
+  };
+})();

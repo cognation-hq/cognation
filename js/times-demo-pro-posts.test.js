@@ -90,9 +90,9 @@ function runCallers(win, label) {
   /* 2. tower.js resolveActiveProfileId */
   var active = win.CognationTowerProfileStore.getActiveProfileId();
   assert.strictEqual(typeof active, "string", label + ": active profile still resolves (" + active + ")");
-  /* 3. people-search.js professionalProfiles: the demo page records are still found */
-  var found = win.CognationPeopleDirectory.search("mira").filter(function (p) { return p.kind === "professional"; });
-  assert.ok(found.some(function (p) { return p.handle === "mira-wellness"; }), label + ": people search still finds the mira-pro page record");
+  /* 3. people search suggests signups, not the demo professional page. */
+  var found = win.CognationPeopleDirectory.search("mira").filter(function (p) { return p.handle === "mira-wellness"; });
+  assert.strictEqual(found.length, 0, label + ": people search does not suggest the demo page");
   /* 4. tower.js professionalHandleForFollower */
   var follower = new Function("window", fnSource(towerSrc, "professionalHandleForFollower") + "\nreturn professionalHandleForFollower;")(win);
   assert.strictEqual(follower("prof-demo-jordan-pro"), "jordan-civic", label + ": follower handle lookup still works");

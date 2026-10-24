@@ -3166,6 +3166,7 @@
     closeClassroom();
     releaseRoomSurface();
     if (!paintCardView("auction", card, card.why || "")) return false;
+    if (window.CognationAuctionRoom) window.CognationAuctionRoom.mount(roomEl(), card, getMemberAge());
     state.auctionId = card.id;
     friction("begin", "auction", "auction:" + card.id);
     if (scroll && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });

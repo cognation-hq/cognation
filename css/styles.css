@@ -8629,6 +8629,15 @@ body { padding-top: 0 !important; }
   margin-top: 0.45rem;
   align-self: flex-start;
 }
+.tower-cal-pills { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 0.65rem; }
+.tower-cal-pill {
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  border: 1px solid rgba(220, 246, 255, 0.35); border-radius: 999px;
+  padding: 0.28rem 0.75rem; font-size: 0.85rem; cursor: pointer;
+}
+.tower-cal-pill:has(input:checked) { outline: 2px solid #7fd6ff; background: rgba(127, 214, 255, 0.14); }
+.tower-cal-pills .form-hint { flex: 1 0 100%; margin: 0.15rem 0 0; }
+[data-tower-cal-auction-fields][hidden] { display: none; }
 .tower-cal-editor,
 .tower-cal-google {
   margin-top: 0.75rem;

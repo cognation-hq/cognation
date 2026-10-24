@@ -3193,7 +3193,7 @@
         escapeHtml(formatTime(post.createdAt)) +
         "</time></header>" +
         (post.body
-          ? '<p class="tower-post-body">' + escapeHtml(post.body) + "</p>"
+          ? '<p class="tower-post-body">' + escapeHtml(post.body).replace(/(^|[^A-Za-z0-9_])(#addevent)\b/ig, '$1<a class="tower-invite-tag" href="#addevent" data-feed-add-event="' + escapeHtml(post.id || "") + '">$2</a>') + "</p>"
           : "") +
         feedInviteHtml(post) +
         renderAttachments(post.attachments);
@@ -3269,8 +3269,7 @@
     return '<div class="tower-post-invite">' +
       '<p class="tower-invite-title">' + escapeHtml(invite.title) + "</p>" +
       (inviteWhenLabel(invite) ? '<p class="tower-invite-when">' + escapeHtml(inviteWhenLabel(invite)) + "</p>" : "") +
-      (where ? '<p class="tower-invite-line">Where: ' + where + "</p>" : "") +
-      '<button type="button" class="btn btn-primary" data-feed-add-event="' + escapeHtml(post.id || "") + '">Add event</button></div>';
+      (where ? '<p class="tower-invite-line">Where: ' + where + "</p>" : "") + "</div>";
   }
   function addInviteToOwnCalendar(post) {
     var invite = feedInvite(post);
@@ -3326,11 +3325,7 @@
       TowerStore.list().forEach(function (p) { if (p && p.id === id) post = p; });
       if (!post) return;
       var invite = feedInvite(post);
-      if (!addInviteToOwnCalendar(post)) {
-        btn.textContent = "Sign in to add this event.";
-        return;
-      }
-      btn.textContent = "Added";
+      if (!addInviteToOwnCalendar(post)) return;
       openOutlookInvite(invite);
     });
   }
@@ -12088,7 +12083,8 @@
         }
         var when = readEventWhen(whenIn);
         var what = whatIn ? String(whatIn.value || "").trim() : "";
-        var where = whereIn ? String(whereIn.value || "").trim() : "";
+        var who = TowerProfileStore.get() || {};
+        var where = (who.displayName || who.handle || "Host") + "\u2019s Tower page";
         if (!when || !what) {
           say("Add when and what.", true);
           return;

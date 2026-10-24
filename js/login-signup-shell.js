@@ -364,6 +364,9 @@
             .then(function (result) {
               delete profile.birthYearMonth; /* not kept on the device either */
               writeProfile(profile);
+              if (window.CognationAccounts && window.CognationAccounts.ensureCognationFriend) {
+                try { window.CognationAccounts.ensureCognationFriend(profile.username); } catch (eFriend) {}
+              }
               if (result && result.session && window.CognationAuth) {
                 return window.CognationAuth.login(profile.email, password);
               }

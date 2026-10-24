@@ -2,9 +2,9 @@
  * Cognation login gate — required username/password (client-side gate on Pages).
  * Not a substitute for server auth; fine for a private $0 preview.
  *
- * After credentials succeed, if the account has 2 Tower profiles, show a
- * Choose profile step (Personal / Professional). Session records
- * activeProfileId + profileKind.
+ * After credentials succeed, either email on the account opens that same
+ * account on the personal page. Personal and Professional are a toggle
+ * after login. Sign-in does not ask which page to open.
  *
  * Session: cognation.session.v2
  * Production sign-in uses the configured account provider.
@@ -233,15 +233,17 @@
   }
 
   function finishWithProfileChoice(username, profiles, auth) {
+    /* One account. Do not ask Personal or Professional, and do not create
+       a second account when the other email is used. */
     profiles = profiles || [];
-    if (profiles.length <= 1) {
-      return establishSession(username, profiles[0] || null, auth);
+    var personal = null;
+    for (var i = 0; i < profiles.length; i++) {
+      if (profiles[i] && profiles[i].kind !== "professional") {
+        personal = profiles[i];
+        break;
+      }
     }
-    if (auth) {
-      pendingAuth = auth;
-    }
-    showPickerStep(username, profiles);
-    return null;
+    return establishSession(username, personal || profiles[0] || null, auth);
   }
 
   function login(username, password, opts) {

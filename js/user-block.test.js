@@ -19,7 +19,7 @@ assert.ok(/list_my_blocks/.test(code) && !/email/i.test(code));
 
 assert.ok(/data-news-comment-block/.test(comments));
 assert.ok(/Report<\/button>' \+ blockBtn/.test(comments) || /option \+ blockBtn/.test(comments), "Block below Report");
-assert.ok(/CognationBlock\.blockUser/.test(comments));
+assert.ok(/hideContent/.test(comments) && !/blockUser/.test(comments), "comment Block hides that comment");
 assert.ok(/Unblock/.test(page) && /not notified/.test(page));
 assert.ok(/href=\"\/blocked\.html\"/.test(fs.readFileSync(path.join(root, "index.html"), "utf8")), "Blocked settings link");
 assert.ok(!/@[a-z0-9.-]+\.[a-z]{2,}/i.test(blockJs + page.replace(/@sam|@jordan/g, "")));

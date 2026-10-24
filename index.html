@@ -16,7 +16,7 @@
   <title data-brand-page="Home">COGNATION — Home</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Great+Vibes&family=Rozha+One&family=IM+Fell+English:ital@0;1&family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&family=Special+Elite&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Great+Vibes&family=Rozha+One&family=IM+Fell+English:ital@0;1&family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&family=Special+Elite&family=UnifrakturMaguntia&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body class="login-gate-open">
@@ -108,6 +108,7 @@
               <option value="Japan">Japan</option>
               <option value="Other">Other</option>
             </select>
+            <p class="login-area-block" data-login-area-block hidden role="status">The site isn't available to users in your area at this time.</p>
           </div>
           <div class="form-group" data-login-state-group>
             <label for="state">State / region</label>
@@ -242,17 +243,6 @@
         <p class="form-hint login-demo-storage-hint">Your account is secured by Cognation sign-in.</p>
       </form>
       </div>
-
-      <div id="login-profile-picker" class="login-profile-picker" hidden data-login-profile-picker>
-        <h3 class="login-profile-picker-title">Choose profile</h3>
-        <p class="login-profile-picker-desc">This account has two Tower pages. Pick which one to enter.</p>
-        <div id="login-profile-picker-list" class="login-profile-picker-list" role="radiogroup" aria-label="Tower profiles"></div>
-        <div class="form-actions login-form-actions login-profile-picker-actions">
-          <button type="button" class="btn btn-secondary" id="login-profile-back">Back</button>
-          <button type="button" class="btn btn-primary" id="login-profile-continue">Continue</button>
-        </div>
-        <p class="form-hint login-demo-storage-hint">Up to 2 profiles per phone · demo registry in localStorage.</p>
-      </div>
     </div>
   </div>
   <script>
@@ -282,9 +272,11 @@
           placeholder="Search friends and professional profiles"
           autocomplete="off"
           spellcheck="false"
+          aria-autocomplete="list"
+          aria-controls="people-search-results"
           data-people-search-input
         >
-        <div class="people-search-results" data-people-search-results hidden role="listbox" aria-label="People results"></div>
+        <div class="people-search-results" id="people-search-results" data-people-search-results hidden role="listbox" aria-label="Name suggestions"></div>
       </div>
     </div>
   </header>
@@ -313,12 +305,12 @@
               <button type="button" role="tab" id="tab-pages" aria-controls="panel-pages" aria-selected="false" tabindex="-1" hidden>PAGES</button>
             </div>
             <div class="app-topbar-actions">
-              <div class="site-switch" data-site-switch role="group" aria-label="Switch site">
+              <!-- COGNATION | WAYMAKERS switch: hidden until Waymakers has a full design. Remove `hidden` to bring it back; markup, link and styles are unchanged. -->
+              <div class="site-switch" data-site-switch role="group" aria-label="Switch site" hidden>
                 <span class="site-switch-side is-active" aria-current="page">COGNATION</span>
                 <span class="site-switch-sep" aria-hidden="true">|</span>
                 <a class="site-switch-side" href="https://waymakers.pages.dev/" data-site-switch-waymakers>WAYMAKERS</a>
               </div>
-              <a class="app-logout-btn" href="/blocked.html" style="text-decoration:none;display:inline-flex;align-items:center">Blocked</a>
               <button type="button" class="app-logout-btn" data-cognation-logout>Log out</button>
             </div>
           </div>
@@ -329,59 +321,46 @@
                 <h3 class="tower-title">TOWER</h3>
               </header>
               <div class="tower-app" data-tower-app data-tower-side="public" data-tower-is-owner="true">
-                <div class="tower-side-toggle" data-tower-side-toggle role="tablist" aria-label="Tower side">
-                  <button type="button" class="tower-side-btn" role="tab" data-tower-side-btn="private" aria-selected="false" id="tower-side-private">Connections</button>
-                  <button type="button" class="tower-side-btn" role="tab" data-tower-side-btn="public" aria-selected="true" id="tower-side-public">Public profile</button>
+              <section class="tower-live-screen" data-live-stage hidden aria-label="Live">
+                <div class="tower-live-screen-head">
+                  <button type="button" class="tower-live-back" data-live-back>‹ Back</button>
+                  <div class="tower-live-screen-titles">
+                    <h4 class="tower-live-screen-title" data-live-host>Live</h4>
+                    <p class="tower-live-screen-kind" data-live-kind></p>
+                  </div>
+                  <div class="tower-live-share">
+                    <button type="button" data-live-share-signal aria-pressed="false">Share to Signal</button>
+                  </div>
                 </div>
+                <div class="tower-live-session" data-live-session></div>
+                <div class="tower-live-joins" data-live-joins>
+                  <p class="tower-live-joins-label">Join requests</p>
+                  <div class="tower-live-join-slots" data-live-join-slots>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="1">Request</button>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="2">Request</button>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="3">Request</button>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="4">Request</button>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="5">Request</button>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="6">Request</button>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="7">Request</button>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="8">Request</button>
+                    <button type="button" class="tower-live-join-slot" data-live-join-slot="9">Request</button>
+                  </div>
+                </div>
+                <div class="tower-live-room-chat" data-live-room-chat>
+                  <p class="tower-live-chat-label">Chat</p>
+                  <div class="tower-live-chat-log" data-live-chat-log role="log" aria-live="polite"></div>
+                  <form class="tower-live-chat-form" data-live-room-chat-form action="#" method="post">
+                    <label class="visually-hidden" for="tower-live-room-chat">Message the broadcaster</label>
+                    <input id="tower-live-room-chat" data-live-room-chat-input type="text" maxlength="280" placeholder="Write to the broadcaster" autocomplete="off">
+                    <button type="submit" class="tower-live-chat-send">Send</button>
+                  </form>
+                </div>
+              </section>
 
                 <!-- PRIVATE: profiles + connections (Feed compose lives under SIGNAL) -->
                 <div class="tower-private-side" data-tower-private-side>
                   <div class="tower-main">
-                    <p class="tower-side-jump-row">
-                      <button type="button" class="tower-side-jump" data-tower-side-jump="public">Public profile →</button>
-                    </p>
-                    <details class="tower-private-theme tower-private-friends tower-compact-block tower-densify-section" data-tower-private-friends data-tower-top-friends open>
-                      <summary class="tower-private-theme-summary">Top friends</summary>
-                      <div class="tower-private-theme-body">
-                        <p class="form-hint">Feature pins on Public · drag to place</p>
-                        <div class="form-group tower-friends-display">
-                          <label for="tower-friends-count">Public friends to display</label>
-                          <select id="tower-friends-count" name="friendsDisplayCount" data-tower-friends-count>
-                            <option value="3">Top 3</option>
-                            <option value="6">Top 6</option>
-                            <option value="8">Top 8</option>
-                          </select>
-                          <fieldset class="tower-friends-pick" data-tower-friends-pick>
-                            <legend class="visually-hidden">Search friends to feature</legend>
-                            <label class="tower-friends-search-label" for="tower-friends-search">Search friends</label>
-                            <input id="tower-friends-search" type="search" data-tower-friends-search placeholder="Type a name" autocomplete="off">
-                            <div class="tower-friends-search-results" data-tower-friends-search-results hidden></div>
-                            <div class="tower-friends-chips" data-tower-friends-chips></div>
-                            <div class="tower-friends-save-row" style="margin-top:0.5rem;display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;">
-                              <button type="button" class="btn btn-primary tower-btn-compact" data-tower-save-friends>Save</button>
-                              <span class="form-hint" data-tower-friends-status role="status" aria-live="polite"></span>
-                            </div>
-                          </fieldset>
-                        </div>
-                      </div>
-                    </details>
-
-                    <details class="tower-private-theme tower-private-badges tower-compact-block tower-densify-section" data-tower-private-badges data-tower-badges open>
-                      <summary class="tower-private-theme-summary">Badges</summary>
-                      <div class="tower-private-theme-body">
-                        <p class="form-hint">Show as pins on Public</p>
-                        <div class="tower-badge-visibility" data-tower-badge-visibility></div>
-                        <label class="tower-badge-upload">
-                          Upload a badge image
-                          <input type="file" accept="image/*" data-tower-badge-file aria-label="Upload a badge image">
-                        </label>
-                        <div class="tower-friends-save-row" style="margin-top:0.65rem;display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;">
-                          <button type="button" class="btn btn-primary tower-btn-compact" data-tower-save-badges>Save</button>
-                          <span class="form-hint" data-tower-badges-status role="status" aria-live="polite"></span>
-                        </div>
-                      </div>
-                    </details>
-
                     <details class="tower-private-theme tower-private-calendar tower-compact-block tower-densify-section" data-tower-private-calendar data-tower-calendar open>
                       <summary class="tower-private-theme-summary">Calendar</summary>
                       <div class="tower-private-theme-body">
@@ -468,11 +447,9 @@
 
                 <!-- PUBLIC: scrapbook face visitors see -->
                 <div class="tower-public-side" data-tower-public-side hidden>
-                  <p class="tower-side-jump-row tower-side-jump-row--public">
-                    <button type="button" class="tower-side-jump" data-tower-side-jump="private">← Connections</button>
-                  </p>
                   <div class="tower-profile-kind-toggle" data-tower-profile-kind-toggle role="tablist" aria-label="Public profile page" hidden>
                     <button type="button" class="tower-kind-btn" role="tab" data-tower-profile-kind="personal" aria-selected="true" id="tower-kind-personal">Personal page</button>
+                    <span class="signal-subtab-sep" aria-hidden="true">|</span>
                     <button type="button" class="tower-kind-btn" role="tab" data-tower-profile-kind="professional" aria-selected="false" id="tower-kind-professional">Professional page</button>
                   </div>
                   <div class="tower-scrapbook-bar" data-tower-scrapbook-bar hidden>
@@ -483,6 +460,7 @@
                   </div>
                   <button type="button" class="btn btn-secondary" data-tower-add-widget title="Add a quote or text sticker">Add widget</button>
                   <div class="tower-emoji-bar" data-tower-emoji-bar role="group" aria-label="Emoji widgets"></div>
+                  <p class="tower-hidden-widget-notice tower-stage-notice" data-tower-stage-notice role="status" aria-live="polite" hidden></p>
                 </div>
 
                   <div class="tower-bg-upload" data-tower-public-look>
@@ -506,6 +484,9 @@
                         <img class="tower-avatar-frame-overlay" data-tower-frame-overlay src="" alt="" aria-hidden="true" hidden>
                         <button type="button" class="tower-avatar-resize" data-tower-avatar-resize aria-label="Drag to resize frame" title="Drag to resize frame"></button>
                       </div>
+                      <div class="tower-sticker tower-sticker--identity" data-tower-widget="identity" data-sticker-label="Name"><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Name sticker" tabindex="-1" hidden>⋮⋮</button><div class="tower-profile-name-wrap" data-tower-profile-name-wrap><p class="tower-profile-name" data-tower-profile-name>You</p><button type="button" class="tower-name-resize" data-tower-name-resize aria-label="Drag to resize display name" title="Drag to resize name"></button></div>
+                      <p class="tower-handle-badge" data-tower-handle-badge hidden></p>
+                      </div>
                       <div class="tower-profile-actions">
                         <div class="tower-follow-row" data-tower-follow-row>
                           <button
@@ -515,7 +496,7 @@
                             data-profile-id=""
                             aria-pressed="false"
                             aria-label="Add this person as a friend"
-                          >Add friend</button>
+                          >+ friend</button>
                           <button
                             type="button"
                             class="tower-follow-btn tower-message-btn"
@@ -525,48 +506,24 @@
                           >Message</button>
                           <p class="form-hint tower-message-status" data-tower-message-status role="status" aria-live="polite" hidden></p>
                         </div>
+                      </div>
+                      <div class="tower-under-photo" data-tower-under-photo>
+                        <div class="tower-pro-links" data-tower-pro-links hidden></div>
+                        <div class="tower-pro-pay-confirm" data-tower-pro-pay-confirm hidden>
+                          <label class="visually-hidden" for="tower-pro-pay-for">What this payment is for</label>
+                          <input id="tower-pro-pay-for" data-tower-pro-pay-for type="text" maxlength="120" placeholder="What this payment is for" autocomplete="off">
+                          <button type="button" class="tower-pro-link" data-tower-pro-pay-go>Confirm</button>
+                        </div>
+                        <p class="tower-pro-pay-note" data-tower-pro-pay-note hidden role="status"></p>
+                        <button type="button" class="tower-follow-btn" data-tower-add-friends aria-label="Find friends">Find friends</button>
+                        <p class="tower-mutual-friends" data-tower-mutual-friends>Mutual friends</p>
                         <button type="button" class="tower-go-live-btn" data-go-live aria-label="Go live">Go live</button>
+                        <p class="tower-golive-status" data-classroom-golive-status role="status" aria-live="polite" hidden></p>
+                        <div class="tower-sticker tower-sticker--envelope" data-tower-widget="envelope" data-sticker-label="Messages">
+                          <a class="tower-envelope-btn" href="messages.html" data-tower-envelope draggable="false" aria-label="Messages">✉</a>
+                        </div>
                       </div>
                       </div>
-                      <!-- CGN-010 Live stage shell (demo stubs) -->
-                      <section class="tower-live-panel" data-live-stage hidden>
-                        <header class="tower-live-panel-head">
-                          <h4 class="tower-live-panel-title">Live</h4>
-                          <p class="cgn-deferral" role="note">Demo / local only</p>
-                          <div class="tower-live-share" role="group" aria-label="Share live">
-                            <button type="button" class="btn btn-secondary" data-live-share-commune>Share to COMMUNE</button>
-                            <button type="button" class="btn btn-secondary" data-live-share-tower>Share to Tower</button>
-                          </div>
-                        </header>
-                        <div class="tower-live-multicam" data-live-cam-count="6" aria-label="Multi-cam grid">
-                          <div class="tower-live-cam" data-live-cam="1">Cam 1</div>
-                          <div class="tower-live-cam" data-live-cam="2">Cam 2</div>
-                          <div class="tower-live-cam" data-live-cam="3">Cam 3</div>
-                          <div class="tower-live-cam" data-live-cam="4">Cam 4</div>
-                          <div class="tower-live-cam" data-live-cam="5">Cam 5</div>
-                          <div class="tower-live-cam" data-live-cam="6">Cam 6</div>
-                        </div>
-                        <div class="tower-live-join" data-live-join-request>
-                          <p class="form-hint">Join request (demo)</p>
-                          <button type="button" class="btn btn-secondary" data-live-approve-join>Approve join</button>
-                        </div>
-                        <div class="tower-live-sales" role="group" aria-label="Pro sales">
-                          <p class="cgn-deferral" role="note">Demo / local only — not live backend</p>
-                          <button type="button" class="btn btn-primary" data-live-sales>Buy / tip</button>
-                          <button type="button" class="btn btn-secondary" data-live-class>Join class</button>
-                        </div>
-                        <div class="tower-live-comments" data-live-comments>
-                          <ul class="tower-live-comment-list" data-live-comment-list>
-                            <li>Demo: “Love this stream!”</li>
-                          </ul>
-                          <form class="tower-live-comment-form" data-live-comment-form action="#" method="post">
-                            <label class="visually-hidden" for="tower-live-comment-input">Comment</label>
-                            <input id="tower-live-comment-input" type="text" maxlength="280" placeholder="Say something…" autocomplete="off">
-                            <button type="submit" class="btn btn-primary">Send</button>
-                          </form>
-                        </div>
-                        <p class="commune-status" data-live-status hidden role="status" aria-live="polite"></p>
-                      </section>
                       <div class="tower-profile-edit" data-tower-profile-edit>
                         <button type="button" class="btn btn-secondary tower-edit-profile-btn" data-tower-edit-profile aria-expanded="false" aria-haspopup="true" aria-controls="tower-profile-edit-panel">
                           Edit profile
@@ -575,6 +532,11 @@
                         <div class="tower-profile-edit-dropdown" id="tower-profile-edit-panel" data-tower-profile-edit-panel hidden>
                           <div class="tower-profile-edit-sheet-head"><span class="tower-profile-edit-sheet-title">Edit profile</span><button type="button" class="tower-profile-edit-close" data-tower-profile-edit-close aria-label="Close Edit profile">×</button></div>
                           <form class="tower-profile-form" data-tower-profile-form action="#" method="post">
+                        <div class="form-group tower-job-title-fields" data-tower-job-title-fields hidden>
+                          <label for="tower-job-title">Job title</label>
+                          <input id="tower-job-title" name="jobTitle" type="text" maxlength="60" placeholder="Optional · e.g. Product designer" data-tower-job-title autocomplete="organization-title" disabled>
+                          <p class="tower-job-title-hint">Optional. Up to 60 characters. Saved with Save profile.</p>
+                        </div>
                         <div class="form-group tower-social-fields">
                           <p class="tower-social-fields-label">Social links</p>
                           <label for="tower-social-x">X</label>
@@ -589,14 +551,14 @@
                           <input id="tower-social-tiktok" name="socialTiktok" type="url" maxlength="500" placeholder="https://tiktok.com/@…" data-tower-social="tiktok" inputmode="url">
                           <label for="tower-social-linkedin">LinkedIn</label>
                           <input id="tower-social-linkedin" name="socialLinkedin" type="url" maxlength="500" placeholder="https://linkedin.com/in/…" data-tower-social="linkedin" inputmode="url">
-                          <label for="tower-social-linktree">Website</label>
+                          <label for="tower-social-shop">Shop</label>
+                          <input id="tower-social-shop" name="socialShop" type="url" maxlength="500" placeholder="https://…" data-tower-social="shop" inputmode="url">
+                          <label for="tower-social-linktree">Linktree</label>
                           <input id="tower-social-linktree" name="socialLinktree" type="url" maxlength="500" placeholder="https://linktr.ee/…" data-tower-social="linktree" inputmode="url">
-                          <label for="tower-social-venmo">Venmo</label>
-                          <input id="tower-social-venmo" name="socialVenmo" type="text" maxlength="500" placeholder="@handle or https://venmo.com/…" data-tower-social="venmo" autocomplete="off">
-                          <label for="tower-social-services">Pay for services link</label>
-                          <input id="tower-social-services" name="socialServices" type="url" maxlength="500" placeholder="https://… (your booking page)" data-tower-social="services" inputmode="url">
-                          <label for="tower-social-ads">Buy ads link</label>
-                          <input id="tower-social-ads" name="socialAds" type="url" maxlength="500" placeholder="https://… (your ad page)" data-tower-social="ads" inputmode="url">
+                          <label for="tower-social-applepay">Apple Pay</label>
+                          <input id="tower-social-applepay" name="socialApplePay" type="text" maxlength="120" placeholder="Payee name, not a card number" data-tower-social="applepay" autocomplete="off">
+                          <label for="tower-social-appleamt">Amount</label>
+                          <input id="tower-social-appleamt" name="socialAppleAmt" type="text" maxlength="12" placeholder="Amount you charge" data-tower-social="appleamt" inputmode="decimal" autocomplete="off">
                           <div class="form-actions tower-social-actions">
                             <button type="submit" class="btn btn-primary" data-tower-save-profile>Save profile</button>
                           </div>
@@ -634,17 +596,46 @@
                             <button type="button" class="btn btn-primary" data-tower-save-frame>Save frame</button>
                           </div>
                         </div>
+                        <div class="form-group tower-hidden-widgets-fields" data-tower-hidden-widgets hidden>
+                          <p class="tower-frame-fields-label">Show hidden widgets</p>
+                          <div class="tower-hidden-widgets-list" data-tower-hidden-widgets-list></div>
+                        </div>
                         <div class="tower-add-profile-row" data-tower-add-profile-row>
                           <button type="button" class="btn btn-secondary" data-tower-add-profile hidden>Add a professional page</button>
                           <p class="commune-status" data-tower-add-profile-status hidden role="status" aria-live="polite"></p>
                         </div>
                         <p class="commune-status" data-tower-profile-status hidden role="status" aria-live="polite"></p>
                       </form>
+                      <div class="tower-edit-entries">
+                        <details class="tower-edit-entry" data-tower-edit-calendar>
+                          <summary>Calendar</summary>
+                          <div class="tower-sticker tower-sticker--calendar" data-tower-widget="calendar" data-sticker-label="Calendar" data-tower-calendar-personal>
+                            <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Calendar sticker" tabindex="-1" hidden>⋮⋮</button>
+                            <div class="tower-cal tower-cal--public" data-tower-cal-public data-tower-calendar-personal aria-label="Calendar">
+                              <h4 class="tower-cal-public-title">Calendar</h4>
+                              <div data-tower-cal-public-body></div>
+                            </div>
+                          </div>
+                        </details>
+                        <details class="tower-edit-entry" data-tower-edit-sessions hidden>
+                          <summary>Classroom sessions</summary>
+                          <div class="tower-sessions-owner" data-tower-sessions-owner></div>
+                        </details>
+                        <button type="button" class="btn btn-secondary" data-tower-open-events>Events</button>
+                        <a class="btn btn-secondary" href="/blocked.html">Block list</a>
+                      </div>
                         </div>
                       </div>
-                      </div><div class="tower-sticker tower-sticker--identity" data-tower-widget="identity" data-sticker-label="Name"><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Name sticker" tabindex="-1" hidden>⋮⋮</button><div class="tower-profile-name-wrap" data-tower-profile-name-wrap><p class="tower-profile-name" data-tower-profile-name>You</p><button type="button" class="tower-name-resize" data-tower-name-resize aria-label="Drag to resize display name" title="Drag to resize name"></button></div>
-                      <p class="tower-handle-badge" data-tower-handle-badge hidden></p>
-                      </div><div class="tower-sticker tower-sticker--slogan" data-tower-widget="slogan" data-sticker-label="Quote / slogan" hidden><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Quote / slogan sticker" tabindex="-1" hidden>⋮⋮</button><blockquote class="tower-slogan-card" data-tower-slogan-display></blockquote>
+                      </div><!-- Calendar: its own card under the bio card (visitors only; owner keeps Edit profile > Calendar). -->
+                      <section class="tower-sticker tower-sticker--visitor-calendar tower-visitor-calendar" data-tower-widget="visitor-calendar" data-sticker-label="Calendar" data-tower-visitor-calendar hidden aria-label="Calendar">
+                        <h4 class="tower-cal-public-title">Calendar</h4>
+                        <div class="tower-visitor-sessions" data-tower-visitor-sessions hidden></div>
+                        <div class="tower-cal tower-cal--public" data-tower-cal-visitor data-calendar-busy="true">
+                          <div data-tower-cal-visitor-body></div>
+                        </div>
+                        <a class="tower-visitor-cal-link" href="/calendar.html">Cognation Calendar ›</a>
+                      </section>
+                      <div class="tower-sticker tower-sticker--slogan" data-tower-widget="slogan" data-sticker-label="Quote / slogan" hidden><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Quote / slogan sticker" tabindex="-1" hidden>⋮⋮</button><blockquote class="tower-slogan-card" data-tower-slogan-display></blockquote>
                       </div><!-- Per-network social widgets (v3.3); no grouped LINKS box. -->
                       <div class="tower-sticker tower-sticker--music" data-tower-widget="music" data-sticker-label="Music"><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Music sticker" tabindex="-1" hidden>⋮⋮</button><div class="tower-music" data-tower-music data-music-skin="classic" hidden>
                         <audio data-tower-audio preload="metadata" playsinline></audio>
@@ -706,13 +697,12 @@
                         </div>
                       </div>
 
-                      <div class="tower-sticker tower-sticker--badges" data-tower-widget="badges" data-sticker-label="Badges"><button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Badges sticker" tabindex="-1" hidden>⋮⋮</button><div class="tower-badge-shelf" data-tower-badge-shelf aria-label="Badges">
+                      <div class="tower-sticker tower-sticker--badges" data-tower-widget="badges" data-sticker-label="Badges" hidden><div class="tower-badge-shelf" data-tower-badge-shelf aria-label="Badges">
                         <p class="tower-badge-shelf-label" data-tower-badges-public>Badges</p>
-                        <!-- Individual badge pins render on the scrapbook stage (like top friends). -->
                         <div class="tower-badge-stage" data-tower-badge-stage hidden></div>
                       </div>
 
-                      </div><div class="tower-sticker tower-sticker--friends" data-tower-widget="friends" data-sticker-label="Friends">
+                      </div><div class="tower-sticker tower-sticker--friends" data-tower-widget="friends" data-sticker-label="Friends" hidden>
                         <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Friends sticker" tabindex="-1" hidden>⋮⋮</button>
                         <div class="tower-friends-public" data-tower-friends-public aria-label="Featured friends"></div>
                       </div>
@@ -746,7 +736,7 @@
                         </div>
                       </div>
                       <input type="file" accept="image/*" data-tower-avatar-file class="tower-offscreen-file" tabindex="-1" aria-label="Upload profile photo">
-                      <input type="file" accept="image/*" data-tower-instax-file class="tower-offscreen-file" tabindex="-1" aria-label="Upload a photo">
+                      <input type="file" accept="image/*" multiple data-tower-instax-file class="tower-offscreen-file" tabindex="-1" aria-label="Upload a photo">
 
                       <div class="tower-sticker tower-sticker--going-live" data-tower-widget="going-live" data-sticker-label="Going live" hidden>
                         <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Going live sticker" tabindex="-1" hidden>⋮⋮</button>
@@ -765,13 +755,6 @@
                           <ul class="tower-followers-results" data-tower-followers-results role="list"></ul>
                         </div>
                       </div>
-                      <div class="tower-sticker tower-sticker--calendar" data-tower-widget="calendar" data-sticker-label="Calendar" data-tower-calendar-personal>
-                        <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Calendar sticker" tabindex="-1" hidden>⋮⋮</button>
-                        <div class="tower-cal tower-cal--public" data-tower-cal-public data-tower-calendar-personal aria-label="Calendar">
-                          <h4 class="tower-cal-public-title">Calendar</h4>
-                          <div data-tower-cal-public-body></div>
-                        </div>
-                      </div>
                   </aside>
                   </div>
                 </div>
@@ -783,6 +766,9 @@
             </div><!-- /#panel-tower -->
 
             <div role="tabpanel" id="panel-signal" class="signal-tab-panel" aria-labelledby="tab-signal" hidden>
+              <header class="tower-header">
+                <h3 class="tower-title">SIGNAL</h3>
+              </header>
               <!-- Second row under SIGNAL: News | Feed pipe-switch (same chrome as COGNATION|WAYMAKERS / Personal|Professional) -->
               <div class="signal-subtabs site-switch" data-signal-subtabs role="tablist" aria-label="SIGNAL views">
                 <button type="button" class="signal-subtab site-switch-side is-selected" role="tab" id="signal-sub-news" data-signal-pane-btn="news" aria-controls="signal-pane-news" aria-selected="true" tabindex="0">News</button>
@@ -794,16 +780,13 @@
               <div class="commune-paper" data-commune-app>
                 <!-- Newspaper masthead -->
                 <header class="paper-masthead">
-                  <p class="paper-eyebrow">An official <span data-brand>COGNATION</span> publication</p>
-                  <h3 class="paper-title">NEWS</h3>
-                  <p class="paper-subtitle" data-commune-edition-subtitle>Local Newspaper · Demo</p>
-                  <p class="cgn-deferral" role="note">Demo / local only</p>
+                  <h3 class="paper-title">COGNATION TIMES</h3>
                   <div class="paper-dateline" role="group" aria-label="Edition details">
                     <span class="paper-volume" data-commune-volume>Vol. I · No. 1</span>
                     <span class="paper-rule" aria-hidden="true"></span>
-                    <time class="paper-date" data-commune-date datetime=""></time>
+                    <span class="paper-price">Cognation</span>
                     <span class="paper-rule" aria-hidden="true"></span>
-                    <span class="paper-price" data-commune-edition-label>Local edition · Demo</span>
+                    <time class="paper-date" data-commune-date datetime=""></time>
                   </div>
 
                   <div class="paper-edition-scope" data-commune-edition-scope>
@@ -889,12 +872,12 @@
                           data-commune-feed-list
                           role="feed"
                           aria-busy="false"
-                          aria-label="AI news and social feed"
+                          aria-label="Cognation Times"
                         >
                           <div class="commune-feed-sentinel" data-commune-feed-sentinel hidden aria-hidden="true"></div>
                         </div>
                         <p class="commune-feed-loading" data-commune-feed-loading hidden>Loading more AI wire…</p>
-                        <p class="commune-empty" data-commune-feed-empty hidden>No plate yet — News will fill this edition.</p>
+                        <p class="commune-empty" data-commune-feed-empty hidden>No stories yet — News will fill this edition.</p>
                       </div>
                     </section>
 
@@ -993,7 +976,16 @@
               <div id="signal-pane-feed" class="signal-pane signal-pane--feed" role="tabpanel" data-signal-pane="feed" aria-labelledby="signal-sub-feed" hidden>
                 <div class="signal-feed-host" data-signal-feed-host>
                     <form class="tower-compose tower-compose--compact" data-tower-compose action="#" method="post">
-                      <h4 class="tower-block-heading" data-tower-block-heading>Send a signal</h4>
+                      <!-- Post as: which of the signed-in member's own pages this signal is from.
+                           Shown only when they own a Professional page (js/signal-post-as.js). -->
+                      <div class="signal-compose-head" data-signal-compose-head>
+                        <h4 class="tower-block-heading" data-tower-block-heading>Send a signal</h4>
+                        <div class="signal-post-as" data-signal-post-as role="radiogroup" aria-label="Post as" hidden>
+                          <button type="button" class="signal-post-as-side is-selected" role="radio" aria-checked="true" data-signal-post-as-btn="personal">Personal</button>
+                          <span class="signal-post-as-sep" aria-hidden="true">|</span>
+                          <button type="button" class="signal-post-as-side" role="radio" aria-checked="false" tabindex="-1" data-signal-post-as-btn="professional">Professional</button>
+                        </div>
+                      </div>
                       <div class="form-group">
                         <label class="visually-hidden" for="tower-body">Update</label>
                         <textarea id="tower-body" name="body" rows="2" maxlength="2000" placeholder="Share a signal…"></textarea>
@@ -1021,7 +1013,7 @@
                       </div>
                       <p class="commune-status" data-tower-status hidden role="status" aria-live="polite"></p>
                       <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">Post</button>
+                        <button type="submit" class="btn btn-primary" data-tower-post-submit>Post</button>
                       </div>
                     </form>
 
@@ -1326,6 +1318,7 @@
   <script src="js/signal-nav.js" defer></script>
   <script src="js/main.js" defer></script>
   <script src="js/accounts.js" defer></script>
+  <script src="js/handle-reserved.js" defer></script>
   <script src="js/seedops-schema.js" defer></script>
   <script src="js/seedops-log.js" defer></script>
   <script src="js/seedops-friend-gate.js" defer></script>
@@ -1343,20 +1336,43 @@
   <script src="js/login-signup-shell.js" defer></script>
   <script src="js/screen-break.js" defer></script>
   <script src="js/supabase-social.js" defer></script>
+  <script src="js/signal-post-as.js" defer></script>
   <script src="js/seed-preview.js" defer></script>
   <script src="js/people-search.js" defer></script>
   <script src="js/circle-saved-relations.js" defer></script>
+  <script src="js/pulse-mutual.js" defer></script>
   <script src="js/profile-photo.js" defer></script>
   <script src="js/pulse-falling-friends.js" defer></script>
   <script src="js/tower-layout-sync.js" defer></script>
   <script src="js/tower.js" defer></script>
+  <script src="js/feed-rating.js" defer></script>
+  <script src="js/signal-featured-songs.js" defer></script>
+  <script src="js/pro-job-title.js" defer></script>
   <script src="js/social-graph.js" defer></script>
   <script src="js/tower-follow.js" defer></script>
   <script src="js/tower-message.js" defer></script>
   <script src="js/moderation.js" defer></script>
   <script src="js/commune.js" defer></script>
   <script src="js/commune-messages.js" defer></script>
+  <script src="js/message-apple-pay.js" defer></script>
   <script src="js/dating-flag.js" defer></script>
+  <script src="js/echo-group.js" defer></script>
+  <script src="js/classroom-sessions.js" defer></script>
+  <script src="js/tower-classroom-sessions.js" defer></script>
+  <script src="js/chatroom-rules.js" defer></script>
+  <script src="js/college-programs-room.js" defer></script>
+  <script src="js/content-creator-room.js" defer></script>
+  <script src="js/peer-review-room.js" defer></script>
+  <script src="js/echo-mogul.js" defer></script>
+  <script src="js/licensure-room.js" defer></script>
+  <script src="js/echo-executives.js" defer></script>
+  <script src="js/echo-business.js" defer></script>
+  <script src="js/ai-at-work-room.js" defer></script>
+  <script src="js/echo-doctoral.js" defer></script>
+  <script src="js/industry-room.js" defer></script>
+  <script src="js/pro-interest.js" defer></script>
+  <script src="js/echo-ethics.js" defer></script>
+  <script src="js/research-room.js" defer></script>
   <script src="js/commune-swipe.js" defer></script>
   <script src="js/seedops-commune-alive.js" defer></script>
   <script src="js/seedops-dating-hydrate.js" defer></script>

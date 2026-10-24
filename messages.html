@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Messages</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="tower-messages-page">
+  <main class="tower-messages-room">
+    <header class="tower-messages-room-head">
+      <a href="index.html">Tower</a>
+      <h1>Messages</h1>
+    </header>
+    <div class="tower-messages" data-commune-messaging data-tower-messages>
+      <ul class="commune-conv-list tower-conv-list" data-commune-list role="listbox" aria-label="Conversations"></ul>
+      <div class="commune-thread tower-thread" data-tower-thread aria-label="Message thread">
+        <header class="commune-thread-header">
+          <h2 class="commune-thread-title" data-commune-thread-title>Messages</h2>
+        </header>
+        <p class="commune-empty" data-commune-empty>No messages yet.</p>
+        <div class="commune-messages" data-commune-messages role="log" aria-live="polite" tabindex="0"></div>
+        <p class="commune-status" data-commune-status hidden role="status"></p>
+        <form class="commune-compose" data-commune-compose action="#" method="post">
+          <label class="visually-hidden" for="commune-compose-input">Write a message</label>
+          <textarea id="commune-compose-input" name="message" rows="2" maxlength="2000" placeholder="Message…" required></textarea>
+          <button type="submit" class="btn btn-primary">Send</button>
+        </form>
+      </div>
+    </div>
+  </main>
+  <script src="js/cognation-config.js"></script>
+  <script src="/runtime-config"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/commune-messages.js" defer></script>
+  <script src="js/message-apple-pay.js" defer></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var to = "";
+      try { to = new URLSearchParams(location.search).get("to") || ""; } catch (e) {}
+      var store = window.CognationMessageStore;
+      if (!to || !store || typeof store.ensureConversation !== "function") return;
+      store.ensureConversation(to, "Member").then(function (res) {
+        if (res && res.ok && res.conversation && typeof store._openThread === "function") store._openThread(res.conversation.id);
+      });
+    });
+  </script>
+</body>
+</html>

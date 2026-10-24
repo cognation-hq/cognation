@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Cognation Calendar — Cognation</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="cgn-cal-page">
+  <a class="skip-link" href="#main">Skip to main content</a>
+  <nav class="cgn-cal-topbar" aria-label="Cognation">
+    <a href="/#tower">Tower</a><a href="/#signal">Signal</a><a href="/#commune">Echo</a><a href="/#circle">Pulse</a>
+  </nav>
+  <main id="main" class="cgn-cal-wrap" data-cognation-calendar>
+    <header class="cgn-cal-head">
+      <h1 class="cgn-cal-h1">Cognation Calendar</h1>
+      <p class="cgn-cal-lede">Classrooms and webinars from Professional pages, open to everyone. Personal events never show here.</p>
+    </header>
+    <div class="cgn-cal-toolbar">
+      <div class="cgn-cal-chips" role="group" aria-label="Filter sessions" data-cal-filters></div>
+      <span class="cgn-cal-zone" data-cal-zone>Times shown in your time zone</span>
+    </div>
+    <div class="cgn-cal-list" data-cal-list aria-live="polite"></div>
+    <p class="cgn-cal-hint">Want to host? Book a session from your Professional Tower page.</p>
+  </main>
+  <script src="/js/cognation-config.js"></script>
+  <script src="/runtime-config"></script>
+  <script src="/js/supabase-client.js"></script>
+  <script src="/js/age-floor-keywords.js"></script>
+  <script src="/js/seedops-badge.js" defer></script>
+  <script src="/js/classroom-sessions.js" defer></script>
+  <script src="/js/cognation-calendar.js" defer></script>
+</body>
+</html>

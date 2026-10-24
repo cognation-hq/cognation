@@ -18,7 +18,7 @@ var firstReturn = start.indexOf("    return;\n");
 assert.ok(firstReturn > 0 && start.slice(0, firstReturn).indexOf("CognationPulseFall.mount(layer") > 0, "falling friends mount on PULSE open");
 assert.ok(html.indexOf('src="js/pulse-falling-friends.js"') > 0, "falling friends script loaded");
 var pulse = require("./pulse-falling-friends.js");
-assert.strictEqual(pulse.cap, 6000, "falling friends cap 6,000");
+assert.strictEqual(pulse.cap, 30, "falling friends cap 30 (Alexa final spec 2026-10-20)");
 
 /* Electric lines: old color, crackle, brightness */
 var lightning = tower.slice(tower.indexOf("function paintCircleLightning"), tower.indexOf("var CIRCLE_REFRESH_MS"));
@@ -30,6 +30,8 @@ assert.ok(start.slice(0, firstReturn).indexOf("paintCircleRingShell(layer") > 0,
 
 /* Halo circles: in front, visual only */
 assert.ok(/CIRCLE_SPOTS\s*=\s*\[/.test(tower) && /\.circle-spot\.is-empty/.test(css), "halo circles");
+assert.ok(/\.circle-spot\s*\{[^}]*border-radius:\s*50%/.test(css), "halo frames are circles");
+assert.ok(/var size = 5\.6;[\s\S]{0,160}style\.height = size/.test(tower), "frames stay round; front scale is larger");
 assert.ok(/\.circle-ring\s*\{[^}]*z-index:\s*2/.test(css), "halo in front");
 assert.ok(/\.pulse-fall-stack\s*\{[^}]*z-index:\s*1/.test(css), "friends behind");
 
@@ -96,19 +98,20 @@ assert.ok(ringNode.children.some(function (c) { return c.attrs["data-circle-ligh
 var bolt = ringNode.children.filter(function (c) { return c.attrs["data-circle-bolt"] !== undefined; })[0];
 assert.ok(bolt, "lightning bolt SVG attached");
 var strokes = draw.paths.filter(function (pth) { return parseFloat(pth.attrs.opacity) >= 0.5 && parseFloat(pth.attrs["stroke-width"]) > 0.5; });
-assert.ok(strokes.length >= 50, "bolt has visible strokes (" + strokes.length + ")");
+assert.ok(strokes.length >= 3 && strokes.length <= 8, "one halo glow (" + strokes.length + ")");
+assert.ok(strokes.every(function (pth) { return (pth.attrs.d.match(/L/g) || []).length > 40; }), "glow is one oval, not chopped loops");
 ["#b44bff", "#3ecbff", "#ff4ad8", "#e9f7ff"].forEach(function (c) {
   assert.ok(draw.paths.some(function (pth) { return pth.attrs.stroke === c; }), "old bolt color " + c);
 });
 assert.ok(!/\.circle-lightning\s*\{[^}]*(display:\s*none|opacity:\s*0[;\s]|visibility:\s*hidden)/.test(css), "lightning not hidden by CSS");
 assert.ok(/svg\.circle-bolt\s*\{[^}]*opacity:\s*1/.test(css) && /pulse-bolt-crackle/.test(css), "bolt visible with crackle");
 
-/* Tower Private|Public switch and Search followers (restored after #59/#117), switch owner only, Search followers for everyone on Professional */
-assert.ok(/data-tower-side-toggle[^>]*>/.test(html) && !/data-tower-side-toggle[^>]*hidden>/.test(html), "Private|Public switch in markup, not hard-hidden");
-assert.ok(/data-tower-side-btn="private"/.test(html) && /data-tower-side-btn="public"/.test(html), "both side buttons");
-assert.ok(/toggle\.hidden = !owner;/.test(tower), "switch shows for owner only");
-assert.ok(!/\[data-tower-side-toggle\]\s*\{\s*display:\s*none/.test(css), "switch not forced off by CSS");
-assert.ok(/\[data-tower-app\]:not\(\[data-tower-is-owner="true"\]\) \[data-tower-side-toggle\]/.test(css), "non-owners never see the switch");
+/* Connections | Public profile pill, jumps, and the friends picker are gone. Search followers stays. */
+assert.ok(!/data-tower-side-toggle/.test(html), "Connections|Public profile pill removed");
+assert.ok(!/data-tower-side-btn/.test(html), "side buttons removed");
+assert.ok(!/data-tower-side-jump/.test(html), "side jumps removed");
+assert.ok(!/Feature pins on Public/.test(html) && !/data-tower-badge-file/.test(html), "public friends picker and badge upload removed");
+assert.ok(/data-tower-widget="friends"/.test(html) && /data-tower-widget="badges"/.test(html), "profile widget markup stays for Apply");
 assert.ok(/data-tower-followers-find/.test(html), "Search followers box in markup");
 assert.ok(/input\.hidden = false;/.test(tower) && !/searchOwner/.test(tower) && /shownEdges = edges\.filter/.test(tower), "Search followers shows for owner and visitors on Professional, and filters");
 
@@ -118,6 +121,10 @@ assert.ok(/window\.CognationTowerOpenOwn = function/.test(tower), "CognationTowe
 assert.ok(/name === "tower" && typeof window\.CognationTowerOpenOwn === "function"/.test(fs.readFileSync(path.join(__dirname, "tabs.js"), "utf8")), "Tower tab click opens own Tower");
 assert.ok(/data-tower-add-profile/.test(html) && /Add a professional page/.test(html), "Add a professional page in Edit profile markup");
 assert.ok(/btn\.textContent = "Add a professional page"/.test(tower), "Add a professional page button label");
+assert.ok(/data-tower-add-friends[^>]*>Find friends</.test(html), "owner action starts as Find friends (owner-only pill; #208)");
+assert.ok(!/textContent = "Add friends"/.test(tower), "personal page does not force the Add friends label");
+assert.ok(/el\.textContent = pro \? "Find people" : "Find friends"/.test(tower), "owner action reads Find people (Pro) / Find friends (Personal) (#208)");
+assert.ok(/--tower-name-size, 28px\) \* 0\.3/.test(css), "friend pill font tracks the display name");
 assert.ok(/if \(!anyDragged\) return null;/.test(tower), "never-dragged layouts use default grid (no overlap)");
 assert.ok(/var handleHit = ev\.target\.closest\("\[data-tower-sticker-handle\]"\);/.test(tower), "sticker handle starts a drag");
 assert.ok(/_userId: profile\.user_id \|\| ""/.test(fs.readFileSync(path.join(__dirname, "supabase-social.js"), "utf8")), "remote Tower profile carries user id for owner check");
@@ -244,11 +251,11 @@ assert.strictEqual(tr.getWidgetLayout({ widgetLayout: { avatar: { x: 0, y: 0 }, 
 
 /* Wiring in the real handler / store (static, so a refactor that drops it fails). */
 var down = grab("      /* Drag from anywhere on the sticker", "    stage.addEventListener(\"pointerdown\", onPointerDown);");
-assert.ok(/dragStarted = true;\s*\n\s*if \(liftDefaultGrid\(stage\)\)/.test(down), "drag start lifts the default grid");
+assert.ok(/dragStarted = true;\s*\n(?:\s*\/\*[\s\S]*?\*\/)?\s*if \(wid !== "quote" && liftDefaultGrid\(stage\)\)/.test(down), "drag start lifts the default grid (built-in widgets; a Quote floats and never lifts it, #223)");
 assert.ok(/if \(!dragStarted\) \{[^}]*return;/.test(down), "no save when the pointer never dragged");
 assert.ok(/freezeSpawnedWidgets\(root, layout\)/.test(down) && /TowerProfileStore\.save\(p, \{ geometry: true \}\)/.test(down), "drop freezes others and saves geometry");
 assert.ok(/stage\.querySelectorAll\("\[data-tower-widget\]\.is-spawned"\)/.test(grab("  function freezeSpawnedWidgets", "  /* Old scrapbook")) && /liftDefaultGrid\(stage\);/.test(grab("  function freezeSpawnedWidgets", "  /* Old scrapbook")), "freeze pins from on-screen spots");
-assert.ok(/if \(opts\.geometry && window\.CognationTowerLayoutSync\) window\.CognationTowerLayoutSync\.save\(data\)/.test(tower), "account layout saved only on a geometry edit (never on open)");
+assert.ok(/if \(window\.CognationTowerLayoutSync && liveSignedInForTower\(\)\) \{\s*if \(opts\.geometry\) window\.CognationTowerLayoutSync\.save\(data\);\s*else if \(window\.CognationTowerLayoutSync\.saveWidgetsIfChanged\) window\.CognationTowerLayoutSync\.saveWidgetsIfChanged\(data\);/.test(tower), "account layout: positions on a geometry edit, added widgets only when they change (never on open), signed-in only");
 assert.ok(/!signInConfigured && window\.CognationAccounts/.test(tower), "demo profile id only in local preview, never with sign-in configured");
 
 })();
@@ -276,7 +283,7 @@ vm.runInContext([
 
 /* Default spawn never overlaps, Personal and Pro, desktop and phone. */
 var SIZES = { avatar: [220, 220], identity: [400, 90], slogan: [400, 70], music: [300, 380], youtube: [560, 340],
-  friends: [440, 200], "social-instagram": [160, 48], "social-tiktok": [160, 48], badges: [300, 160], calendar: [300, 260], followers: [300, 240],
+  friends: [440, 200], "social-instagram": [160, 48], "social-tiktok": [160, 48], badges: [300, 160], calendar: [300, 260], "visitor-calendar": [400, 430], followers: [300, 240],
   polaroid: [280, 320], html: [420, 200], instax: [220, 280] };
 function expandRows(face) {
   var chips = face === "professional" ? ["social-instagram", "social-tiktok"] : ["social-instagram", "social-tiktok"];
@@ -367,7 +374,6 @@ vm.runInContext([
 function net(id) { return ctx.nets.filter(function (n) { return n.id === id; })[0]; }
 assert.ok(net("venmo") && ctx.allowed(net("venmo"), "personal") && ctx.allowed(net("venmo"), "professional"), "Venmo on Personal and Pro");
 assert.strictEqual(ctx.href("venmo", "@alexa"), "https://venmo.com/u/alexa", "Venmo handle links out");
-assert.ok(/data-tower-social="venmo"/.test(html), "Venmo field in Edit profile");
 ["services", "ads"].forEach(function (id) {
   var n = net(id);
   assert.ok(n && n.label === (id === "services" ? "Pay for services" : "Buy ads") && n.quiet && !n.cta, id + " link defined, quiet");
@@ -378,7 +384,6 @@ assert.ok(/data-tower-social="venmo"/.test(html), "Venmo field in Edit profile")
     assert.strictEqual(ctx.href(id, bad), "", id + " rejected: " + bad);
     assert.strictEqual(ctx.stored(id, bad), "", id + " not stored: " + bad);
   });
-  assert.ok(new RegExp('<input id="tower-social-' + id + '"[^>]*type="url"[^>]*data-tower-social="' + id + '"').test(html), "owner sets " + id + " in Edit profile");
 });
 assert.ok(!net("hire") && !/is-cta/.test(tower) && !/data-tower-social="hire"/.test(html), "single Hire/Buy CTA gone");
 var css = fs.readFileSync(path.join(__dirname, "..", "css", "styles.css"), "utf8");
@@ -455,10 +460,11 @@ assert.ok(/a\.target = "_blank";\s*a\.rel = "noopener noreferrer";/.test(tower),
   assert.ok(/CognationTowerLayoutSync\.savePublic/.test(tower), "Tower calls savePublic on social/YouTube save");
   assert.ok(/Empty local must not wipe server _public links/.test(tower), "empty localStorage does not clear server socials");
 
-  /* v3.2/v3.3 density: profile strip ~72–88px, YouTube band ~96–112px, quote under handle. */
+  /* v3.2/v3.3 density: profile strip ~72–88px. YouTube card keeps player + paste field. */
   assert.ok(/data-tower-profile-strip/.test(tower) && /ensureProfileStrip/.test(tower), "profile strip wrapper");
   assert.ok(/max-height:\s*88px/.test(css) && /min-height:\s*72px/.test(css), "profile strip height band");
-  assert.ok(/max-height:\s*112px/.test(css) && /max-height:\s*96px/.test(css), "YouTube thumb band");
+  assert.ok(/\.tower-sticker--youtube\.is-spawned \{\s*max-height: none;/.test(css), "YouTube card is not clipped after a link");
+  assert.ok(/data-music-mode="youtube"\] \.tower-music-owner/.test(css), "personal paste field stays with the player");
   assert.ok(/tower-profile-strip-quote/.test(css) && /content: none !important/.test(css), "quote under handle, no divider");
   assert.ok(/__socials__/.test(tower) && /socialWidgetId/.test(tower), "SPAWN_ROWS expands per-link social chips");
   assert.ok(!/\["friends", "social"\]/.test(tower) && !/\["social", "badges"\]/.test(tower), "grouped social spawn slots removed");
@@ -497,11 +503,12 @@ assert.ok(/a\.target = "_blank";\s*a\.rel = "noopener noreferrer";/.test(tower),
   /* tower-widgets PR: the X on each chip is gone; Backspace/Delete (and the touch
      Remove button) clear the selected chip's link instead. */
   assert.ok(!/rm\.setAttribute\("data-tower-social-remove"/.test(tower), "no X button on social chips");
+  assert.ok(!/className = "tower-social-chip-label"/.test(tower), "social chips are logos only; X paints no letter that reads as delete");
   assert.ok(/var socialNet = socialNetIdFromWidget\(id\);\s*if \(socialNet\) \{\s*removeSocialWidget\(root, socialNet\);/.test(tower), "selected chip removable by key / Remove button");
   assert.ok(/tower-sticker--social-chip/.test(css), "chip CSS present");
   assert.ok(/migrateGroupedSocialLayout/.test(tower), "old grouped layout.social maps to first chip");
 
-  var start = tower.indexOf("function optedInSocialNetIds");
+  var start = tower.indexOf("function chipSocialLinks");
   var end = tower.indexOf("function expandSpawnRows");
   assert.ok(start > 0 && end > start, "optedInSocialNetIds present");
   var ctx = vm.createContext({

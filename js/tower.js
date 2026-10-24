@@ -14096,6 +14096,110 @@
   }
 
   /* Cap 250 — ring shell as Circle page background: lightning + five spots. */
+  /* Project a torus each frame. The near side is thicker. A charge travels
+     the ring and the bright edge rolls across the tube. No image. */
+  function drawPulseSolidRings(now) {
+    var canvas = document.querySelector("[data-pulse-solid]");
+    if (!canvas || !canvas.getContext) return;
+    var ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    var cx = canvas.width / 2;
+    var cy = canvas.height / 2;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var t = reduce ? 0 : (now || 0) / 1000;
+    function ringPts(major, minor, shift) {
+      var n = 150, i, out = [];
+      for (i = 0; i <= n; i++) {
+        var deg = (i / n) * 360;
+        var p = circleProjectRadius(deg, major);
+        var q = circleProjectRadius(deg + 2, major);
+        var tx = q.x - p.x, ty = q.y - p.y;
+        var len = Math.sqrt(tx * tx + ty * ty) || 1;
+        var depth = Math.max(0.3, Math.min(p.s / CIRCLE_SCALE, 2.4));
+        var span = minor * (0.36 + 0.64 * depth / 2.4);
+        out.push({
+          x: cx + p.x + (-ty / len) * shift * span,
+          y: cy + p.y + (tx / len) * shift * span,
+          d: depth,
+          deg: deg
+        });
+      }
+      return out;
+    }
+    function trace(list) {
+      ctx.beginPath();
+      for (var i = 0; i < list.length; i++) {
+        if (i) ctx.lineTo(list[i].x, list[i].y); else ctx.moveTo(list[i].x, list[i].y);
+      }
+    }
+    function fillBand(a, b) {
+      ctx.beginPath();
+      var i;
+      for (i = 0; i < a.length; i++) (i ? ctx.lineTo(a[i].x, a[i].y) : ctx.moveTo(a[i].x, a[i].y));
+      for (i = b.length - 1; i >= 0; i--) ctx.lineTo(b[i].x, b[i].y);
+      ctx.closePath();
+      ctx.fill();
+    }
+    function band(major, minor, spin, roll, cyanBias) {
+      var mid = ringPts(major, minor, 0);
+      var outer = ringPts(major, minor, 1);
+      var inner = ringPts(major, minor, -1);
+      var gleam = ringPts(major, minor, Math.sin(roll));
+      ctx.globalCompositeOperation = "source-over";
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = cyanBias > 0.5 ? "rgba(20, 70, 140, 0.22)" : "rgba(70, 20, 120, 0.2)";
+      fillBand(outer, inner);
+      var frontO = outer.filter(function (p) { return p.deg > 40 && p.deg < 140; });
+      var frontI = inner.filter(function (p) { return p.deg > 40 && p.deg < 140; });
+      ctx.fillStyle = cyanBias > 0.5 ? "rgba(90, 220, 255, 0.42)" : "rgba(200, 130, 255, 0.4)";
+      if (frontO.length > 2 && frontI.length > 2) fillBand(frontO, frontI);
+      ctx.globalCompositeOperation = "lighter";
+      ctx.shadowBlur = 16;
+      ctx.globalAlpha = 0.38;
+      ctx.lineWidth = cyanBias > 0.5 ? 2.6 : 3.6;
+      ctx.shadowColor = "rgba(62, 203, 255, 0.95)";
+      ctx.strokeStyle = "rgba(168, 244, 255, 0.8)";
+      trace(outer);
+      ctx.stroke();
+      ctx.shadowColor = "rgba(180, 75, 255, 0.95)";
+      ctx.strokeStyle = "rgba(197, 166, 255, 0.82)";
+      trace(inner);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = cyanBias > 0.5 ? 4.4 : 6.5;
+      ctx.shadowColor = "rgba(62, 203, 255, 1)";
+      ctx.strokeStyle = "rgba(214, 252, 255, 0.95)";
+      trace(frontO);
+      ctx.stroke();
+      ctx.shadowColor = "rgba(188, 90, 255, 1)";
+      ctx.strokeStyle = "rgba(226, 196, 255, 0.95)";
+      trace(frontI);
+      ctx.stroke();
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = "rgba(247, 254, 255, 0.9)";
+      ctx.strokeStyle = "rgba(247, 254, 255, 0.88)";
+      ctx.lineWidth = 2;
+      trace(gleam);
+      ctx.stroke();
+      ctx.beginPath();
+      var started = false, i, hot;
+      for (i = 0; i < mid.length; i++) {
+        hot = Math.cos(mid[i].deg * Math.PI / 180 - spin);
+        if (hot > 0.62) {
+          if (!started) { ctx.moveTo(mid[i].x, mid[i].y); started = true; }
+          else ctx.lineTo(mid[i].x, mid[i].y);
+        } else if (started) { ctx.stroke(); ctx.beginPath(); started = false; }
+      }
+      if (started) ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+    band(328 + Math.sin(t * 0.8) * 6, 18, t * 1.15, t * 1.4, 0.2);
+    band(236, 11, -t * 0.72, -t * 1.1, 0.85);
+  }
+
   function paintCircleRingShell(layer, people) {
     if (!layer) return;
     var old = layer.querySelector("[data-circle-ring]");
@@ -14107,9 +14211,17 @@
     ring.setAttribute("data-circle-topics", String(people.length));
     ring.setAttribute("data-circle-shell", "1");
     paintCircleLightning(ring);
+    /* 3D rings are redrawn each frame. Not a picture. */
+    var solid = document.createElement("canvas");
+    solid.className = "pulse-solid-ring";
+    solid.setAttribute("data-pulse-solid", "");
+    solid.setAttribute("aria-hidden", "true");
+    solid.width = 1100;
+    solid.height = 720;
+    ring.appendChild(solid);
     var spin = document.createElement("div");
     spin.className = "circle-ring-spin";
-    /* People keep their shared bob. The solid inner ellipse is a pseudo on the spin and stays still. */
+    /* People keep their shared bob. */
     var crew = document.createElement("div");
     crew.className = "circle-ring-people";
     var i;
@@ -14379,7 +14491,9 @@
       var st = circleFallState;
       if (!st || !st.shellOnly) return;
       placeCircleSpots();
-      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { st.raf = 0; return; }
+      var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      drawPulseSolidRings(reduceMotion ? 0 : performance.now());
+      if (reduceMotion) { st.raf = 0; return; }
       st.raf = requestAnimationFrame(frameShell);
     }
     if (!window.__cognationPulseBgResize) {

@@ -15230,6 +15230,31 @@ textarea::placeholder {
   .circle-fall[data-pulse-bg] .circle-ring-spin::after,
   .circle-fall[data-pulse-bg] .circle-ring-people { animation: none; }
 }
+/* 3D rings replace the photo and the flat spinning discs. The extra halo wash
+   comes off. People bob stays. */
+.circle-fall[data-pulse-bg] {
+  background: linear-gradient(145deg, #171a3a 0%, #291b3a 100%) !important;
+}
+.circle-fall[data-pulse-bg]::before,
+.circle-fall[data-pulse-bg]::after,
+.circle-fall[data-pulse-bg] .circle-ring::before,
+.circle-fall[data-pulse-bg] .circle-ring-spin::before,
+.circle-fall[data-pulse-bg] .circle-ring-spin::after {
+  display: none !important;
+  animation: none !important;
+  background: none !important;
+  background-image: none !important;
+}
+.circle-fall[data-pulse-bg] canvas.pulse-solid-ring {
+  position: absolute;
+  left: 50%;
+  top: var(--pulse-ring-y, 48%);
+  width: 1100px;
+  height: 720px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 0;
+}
 .pulse-side-toggle {
   position: absolute; z-index: 6; top: 8px; left: 50%; transform: translateX(-50%);
   display: flex; gap: 6px; pointer-events: auto;

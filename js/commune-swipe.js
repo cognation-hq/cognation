@@ -2080,6 +2080,11 @@
         if (deck.some(function (c) { return stableCardId(c.id) === stableCardId(add.id); })) continue;
         deck.unshift(add);
       }
+      var peer = window.CognationPeerReview, interests = viewerInterestPhrases();
+      var peerExtra = peer && peer.cards ? omitPassed((peer.cards({ field: interests[0] || "", interests: interests, age: getMemberProfile().age }) || []).filter(function (c) {
+        return !peer.forInterest || peer.forInterest(c, interests);
+      })) : [];
+      if (peerExtra.length) deck = peerExtra.concat(deck);
       return deck.length > limit ? deck.slice(0, limit) : deck;
     }
     var built = buildLanes();
@@ -2339,6 +2344,11 @@
     el.setAttribute("data-commune-card", "");
     el.setAttribute("data-card-type", card.type === TYPE.DATING ? "speed-dating" : card.type);
     el.setAttribute("data-card-id", card.id);
+    if (card.peerReview && window.CognationPeerReview && window.CognationPeerReview.cardHtml) {
+      el.setAttribute("data-professional-card", "");
+      el.innerHTML = window.CognationPeerReview.cardHtml(card);
+      return el;
+    }
     if (card.type === TYPE.CLASSROOM) {
       el.setAttribute("data-classroom", "card");
     }
@@ -2537,6 +2547,16 @@
   }
 
   function bindCard(el, card) {
+    if (card && card.peerReview && window.CognationPeerReview) {
+      var openPeer = function () { window.CognationPeerReview.open(card); };
+      el.addEventListener("click", function (ev) {
+        if (ev.target && ev.target.closest && ev.target.closest("button, a, input, textarea")) return;
+        if (Math.abs(state.lastDragDx || 0) < 10) openPeer();
+      });
+      var peerBtn = el.querySelector("[data-peer-open]");
+      if (peerBtn) peerBtn.addEventListener("click", function (ev) { ev.stopPropagation(); openPeer(); });
+      return;
+    }
     var liveJoin = el.querySelector("[data-live-session-join]");
     if (liveJoin) liveJoin.addEventListener("click", function (ev) {
       ev.stopPropagation();
@@ -3642,6 +3662,7 @@
   }
 
   function closeRoom() {
+    try { if (window.CognationPeerReview && window.CognationPeerReview.owns()) window.CognationPeerReview.close(); } catch (ePeer) {}
     if (state.roomId) friction("abandon", "chat", "room_back");
     if (state.cardView) {
       if (state.cardView === "classroom" && state.classroomId) friction("abandon", "classroom", "classroom_back");
@@ -4380,6 +4401,11 @@
         ev.preventDefault();
         var input = roomEl() && roomEl().querySelector("[data-commune-room-input]");
         var body = input ? String(input.value || "").trim() : "";
+        if (window.CognationPeerReview && window.CognationPeerReview.owns()) {
+          if (body) window.CognationPeerReview.send(body);
+          if (input) input.value = "";
+          return;
+        }
         if (!body || !state.roomId) return;
         body = body.slice(0, 500);
         if (window.CognationEchoMogul && window.CognationEchoMogul.isRoom(state.roomId)) {

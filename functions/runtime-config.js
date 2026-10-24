@@ -6,6 +6,8 @@
  *   SUPABASE_URL
  *   SUPABASE_PUBLISHABLE_KEY
  *   COGNATION_LOCAL_DEMO  (optional; "1" enables local demo on non-Pages hosts only)
+ *   APPLE_PAY_MERCHANT_ID (optional; public merchant id, never a card number)
+ *   APPLE_PAY_PROCESSOR   (optional; https processor. Absent means Apple Pay is not set up)
  */
 export async function onRequest(context) {
   const env = (context && context.env) || {};
@@ -17,6 +19,10 @@ export async function onRequest(context) {
   if (key) payload.supabasePublishableKey = key;
   /* Live Pages still ignores this. demo-mode.js refuses *.pages.dev hosts. */
   if (localDemo === "1" || localDemo === "true") payload.localDemo = true;
+  const merchant = String(env.APPLE_PAY_MERCHANT_ID || "").trim();
+  const processor = String(env.APPLE_PAY_PROCESSOR || "").trim();
+  if (merchant) payload.applePayMerchantId = merchant;
+  if (/^https:\/\//.test(processor)) payload.applePayProcessor = processor;
   const body =
     "window.CognationConfig=Object.assign({},window.CognationConfig||{}," +
     JSON.stringify(payload) +

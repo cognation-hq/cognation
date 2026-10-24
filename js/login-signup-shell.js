@@ -28,8 +28,10 @@
   var demoHint = form.querySelector("[data-login-demo-hint]");
   var passwordInput = form.querySelector("#login-password");
   var ageBlockEl = document.querySelector("[data-login-age-block]");
+  var areaBlockEl = form.querySelector("[data-login-area-block]");
   var submitActions = form.querySelector(".login-form-actions");
   var legalLinks = form.querySelector("[data-login-legal-links]");
+  var PILOT_COUNTRY = "United States";
 
   function gate() {
     return window.CognationAgeGate || null;
@@ -191,6 +193,22 @@
     if (legalLinks) legalLinks.hidden = !isSignup;
     if (!opts.keepStatus) setStatus("");
     applyAgeBlock(isSignup);
+    applyAreaBlock(isSignup);
+  }
+
+  /* USA pilot: the signup country field is the only check. Public pages stay open. */
+  function outsidePilot() {
+    return !!(signupCountrySelect && signupCountrySelect.value !== PILOT_COUNTRY);
+  }
+
+  function applyAreaBlock(isSignup) {
+    var blocked = !!isSignup && outsidePilot();
+    if (areaBlockEl) areaBlockEl.hidden = !blocked;
+    if (submitBtn) submitBtn.disabled = blocked;
+    if (blocked && areaBlockEl && areaBlockEl.scrollIntoView) {
+      try { areaBlockEl.scrollIntoView({ block: "nearest" }); } catch (e) {}
+    }
+    return blocked;
   }
 
   function markInvalid(el, bad) {
@@ -287,6 +305,7 @@
   if (signupCountrySelect) {
     signupCountrySelect.addEventListener("change", function () {
       syncStateInputs(signupCountrySelect.value);
+      applyAreaBlock((step.getAttribute("data-login-mode") || "signin") === "signup");
     });
   }
 
@@ -310,6 +329,8 @@
           blockSignup();
           return;
         }
+        /* Outside the USA pilot: stop before any account is created or stored. */
+        if (applyAreaBlock(true)) return;
         if (!validateSignup()) {
           setStatus("Use a 3–40 character username (letters, numbers, _ or -), then fix any highlighted fields.", true);
           return;
@@ -364,6 +385,9 @@
             .then(function (result) {
               delete profile.birthYearMonth; /* not kept on the device either */
               writeProfile(profile);
+              if (window.CognationAccounts && window.CognationAccounts.ensureCognationFriend) {
+                try { window.CognationAccounts.ensureCognationFriend(profile.username); } catch (eFriend) {}
+              }
               if (result && result.session && window.CognationAuth) {
                 return window.CognationAuth.login(profile.email, password);
               }

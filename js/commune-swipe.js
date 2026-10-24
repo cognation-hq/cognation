@@ -134,8 +134,9 @@
     ETHICS: "pro-ethics",
     FIELD: "pro-field",
     POP: "pro-popculture",
+    DOCTORAL: "pro-doctoral",
   };
-  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.ETHICS, PRO.FIELD, PRO.POP];
+  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.ETHICS, PRO.DOCTORAL, PRO.FIELD, PRO.POP];
   var PRO_MARK = {};
   PRO_MARK[PRO.WEBINAR] = "Webinar";
   PRO_MARK[PRO.KNOW] = "Professionals you might know";
@@ -145,6 +146,7 @@
   PRO_MARK[PRO.ETHICS] = "Ethics board";
   PRO_MARK[PRO.FIELD] = "Field";
   PRO_MARK[PRO.POP] = "Pop-culture";
+  PRO_MARK[PRO.DOCTORAL] = "Doctoral degrees";
   PRO_MARK["pro-industry"] = "Industry";
   PRO_MARK["pro-licensure"] = "Licensure";
   /* Podcast cards stay, with no Demo badge (Alexa 2026-10-22 11:46 AM CT, via SeedOps:
@@ -1932,6 +1934,11 @@
     return [];
   }
 
+  function doctoralCards() {
+    var api = window.CognationEchoDoctoral;
+    return api && typeof api.cards === "function" ? api.cards(viewerInterestTokens()) : [];
+  }
+
   function ethicsCards() {
     var api = window.CognationEchoEthics;
     return api && typeof api.cards === "function" ? api.cards(viewerInterestTokens()) : [];
@@ -1953,6 +1960,7 @@
       return { id: w.id, type: PRO.PODCAST, title: w.title, body: w.body,
         why: "Picked by topic: ethics, async work, continuing education.", rating: "G", minAge: 0, keepOnly: true };
     });
+    lanes[PRO.DOCTORAL] = doctoralCards();
     lanes[PRO.ETHICS] = ethicsCards();
     /* Research chat only if this person lists research. Field and Pop culture stay empty. */
     lanes[PRO.RESEARCH] = researchRoomCards();
@@ -2341,9 +2349,11 @@
       if (card.type === "pro-industry") {
         html += '<button type="button" class="btn btn-primary" data-industry-open>Enter room</button>';
       }
-      /* Shown without the interest: do not claim they listed Industry. */
+      /* Shown without the interest: do not claim they listed it. */
       var industryOff = card.type === "pro-industry" && !hasInterest((window.CognationIndustry || {}).INTERESTS || []);
-      if (card.why && !industryOff) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
+      var doctoralOff = card.type === PRO.DOCTORAL && !hasInterest(["doctoral degrees"]);
+      var ethicsOff = card.type === PRO.ETHICS && !hasInterest(["ethics board"]);
+      if (card.why && !industryOff && !doctoralOff && !ethicsOff) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
       if (card.type === PRO.RESEARCH) {
         html += '<button type="button" class="btn btn-primary" data-research-enter>Enter Research</button>';
         if (card.full) html += '<p class="commune-card-meta">Full — another Research card is open.</p>';
@@ -2544,6 +2554,7 @@
     } else if (card.type === PRO.AUCTION) {
       wireClassroomCardClick(el, card, function () { openAuction(card, true); });
     }
+    if (card.type === PRO.DOCTORAL) wireClassroomCardClick(el, card, openDoctoral);
     if (card.type === PRO.ETHICS) wireClassroomCardClick(el, card, openEthics);
     /* Alexa's rule: an ECHO card opens its own full-screen window or a Tower profile, nothing else. */
     if (card.type === TYPE.CHAT) {
@@ -3264,6 +3275,7 @@
     if (members) { members.hidden = true; members.textContent = ""; }
     ensureRoomHeader(panel);
     wireRoomSwipe(panel);
+    if (window.CognationEchoDoctoral) window.CognationEchoDoctoral.clearChrome(panel);
     if (window.CognationEchoEthics) window.CognationEchoEthics.clearChrome(panel);
     if (log) paintLiveLog(opts.messages || state.liveMessages || []);
     showRoom(true);
@@ -3365,6 +3377,33 @@
     }
     return liveRoomUnavailable(supabaseLiveSession() ? "Live rooms aren't ready yet. Try again soon." : "Sign in to join live rooms.");
   }
+  function openDoctoral(cardId) {
+    var api = window.CognationEchoDoctoral;
+    var card = null;
+    [state.cards, doctoralCards()].forEach(function (list) {
+      (list || []).forEach(function (c) {
+        if (!card && c && (c.id === cardId || c.roomId === cardId)) card = c;
+      });
+    });
+    if (!api || !card || !roomEl()) return false;
+    var joined = api.join(card.roomId);
+    if (!joined.ok) {
+      setStatus(joined.message || "That Doctoral degrees room is not available.");
+      if (joined.full) rebuildDeck();
+      return false;
+    }
+    var panel = roomEl();
+    state.roomId = card.roomId;
+    state.liveRoom = false;
+    state.roomSqlId = "";
+    ensureRoomHeader(panel);
+    wireRoomSwipe(panel);
+    api.paint(panel, card.roomId);
+    showRoom(true);
+    setStatus("You're in the Doctoral degrees chatroom.");
+    return true;
+  }
+
   function openEthics(cardId) {
     var api = window.CognationEchoEthics;
     var card = null;
@@ -3402,6 +3441,7 @@
 
   function releaseRoomSurface() {
     /* Drop open-room lock and restore deck/actions so the card can swipe again. */
+    if (window.CognationEchoDoctoral) window.CognationEchoDoctoral.clearChrome(roomEl());
     if (window.CognationEchoEthics) window.CognationEchoEthics.clearChrome(roomEl());
     var wasLive = state.liveRoom;
     var sqlId = state.roomSqlId;
@@ -4156,6 +4196,14 @@
         var body = input ? String(input.value || "").trim() : "";
         if (!body || !state.roomId) return;
         body = body.slice(0, 500);
+        if (window.CognationEchoDoctoral && window.CognationEchoDoctoral.isRoom(state.roomId)) {
+          var doctoralSent = window.CognationEchoDoctoral.post(state.roomId, body);
+          if (input) input.value = "";
+          window.CognationEchoDoctoral.paint(roomEl(), state.roomId);
+          setStatus(doctoralSent && doctoralSent.ok ? "Sent." : (doctoralSent && doctoralSent.message) || "Couldn't send.");
+          return;
+        }
+
         if (state.industryRoom && window.CognationIndustry) {
           var industryApi = window.CognationIndustry;
           var industryRes = industryApi.comment(state.roomId, currentProfileId(), viewerDisplayName(), body);

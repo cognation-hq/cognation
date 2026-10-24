@@ -278,7 +278,10 @@
       host.innerHTML = '<p class="news-comment-signin">Sign in to see and post comments.</p>';
       return host;
     }
-    var comments = listForStory(storyId);
+    var comments = listForStory(storyId).filter(function (c) {
+      var mod = window.CognationModeration;
+      return !(mod && mod.isPostHidden && mod.isPostHidden(c.id));
+    });
     var under13 = age() < 13;
     /* ⋯ menu with Report: signed-in shared comments only (never signed out). */
     var canReport = remoteOn() && !!signed;
@@ -287,9 +290,7 @@
       var option = c.reportedByMe
         ? '<button type="button" class="news-report-option" disabled data-news-comment-reported>Reported</button>'
         : '<button type="button" class="news-report-option" data-news-comment-report data-comment-id="' + esc(c.id) + '">Report</button>';
-      var blockBtn = c.authorUserId
-        ? '<button type="button" class="news-report-option" data-news-comment-block data-author-user-id="' + esc(c.authorUserId) + '">Block</button>'
-        : "";
+      var blockBtn = '<button type="button" class="news-report-option" data-news-comment-block data-comment-id="' + esc(c.id) + '">Block</button>';
       return '<button type="button" class="news-comment-more" data-news-comment-more aria-haspopup="true" aria-expanded="false" aria-label="More for this comment">⋯</button>' +
         '<div class="news-report-menu" data-news-comment-menu hidden>' + option + blockBtn + "</div>";
     }
@@ -327,7 +328,7 @@
     line.textContent = POST_FAILED;
     form.insertAdjacentElement("afterend", line);
   }
-  var REPORT_FAILED = "Couldn't report. Try again.";
+  var REPORT_FAILED = "Couldn't send report, try again";
   function showReportError(item) {
     if (!item || item.querySelector("[data-news-comment-report-error]")) return;
     var line = document.createElement("p");
@@ -341,9 +342,60 @@
     var line = host.querySelector("[data-news-comment-error]");
     if (line) line.remove();
   }
+  /* Cognation Times (SIGNAL › News): each story's thread starts closed behind one ink
+     text line, "Comments (n)" / "Hide comments". The thread still mounts and loads
+     exactly as before; the line only shows or hides it (CSS keys off the article's
+     data-times-comments-open). Once per story; other surfaces are untouched. */
+  function wireTimesToggle(article, host, storyId) {
+    if (!article.closest || !article.closest("#panel-signal")) return;
+    if (article.querySelector("[data-times-comments-toggle]")) return;
+    /* A redraw of the same edition (Statewide Refresh, signed-in posts landing)
+       rebuilds every story; a thread the reader had open comes back open. */
+    if (timesOpen[storyId]) article.setAttribute("data-times-comments-open", "");
+    timesSeq += 1;
+    if (!host.id) host.id = "times-comments-" + timesSeq + "-" + String(storyId).replace(/[^a-z0-9_-]/gi, "").slice(0, 40);
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "times-comments-toggle";
+    btn.setAttribute("data-times-comments-toggle", "");
+    btn.setAttribute("aria-controls", host.id);
+    btn.setAttribute("aria-expanded", "false");
+    host.parentNode.insertBefore(btn, host);
+    function sync() {
+      var open = article.hasAttribute("data-times-comments-open");
+      var n = host.querySelectorAll(".news-comment-item").length;
+      var text = open ? "Hide comments" : n ? "Comments (" + n + ")" : "Comments";
+      if (btn.textContent !== text) btn.textContent = text;
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      /* Viewers the thread is not shown to (age rule above) get no line either. */
+      btn.hidden = host.hidden;
+    }
+    host.__timesSync = sync;
+    btn.addEventListener("click", function () {
+      if (article.hasAttribute("data-times-comments-open")) {
+        article.removeAttribute("data-times-comments-open");
+        delete timesOpen[storyId];
+      } else {
+        article.setAttribute("data-times-comments-open", "");
+        timesOpen[storyId] = true;
+      }
+      sync();
+    });
+    if (typeof MutationObserver === "function") {
+      new MutationObserver(sync).observe(host, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
+    }
+    sync();
+  }
+  var timesSeq = 0;
+  /* Story keys whose Times thread is open; cleared when the edition changes. */
+  var timesOpen = {};
+  function resetTimesOpen() { timesOpen = {}; }
+
   function mount(article, post) {
     if (!article) return null;
-    var storyId = (post && post.id) || article.getAttribute(cfg.idAttr) || "";
+    /* data-news-story-key: the story a reshuffled copy came from (commune.js), so
+       a Statewide Refresh keeps the same thread. */
+    var storyId = (post && post.id) || article.getAttribute("data-news-story-key") || article.getAttribute(cfg.idAttr) || "";
     if (!storyId) return null;
     if (cfg.parentCol === "post_id" && !UUID_RE.test(String(storyId))) return null;
     var rating = (post && post.rating) || article.getAttribute("data-news-rating") || "";
@@ -357,6 +409,7 @@
       host.setAttribute("data-news-comments", "");
       article.appendChild(host);
     }
+    if (cfg === NEWS) wireTimesToggle(article, host, storyId);
     /* Every mount() redraws this one slot; only the latest call may paint, so a
        slow pull from an earlier call (old session or profile) loses. */
     var token = (host.__renderToken || 0) + 1;
@@ -364,11 +417,13 @@
     if (remoteOn() && sessionAuthor() && !(cfg.under13NoThread && age() < 13)) {
       pullStory(storyId).then(function () {
         if (host.__renderToken === token) renderThread(host, storyId, rating);
+        if (host.__timesSync) host.__timesSync();
       }, function () {
         if (host.__renderToken !== token) return;
         var d = read(); d.byStory[storyId] = []; write(d); renderThread(host, storyId, rating);
       });
     } else renderThread(host, storyId, rating);
+    if (host.__timesSync) host.__timesSync();
     if (!host.__bound) {
       host.__bound = true;
       host.addEventListener("submit", function (ev) {
@@ -421,15 +476,14 @@
           return;
         }
         var blockBtn = ev.target && ev.target.closest("[data-news-comment-block]");
-      if (blockBtn) {
+      if (blockBtn && host.contains(blockBtn)) {
         ev.preventDefault();
-        var uid = blockBtn.getAttribute("data-author-user-id");
-        if (uid && window.CognationBlock) {
-          blockBtn.disabled = true;
-          window.CognationBlock.blockUser(uid).then(function () {
-            blockBtn.textContent = "Blocked";
-          }, function () { blockBtn.disabled = false; });
+        var cid = blockBtn.getAttribute("data-comment-id");
+        if (cid && window.CognationModeration && window.CognationModeration.hideContent) {
+          window.CognationModeration.hideContent(cid);
         }
+        var item = blockBtn.closest(".news-comment-item");
+        if (item) item.hidden = true;
         return;
       }
       var reportBtn = ev.target && ev.target.closest("[data-news-comment-report]");
@@ -482,6 +536,7 @@
     listForStory: listForStory, addComment: addComment,
     publishComment: publishComment, pullStory: pullStory, authorBadge: authorBadge, reportComment: reportComment,
     toggleReact: toggleReact, mount: mount, mountAll: mountAll, viewerAge: age,
+    resetTimesOpen: resetTimesOpen,
   };
 
   if (typeof document !== "undefined" && document.addEventListener) {

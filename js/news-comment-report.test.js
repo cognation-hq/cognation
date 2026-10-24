@@ -129,7 +129,7 @@ function testFailureShowsErrorLine() {
     return tick().then(function () {
       assert.strictEqual(lines.length, 1, "one error line");
       assert.strictEqual(lines[0].className, "commune-status is-error", "existing News error line style");
-      assert.strictEqual(lines[0].textContent, "Couldn't report. Try again.");
+      assert.strictEqual(lines[0].textContent, "Couldn't send report, try again");
       assert.strictEqual(btn.disabled, false, "Report can be tried again");
     });
   });

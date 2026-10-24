@@ -95,10 +95,41 @@
     return !!(friends && typeof friends.has === "function" && friends.has(friendId));
   }
 
+  /* No page to open: hide the control. Never leave a dead button. */
+  function hideNoPage(btn) {
+    var row = btn.closest("[data-tower-follow-row]");
+    if (row) row.hidden = true;
+    btn.hidden = true;
+    btn.disabled = true;
+    return true;
+  }
+
+  /* Follow / Add friend stay on the profile pages. Messages never shows them. */
+  function messagesSurface(btn) {
+    var body = document.body;
+    if (body && body.classList && body.classList.contains("tower-messages-page")) return true;
+    if (btn.closest("[data-tower-messages], .tower-messages-room, .tower-messages-page, .commune-thread")) return true;
+    var app = btn.closest("[data-tower-app]");
+    return !!(app && app.getAttribute("data-tower-side") === "private");
+  }
+
+  /* Directory and saved profiles are pages. A "viewed:" id is a hash with no page. */
+  function pageOpen() {
+    var p = activeProfile();
+    if (!p || p._loading) return false;
+    var pid = String(p._profileId || p.id || "");
+    if (!pid || pid.indexOf("viewed:") === 0) return false;
+    return true;
+  }
+
   function renderRemoteState(btn, pro, state) {
     var row = btn.closest("[data-tower-follow-row]");
     if (state.mode === "self" || ownProfileOnScreen(btn)) {
       if (row) row.hidden = true;
+      return;
+    }
+    if (state.mode === "missing") {
+      hideNoPage(btn);
       return;
     }
     if (row) row.hidden = false;
@@ -110,7 +141,7 @@
       state.mode === "following" || state.mode === "friends" ? "true" : "false"
     );
     if (pro) {
-      btn.textContent = state.mode === "following" ? "Following" : "Follow";
+      btn.textContent = state.mode === "following" ? "Following" : "+ follow";
       btn.setAttribute(
         "aria-label",
         state.mode === "following"
@@ -128,7 +159,20 @@
       btn.disabled = true;
       btn.setAttribute("aria-label", "Friend request sent");
     } else {
-      btn.textContent = "Add friend";
+      /* SeedOps: real ↛ seed/ops (send_friend_request also refuses). The server
+         row in state.target carries account_kind / seed_fleet_id. */
+      var gateRemote = window.CognationSeedOpsFriendGate;
+      var blockedRemote =
+        gateRemote && typeof gateRemote.canFriend === "function" && state.target
+          ? gateRemote.canFriend(null, state.target)
+          : { ok: true };
+      if (!blockedRemote.ok) {
+        btn.disabled = true;
+        btn.textContent = "Unavailable";
+        btn.setAttribute("aria-label", blockedRemote.message || "Cannot friend seed or ops accounts");
+        return;
+      }
+      btn.textContent = "+ friend";
       btn.setAttribute("aria-label", "Add this person as a friend");
     }
   }
@@ -141,22 +185,9 @@
   }
 
   function syncRemoteButton(btn, graph, id, pro) {
-    var row = btn.closest("[data-tower-follow-row]");
-    /* A saved profile page is on screen. The missing-page label is only for an id with no page. */
-    if (id && !graph.isRemoteProfileId(id) && localProfileExists(id)) return false;
-    if (!id || !graph.isRemoteProfileId(id)) {
-      if (row) row.hidden = false;
-      btn.hidden = false;
-      btn.disabled = true;
-      btn.classList.remove("is-following");
-      btn.setAttribute("aria-pressed", "false");
-      btn.textContent = "Member page unavailable";
-      btn.setAttribute(
-        "aria-label",
-        "This demo profile is not yet a Cognation member page"
-      );
-      return true;
-    }
+    /* A saved or directory page uses Follow / Add friend. No page: hide. */
+    if (id && !graph.isRemoteProfileId(id) && (localProfileExists(id) || pageOpen())) return false;
+    if (!id || !graph.isRemoteProfileId(id)) return hideNoPage(btn);
     btn.disabled = true;
     graph
       .relationship(id, pro ? "professional" : "personal")
@@ -165,7 +196,7 @@
       })
       .catch(function () {
         btn.disabled = false;
-        btn.textContent = pro ? "Follow" : "Add friend";
+        btn.textContent = pro ? "+ follow" : "+ friend";
         btn.setAttribute(
           "aria-label",
           "Could not load this member connection. Try again."
@@ -261,6 +292,15 @@
     return isOwnProfileId(resolveProfileId(btn));
   }
 
+  function isCognationPage() {
+    var p = activeProfile();
+    if (!p) return false;
+    var handle = String(p.handle || "").replace(/^@/, "").toLowerCase();
+    var id = String(p._profileId || p.id || "");
+    var name = String(p.displayName || "").trim().toLowerCase();
+    return id === "prof-alexa-professional" || handle === "alexa-pro" || handle === "cognation" || name === "cognation";
+  }
+
   function syncButton(btn) {
     var api = swipeApi();
     var graph = socialApi();
@@ -268,17 +308,21 @@
     if (id) btn.setAttribute("data-profile-id", id);
     var row = btn.closest("[data-tower-follow-row]");
     /* Hidden (never relabeled "Unavailable") on your own profile. */
-    if (ownProfileOnScreen(btn)) {
+    if (ownProfileOnScreen(btn) || isCognationPage()) {
       if (row) row.hidden = true;
       btn.hidden = true;
       return;
     }
+    if (messagesSurface(btn)) return hideNoPage(btn);
     var pro = isProfessionalContext(btn);
-    if (row) row.hidden = false;
-    btn.hidden = false;
     if (graph && graph.isReady && graph.isReady()) {
       if (syncRemoteButton(btn, graph, id, pro) !== false) return;
+    } else if (!(id && localProfileExists(id)) && !pageOpen()) {
+      hideNoPage(btn);
+      return;
     }
+    if (row) row.hidden = false;
+    btn.hidden = false;
     btn.disabled = false;
     var viewed = activeProfile();
     var face = viewerFace(btn);
@@ -288,7 +332,7 @@
       var following = alreadyFollowing(viewed);
       btn.setAttribute("aria-pressed", following ? "true" : "false");
       btn.classList.toggle("is-following", following);
-      btn.textContent = following ? "Following" : "Follow";
+      btn.textContent = following ? "Following" : "+ follow";
       btn.setAttribute(
         "aria-label",
         following
@@ -319,7 +363,7 @@
         return;
       }
     }
-    btn.textContent = friends ? "Friends" : "Add friend";
+    btn.textContent = friends ? "Friends" : "+ friend";
     btn.setAttribute("aria-label", friends ? "You are friends" : "Add this person as a friend");
     if (!id && !viewed) return;
   }
@@ -331,19 +375,24 @@
   document.addEventListener("click", function (ev) {
     var btn = ev.target && ev.target.closest && ev.target.closest("[data-tower-follow]");
     if (!btn) return;
+    if (messagesSurface(btn) || isCognationPage()) {
+      ev.preventDefault();
+      hideNoPage(btn);
+      return;
+    }
     ev.preventDefault();
     var api = swipeApi();
     var graph = socialApi();
     var id = resolveProfileId(btn);
     if (!id) {
-      btn.setAttribute("aria-label", "Follow unavailable — no profile id");
+      hideNoPage(btn);
       return;
     }
     btn.setAttribute("data-profile-id", id);
     if (graph && graph.isReady && graph.isReady()) {
       if (!graph.isRemoteProfileId(id)) {
-        if (!localProfileExists(id)) {
-          btn.setAttribute("aria-label", "This demo profile is not yet a Cognation member page");
+        if (!localProfileExists(id) && !pageOpen()) {
+          hideNoPage(btn);
           return;
         }
       } else {
@@ -417,7 +466,7 @@
     syncAll();
     /* Re-sync when professional/personal tabs change */
     document.addEventListener("click", function (ev) {
-      if (ev.target && ev.target.closest && ev.target.closest("[data-tower-profile-kind]")) {
+      if (ev.target && ev.target.closest && ev.target.closest("[data-tower-profile-kind], [data-tower-side-btn], [data-tower-side-jump]")) {
         window.setTimeout(syncAll, 30);
       }
     });

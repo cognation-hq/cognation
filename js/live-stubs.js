@@ -389,6 +389,8 @@
     var live = getLive();
     var active = !!(live && live.active);
     document.querySelectorAll("[data-go-live]").forEach(function (btn) {
+      /* Professional pages: classroom-sessions.js owns the label. */
+      if (btn.hasAttribute("data-classroom-go-live")) return;
       btn.textContent = active ? "Offline" : "Go live";
       btn.setAttribute("aria-label", active ? "Offline" : "Go live");
     });
@@ -414,10 +416,8 @@
     var who = profileOnScreen();
     var host = stage.querySelector("[data-live-host]");
     var kind = stage.querySelector("[data-live-kind]");
-    var fill = stage.querySelector("[data-live-session-name]");
     if (host) host.textContent = who.name;
     if (kind) kind.textContent = who.kind + " · live";
-    if (fill) fill.textContent = who.name;
     bindRoom(stage, who.name);
   }
 
@@ -455,7 +455,8 @@
     });
   }
 
-  var echoShared = false;
+  /* The browser-only "X is live" ECHO card (echoCard / Share to Echo) is removed:
+     ECHO's live cards come only from real live sessions (js/classroom-sessions.js). */
   var SIGNAL_ID = "live-signal-share";
 
   function setSignalShare(on) {
@@ -477,24 +478,6 @@
     }
     store.save(data);
     document.dispatchEvent(new CustomEvent("cognation:tower-updated"));
-  }
-
-  function setEchoShare(on) {
-    echoShared = !!on;
-    var swipe = window.CognationCommuneSwipe;
-    if (swipe && swipe.rebuild) swipe.rebuild();
-  }
-
-  function echoCard() {
-    if (!echoShared) return null;
-    var who = profileOnScreen();
-    return {
-      id: "live-echo-share",
-      type: "live",
-      title: who.name + " is live",
-      body: "Anyone can join.",
-      liveJoin: true
-    };
   }
 
   function bindRoom(stage, name) {
@@ -544,14 +527,9 @@
     if (root.classList) root.classList.remove("is-live-open");
     releaseMedia(stage);
     var signalBtn = stage && stage.querySelector("[data-live-share-signal]");
-    var echoBtn = stage && stage.querySelector("[data-live-share-echo]");
     if (signalBtn && signalBtn.getAttribute("aria-pressed") === "true") {
       signalBtn.setAttribute("aria-pressed", "false");
       setSignalShare(false);
-    }
-    if (echoBtn && echoBtn.getAttribute("aria-pressed") === "true") {
-      echoBtn.setAttribute("aria-pressed", "false");
-      setEchoShare(false);
     }
     refreshEcho();
     syncGoLiveButtons();
@@ -610,13 +588,12 @@
         goOffline();
         return;
       }
-      var share = node && node.closest && node.closest("[data-live-share-signal], [data-live-share-echo]");
+      var share = node && node.closest && node.closest("[data-live-share-signal]");
       if (share) {
         ev.preventDefault();
         var on = share.getAttribute("aria-pressed") !== "true";
         share.setAttribute("aria-pressed", on ? "true" : "false");
-        if (share.hasAttribute("data-live-share-signal")) setSignalShare(on);
-        else setEchoShare(on);
+        setSignalShare(on);
         return;
       }
       var btn = node && node.closest && node.closest("[data-go-live]");
@@ -625,6 +602,10 @@
       ev.stopPropagation();
       var app = btn.closest && btn.closest("[data-tower-app]");
       if (btn.hidden || (app && app.getAttribute("data-tower-is-owner") !== "true")) return;
+      /* Professional page: Go live / End session sets the booked session's status on the
+         server (js/classroom-sessions.js). No camera, no local live state. */
+      var sessions = window.CognationClassroomSessions;
+      if (sessions && typeof sessions.handleGoLive === "function" && sessions.handleGoLive(btn)) return;
       openLive(true);
       var session = document.querySelector("[data-tower-app] [data-live-session]");
       connectMedia(session);
@@ -645,7 +626,6 @@
     getSession: getLive,
     memberAge: memberAge,
     open: openLive,
-    echoCard: echoCard,
     professionalBroadcast: professionalBroadcast,
   };
 })();

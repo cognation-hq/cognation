@@ -19,6 +19,8 @@ var win = {
   document: { dispatchEvent: function (e) { events.push(e.type); } },
   CognationSupabase: {
     configured: function () { return true; },
+    /* Writes need a signed-in session (Oct 22). */
+    getSession: function () { return { access_token: "t" }; },
     rest: function (table, opts) {
       calls.push({ table: table, opts: opts });
       if (!opts.method) {

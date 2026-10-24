@@ -93,7 +93,7 @@
   function normalizeReport(raw) {
     raw = raw || {};
     var reason = String(raw.reason || raw.reportReason || "").toLowerCase();
-    if (reason !== "harmful" && reason !== "untruthful") {
+    if (reason !== "harmful" && reason !== "untruthful" && reason !== "misrated") {
       reason = reason.indexOf("truth") >= 0 ? "untruthful" : "harmful";
     }
     var id = String(raw.id || "");
@@ -119,6 +119,10 @@
     if (!map.__global) map.__global = {};
     map.__global[postId] = true;
     saveHidden(map);
+  }
+
+  function hideContent(postId) {
+    hidePostForReporter(postId);
   }
 
   function isPostHidden(postId) {
@@ -193,8 +197,9 @@
     try {
       if (
         window.CognationContentReport &&
+        !report.serverFiled &&
         item.postId &&
-        (item.reason === "harmful" || item.reason === "untruthful")
+        (item.reason === "harmful" || item.reason === "untruthful" || item.reason === "misrated")
       ) {
         window.CognationContentReport.reportTowerPost({
           postId: item.postId,
@@ -294,6 +299,7 @@
     enqueue: enqueue,
     listQueue: listQueue,
     isPostHidden: isPostHidden,
+    hideContent: hideContent,
     exportQueueJson: exportQueueJson,
     exportNewsModerationFile: exportNewsModerationFile,
     downloadQueueSnapshot: downloadQueueSnapshot,

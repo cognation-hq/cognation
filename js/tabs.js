@@ -21,7 +21,7 @@
 
     if (!tabs.length || tabs.length !== panels.length) return;
 
-    function activate(index, focusTab) {
+    function activate(index, focusTab, userTap) {
       if (window.CognationCircleFall && typeof window.CognationCircleFall.stop === "function") {
         window.CognationCircleFall.stop();
       }
@@ -40,6 +40,11 @@
            People → Open set #tower-profile-… then activate this tab; calling
            OpenOwn there cleared the hash and bounced everyone to their own Tower. */
         if (name === "tower" && typeof window.CognationTowerOpenOwn === "function") {
+          /* You tapped TOWER yourself: that is your own Tower. A left-over
+             #tower-profile-* naming someone else's page is dropped. */
+          if (userTap && typeof window.CognationTowerClearForeignHash === "function") {
+            try { window.CognationTowerClearForeignHash(); } catch (eClear) {}
+          }
           var hash = String(location.hash || "").replace(/^#/, "");
           var viewingOther = hash.indexOf("tower-profile-") === 0;
           if (!viewingOther) {
@@ -51,8 +56,10 @@
     }
 
     tabs.forEach(function (tab, i) {
-      tab.addEventListener("click", function () {
-        activate(i, false);
+      tab.addEventListener("click", function (ev) {
+        /* Programmatic clicks (friend tap / People → Open set the hash, then
+           click this tab) are not trusted and keep the opened page. */
+        activate(i, false, !!(ev && ev.isTrusted));
       });
 
       tab.addEventListener("keydown", function (e) {
@@ -73,13 +80,13 @@
           case "Enter":
           case " ":
             e.preventDefault();
-            activate(i, false);
+            activate(i, false, true);
             return;
           default:
             return;
         }
         e.preventDefault();
-        activate(next, true);
+        activate(next, true, true);
       });
     });
 
@@ -90,6 +97,11 @@
   }
 
   function openTowerAnchor(name) {
+    /* PULSE and the Tower shortcuts are your own space: drop a left-over
+       #tower-profile-* that names someone else's page. */
+    if (typeof window.CognationTowerClearForeignHash === "function") {
+      try { window.CognationTowerClearForeignHash(); } catch (eClear) {}
+    }
     if (name === "circle") {
       if (window.CognationCircleFall && typeof window.CognationCircleFall.start === "function") {
         window.CognationCircleFall.start();

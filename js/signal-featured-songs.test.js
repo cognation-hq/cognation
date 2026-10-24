@@ -50,5 +50,9 @@ feed.newsList().forEach(function (post) {
   assert.ok(post.body.indexOf("Harbor") === -1 && post.body.indexOf("Paper") === -1);
 });
 assert.ok(fs.readFileSync(path.join(__dirname, "../index.html"), "utf8").indexOf("js/signal-featured-songs.js") !== -1);
+var songSrc = fs.readFileSync(path.join(__dirname, "signal-featured-songs.js"), "utf8");
+assert.ok(songSrc.indexOf('toggle.textContent = "Add song"') !== -1, "one Add song control");
+assert.ok(songSrc.indexOf("list.hidden = true") !== -1, "song list starts closed");
+assert.ok(songSrc.indexOf("if (!allowed(song.id)) button.disabled = true") !== -1, "not opted in stays unavailable");
 
 console.log("signal-featured-songs.test.js: OK");

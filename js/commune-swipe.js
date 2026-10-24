@@ -131,16 +131,18 @@
     RESEARCH: "pro-research",
     AUCTION: "pro-auction",
     PODCAST: "pro-podcast",
+    ETHICS: "pro-ethics",
     FIELD: "pro-field",
     POP: "pro-popculture",
   };
-  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.FIELD, PRO.POP];
+  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.ETHICS, PRO.FIELD, PRO.POP];
   var PRO_MARK = {};
   PRO_MARK[PRO.WEBINAR] = "Webinar";
   PRO_MARK[PRO.KNOW] = "Professionals you might know";
   PRO_MARK[PRO.RESEARCH] = "Research";
   PRO_MARK[PRO.AUCTION] = "Auction";
   PRO_MARK[PRO.PODCAST] = "Podcast";
+  PRO_MARK[PRO.ETHICS] = "Ethics board";
   PRO_MARK[PRO.FIELD] = "Field";
   PRO_MARK[PRO.POP] = "Pop-culture";
   /* Podcast cards stay, with no Demo badge (Alexa 2026-10-22 11:46 AM CT, via SeedOps:
@@ -1928,6 +1930,11 @@
     return [];
   }
 
+  function ethicsCards() {
+    var api = window.CognationEchoEthics;
+    return api && typeof api.cards === "function" ? api.cards(viewerInterestTokens()) : [];
+  }
+
   function researchRoomCards() {
     var api = window.CognationResearchRoom;
     if (!api || typeof api.cards !== "function" || !hasInterest(["research"])) return [];
@@ -1944,6 +1951,7 @@
       return { id: w.id, type: PRO.PODCAST, title: w.title, body: w.body,
         why: "Picked by topic: ethics, async work, continuing education.", rating: "G", minAge: 0, keepOnly: true };
     });
+    lanes[PRO.ETHICS] = ethicsCards();
     /* Research chat only if this person lists research. Field and Pop culture stay empty. */
     lanes[PRO.RESEARCH] = researchRoomCards();
     lanes[PRO.FIELD] = [];
@@ -2291,7 +2299,7 @@
         });
         html += "</ul>";
       }
-      if (card.why) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
+      if (card.why && (card.type !== PRO.ETHICS || hasInterest(["ethics board"]))) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
       if (card.type === PRO.RESEARCH) {
         html += '<button type="button" class="btn btn-primary" data-research-enter>Enter Research</button>';
         if (card.full) html += '<p class="commune-card-meta">Full — another Research card is open.</p>';
@@ -2492,6 +2500,7 @@
     } else if (card.type === PRO.AUCTION) {
       wireClassroomCardClick(el, card, function () { openAuction(card, true); });
     }
+    if (card.type === PRO.ETHICS) wireClassroomCardClick(el, card, openEthics);
     /* Alexa's rule: an ECHO card opens its own full-screen window or a Tower profile, nothing else. */
     if (card.type === TYPE.CHAT) {
       wireClassroomCardClick(el, card, function () { openRoom(card.id, true); });
@@ -3205,6 +3214,7 @@
     if (members) { members.hidden = true; members.textContent = ""; }
     ensureRoomHeader(panel);
     wireRoomSwipe(panel);
+    if (window.CognationEchoEthics) window.CognationEchoEthics.clearChrome(panel);
     if (log) paintLiveLog(opts.messages || state.liveMessages || []);
     showRoom(true);
     state.roomId = room.id;
@@ -3286,6 +3296,32 @@
     }
     return liveRoomUnavailable(supabaseLiveSession() ? "Live rooms aren't ready yet. Try again soon." : "Sign in to join live rooms.");
   }
+  function openEthics(cardId) {
+    var api = window.CognationEchoEthics;
+    var card = null;
+    [state.cards, ethicsCards()].forEach(function (list) {
+      (list || []).forEach(function (c) {
+        if (!card && c && (c.id === cardId || c.roomId === cardId)) card = c;
+      });
+    });
+    if (!api || !card || !roomEl()) return false;
+    var joined = api.join(card.roomId);
+    if (!joined.ok) {
+      setStatus(joined.message || "That Ethics board room is not available.");
+      if (joined.full) rebuildDeck();
+      return false;
+    }
+    var panel = roomEl();
+    state.roomId = card.roomId;
+    state.liveRoom = false;
+    state.roomSqlId = "";
+    ensureRoomHeader(panel);
+    wireRoomSwipe(panel);
+    api.paint(panel, card.roomId);
+    showRoom(true);
+    setStatus("You're in the Ethics board chatroom.");
+    return true;
+  }
   function clearPointer() {
     var el = state.pointer && state.pointer.el;
     if (el) {
@@ -3297,6 +3333,7 @@
 
   function releaseRoomSurface() {
     /* Drop open-room lock and restore deck/actions so the card can swipe again. */
+    if (window.CognationEchoEthics) window.CognationEchoEthics.clearChrome(roomEl());
     var wasLive = state.liveRoom;
     var sqlId = state.roomSqlId;
     state.roomId = "";
@@ -4044,6 +4081,13 @@
         var body = input ? String(input.value || "").trim() : "";
         if (!body || !state.roomId) return;
         body = body.slice(0, 500);
+        if (window.CognationEchoEthics && window.CognationEchoEthics.isRoom(state.roomId)) {
+          var ethicsSent = window.CognationEchoEthics.post(state.roomId, body);
+          if (input) input.value = "";
+          window.CognationEchoEthics.paint(roomEl(), state.roomId);
+          setStatus(ethicsSent && ethicsSent.ok ? "Sent." : (ethicsSent && ethicsSent.message) || "Couldn't send.");
+          return;
+        }
         if (state.liveRoom && state.roomSqlId) {
           var sqlId = state.roomSqlId;
           setStatus("Sending…");

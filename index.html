@@ -282,9 +282,11 @@
           placeholder="Search friends and professional profiles"
           autocomplete="off"
           spellcheck="false"
+          aria-autocomplete="list"
+          aria-controls="people-search-results"
           data-people-search-input
         >
-        <div class="people-search-results" data-people-search-results hidden role="listbox" aria-label="People results"></div>
+        <div class="people-search-results" id="people-search-results" data-people-search-results hidden role="listbox" aria-label="Name suggestions"></div>
       </div>
     </div>
   </header>

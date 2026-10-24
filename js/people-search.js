@@ -1,13 +1,24 @@
 /**
  * Top-right member search.
- * Authenticated Supabase members search real Cognation profiles and open the
- * selected Tower page. The legacy directory remains available only offline.
+ * As someone types, commonly typed personal and professional names are
+ * suggested together. Authenticated Supabase members also search real
+ * Cognation profiles and open the selected Tower page. The legacy directory
+ * remains available only offline.
  */
 (function () {
   "use strict";
 
   var PEOPLE = [{"id": "alex-rivera", "first": "Alex", "last": "Rivera", "handle": "alexrivera"}, {"id": "sam-okonkwo", "first": "Sam", "last": "Okonkwo", "handle": "samok"}, {"id": "jordan-lee", "first": "Jordan", "last": "Lee", "handle": "jlee"}, {"id": "mira-chen", "first": "Mira", "last": "Chen", "handle": "mirachen"}, {"id": "chris-patel", "first": "Chris", "last": "Patel", "handle": "cpatel"}, {"id": "susan-park", "first": "Susan", "last": "Park", "handle": "susanpark"}, {"id": "devon-brooks", "first": "Devon", "last": "Brooks", "handle": "devonb"}, {"id": "riley-nguyen", "first": "Riley", "last": "Nguyen", "handle": "rileyng"}, {"id": "casey-morris", "first": "Casey", "last": "Morris", "handle": "caseym"}, {"id": "avery-kim", "first": "Avery", "last": "Kim", "handle": "averyk"}, {"id": "taylor-james", "first": "Taylor", "last": "James", "handle": "tjames"}, {"id": "morgan-diaz", "first": "Morgan", "last": "Diaz", "handle": "morgand"}, {"id": "quinn-foster", "first": "Quinn", "last": "Foster", "handle": "qfoster"}, {"id": "harper-wong", "first": "Harper", "last": "Wong", "handle": "harperw"}, {"id": "alexa-thomas", "first": "Alexa", "last": "Thomas", "handle": "alexa"}];
   var ADDED_KEY = "cognation.people.added.v1";
+  var TYPED_KEY = "cognation.search.typed.v1";
+  /* Starting mix of commonly typed names. Personal and professional pages
+     share this list. Typed searches are remembered, so these are not the
+     only names that can be suggested, and this is not a directory of people. */
+  var TYPED_EXAMPLES = [
+    { name: "Peter Thomas Roth", kind: "professional", n: 30 },
+    { name: "Prada", kind: "professional", n: 20 },
+    { name: "Pablo Thompson", kind: "personal", n: 10 }
+  ];
 
   function remoteSocial() {
     return window.CognationSupabaseSocial || null;
@@ -101,9 +112,105 @@
     }).slice(0, 6);
   }
 
-  function searchPeople(query) {
-    var q = normalize(query);
-    if (!q) return [];
+  function readTyped() {
+    try {
+      var raw = localStorage.getItem(TYPED_KEY);
+      var data = raw ? JSON.parse(raw) : [];
+      return Array.isArray(data) ? data : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function pageKind(kind) {
+    return kind === "professional" ? "professional" : "personal";
+  }
+
+  function kindForTyped(name) {
+    var q = normalize(name);
+    var pros = professionalProfiles();
+    for (var i = 0; i < pros.length; i++) {
+      if (normalize(pros[i].name) === q) return "professional";
+    }
+    return "personal";
+  }
+
+  function rememberTyped(name, kind) {
+    var clean = String(name || "").trim().replace(/\s+/g, " ");
+    if (clean.length < 2 || clean.length > 80) return;
+    var page = kind === "professional" || kind === "personal" ? kind : kindForTyped(clean);
+    var rows = readTyped();
+    var key = normalize(clean);
+    var row = null;
+    rows.forEach(function (item) {
+      if (item && normalize(item.name) === key) row = item;
+    });
+    if (row) {
+      row.name = clean;
+      row.kind = page;
+      row.n = (Number(row.n) || 1) + 1;
+    } else {
+      rows.push({ name: clean, kind: page, n: 1 });
+    }
+    rows.sort(function (a, b) { return (Number(b.n) || 0) - (Number(a.n) || 0); });
+    if (rows.length > 40) rows.length = 40;
+    try { localStorage.setItem(TYPED_KEY, JSON.stringify(rows)); } catch (e2) {}
+  }
+
+  function nameHits(name, q) {
+    return String(name || "").toLowerCase().split(/\s+/).some(function (word) {
+      return word.indexOf(q) === 0;
+    });
+  }
+
+  function typedSuggestions(q) {
+    var map = {};
+    function add(row, stored) {
+      if (!row || !row.name) return;
+      var key = normalize(row.name);
+      if (!key) return;
+      var prev = map[key];
+      var n = Number(row.n) || 1;
+      if (!prev) {
+        map[key] = { name: String(row.name).trim(), kind: pageKind(row.kind), n: n };
+        return;
+      }
+      prev.n = Math.max(prev.n, n);
+      if (!stored) return;
+      prev.name = String(row.name).trim();
+      if (row.kind === "professional" || row.kind === "personal") prev.kind = pageKind(row.kind);
+    }
+    TYPED_EXAMPLES.forEach(function (row) { add(row, false); });
+    readTyped().forEach(function (row) { add(row, true); });
+    return Object.keys(map).map(function (key) { return map[key]; }).filter(function (row) {
+      return nameHits(row.name, q);
+    }).sort(function (a, b) {
+      return b.n - a.n || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+    }).slice(0, 6);
+  }
+
+  function mergeNameLists(suggestions, found) {
+    var seen = {};
+    var out = [];
+    function take(item) {
+      var key = normalize(item && item.name);
+      if (!key || seen[key]) return;
+      seen[key] = true;
+      out.push(item);
+    }
+    suggestions.forEach(function (s) {
+      var key = normalize(s.name);
+      var profile = null;
+      found.forEach(function (p) {
+        if (!profile && normalize(p.name) === key) profile = p;
+      });
+      take(profile || { name: s.name, kind: pageKind(s.kind), suggestion: true });
+    });
+    found.forEach(take);
+    return out;
+  }
+
+  function memberMatches(q) {
     var social = remoteSocial();
     if (hasRemoteSession() && social && social.memberResults) {
       var u13 = window.CognationU13TestViewer;
@@ -124,8 +231,14 @@
     return friendMatches(q).concat(professionalMatches(q));
   }
 
+  function searchPeople(query) {
+    var q = normalize(query);
+    if (!q) return [];
+    return mergeNameLists(typedSuggestions(q), memberMatches(q));
+  }
+
   function kindLabel(kind) {
-    return kind === "professional" ? "Professional" : "Friend";
+    return kind === "professional" ? "Professional" : "Personal";
   }
 
   function openResult(item) {
@@ -156,7 +269,7 @@
       row.className = "people-search-row";
       row.setAttribute("role", "option");
       row.setAttribute("data-result-kind", p.kind);
-      row.setAttribute("data-result-handle", p.handle);
+      if (p.handle) row.setAttribute("data-result-handle", p.handle);
       if (p.id) row.setAttribute("data-profile-id", String(p.id));
       if (p.accountKind) row.setAttribute("data-account-kind", p.accountKind);
       row.innerHTML =
@@ -165,14 +278,22 @@
         '<span class="people-search-name">' +
         escapeHtml(p.name) +
         "</span></span>" +
-        '<span class="people-search-handle">@' +
-        escapeHtml(p.handle) +
-        "</span>" +
+        (p.handle
+          ? '<span class="people-search-handle">@' + escapeHtml(p.handle) + "</span>"
+          : "") +
         '<span class="people-search-kind">' +
         kindLabel(p.kind) +
         "</span></span>" +
-        '<span class="people-search-open">Open</span>';
+        (p.suggestion ? "" : '<span class="people-search-open">Open</span>');
       row.addEventListener("click", function () {
+        if (p.suggestion) {
+          rememberTyped(p.name, p.kind);
+          var field = root.querySelector("[data-people-search-input]");
+          if (field) field.value = p.name;
+          box.hidden = true;
+          return;
+        }
+        rememberTyped(p.name, p.kind === "professional" ? "professional" : "personal");
         openResult(p);
         inputClear(root);
       });
@@ -228,6 +349,8 @@
       if (e.key === "Escape") {
         box.hidden = true;
         input.blur();
+      } else if (e.key === "Enter") {
+        rememberTyped(input.value);
       }
     });
   }
@@ -244,6 +367,7 @@
 
   window.CognationPeopleDirectory = {
     search: searchPeople,
+    remember: rememberTyped,
     all: function () {
       return PEOPLE.slice();
     },

@@ -7580,6 +7580,7 @@
       normalized.signupFriendIds = ev.signupFriendIds.map(function (id) { return String(id || ""); }).filter(Boolean);
     }
     if (ev.hostHandle) normalized.hostHandle = String(ev.hostHandle).replace(/^@/, "").slice(0, 80);
+    if (ev.kind === "hangout") normalized.kind = "hangout";
     if (ev.kind === "classroom") normalized.kind = "classroom";
     if (ev.kind === "webinar") {
       normalized.kind = "webinar";
@@ -8160,7 +8161,8 @@
       time: time,
       notes: fromVisitor ? "Booked from the calendar" : "Suggested open time",
       status: "accepted",
-      source: fromVisitor ? "friend" : "owner"
+      source: fromVisitor ? "friend" : "owner",
+      kind: "hangout"
     };
     if (fromVisitor) {
       var who = getSessionUsername();
@@ -8221,6 +8223,34 @@
       handle: String((profile && profile.handle) || "").replace(/^@/, ""),
       minAge: 16, payInRoom: false,
     };
+  }
+
+  /* A hangout is the open-time row (or one already saved as kind hangout).
+     Classroom, webinar, and auction stay on their own editor. */
+  function isHangoutEvent(e) {
+    if (!e) return false;
+    if (e.kind === "classroom" || e.kind === "webinar" || e.kind === "auction") return false;
+    if (e.kind === "hangout") return true;
+    var notes = String(e.notes || "");
+    return e.title === "Hangout" || notes === "Suggested open time" || notes === "Booked from the calendar";
+  }
+
+  function hangoutEditorHtml(editing) {
+    return '<form class="tower-cal-editor" data-tower-cal-hangout-editor action="#" method="post">' +
+      "<h5>Edit hangout</h5>" +
+      '<input type="hidden" name="id" value="' + escapeHtml(editing.id) + '" data-tower-cal-edit-id>' +
+      '<div class="form-group"><label for="tower-cal-hangout-title">Title</label>' +
+      '<input id="tower-cal-hangout-title" name="title" type="text" maxlength="120" required value="' + escapeHtml(editing.title || "") + '" data-tower-cal-edit-title></div>' +
+      '<div class="tower-cal-friend-row">' +
+      '<div class="form-group"><label for="tower-cal-hangout-date">Date</label>' +
+      '<input id="tower-cal-hangout-date" name="date" type="date" required value="' + escapeHtml(editing.date || "") + '" data-tower-cal-edit-date></div>' +
+      '<div class="form-group"><label for="tower-cal-hangout-time">Time</label>' +
+      '<input id="tower-cal-hangout-time" name="time" type="time" value="' + escapeHtml(String(editing.time || "").slice(0, 5)) + '" data-tower-cal-edit-time></div></div>' +
+      '<div class="form-group"><label for="tower-cal-hangout-notes">Notes</label>' +
+      '<input id="tower-cal-hangout-notes" name="notes" type="text" maxlength="240" value="' + escapeHtml(editing.notes || "") + '" data-tower-cal-edit-notes></div>' +
+      '<div class="form-actions"><button type="submit" class="btn btn-primary">Save changes</button>' +
+      '<button type="button" class="btn btn-secondary" data-tower-cal-cancel-edit>Cancel</button></div>' +
+      '<p class="commune-status" data-tower-cal-editor-status hidden role="status" aria-live="polite"></p></form>';
   }
 
   function calendarEditorHtml(editing, selected) {
@@ -8340,6 +8370,19 @@
         })
       : busyBlocksOnly(shared);
     var selected = view.selected;
+    var editingId = "";
+    var calHost = root.querySelector("[data-tower-cal-public]");
+    if (calHost) editingId = calHost.getAttribute("data-editing-id") || "";
+    var editingHangout = null;
+    if (owner && editingId) {
+      (shared || []).some(function (e) {
+        if (e && String(e.id) === String(editingId) && isHangoutEvent(e)) {
+          editingHangout = e;
+          return true;
+        }
+        return false;
+      });
+    }
     var schedulerHtml = view.schedulerOpen
       ? renderSchedulerPanel(owner ? shared : events, selected, {
           visitor: !owner,
@@ -8369,6 +8412,7 @@
       "</h5>" +
       renderDayEventList(events, selected, { ownerControls: owner, busyOnly: !owner }) +
       "</div>" +
+      (editingHangout ? hangoutEditorHtml(editingHangout) : "") +
       schedulerHtml;
   }
 
@@ -8798,6 +8842,56 @@
     root.addEventListener("submit", function (ev) {
       var form = ev.target;
       if (!form || !root.contains(form)) return;
+
+      if (form.matches("[data-tower-cal-hangout-editor]")) {
+        ev.preventDefault();
+        var hTitleEl = form.querySelector("[data-tower-cal-edit-title]");
+        var hDateEl = form.querySelector("[data-tower-cal-edit-date]");
+        var hTimeEl = form.querySelector("[data-tower-cal-edit-time]");
+        var hNotesEl = form.querySelector("[data-tower-cal-edit-notes]");
+        var hIdEl = form.querySelector("[data-tower-cal-edit-id]");
+        var hTitle = hTitleEl ? hTitleEl.value.trim().slice(0, 120) : "";
+        var hDate = hDateEl ? hDateEl.value : "";
+        var hTime = hTimeEl ? String(hTimeEl.value || "").slice(0, 5) : "";
+        var hNotes = hNotesEl ? hNotesEl.value.trim().slice(0, 240) : "";
+        var hStatus = form.querySelector("[data-tower-cal-editor-status]");
+        function setHangoutStatus(msg, isError) {
+          if (!hStatus) return;
+          hStatus.hidden = !msg;
+          hStatus.textContent = msg || "";
+          hStatus.classList.toggle("is-error", !!isError);
+        }
+        if (!hTitle || !/^\d{4}-\d{2}-\d{2}$/.test(hDate) || (hTime && !/^\d{2}:\d{2}$/.test(hTime))) {
+          setHangoutStatus("Title and a valid date are required.", true);
+          return;
+        }
+        var hId = hIdEl ? hIdEl.value : "";
+        var hangoutSaved = false;
+        saveCalendarToProfile(function (p) {
+          (p.calendarEvents || []).forEach(function (e) {
+            if (!e || e.id !== hId || !isHangoutEvent(e)) return;
+            e.title = hTitle;
+            e.date = hDate;
+            e.time = hTime;
+            e.notes = hNotes;
+            e.kind = "hangout";
+            hangoutSaved = true;
+          });
+        });
+        if (!hangoutSaved) {
+          setHangoutStatus("Couldn't save that hangout.", true);
+          return;
+        }
+        var hHost = root.querySelector("[data-tower-cal-public]");
+        if (hHost) hHost.removeAttribute("data-editing-id");
+        var hView = getCalendarViewState(root, "public");
+        hView.selected = hDate;
+        var hParts = hDate.split("-");
+        hView.year = parseInt(hParts[0], 10);
+        hView.month0 = parseInt(hParts[1], 10) - 1;
+        refreshTowerCalendars(root);
+        return;
+      }
 
       if (form.matches("[data-tower-cal-editor]")) {
         ev.preventDefault();

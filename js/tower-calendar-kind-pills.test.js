@@ -16,6 +16,6 @@ assert.ok(/data-tower-cal-selling/.test(src) && /data-tower-cal-start/.test(src)
 var note = msg.slice(msg.indexOf("Hello! You have agreed"));
 assert.ok(/data-auction-amt/.test(note) && /data-auction-seller/.test(note) && /data-auction-date/.test(note));
 assert.ok(!/value=/.test(note.slice(0, note.indexOf("> amount of money"))));
-assert.ok(/data-auction-pay>Apple Pay/.test(msg) && /No payment was taken/.test(msg) && !/receipt|purchase completed/i.test(msg));
+assert.ok(/data-auction-draft/.test(msg) && /Buyer connected/.test(msg) && /data-auction-send>Send/.test(msg) && /data-auction-pay>Apple Pay/.test(msg) && /No payment was taken/.test(msg) && !/receipt|purchase completed/i.test(msg));
 assert.ok(!/Apple Pay|apple-pay|ApplePay/.test(swipe) && /CognationAuctionRoom\.mount/.test(swipe) && !/tower-profile/.test(msg.slice(msg.lastIndexOf("function mount"))));
 console.log("tower-calendar-kind-pills.test.js ok");

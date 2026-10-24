@@ -149,6 +149,7 @@
   PRO_MARK[PRO.DOCTORAL] = "Doctoral degrees";
   PRO_MARK["pro-industry"] = "Industry";
   PRO_MARK["pro-licensure"] = "Licensure";
+  PRO_MARK["pro-ai-work"] = "AI at work";
   /* Podcast cards stay, with no Demo badge (Alexa 2026-10-22 11:46 AM CT, via SeedOps:
      "this will also be a card when cognation goes live but doesnt need to be a demo"). */
   var PRO_PODCASTS = [
@@ -2029,16 +2030,23 @@
         });
         if (deck.length > limit) deck.length = limit;
       }
-      return deck;
-      var deck = paceProfessional(buildProfessionalLanes(), count || 18);
-      var cap = count || 18;
+      var aiWork = window.CognationAiAtWork;
+      /* No AI at work interest: the card is not in the algorithm. */
+      if (aiWork && hasInterest(aiWork.INTERESTS)) {
+        omitPassed(aiWork.cards()).forEach(function (card) {
+          if (deck.length >= limit) return;
+          if (!professionalCardAllowed(card)) return;
+          if (deck.some(function (c) { return stableCardId(c.id) === stableCardId(card.id); })) return;
+          deck.push(card);
+        });
+      }
       var extra = omitPassed(proInterestCards()).filter(professionalCardAllowed);
       for (var xi = extra.length - 1; xi >= 0; xi--) {
         var add = extra[xi];
         if (deck.some(function (c) { return stableCardId(c.id) === stableCardId(add.id); })) continue;
         deck.unshift(add);
       }
-      return deck.length > cap ? deck.slice(0, cap) : deck;
+      return deck.length > limit ? deck.slice(0, limit) : deck;
     }
     var built = buildLanes();
     return paceDeck(built.lanes, built.dating, count || 18);
@@ -2346,9 +2354,13 @@
         });
         html += "</ul>";
       }
+      if (card.type === "pro-ai-work" && window.CognationAiAtWork) {
+        card.why = window.CognationAiAtWork.displayWhy(card.why, hasInterest(window.CognationAiAtWork.INTERESTS));
+      }
       if (card.type === "pro-industry") {
         html += '<button type="button" class="btn btn-primary" data-industry-open>Enter room</button>';
       }
+      if (card.type === "pro-ai-work") html += '<button type="button" class="btn btn-primary" data-ai-work-open>Enter room</button>';
       /* Shown without the interest: do not claim they listed it. */
       var industryOff = card.type === "pro-industry" && !hasInterest((window.CognationIndustry || {}).INTERESTS || []);
       var doctoralOff = card.type === PRO.DOCTORAL && !hasInterest(["doctoral degrees"]);
@@ -2574,6 +2586,11 @@
       var researchBtn = el.querySelector("[data-research-enter]");
       if (researchBtn) researchBtn.addEventListener("click", function (ev) { ev.stopPropagation(); openResearch(); });
       wireClassroomCardClick(el, card, openResearch);
+    }
+    if (card.type === "pro-ai-work") {
+      var openAi = el.querySelector("[data-ai-work-open]");
+      if (openAi) openAi.addEventListener("click", function (ev) { ev.stopPropagation(); openAiAtWork(card.id); });
+      wireClassroomCardClick(el, card, openAiAtWork);
     }
     if ((card.type === TYPE.KNOW || card.type === TYPE.FRIEND) && (card.profileId || card.handle)) {
       el.setAttribute("data-commune-opens-profile", "");
@@ -3349,6 +3366,24 @@
     return true;
   }
 
+  function openAiAtWork(cardOrId) {
+    var api = window.CognationAiAtWork;
+    var panel = roomEl();
+    var id = cardOrId && cardOrId.id ? cardOrId.id : String(cardOrId || "");
+    if (!api || !panel || !id || !state.shell) return false;
+    var me = currentProfileId();
+    var joined = api.join(id, me);
+    if (joined && joined.kicked) { setStatus("You were removed from this chatroom."); return false; }
+    closeClassroom();
+    ensureRoomHeader(panel);
+    api.paint(panel, id, me);
+    showRoom(true);
+    state.roomId = id;
+    state.aiAtWorkRoom = true;
+    state.liveRoom = false;
+    return true;
+  }
+
   function openRoom(roomId, scroll) {
     state.industryRoom = false;
     roomId = String(roomId || "");
@@ -3448,6 +3483,7 @@
     state.roomId = "";
     state.liveRoom = false;
     state.industryRoom = false;
+    state.aiAtWorkRoom = false;
     state.roomSqlId = "";
     state.liveMessages = [];
     showRoom(false);
@@ -4119,6 +4155,9 @@
     (roomEl() || shell).addEventListener("click", function (ev) {
       var roomPanel = roomEl();
       if (!roomPanel || roomPanel.hidden) return;
+      if (state.aiAtWorkRoom && window.CognationAiAtWork && window.CognationAiAtWork.onClick(ev, {
+        panel: roomPanel, roomId: state.roomId, me: currentProfileId(), status: setStatus
+      })) return;
       if (state.industryRoom && window.CognationIndustry && window.CognationIndustry.onClick(ev, {
         panel: roomPanel, roomId: state.roomId, me: currentProfileId(), status: setStatus
       })) return;
@@ -4210,6 +4249,7 @@
           if (input) input.value = "";
           industryApi.paint(roomEl(), state.roomId, currentProfileId());
           setStatus(industryRes && industryRes.kicked ? "You were removed from this chatroom." : "Sent.");
+          return;
         }
 
         if (window.CognationEchoEthics && window.CognationEchoEthics.isRoom(state.roomId)) {
@@ -4217,6 +4257,14 @@
           if (input) input.value = "";
           window.CognationEchoEthics.paint(roomEl(), state.roomId);
           setStatus(ethicsSent && ethicsSent.ok ? "Sent." : (ethicsSent && ethicsSent.message) || "Couldn't send.");
+          return;
+        }
+        if (state.aiAtWorkRoom && window.CognationAiAtWork) {
+          var aiApi = window.CognationAiAtWork;
+          var aiRes = aiApi.comment(state.roomId, currentProfileId(), viewerDisplayName(), body);
+          if (input) input.value = "";
+          aiApi.paint(roomEl(), state.roomId, currentProfileId());
+          setStatus(aiRes && aiRes.kicked ? "You were removed from this chatroom." : "Sent.");
           return;
         }
         if (state.liveRoom && state.roomSqlId) {

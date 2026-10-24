@@ -9828,13 +9828,11 @@
     var dlg = document.querySelector("[data-tower-add-widget-dialog]");
     if (!dlg) return;
     dlg.hidden = false;
-    dlg.removeAttribute("data-add-choice");
-    var fields = dlg.querySelector("[data-tower-add-quote-fields]");
-    if (fields) fields.hidden = true;
     var ta = dlg.querySelector("[data-tower-add-quote-text]");
-    if (ta) ta.value = "";
-    var quoteBtn = dlg.querySelector('[data-tower-add-choice="quote"]');
-    if (quoteBtn) quoteBtn.focus();
+    if (ta) {
+      ta.value = "";
+      ta.focus();
+    }
   }
 
   function closeAddWidgetDialog() {
@@ -9870,11 +9868,9 @@
         if (!isTowerOwner(TowerProfileStore.get())) return;
         var ta = dlg.querySelector("[data-tower-add-quote-text]");
         var text = ta ? ta.value : "";
-        var fields = dlg.querySelector("[data-tower-add-quote-fields]");
-        if (fields && fields.hidden) return;
         var added = addQuoteSticker(root, text);
-          var qStatus = dlg.querySelector("[data-tower-add-quote-status]");
-          if (added && added.blocked) {
+        var qStatus = dlg.querySelector("[data-tower-add-quote-status]");
+        if (added && added.blocked) {
             /* Keep the dialog open with the words so the owner can change them. */
             if (!qStatus && ta && ta.parentNode) {
               qStatus = document.createElement("p");
@@ -9888,22 +9884,11 @@
             setProfileStatusOn(root, QUOTE_BLOCKED_MESSAGE, true);
             return;
           }
-          if (qStatus) { qStatus.hidden = true; qStatus.textContent = ""; }
-          setProfileStatusOn(root, "Quote sticker added.", false);
+        if (qStatus) { qStatus.hidden = true; qStatus.textContent = ""; }
+        setProfileStatusOn(root, "Quote sticker added.", false);
         closeAddWidgetDialog();
       });
     }
-    dlg.querySelectorAll("[data-tower-add-choice]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        dlg.setAttribute("data-add-choice", btn.getAttribute("data-tower-add-choice") || "quote");
-        var fields = dlg.querySelector("[data-tower-add-quote-fields]");
-        if (fields) fields.hidden = false;
-        var oldStatus = dlg.querySelector("[data-tower-add-quote-status]");
-        if (oldStatus) { oldStatus.hidden = true; oldStatus.textContent = ""; }
-        var box = dlg.querySelector("[data-tower-add-quote-text]");
-        if (box) box.focus();
-      });
-    });
 
     /* Empty canvas click on personal public page → offer add */
     var stage = root.querySelector("[data-tower-scrapbook]");

@@ -15862,24 +15862,32 @@ body.cgn-cal-page {
   opacity: 1;
 }
 
-/* Header lockup only. Shade plus a plain light that follows the
-   letter shapes. No disk, ring, or oval. Tagline unchanged. */
+/* Header lockup only. A little shade, and a plain white light that
+   follows the letter shapes. No ellipse behind the word or the brain. */
+.cognation-masthead {
+  background: none;
+}
 .cognation-masthead-home,
 .cognation-masthead-home:hover,
 .cognation-masthead-home:focus-visible {
   text-shadow:
-    0 5px 8px rgba(8, 10, 24, 0.5),
-    0 0 7px #fff,
-    0 0 16px rgba(255, 255, 255, 0.92);
+    0 4px 7px rgba(8, 10, 24, 0.48),
+    0 0 4px #fff,
+    0 0 9px rgba(255, 255, 255, 0.88);
 }
 .cognation-masthead-brain {
   filter: none;
 }
 .cognation-masthead-brain::before {
   content: none;
+  background: none;
+  filter: none;
+  border-radius: 0;
 }
 .cognation-masthead-brain img {
-  filter: drop-shadow(0 10px 14px rgba(6, 8, 22, 0.4));
+  filter: drop-shadow(0 8px 12px rgba(6, 8, 22, 0.38));
+  -webkit-mask-image: none;
+  mask-image: none;
 }
 
 

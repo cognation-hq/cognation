@@ -15862,4 +15862,85 @@ body.cgn-cal-page {
   opacity: 1;
 }
 
+/* Header lockup only. A little shade lifts the word and the brain, and a
+   cyan/purple ring of light circles behind each, the way the PULSE halo glows.
+   The tagline is unchanged. */
+@property --masthead-halo-turn {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0deg;
+}
+@keyframes masthead-halo-spin {
+  to { --masthead-halo-turn: 360deg; }
+}
+.cognation-masthead { animation: masthead-halo-spin 14s linear infinite; }
+.cognation-masthead-home {
+  position: relative;
+  z-index: 1;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.58),
+    2px 3px 0 rgba(64, 32, 108, 0.45),
+    4px 6px 0 rgba(18, 8, 36, 0.32),
+    0 12px 16px rgba(4, 6, 18, 0.5),
+    0 0 26px rgba(189, 247, 255, 0.92),
+    0 0 90px rgba(211, 160, 255, 0.7);
+}
+.cognation-masthead-home:hover,
+.cognation-masthead-home:focus-visible {
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.66),
+    2px 3px 0 rgba(64, 32, 108, 0.45),
+    4px 6px 0 rgba(18, 8, 36, 0.32),
+    0 14px 18px rgba(4, 6, 18, 0.55),
+    0 0 34px rgba(189, 247, 255, 1),
+    0 0 108px rgba(211, 160, 255, 0.82);
+}
+.cognation-masthead-home::before,
+.cognation-masthead-brain::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  pointer-events: none;
+  border-radius: 50%;
+  background: conic-gradient(
+    from var(--masthead-halo-turn),
+    rgba(126, 235, 255, 0.95),
+    rgba(197, 166, 255, 0.92),
+    rgba(90, 212, 255, 0.95),
+    rgba(215, 176, 255, 0.92),
+    rgba(126, 235, 255, 0.95)
+  );
+  filter: blur(14px);
+  mix-blend-mode: screen;
+  -webkit-mask-image: radial-gradient(ellipse at center, transparent 58%, #000 68%, #000 78%, transparent 90%);
+  mask-image: radial-gradient(ellipse at center, transparent 58%, #000 68%, #000 78%, transparent 90%);
+}
+.cognation-masthead-home::before {
+  top: 42%;
+  width: 114%;
+  height: 1.42em;
+  transform: translate(-50%, -50%);
+}
+.cognation-masthead-brain {
+  z-index: 1;
+  filter: none;
+}
+.cognation-masthead-brain img {
+  filter:
+    drop-shadow(2px 4px 0 rgba(22, 10, 44, 0.38))
+    drop-shadow(0 12px 14px rgba(4, 6, 18, 0.48))
+    drop-shadow(0 0 19px rgba(125, 239, 255, 0.88))
+    drop-shadow(0 0 55px rgba(199, 140, 255, 0.62));
+}
+.cognation-masthead-brain::after {
+  top: 46%;
+  width: 118%;
+  height: 132%;
+  transform: translate(-50%, -50%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .cognation-masthead { animation: none; }
+}
+
 

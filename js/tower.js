@@ -703,40 +703,22 @@
     /* Second pass (r146): compact upward. A widget with a big empty band above it
        (more than COMPACT_MIN_GAP px, e.g. YouTube parked far down on an old saved
        layout) moves up to the nearest free spot; the identity row stays pinned.
-       The YouTube link chip is seated right under the YouTube widget. Smaller gaps
-       are kept, and owner-dragged widgets never move up, so a spot the owner
-       chose is not touched. */
+       The YouTube logo is its own widget and is never seated on the video window.
+       Smaller gaps are kept, and owner-dragged widgets never move up, so a spot
+       the owner chose is not touched. */
     var rowCount = rowItems.length;
     var seated = fixed.slice(0, rowCount);
     var rest = fixed.slice(rowCount).sort(function (a, b) { return a.y - b.y || a.x - b.x; });
-    var chip = null;
-    rest = rest.filter(function (b) {
-      if (b.id === "social-youtube") { chip = b; return false; }
-      return true;
-    });
-    var yt = rest.filter(function (b) { return b.id === "youtube"; })[0] || null;
-    /* YouTube widget not on screen yet (still loading): leave the chip where it is. */
     /* One-time compaction of an old layout (no _compacted mark yet): every widget
        in those rows carries an owner-dragged mark, so the marks are ignored on
        this pass only. The identity row stays pinned (seated above). */
     if (opts.ignoreDragged) rest.forEach(function (b) { b.dragged = false; });
-    if (chip && !yt) { chip.dragged = true; rest.push(chip); }
     function freeAt(cand) {
       return !seated.some(function (f) { return boxesOverlap(cand, f); });
     }
-    function seat(b, forceY) {
+    function seat(b) {
       var startY = b.y;
-      if (typeof forceY === "number") {
-        var c0 = { x: b.x, y: forceY, w: b.w, h: b.h };
-        if (freeAt(c0)) b.y = forceY;
-        else {
-          var ysF = seated.map(function (f) { return f.y + f.h + gap; }).filter(function (y) { return y >= forceY; }).sort(function (m, n) { return m - n; });
-          for (var k = 0; k < ysF.length; k++) {
-            var cf = { x: b.x, y: ysF[k], w: b.w, h: b.h };
-            if (freeAt(cf)) { b.y = ysF[k]; break; }
-          }
-        }
-      } else if (!b.dragged) {
+      if (!b.dragged) {
         var ups = [gap].concat(seated.map(function (f) { return f.y + f.h + gap; }))
           .filter(function (y) { return y < b.y; })
           .sort(function (m, n) { return m - n; });
@@ -757,14 +739,7 @@
         moves[b.id] = { x: m0 ? m0.x : b.x, y: b.y };
       }
     }
-    rest.forEach(function (b) {
-      seat(b);
-      if (chip && b === yt) {
-        var cx = Math.max(0, Math.min(Math.max(0, stageW - chip.w), yt.x));
-        if (chip.x !== cx) { chip.x = cx; moves[chip.id] = { x: cx, y: chip.y }; }
-        seat(chip, yt.y + yt.h + 8);
-      }
-    });
+    rest.forEach(function (b) { seat(b); });
     return moves;
   }
   var COMPACT_MIN_GAP = 160;

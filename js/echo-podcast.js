@@ -4,7 +4,6 @@
   var TOPICS = [
     { id: "pro-podcast-leaders", title: "Top industry performers" },
     { id: "pro-podcast-ethics", title: "Ethical collaboration" },
-    { id: "pro-podcast-async", title: "Async by default" },
     { id: "pro-podcast-ce", title: "Continuing education" },
   ];
   function read(key, fallback) { try { var raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch (e) { return fallback; } }
@@ -15,29 +14,18 @@
   function myName() { return String(session().profileDisplayName || session().username || "Member").trim().slice(0, 80) || "Member"; }
   function topicKey(card) { return String((card && (card.podcastId || card.id)) || ""); }
   function roomsFor(d, topic) {
-    var list = [];
-    Object.keys(d.rooms).forEach(function (id) { if (d.rooms[id] && d.rooms[id].topic === topic) list.push(d.rooms[id]); });
-    list.sort(function (a, b) { return a.n - b.n; });
-    return list;
+    var list = []; Object.keys(d.rooms).forEach(function (id) { if (d.rooms[id] && d.rooms[id].topic === topic) list.push(d.rooms[id]); }); list.sort(function (a, b) { return a.n - b.n; }); return list;
   }
   function blank(d, card) {
-    d.n += 1;
-    var topic = topicKey(card), id = "pod-" + d.n;
-    d.rooms[id] = { id: id, n: roomsFor(d, topic).length + 1, topic: topic, title: String((card && card.title) || "Podcast"), members: [], kicked: [], cameras: [], messages: [] };
-    return d.rooms[id];
+    d.n += 1; var topic = topicKey(card), id = "pod-" + d.n;
+    d.rooms[id] = { id: id, n: roomsFor(d, topic).length + 1, topic: topic, title: String((card && card.title) || "Podcast"), members: [], kicked: [], cameras: [], messages: [] }; return d.rooms[id];
   }
-  function openFor(d, card) {
-    var found = null;
-    roomsFor(d, topicKey(card)).forEach(function (r) { if (r.members.length < CAP) found = r; });
-    return found || blank(d, card);
-  }
+  function openFor(d, card) { var found = null; roomsFor(d, topicKey(card)).forEach(function (r) { if (r.members.length < CAP) found = r; }); return found || blank(d, card); }
   function asCard(base, r) {
-    var card = {}, k;
-    for (k in base) if (Object.prototype.hasOwnProperty.call(base, k)) card[k] = base[k];
+    var card = {}, k; for (k in base) if (Object.prototype.hasOwnProperty.call(base, k)) card[k] = base[k];
     card.type = "pro-podcast"; card.roomId = r.id; card.podcastId = r.topic; card.title = base.title || r.title;
     card.cap = CAP; card.cameraCap = CAM; card.presenter = false; card.full = r.members.length >= CAP;
-    if (r.n > 1) { card.id = base.id + "-" + r.n; card.splitOf = base.id; }
-    return card;
+    if (r.n > 1) { card.id = base.id + "-" + r.n; card.splitOf = base.id; } return card;
   }
   function present(list) {
     var d = store(), out = [], viewer = me();

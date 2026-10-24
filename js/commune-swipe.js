@@ -164,7 +164,6 @@
   var PRO_PODCASTS = [
     { id: "pro-podcast-leaders", title: "Top industry performers", body: "Talks with leading people across industries, not only Cognation experts." },
     { id: "pro-podcast-ethics", title: "Ethical collaboration", body: "How strong teams share credit and work through disagreement." },
-    { id: "pro-podcast-async", title: "Async by default", body: "Episodes on remote and async craft. Listen on your own schedule." },
     { id: "pro-podcast-ce", title: "Continuing education", body: "Episodes that pair with continuing-education goals." },
   ];
   /* The legacy classroom panel. Not the deck's classroom CARD (it also carries

@@ -109,7 +109,7 @@ var none = loadSwipe(adultStores([]), sess);
 var lanes = none.buildProfessionalLanes();
 var pods = lanes["pro-podcast"];
 assert.strictEqual(pods.map(function (c) { return c.title; }).join("|"),
-  "Top industry performers|Ethical collaboration|Async by default|Continuing education", "four Podcast cards kept");
+  "Top industry performers|Ethical collaboration|Continuing education", "Podcast cards kept");
 assert.strictEqual(pods[0].body, "Talks with leading people across industries, not only Cognation experts.", "copy kept");
 pods.forEach(function (c) {
   assert.ok(!c.demo, "Podcast not flagged demo: " + c.id);
@@ -123,7 +123,7 @@ assert.ok(/data-podcast-join/.test(swipe) && /function openPodcast/.test(swipe),
   assert.strictEqual(lanes[t].length, 0, "empty lane " + t);
 });
 var only = none.sampleDeck(18);
-assert.strictEqual(only.length, 4, "only the four Podcast cards, each once");
+assert.strictEqual(only.length, 3, "only the Podcast cards, each once");
 assertReal(only, "podcast-only");
 var t0 = Date.now();
 assert.strictEqual(none.paceProfessional({}, 50).length, 0, "all lanes empty -> empty deck");
@@ -140,7 +140,7 @@ var sess2 = memoryStorage(); sess2.setItem("cognation.commune.mode", "profession
 var real = loadSwipe(adultStores(pages), sess2, { CognationProLive: { livePages: function () { return live; } } });
 var deck = real.sampleDeck(18);
 assert.strictEqual(deck.map(function (c) { return c.type; }).join(","),
-  "pro-webinar,pro-know,pro-podcast,pro-podcast,pro-podcast,pro-podcast",
+  "pro-webinar,pro-know,pro-podcast,pro-podcast,pro-podcast",
   "1:1 across real lanes; an exhausted lane drops out: " + deck.map(function (c) { return c.id; }));
 assertReal(deck, "mixed");
 

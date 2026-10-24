@@ -96,7 +96,12 @@
         var z = A.zoneLabel();
         zone.textContent = "Times shown in your time zone" + (z ? " (" + z + ")" : "");
       }
-      if (list) list.innerHTML = renderAgendaHtml(A.agenda(filter), { filter: filter });
+      var rows = A.agenda(filter);
+      var extra = root.CognationClassroomEvent;
+      if (extra && filter !== "webinar" && extra.agendaRows) {
+        try { rows = extra.agendaRows().concat(rows); } catch (eRows) {}
+      }
+      if (list) list.innerHTML = renderAgendaHtml(rows, { filter: filter });
     }
     if (chips) chips.addEventListener("click", function (ev) {
       var b = ev.target && ev.target.closest && ev.target.closest("[data-cal-filter]");
@@ -105,6 +110,7 @@
       paint();
     });
     root.document.addEventListener("cognation:classroom-sessions-updated", paint);
+    root.document.addEventListener("cognation:classroom-event", paint);
     paint();
   }
 

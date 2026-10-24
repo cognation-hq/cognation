@@ -34,6 +34,9 @@
   var NOTICES_KEY = "cognation.commune.notices.v1";
   var SHARES_KEY = "cognation.commune.friend-shares.v1";
   var BIDS_KEY = "cognation.commune.market.bids.v1";
+  var HIGH_KEY = "cognation.commune.market.high.v1";
+  var PAID_KEY = "cognation.commune.market.paid.v1";
+  var BID_MS = 86400000;
   var FADE_LEFT_THRESHOLD = 3;
   var OFF_INTEREST_FRIEND_RATIO = 6;
   var ROOMS_KEY = "cognation.commune.site-rooms.v1";
@@ -1333,6 +1336,64 @@
     var age = getMemberAge();
     return typeof age === "number" && age >= 16;
   }
+  function marketAsk(text) {
+    var m = String(text || "").match(/\$\s*(\d{1,7}(?:,\d{3})*(?:\.\d{1,2})?)/);
+    if (!m) return null;
+    var n = Number(String(m[1]).replace(/,/g, ""));
+    return isFinite(n) && n >= 0 ? n : null;
+  }
+  function marketMoney(amount) {
+    var n = Number(amount);
+    if (!isFinite(n) || n < 0) return "";
+    var whole = Math.abs(n - Math.round(n)) < 0.001;
+    return "$" + (whole ? String(Math.round(n)) : n.toFixed(2));
+  }
+  function marketBidLabel(card) {
+    var price = marketMoney(card && card.ask);
+    return price ? "Bid " + price : "Bid";
+  }
+  var MARKET_MILES = 20;
+  var LOC_KEY = "cognation.member.location.v1";
+  function asPoint(obj) {
+    if (!obj || typeof obj !== "object") return null;
+    var lat = Number(obj.lat != null ? obj.lat : obj.latitude);
+    var lng = Number(obj.lng != null ? obj.lng : (obj.longitude != null ? obj.longitude : obj.lon));
+    if (!isFinite(lat) || !isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    return { lat: lat, lng: lng };
+  }
+  function milesApart(a, b) {
+    var r = 3958.7613;
+    var dLat = (b.lat - a.lat) * Math.PI / 180;
+    var dLng = (b.lng - a.lng) * Math.PI / 180;
+    var s1 = Math.sin(dLat / 2);
+    var s2 = Math.sin(dLng / 2);
+    var h = s1 * s1 + Math.cos(a.lat * Math.PI / 180) * Math.cos(b.lat * Math.PI / 180) * s2 * s2;
+    return 2 * r * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+  function viewerPoint() {
+    var member = getMemberProfile() || {};
+    return asPoint(member) || asPoint(member.location) || asPoint(readJson(localStorage, LOC_KEY, null));
+  }
+  function sellerPoint(post) {
+    var direct = asPoint(post) || asPoint(post && post.location);
+    if (direct) return direct;
+    var atts = post && post.attachments;
+    var i;
+    if (Array.isArray(atts)) {
+      for (i = 0; i < atts.length; i++) {
+        var found = asPoint(atts[i]);
+        if (found) return found;
+      }
+    }
+    var rec = post && post.authorProfileId ? profileById(post.authorProfileId) : null;
+    return asPoint(rec) || asPoint(rec && rec.location);
+  }
+  function marketLocal(post) {
+    var viewer = viewerPoint();
+    var seller = sellerPoint(post);
+    if (!viewer || !seller) return false;
+    return milesApart(viewer, seller) <= MARKET_MILES;
+  }
   function marketPictures(post) {
     var out = [];
     (post && Array.isArray(post.attachments) ? post.attachments : []).forEach(function (a) {
@@ -1393,6 +1454,7 @@
     var out = [];
     posts.forEach(function (post) {
       if (!post || !marketTagged((post.body || "") + " " + (post.title || ""))) return;
+      if (!marketLocal(post) || marketPaid(post)) return;
       var body = String(post.body || "").replace(/(^|[^a-z0-9])#market(?![a-z0-9])/ig, "$1").replace(/\s+/g, " ").trim();
       out.push({
         id: "market-" + (post.id || out.length),
@@ -1403,6 +1465,7 @@
         handle: String(post.handle || "").replace(/^@/, ""),
         profileId: post.authorProfileId || "",
         pictures: marketPictures(post),
+        ask: marketAsk((post.body || "") + " " + (post.title || "")),
       });
     });
     return out;
@@ -1412,14 +1475,92 @@
     var row = doc[currentProfileId()];
     return !!(row && row[cardId]);
   }
-  function optInToBid(cardId) {
+  function optInToBid(cardId, amount) {
     if (!marketCanBid()) return false;
     var doc = readJson(localStorage, BIDS_KEY, {});
     var mine = currentProfileId();
     if (!doc[mine] || typeof doc[mine] !== "object") doc[mine] = {};
-    doc[mine][cardId] = Date.now();
+    var start = Number(amount);
+    doc[mine][cardId] = { at: Date.now(), amount: isFinite(start) && start >= 0 ? start : null };
     writeJson(localStorage, BIDS_KEY, doc);
     return true;
+  }
+  function marketPaid(post) {
+    var doc = readJson(localStorage, PAID_KEY, {});
+    var id = post && (post.id || post);
+    return !!(doc && (doc[id] || doc["market-" + id]));
+  }
+  function liveHigh(cardId) {
+    var row = readJson(localStorage, HIGH_KEY, {})[cardId];
+    if (!row || !isFinite(Number(row.amount)) || !row.at) return null;
+    if (Date.now() - Number(row.at) > BID_MS) return null;
+    return row;
+  }
+  function raiseBid(cardId, amount, ask) {
+    if (!marketCanBid()) return false;
+    var n = Number(amount);
+    var floor = Number(ask);
+    if (!isFinite(n) || (isFinite(floor) && n < floor)) return false;
+    var cur = liveHigh(cardId);
+    if (cur && n <= Number(cur.amount)) return false;
+    var doc = readJson(localStorage, HIGH_KEY, {});
+    doc[cardId] = { bidderId: currentProfileId(), amount: n, at: Date.now() };
+    writeJson(localStorage, HIGH_KEY, doc);
+    return optInToBid(cardId, n);
+  }
+  function settleMarketPayment(cardId, body) {
+    if (!body || body.paid !== true) return false;
+    var doc = readJson(localStorage, PAID_KEY, {});
+    doc[cardId] = Date.now();
+    var postId = String(cardId || "").replace(/^market-/, "");
+    if (postId) doc[postId] = doc[cardId];
+    writeJson(localStorage, PAID_KEY, doc);
+    return true;
+  }
+  function payHighBid(card) {
+    var high = card && liveHigh(card.id);
+    var notSet = { ok: false, paid: false, message: "Apple Pay isn't set up. No payment was taken." };
+    if (!marketCanBid() || !high || String(high.bidderId) !== String(currentProfileId())) {
+      return Promise.resolve({ ok: false, paid: false, message: "Only the current high bidder can pay." });
+    }
+    var c = window.CognationConfig || {};
+    var merchant = String(c.applePayMerchantId || "").trim();
+    var processor = String(c.applePayProcessor || "").trim().replace(/\/$/, "");
+    var Session = window.ApplePaySession;
+    if (!merchant || !/^https:\/\//.test(processor) || typeof Session !== "function") return Promise.resolve(notSet);
+    var amount = (Math.round(Number(high.amount) * 100) / 100).toFixed(2);
+    return new Promise(function (resolve) {
+      var session, done = false;
+      function finish(result) { if (!done) { done = true; resolve(result); } }
+      function fail(msg) {
+        try { if (session) session.completePayment(Session.STATUS_FAILURE); } catch (e1) {}
+        finish({ ok: false, paid: false, message: msg || "Payment didn't go through. Nothing was charged." });
+      }
+      function post(path, payload) {
+        return fetch(processor + path, { method: "POST", credentials: "omit", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) }).then(function (res) { return res.json(); });
+      }
+      try {
+        session = new Session(3, { countryCode: "US", currencyCode: "USD", merchantCapabilities: ["supports3DS"], supportedNetworks: ["visa", "masterCard", "amex", "discover"], total: { label: "Cognation", amount: amount } });
+      } catch (eOpen) { finish(notSet); return; }
+      session.onvalidatemerchant = function (ev) {
+        var url = ev && ev.validationURL;
+        if (!/^https:\/\//.test(url || "")) { fail(); return; }
+        post("/apple-pay/merchant-session", { validationURL: url, merchantId: merchant, amount: amount }).then(function (body) {
+          if (body && body.merchantSession) session.completeMerchantValidation(body.merchantSession); else fail();
+        }).catch(function () { fail(); });
+      };
+      session.onpaymentauthorized = function (ev) {
+        var token = ev && ev.payment && ev.payment.token;
+        if (!token) { fail(); return; }
+        post("/apple-pay/pay", { token: token, amount: amount, cardId: card.id }).then(function (body) {
+          if (!settleMarketPayment(card.id, body)) { fail(); return; }
+          try { session.completePayment(Session.STATUS_SUCCESS); } catch (eOk) {}
+          finish({ ok: true, paid: true, message: "Paid with Apple Pay." });
+        }).catch(function () { fail(); });
+      };
+      session.oncancel = function () { finish({ ok: false, paid: false, message: "Payment cancelled. Nothing was charged." }); };
+      try { session.begin(); } catch (eBegin) { finish(notSet); }
+    });
   }
   function marketCardHtml(card) {
     var html = "";
@@ -1430,12 +1571,18 @@
     if (!marketCanBid()) {
       return html + '<p class="commune-card-meta" data-market-bid-note>Bidding is for ages 16 and up.</p>';
     }
+    var price = marketMoney(card.ask);
+    var high = liveHigh(card.id);
     var opted = marketOptedIn(card.id);
+    var note = (price ? "Starts at " + price + ". " : "") + "Opt in only. Nothing is charged.";
+    if (high) note = "High bid " + marketMoney(high.amount) + ". Pay with Apple Pay within 24 hours. Nothing is charged until then.";
+    else if (opted) note = "You're opted in" + (price ? " at " + price : "") + ". Nothing is charged.";
     return html +
       '<button type="button" class="btn btn-primary" data-market-bid aria-pressed="' + (opted ? "true" : "false") + '">' +
-      (opted ? "Opted in" : "Bid") + "</button>" +
-      '<p class="commune-card-meta" data-market-bid-note>' +
-      (opted ? "You're opted in to bid. Nothing is charged." : "Opt in only. Nothing is charged.") + "</p>";
+      escapeHtml(marketBidLabel(card)) + "</button>" +
+      '<input data-market-raise inputmode="decimal" maxlength="8" aria-label="Raise bid" placeholder="Raise">' +
+      '<button type="button" class="btn btn-secondary" data-market-pay>Apple Pay</button>' +
+      '<p class="commune-card-meta" data-market-bid-note>' + escapeHtml(note) + "</p>";
   }
 
   function ageSafeFeaturedCard(card) {
@@ -2202,6 +2349,20 @@
     return el;
   }
 
+  function wireMarketPay(el, card) {
+    var btn = el && el.querySelector("[data-market-pay]");
+    if (!btn || btn.getAttribute("data-market-pay-wired")) return;
+    btn.setAttribute("data-market-pay-wired", "1");
+    btn.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      payHighBid(card).then(function (res) {
+        var note = el.querySelector("[data-market-bid-note]");
+        if (note) note.textContent = (res && res.message) || "Apple Pay isn't set up. No payment was taken.";
+        if (res && res.paid === true) rebuildDeck();
+      });
+    });
+  }
   function clockLabel(ms) {
     if (!ms) return "";
     try { return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; }
@@ -2295,11 +2456,22 @@
     if (bidBtn) bidBtn.addEventListener("click", function (ev) {
       ev.preventDefault();
       ev.stopPropagation();
-      if (!optInToBid(card.id)) return;
-      bidBtn.textContent = "Opted in";
+      var raise = el.querySelector("[data-market-raise]");
+      var typed = raise && String(raise.value || "").trim();
+      if (!raiseBid(card.id, typed ? Number(typed) : card.ask, card.ask)) return;
+      bidBtn.textContent = marketBidLabel(card);
       bidBtn.setAttribute("aria-pressed", "true");
       var note = el.querySelector("[data-market-bid-note]");
-      if (note) note.textContent = "You're opted in to bid. Nothing is charged.";
+      var high = liveHigh(card.id);
+      if (note && high) note.textContent = "High bid " + marketMoney(high.amount) + ". Pay with Apple Pay within 24 hours. Nothing is charged until then.";
+    });
+    wireMarketPay(el, card);
+    var joinLive = el.querySelector("[data-live-echo-join]");
+    if (joinLive) joinLive.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      var tab = document.getElementById("tab-tower");
+      if (tab) tab.click();
+      if (window.CognationLive && window.CognationLive.open) window.CognationLive.open();
     });
     var sim = el.querySelector("[data-commune-enter-sim]");
     if (sim) sim.addEventListener("click", function (ev) { ev.stopPropagation(); openRoom(card.id, true); });
@@ -4026,6 +4198,11 @@
     towerLiveContentCards: towerLiveContentCards,
     marketplaceCards: marketplaceCards,
     marketCanBid: marketCanBid,
+    marketBidLabel: marketBidLabel,
+    raiseBid: raiseBid,
+    liveHigh: liveHigh,
+    payHighBid: payHighBid,
+    settleMarketPayment: settleMarketPayment,
     optInToBid: optInToBid,
     featuredFamily: featuredFamily,
     getMode: getMode,

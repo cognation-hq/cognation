@@ -12681,6 +12681,15 @@
           if (savedPics[f.name]) row.dataUrl = savedPics[f.name];
           attachments.push(row);
         });
+        if (marketPost) {
+          try {
+            var memberLoc = JSON.parse(localStorage.getItem("cognation.member.profile.v1") || "{}");
+            var savedLoc = JSON.parse(localStorage.getItem("cognation.member.location.v1") || "null");
+            var lat = Number(memberLoc && memberLoc.lat != null ? memberLoc.lat : savedLoc && savedLoc.lat);
+            var lng = Number(memberLoc && memberLoc.lng != null ? memberLoc.lng : savedLoc && savedLoc.lng);
+            if (isFinite(lat) && isFinite(lng)) attachments.push({ kind: "location", label: "location", lat: lat, lng: lng });
+          } catch (eLoc) {}
+        }
         if (usingRemoteSocial()) {
           /* One post at a time: the Post button is disabled while a post is in
              flight (no double posts) and re-enabled on success and on error. */

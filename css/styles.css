@@ -15862,20 +15862,43 @@ body.cgn-cal-page {
   opacity: 1;
 }
 
-/* Header lockup only. A soft shade, then a cyan/purple glow behind it.
-   No ring. The tagline is unchanged. */
+/* Header lockup only. Soft shade on the word and the brain, and a
+   cyan/purple glow behind the letter shadow. No ring. Tagline unchanged. */
 .cognation-masthead-home {
+  position: relative;
+  z-index: 1;
   text-shadow:
-    0 8px 16px rgba(6, 8, 22, 0.4),
-    0 0 26px rgba(189, 247, 255, 0.88),
-    0 0 78px rgba(211, 160, 255, 0.6);
+    0 6px 12px rgba(6, 8, 22, 0.5),
+    0 0 16px rgba(220, 252, 255, 1),
+    0 0 42px rgba(120, 230, 255, 0.95),
+    0 0 96px rgba(186, 150, 255, 0.85);
+}
+.cognation-masthead-home::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: -6%;
+  right: -6%;
+  top: 46%;
+  height: 1.35em;
+  transform: translateY(-50%);
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center,
+    rgba(214, 251, 255, 0.95) 0%,
+    rgba(110, 226, 255, 0.82) 24%,
+    rgba(176, 140, 255, 0.62) 50%,
+    rgba(150, 100, 230, 0.22) 70%,
+    transparent 80%);
+  filter: blur(8px);
 }
 .cognation-masthead-home:hover,
 .cognation-masthead-home:focus-visible {
   text-shadow:
-    0 10px 18px rgba(6, 8, 22, 0.44),
-    0 0 34px rgba(189, 247, 255, 0.95),
-    0 0 96px rgba(211, 160, 255, 0.68);
+    0 8px 14px rgba(6, 8, 22, 0.52),
+    0 0 20px rgba(230, 253, 255, 1),
+    0 0 52px rgba(120, 230, 255, 1),
+    0 0 110px rgba(186, 150, 255, 0.9);
 }
 .cognation-masthead-brain {
   filter: none;

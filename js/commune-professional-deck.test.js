@@ -88,11 +88,11 @@ assert.strictEqual(api.FEATURED_ORDER.join(","), "classroom,ad,chatroom,dating,c
 assert.strictEqual(api.AD_MAX_MS, 3000, "ads max 3s");
 assert.strictEqual(
   api.PRO_ORDER.join(","),
-  "pro-webinar,pro-know,pro-research,pro-auction,pro-podcast,pro-ethics,pro-doctoral,pro-field,pro-popculture",
+  "pro-webinar,pro-know,pro-research,pro-auction,pro-podcast,pro-ethics,pro-doctoral,pro-business,pro-field,pro-popculture",
   "Professional types"
 );
 var marks = api.PRO_ORDER.map(function (t) { return api.PRO_MARK[t]; });
-assert.strictEqual(marks.join("|"), "Webinar|Professionals you might know|Research|Auction|Podcast|Ethics board|Doctoral degrees|Field|Pop-culture", "visible type marks");
+assert.strictEqual(marks.join("|"), "Webinar|Professionals you might know|Research|Auction|Podcast|Ethics board|Doctoral degrees|Business|Field|Pop-culture", "visible type marks");
 
 /* Adult viewer with friends, a dating pool, ads, and professional pages. */
 function adultStores() {

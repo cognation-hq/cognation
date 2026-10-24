@@ -9778,7 +9778,6 @@
         btn.setAttribute("data-tower-emoji-add", item.id);
         btn.setAttribute("aria-label", "Add " + item.label);
         btn.title = item.label;
-        btn.textContent = item.glyph;
         bar.appendChild(btn);
       });
       bar.addEventListener("click", function (ev) {

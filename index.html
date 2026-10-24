@@ -459,7 +459,6 @@
                     <button type="button" class="btn btn-secondary tower-remove-btn" data-tower-remove-selected disabled title="Remove the selected widget (or press Backspace / Delete)">Remove</button>
                   </div>
                   <button type="button" class="btn btn-secondary" data-tower-add-widget title="Add a quote or text sticker">Add widget</button>
-                  <div class="tower-emoji-bar" data-tower-emoji-bar role="group" aria-label="Emoji widgets"></div>
                   <p class="tower-hidden-widget-notice tower-stage-notice" data-tower-stage-notice role="status" aria-live="polite" hidden></p>
                 </div>
 
@@ -1391,7 +1390,10 @@
   <div class="tower-add-widget-dialog" data-tower-add-widget-dialog hidden role="dialog" aria-modal="true" aria-labelledby="tower-add-widget-title">
     <div class="tower-add-widget-dialog-card">
       <label id="tower-add-widget-title" class="tower-add-widget-title" for="tower-add-quote-text">Add to page</label>
+      <div class="tower-emoji-bar" data-tower-emoji-bar role="group" aria-label="Emoji widgets"></div>
       <textarea id="tower-add-quote-text" data-tower-add-quote-text rows="2" maxlength="400" placeholder="Type a quote or note…"></textarea>
+      <button type="button" class="tower-add-widget-image" data-tower-add-image hidden>Image</button>
+      <input type="file" accept="image/*" data-tower-add-image-file hidden tabindex="-1" aria-hidden="true">
       <button type="button" class="tower-add-widget-cancel" data-tower-add-widget-cancel>Cancel</button>
     </div>
   </div>

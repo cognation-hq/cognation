@@ -14966,6 +14966,8 @@ textarea::placeholder {
   --pulse-bg-k: 0.954;            /* image px -> screen px (ring ~1040px wide) */
   --pulse-bg-w: calc(1190px * var(--pulse-bg-k));
   --pulse-bg-h: calc(600px * var(--pulse-bg-k));
+  --pulse-outer-bob: 72px;        /* outer wisps only; the solid inner ellipse stays put */
+  --pulse-outer-sway: 22px;
   /* Cap 250 halo kept, blended over the image's page colour. */
   background:
     radial-gradient(ellipse at 50% 44%, rgba(168, 244, 255, 0.16), transparent 42%),
@@ -15034,7 +15036,7 @@ textarea::placeholder {
 /* real friend circles sit on top of the background and the ring */
 .circle-fall[data-pulse-bg] .pulse-fall-stack { z-index: 3; }
 @media (max-width: 600px) {
-  .circle-fall[data-pulse-bg] { --pulse-bg-k: 0.31; }
+  .circle-fall[data-pulse-bg] { --pulse-bg-k: 0.31; --pulse-outer-bob: 34px; --pulse-outer-sway: 8px; }
   .circle-fall[data-pulse-bg]::before,
   .circle-fall[data-pulse-bg]::after {
     background-image: url("../assets/pulse/pulse-bg-760.jpg");
@@ -15147,9 +15149,16 @@ textarea::placeholder {
   a.pulse-fall-circle { animation: none !important; transform: none !important; }
   .circle-fall[data-pulse-bg]::after { animation: none !important; transform: none !important; }
   .circle-fall[data-pulse-bg] .circle-ring-spin,
-  .circle-fall[data-pulse-bg] .circle-ring-spin::before { animation: none; }
+  .circle-fall[data-pulse-bg] .circle-ring-spin::before,
+  .circle-fall[data-pulse-bg] .circle-ring-spin::after { animation: none; }
 }
-.circle-fall[data-pulse-bg] .circle-ring-spin { animation: pulse-halo-bob 4.4s ease-in-out infinite; }
+/* Solid inner ellipse stays still. The outer wisps (photo band + a traveling charge) circulate and bounce, and that motion stays outside the ellipse. */
+.circle-fall[data-pulse-bg] .circle-ring-spin { animation: none; }
+.circle-fall[data-pulse-bg] .circle-ring-people {
+  position: absolute; left: 0; top: 0; width: 0; height: 0;
+  animation: pulse-people-bob 4.4s ease-in-out infinite;
+}
+@keyframes pulse-people-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-32px); } }
 .circle-fall[data-pulse-bg] .circle-ring-spin::before {
   content: ""; position: absolute; pointer-events: none; border-radius: 50%;
   width: min(640px, 94vw); height: min(640px, 94vw);
@@ -15158,14 +15167,69 @@ textarea::placeholder {
   -webkit-mask: radial-gradient(circle, #0000 63%, #000 70% 78%, #0000 86%);
   mask: radial-gradient(circle, #0000 63%, #000 70% 78%, #0000 86%);
   transform: rotateX(80deg);
-  animation: pulse-halo-3d 8s linear infinite, pulse-halo-ghost 4.8s ease-in-out infinite;
+  animation: none;
+  opacity: 0.92;
+  filter: drop-shadow(0 0 8px rgba(62, 203, 255, 0.55)) drop-shadow(0 0 14px rgba(180, 75, 255, 0.4));
 }
-@keyframes pulse-halo-3d { to { transform: rotateX(80deg) rotateZ(1turn); } }
-@keyframes pulse-halo-ghost {
-  0%, 100% { opacity: 0.4; filter: drop-shadow(0 0 6px rgba(62, 203, 255, 0.32)) drop-shadow(0 0 14px rgba(180, 75, 255, 0.26)); }
-  50% { opacity: 1; filter: drop-shadow(0 0 22px rgba(62, 203, 255, 0.95)) drop-shadow(0 0 42px rgba(180, 75, 255, 0.72)); }
+@property --pulse-bolt-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
 }
-@keyframes pulse-halo-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-32px); } }
+.circle-fall[data-pulse-bg] .circle-ring-spin::after {
+  content: ""; position: absolute; pointer-events: none; border-radius: 50%; z-index: 0;
+  width: calc(min(640px, 94vw) * 1.75); height: calc(min(640px, 94vw) * 1.75);
+  left: calc(min(640px, 94vw) * 1.75 / -2); top: calc(min(640px, 94vw) * 1.75 / -2);
+  background: conic-gradient(from var(--pulse-bolt-angle),
+    rgba(168, 244, 255, 0) 0deg, rgba(168, 244, 255, 0.55) 14deg, rgba(247, 254, 255, 0.95) 26deg,
+    rgba(62, 203, 255, 0.4) 40deg, rgba(180, 75, 255, 0) 64deg, rgba(197, 166, 255, 0.2) 130deg,
+    rgba(180, 75, 255, 0.75) 156deg, rgba(168, 244, 255, 0.25) 176deg, rgba(62, 203, 255, 0) 200deg,
+    rgba(62, 203, 255, 0.5) 248deg, rgba(197, 166, 255, 0.2) 270deg, rgba(168, 244, 255, 0) 300deg);
+  -webkit-mask: radial-gradient(circle, #0000 74%, #000 81% 88%, #0000 96%);
+  mask: radial-gradient(circle, #0000 74%, #000 81% 88%, #0000 96%);
+  mix-blend-mode: screen;
+  filter: blur(3px) drop-shadow(0 0 10px rgba(62, 203, 255, 0.75)) drop-shadow(0 0 16px rgba(180, 75, 255, 0.55));
+  animation: pulse-outer-bob 4.8s ease-in-out infinite, pulse-bolt-spin 5.2s linear infinite;
+}
+.circle-fall[data-pulse-bg]::before {
+  -webkit-mask-image: radial-gradient(ellipse 42% 35% at 51% 44%, #000 62%, transparent 78%);
+  mask-image: radial-gradient(ellipse 42% 35% at 51% 44%, #000 62%, transparent 78%);
+  -webkit-mask-composite: source-over;
+  mask-composite: add;
+}
+.circle-fall[data-pulse-bg]::after {
+  mix-blend-mode: normal;
+  animation: pulse-wisp-live 4.8s ease-in-out infinite;
+  -webkit-mask-image: radial-gradient(ellipse 42% 35% at 51% 44%, transparent 58%, #000 74%, #000 88%, transparent 100%);
+  mask-image: radial-gradient(ellipse 42% 35% at 51% 44%, transparent 58%, #000 74%, #000 88%, transparent 100%);
+  -webkit-mask-composite: source-over;
+  mask-composite: add;
+}
+@media (max-width: 600px) {
+  .circle-fall[data-pulse-bg]::before {
+    -webkit-mask-image: radial-gradient(ellipse 86% 64% at 51% 44%, #000 56%, transparent 74%);
+    mask-image: radial-gradient(ellipse 86% 64% at 51% 44%, #000 56%, transparent 74%);
+  }
+  .circle-fall[data-pulse-bg]::after {
+    -webkit-mask-image: radial-gradient(ellipse 86% 64% at 51% 44%, transparent 52%, #000 70%, #000 90%, transparent 100%);
+    mask-image: radial-gradient(ellipse 86% 64% at 51% 44%, transparent 52%, #000 70%, #000 90%, transparent 100%);
+  }
+}
+@keyframes pulse-bolt-spin { to { --pulse-bolt-angle: 360deg; } }
+@keyframes pulse-outer-bob {
+  0%, 100% { transform: translate3d(0, 0, 0) rotateX(70deg) scale(1); }
+  50% { transform: translate3d(0, calc(var(--pulse-outer-bob) * -1), 0) rotateX(70deg) scale(1.06); }
+}
+@keyframes pulse-wisp-live {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.88; }
+  25% { transform: translate3d(var(--pulse-outer-sway), calc(var(--pulse-outer-bob) * -0.55), 0) scale(1.04); opacity: 1; }
+  50% { transform: translate3d(0, calc(var(--pulse-outer-bob) * -1), 0) scale(1.06); opacity: 0.92; }
+  75% { transform: translate3d(calc(var(--pulse-outer-sway) * -1), calc(var(--pulse-outer-bob) * -0.55), 0) scale(1.04); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .circle-fall[data-pulse-bg] .circle-ring-spin::after,
+  .circle-fall[data-pulse-bg] .circle-ring-people { animation: none; }
+}
 .pulse-side-toggle {
   position: absolute; z-index: 6; top: 8px; left: 50%; transform: translateX(-50%);
   display: flex; gap: 6px; pointer-events: auto;

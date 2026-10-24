@@ -14109,6 +14109,9 @@
     paintCircleLightning(ring);
     var spin = document.createElement("div");
     spin.className = "circle-ring-spin";
+    /* People keep their shared bob. The solid inner ellipse is a pseudo on the spin and stays still. */
+    var crew = document.createElement("div");
+    crew.className = "circle-ring-people";
     var i;
     for (i = 0; i < CIRCLE_SPOTS.length; i++) {
       var spotMeta = CIRCLE_SPOTS[i];
@@ -14153,8 +14156,9 @@
         spot.textContent = "";
         spot.setAttribute("aria-hidden", "true");
       }
-      spin.appendChild(spot);
+      crew.appendChild(spot);
     }
+    spin.appendChild(crew);
     ring.appendChild(spin);
     layer.appendChild(ring);
     placeCircleSpots();

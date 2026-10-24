@@ -1,5 +1,7 @@
 /**
- * Feed photos are images, age-gated per photo. Composer audience is Personal | Professional.
+ * Feed photos are images, age-gated per photo. The composer audience is the
+ * PERSONAL | PROFESSIONAL switch on the Send a signal line. The pill under
+ * Choose Files stays off.
  * Run: node js/feed-photo-audience.test.js
  */
 "use strict";
@@ -46,6 +48,8 @@ assert.strictEqual(added.post.authorProfileId, "pro-1");
 assert.strictEqual(added.post.handle, "alex-pro");
 var form = fs.readFileSync(path.join(root, "index.html"), "utf8");
 var choice = form.slice(form.indexOf('id="tower-files"'), form.indexOf("</form>", form.indexOf('id="tower-files"')));
-assert.ok(/data-tower-compose-kind="personal"/.test(choice) && /data-tower-compose-kind="professional"/.test(choice));
-assert.ok(/signal-subtab site-switch-side/.test(choice), "Personal | Professional tab style");
+assert.ok(!/data-tower-compose-audience/.test(choice), "no audience pill under Choose Files");
+assert.ok(!/data-tower-compose-kind=/.test(choice), "under-files Personal | Professional stays off");
+var head = form.slice(form.indexOf("data-signal-compose-head"), form.indexOf('id="tower-files"'));
+assert.ok(/data-signal-post-as-btn="personal"/.test(head) && /data-signal-post-as-btn="professional"/.test(head), "PERSONAL | PROFESSIONAL switch stays on the composer");
 console.log("feed-photo-audience.test.js ok");

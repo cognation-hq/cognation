@@ -30,16 +30,9 @@ assert.ok(/border:\s*1px solid rgba\(217, 210, 240, 0\.4\)/.test(card), "#d9d2f0
 assert.ok(/color:\s*#f7f9ff !important/.test(rule(".tower-add-widget-dialog .tower-add-widget-label {")), "title + label #f7f9ff");
 assert.ok(/color:\s*#d9d2f0 !important/.test(rule(".tower-add-widget-dialog .tower-add-widget-dialog-card .form-hint {")), "hint #d9d2f0");
 
-var outline = rule(".tower-add-widget-dialog .form-actions [data-tower-add-widget-cancel] {");
-assert.ok(/background:\s*transparent !important/.test(outline));
-assert.ok(/border:\s*1px solid rgba\(217, 210, 240, 0\.4\) !important/.test(outline));
-assert.ok(/color:\s*#f7f9ff !important/.test(outline), "unselected tab + Cancel");
-
-assert.ok(/\.tower-add-widget-dialog:not\(\[data-add-choice="slogan"\]\) \.tower-add-widget-choices \[data-tower-add-choice="quote"\],/.test(blk), "Quote pill by default");
-assert.ok(/\.tower-add-widget-dialog\[data-add-choice="slogan"\] \.tower-add-widget-choices \[data-tower-add-choice="slogan"\],/.test(blk), "Slogan pill when chosen");
-var pill = rule(".tower-add-widget-dialog .form-actions [data-tower-add-quote-confirm] {");
-assert.ok(/linear-gradient\(100deg, rgba\(139, 237, 255, 0\.42\), rgba\(204, 161, 255, 0\.38\)\)/.test(pill), "same gradient pill");
-assert.ok(/color:\s*#1c1630 !important/.test(pill), "ink text");
+var cancel = rule(".tower-add-widget-dialog [data-tower-add-widget-cancel] {");
+assert.ok(/border:\s*0/.test(cancel) && /border-radius:\s*0/.test(cancel) && /background:\s*none/.test(cancel), "Cancel is plain text");
+assert.ok(!/data-tower-add-quote-confirm/.test(blk), "no Add sticker pill");
 
 var ta = rule(".tower-add-widget-dialog [data-tower-add-quote-text] {");
 assert.ok(/background:\s*rgba\(255, 255, 255, 0\.06\)/.test(ta) && /color:\s*#f7f9ff/.test(ta), "textarea");
@@ -50,7 +43,7 @@ assert.ok(/background:\s*#fbe3e6/.test(err) && /border:\s*1px solid #e88a99/.tes
 
 assert.ok(!/#ED9300|--color-accent/i.test(blk), "no yellow");
 /* Copy and controls unchanged. */
-["Add to scrapbook", "Add a quote or text sticker you can drag and resize.", "Quote / text", "Slogan card", "Quote text", "Type a quote or note…", "Add sticker", "Cancel"].forEach(function (t) {
+["Add to page", "Type a quote or note…", "Cancel"].forEach(function (t) {
   assert.ok(html.indexOf(t) > 0, "copy kept: " + t);
 });
 console.log("tower-add-dialog-contrast tests passed");

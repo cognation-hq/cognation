@@ -37,6 +37,12 @@ function loadSwipe(localStorage, sessionStorage) {
     querySelector: function () { return null; },
     addEventListener: function () {},
     dispatchEvent: function () {},
+    createElement: function () {
+      var el = { className: "", innerHTML: "" };
+      el.setAttribute = function () {};
+      el.classList = { add: function () {} };
+      return el;
+    },
   };
   var context = vm.createContext({
     window: windowStub,
@@ -59,7 +65,9 @@ function loadSwipe(localStorage, sessionStorage) {
     String: String,
     Number: Number,
   });
+  vm.runInContext(src("js/content-creator-room.js"), context);
   vm.runInContext(src("js/commune-swipe.js"), context);
+  windowStub.CognationCommuneSwipe.contentCreator = windowStub.CognationContentCreator;
   return windowStub.CognationCommuneSwipe;
 }
 
@@ -88,11 +96,11 @@ assert.strictEqual(api.FEATURED_ORDER.join(","), "classroom,ad,chatroom,dating,c
 assert.strictEqual(api.AD_MAX_MS, 3000, "ads max 3s");
 assert.strictEqual(
   api.PRO_ORDER.join(","),
-"pro-webinar,pro-know,pro-research,pro-auction,pro-podcast,pro-ethics,pro-doctoral,pro-business,pro-field,pro-popculture",
+  "pro-webinar,pro-know,pro-research,pro-auction,pro-podcast,pro-ethics,pro-doctoral,pro-business,pro-executives,pro-mogul,pro-field,pro-popculture,pro-creator",
   "Professional types"
 );
 var marks = api.PRO_ORDER.map(function (t) { return api.PRO_MARK[t]; });
-assert.strictEqual(marks.join("|"), "Webinar|Professionals you might know|Research|Auction|Podcast|Ethics board|Doctoral degrees|Business|Field|Pop-culture", "visible type marks");
+assert.strictEqual(marks.join("|"), "Webinar|Professionals you might know|Research|Auction|Podcast|Ethics board|Doctoral degrees|Business|Executives|Mogul|Field|Pop-culture|Content Creator", "visible type marks");
 
 /* Adult viewer with friends, a dating pool, ads, and professional pages. */
 function adultStores() {
@@ -199,5 +207,34 @@ assert.ok(kidDeck.length > 0 && kidDeck.every(function (c) { return c.type === "
 assert.ok(kidDeck.every(function (c) {
   return c.type !== "pro-auction" && c.type !== "pro-know" && ["G", "PG"].indexOf(c.rating) >= 0;
 }), "under-13 Professional is G/PG only");
+
+/* Content Creator is its own Professional room. No interest hides it; a left swipe passes it. */
+var ccSrc = src("js/content-creator-room.js");
+assert.ok(ccSrc.indexOf(">Report<") >= 0, "each comment can be reported");
+assert.ok(!/getUserMedia|RTCPeer|payout|\bcourse\b/i.test(ccSrc), "no media server, course, or payout");
+assert.strictEqual(adult.buildProfessionalLanes()["pro-creator"].length, 0, "without the interest the algorithm hides it");
+adult.settleSwipe({ id: "content-creator-shown", type: "pro-creator", interests: ["content creator"], roomKind: "content-creator" }, "left");
+assert.ok(JSON.parse(stores.local.getItem("cognation.commune.swipe.dismissed.v1")).ada.indexOf("content-creator-shown") >= 0, "left swipe passes it");
+var passedCard = adult.renderCard({ id: "content-creator-shown", type: "pro-creator", title: "Content Creator", body: "Chatroom for people who make things. Up to 100 people.", why: "You listed Content Creator as an interest.", roomKind: "content-creator", interests: ["content creator"] });
+assert.ok(passedCard.innerHTML.indexOf("You listed Content Creator as an interest") < 0, "passed card does not claim the interest");
+var makerLocal = memoryStorage();
+makerLocal.setItem("cognation.member.profile.v1", JSON.stringify({ age: 30, interests: ["content creator"] }));
+var makerSession = memoryStorage();
+makerSession.setItem("cognation.commune.mode", "professional");
+var maker = loadSwipe(makerLocal, makerSession);
+var makerCard = maker.sampleDeck(8).filter(function (c) { return c.type === "pro-creator" && c.roomKind === "content-creator"; })[0];
+assert.ok(makerCard, "interest shows the card");
+assert.ok(maker.renderCard(makerCard).innerHTML.indexOf("You listed Content Creator as an interest") >= 0, "interest keeps the why line");
+var cc = maker.contentCreator;
+var room = cc.cards(true)[0];
+var msg = cc.send(room.id, "bad", "Bad", "spam");
+cc.send(room.id, "ok", "Ok", "hi");
+for (var ri = 0; ri < 10; ri++) cc.report(room.id, msg.room.log[0].id, "rep" + ri);
+assert.strictEqual(cc.enter(room.id, "bad").error, "kicked", "ten reports kick");
+assert.strictEqual(cc.enter("content-creator-9", "bad").ok, true, "kick is this chatroom only");
+for (var ci = 0; ci < cc.CAM; ci++) cc.camera(room.id, "cam" + ci);
+assert.strictEqual(cc.camera(room.id, "cam-extra").error, "camera_full", "15 camera requests");
+for (var pi = cc.read().rooms[room.id].members.length; pi < cc.CAP; pi++) cc.enter(room.id, "p" + pi);
+assert.strictEqual(cc.cards(true)[0].id, "content-creator-2", "a full room mints another card");
 
 console.log("commune-professional-deck.test.js: OK");

@@ -1568,7 +1568,9 @@
 
   function ensureSiteRooms() {
     writeJson(localStorage, ROOMS_KEY, { host: "Cognation", rooms: SITE_ROOMS });
-    return SITE_ROOMS.filter(roomVisible).map(roomCard);
+    var cards = SITE_ROOMS.filter(roomVisible).map(roomCard);
+    var rules = window.CognationChatroomRules;
+    return rules && rules.expand ? rules.expand(cards) : cards;
   }
 
   function groupLane() {
@@ -2166,14 +2168,12 @@
         html += '<p class="commune-card-meta">Book on the calendar, or follow this professional page.</p>';
       }
       if (card.type === TYPE.CHAT) {
-        if (liveChatEligible()) {
-          html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room</button>';
-          html += '<p class="commune-card-meta">Live group chat — up to 12 people. Keep it kind.</p>';
-        } else {
-          /* No local demo room (standing rule): live rooms only. */
-          html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room</button>';
-          html += '<p class="commune-card-meta">Live group chat — sign in to join (up to 12 people).</p>';
-        }
+        html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room</button>';
+        var roomRules = window.CognationChatroomRules;
+        html += roomRules && roomRules.extrasHtml
+          ? roomRules.extrasHtml(card, escapeHtml)
+          : '<p class="commune-card-meta">Live group chat — up to 100 people. Keep it kind.</p>';
+        if (!liveChatEligible()) html += '<p class="commune-card-meta">Live group chat — sign in to join (up to 100 people).</p>';
       }
       if (card.type === TYPE.CLASSROOM) {
         html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
@@ -2615,10 +2615,14 @@
     if (!state.liveRoom) return "";
     var uid = msg && msg.authorUserId ? String(msg.authorUserId) : "";
     if (!uid) return "";
-    var me = currentLiveUserId();
-    if (me && uid === me) return "";
     var mid = msg && msg.id ? String(msg.id) : "";
     var reported = !!(mid && state.roomReportedMsgIds[mid]);
+    var beside = reported
+      ? '<button type="button" class="chatroom-report" disabled>Reported</button>'
+      : '<button type="button" class="chatroom-report" data-commune-room-report data-message-id="' +
+        escapeHtml(mid) + '" data-author-user-id="' + escapeHtml(uid) + '">Report</button>';
+    var me = currentLiveUserId();
+    if (me && uid === me) return beside;
     var reportBtn = reported
       ? '<button type="button" class="news-report-option" disabled data-commune-room-reported>Reported</button>'
       : '<button type="button" class="news-report-option" data-commune-room-report data-message-id="' +
@@ -2630,7 +2634,7 @@
       '<button type="button" class="news-report-option" data-commune-room-block data-message-id="' +
       escapeHtml(mid) +
       '">Block</button>';
-    return (
+    return beside + (
       '<button type="button" class="commune-room-more" data-commune-room-more aria-haspopup="true" aria-expanded="false" aria-label="More for this message">⋯</button>' +
       '<div class="news-report-menu commune-room-report-menu" data-commune-room-menu hidden>' +
       reportBtn +
@@ -2683,7 +2687,14 @@
       /* Locked: human report hides for everyone — reporter sees it gone immediately. */
       if (hidden) hideLiveMessageLocally(msgId);
       else paintLiveLog(state.liveMessages);
-      return { ok: true, hidden: !!hidden };
+      var kicked = false;
+      var rules = window.CognationChatroomRules;
+      if (rules && typeof rules.noteReport === "function") {
+        var rec = rules.noteReport(state.roomId, msgId, authorUserId, currentLiveUserId() || "member", body);
+        kicked = !!(rec && rec.kicked);
+        if (kicked && authorUserId && authorUserId === currentLiveUserId()) closeRoom();
+      }
+      return { ok: true, hidden: !!hidden, kicked: kicked };
     }
 
     var sb = window.CognationSupabase;
@@ -3025,6 +3036,11 @@
       if (state.roomSqlId !== sqlId || !Array.isArray(rows)) return;
       el.textContent = rows.length === 1 ? "1 member here" : rows.length + " members here";
       el.hidden = false;
+      if (window.CognationChatroomRules && rows.length >= window.CognationChatroomRules.CAP) {
+        var roomId = "";
+        SITE_ROOMS.forEach(function (room) { if (room.sqlId === sqlId) roomId = room.id; });
+        if (roomId && window.CognationChatroomRules.setOccupancy(roomId, rows.length)) rebuildDeck();
+      }
     }, function () { el.hidden = true; });
   }
   /* No local demo fallback: if the live room can't open, say so and stay on the deck. */
@@ -3046,7 +3062,7 @@
         paintRoomMembers(sqlId);
         setStatus(isClass
           ? "You're in the " + (room.title || "classroom") + " classroom — live."
-          : "You're in " + (room.title || "the room") + " — live group chat (up to 12).");
+          : "You're in " + (room.title || "the room") + " — live group chat (up to 100).");
         friction("begin", isClass ? "classroom" : "chat", (isClass ? "classroom:" : "chatroom:") + room.id);
         if (scroll && state.shell && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
         return true;
@@ -3058,6 +3074,10 @@
       var mapped = mapChatRoomError(err);
       if (isClass && mapped.code === "room_not_found") mapped = { code: mapped.code, message: "Classrooms aren't live yet. Try again soon." };
       showJoinError(mapped);
+      if (mapped.code === "room_full" && window.CognationChatroomRules) {
+        window.CognationChatroomRules.setOccupancy(room.id, window.CognationChatroomRules.CAP);
+        rebuildDeck();
+      }
       return false;
     });
   }
@@ -3810,9 +3830,11 @@
             return;
           }
           setStatus(
-            res.hidden
-              ? "Reported — message hidden for the room until review."
-              : "Reported. Thanks for looking out for the room."
+            res.kicked
+              ? "Kicked from this room."
+              : res.hidden
+                ? "Reported — message hidden for the room until review."
+                : "Reported. Thanks for looking out for the room."
           );
         });
         return;
@@ -3894,6 +3916,7 @@
     bindInteractions(shell);
     liveSignature = liveSessionsSignature();
     rebuildDeck();
+    document.addEventListener("cognation:chatroom-rules", function () { if (state.deck) paintDeck(); });
     document.addEventListener("cognation:session-started", function () {
       refreshSeedGates().then(function () { rebuildDeck(); });
     });

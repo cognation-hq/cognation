@@ -9114,7 +9114,7 @@
     var showShell = !!owner;
     el.hidden = !showShell;
     el.classList.toggle("is-widget-off", !showShell);
-    if (showShell) el.setAttribute("title", "Upload a photo");
+    el.removeAttribute("title");
     paintPolaroidPhoto(el.querySelector("[data-tower-polaroid-photo]"), "");
     applyPolaroidPrintScale(el, 1);
     showCam();
@@ -10772,13 +10772,7 @@
       ) {
         var justDragged = instaxHit.__cognationDraggedAt && Date.now() - instaxHit.__cognationDraggedAt < 700;
         var instaxFile = root.querySelector("[data-tower-instax-file]");
-        if (!justDragged && instaxFile) instaxFile.click();
-      }
-      var polaroidShell = ev.target.closest('[data-tower-widget="polaroid"]');
-      if (polaroidShell && !polaroidShell.hasAttribute("data-tower-polaroid-extra") && stage.contains(polaroidShell) && !polaroidShell.hidden && !ev.target.closest("[data-tower-polaroid-resize], a, button, input, textarea, select, label, summary")) {
-        var justDraggedPol = polaroidShell.__cognationDraggedAt && Date.now() - polaroidShell.__cognationDraggedAt < 700;
-        var polFile = root.querySelector("[data-tower-instax-file]");
-        if (!justDraggedPol && polFile && !polFile.disabled) { polFile.click(); return; }
+        if (!justDragged && instaxFile && !instaxFile.disabled) instaxFile.click();
       }
       var handleClick = ev.target.closest("[data-tower-sticker-handle]");
       if (handleClick) {
@@ -12323,8 +12317,7 @@
           if (prior && prior.indexOf("data:image/") === 0 && prior !== dataUrl && !polaroidHasUrl(normalized, prior)) {
             normalized.push({ url: prior, scale: 1 });
           }
-          if (!polaroidHasUrl(normalized, dataUrl)) normalized.push({ url: dataUrl, scale: 1 });
-          if (normalized.length > 6) normalized = normalized.slice(-6);
+          normalized.push({ url: dataUrl, scale: 1 });
           p.polaroidPrints = normalized;
           p.polaroidRemoved = false;
         });

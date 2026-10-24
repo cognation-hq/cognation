@@ -2876,6 +2876,15 @@ body.login-gate-open .app-topbar {
   color: var(--color-text);
 }
 
+.tower-post-invite { margin: 0.35rem 0 0.15rem; }
+.tower-post-invite p { margin: 0 0 0.15rem; }
+.tower-post-invite .btn { margin-top: 0.3rem; }
+.tower-feed[data-tower-feed] .tower-invite-where {
+  color: #f7f9ff;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 .tower-attachments {
   list-style: none;
   margin: 0;

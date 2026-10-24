@@ -130,8 +130,9 @@
     PODCAST: "pro-podcast",
     FIELD: "pro-field",
     POP: "pro-popculture",
+    MOGUL: "pro-mogul",
   };
-  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.FIELD, PRO.POP];
+  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.MOGUL, PRO.FIELD, PRO.POP];
   var PRO_MARK = {};
   PRO_MARK[PRO.WEBINAR] = "Webinar";
   PRO_MARK[PRO.KNOW] = "Professionals you might know";
@@ -140,6 +141,7 @@
   PRO_MARK[PRO.PODCAST] = "Podcast";
   PRO_MARK[PRO.FIELD] = "Field";
   PRO_MARK[PRO.POP] = "Pop-culture";
+  PRO_MARK[PRO.MOGUL] = "Mogul";
   /* Podcast cards stay, with no Demo badge (Alexa 2026-10-22 11:46 AM CT, via SeedOps:
      "this will also be a card when cognation goes live but doesnt need to be a demo"). */
   var PRO_PODCASTS = [
@@ -1781,6 +1783,11 @@
     return [];
   }
 
+  function mogulCards() {
+    var api = window.CognationEchoMogul;
+    return api && typeof api.cards === "function" ? api.cards(viewerInterestTokens()) : [];
+  }
+
   function buildProfessionalLanes() {
     var lanes = {};
     /* Webinar cards only while a Professional page is live. None live: lane empty. */
@@ -1791,6 +1798,7 @@
       return { id: w.id, type: PRO.PODCAST, title: w.title, body: w.body,
         why: "Picked by topic: ethics, async work, continuing education.", rating: "G", minAge: 0, keepOnly: true };
     });
+    lanes[PRO.MOGUL] = mogulCards();
     /* Research, Field update and Pop culture have no real feed: no cards. */
     lanes[PRO.RESEARCH] = [];
     lanes[PRO.FIELD] = [];
@@ -2304,6 +2312,7 @@
     } else if (card.type === PRO.AUCTION) {
       wireClassroomCardClick(el, card, function () { openAuction(card, true); });
     }
+    if (card.type === PRO.MOGUL) wireClassroomCardClick(el, card, openMogul);
     /* Alexa's rule: an ECHO card opens its own full-screen window or a Tower profile, nothing else. */
     if (card.type === TYPE.CHAT) {
       wireClassroomCardClick(el, card, function () { openRoom(card.id, true); });
@@ -3008,6 +3017,7 @@
     if (members) { members.hidden = true; members.textContent = ""; }
     ensureRoomHeader(panel);
     wireRoomSwipe(panel);
+    if (window.CognationEchoMogul) window.CognationEchoMogul.clearChrome(panel);
     if (log) paintLiveLog(opts.messages || state.liveMessages || []);
     showRoom(true);
     state.roomId = room.id;
@@ -3089,6 +3099,32 @@
     }
     return liveRoomUnavailable(supabaseLiveSession() ? "Live rooms aren't ready yet. Try again soon." : "Sign in to join live rooms.");
   }
+  function openMogul(cardId) {
+    var api = window.CognationEchoMogul;
+    var card = null;
+    [state.cards, mogulCards()].forEach(function (list) {
+      (list || []).forEach(function (c) {
+        if (!card && c && (c.id === cardId || c.roomId === cardId)) card = c;
+      });
+    });
+    if (!api || !card || !roomEl()) return false;
+    var joined = api.join(card.roomId);
+    if (!joined.ok) {
+      setStatus(joined.message || "That Mogul room is not available.");
+      if (joined.full) rebuildDeck();
+      return false;
+    }
+    var panel = roomEl();
+    state.roomId = card.roomId;
+    state.liveRoom = false;
+    state.roomSqlId = "";
+    ensureRoomHeader(panel);
+    wireRoomSwipe(panel);
+    api.paint(panel, card.roomId);
+    showRoom(true);
+    setStatus("You're in the Mogul chatroom.");
+    return true;
+  }
   function clearPointer() {
     var el = state.pointer && state.pointer.el;
     if (el) {
@@ -3100,6 +3136,7 @@
 
   function releaseRoomSurface() {
     /* Drop open-room lock and restore deck/actions so the card can swipe again. */
+    if (window.CognationEchoMogul) window.CognationEchoMogul.clearChrome(roomEl());
     var wasLive = state.liveRoom;
     var sqlId = state.roomSqlId;
     state.roomId = "";
@@ -3838,6 +3875,13 @@
         var body = input ? String(input.value || "").trim() : "";
         if (!body || !state.roomId) return;
         body = body.slice(0, 500);
+        if (window.CognationEchoMogul && window.CognationEchoMogul.isRoom(state.roomId)) {
+          var mogulSent = window.CognationEchoMogul.post(state.roomId, body);
+          if (input) input.value = "";
+          window.CognationEchoMogul.paint(roomEl(), state.roomId);
+          setStatus(mogulSent && mogulSent.ok ? "Sent." : (mogulSent && mogulSent.message) || "Couldn't send.");
+          return;
+        }
         if (state.liveRoom && state.roomSqlId) {
           var sqlId = state.roomSqlId;
           setStatus("Sending…");

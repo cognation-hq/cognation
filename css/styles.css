@@ -12918,6 +12918,7 @@ a.site-switch-side:focus-visible {
 .commune-type-mark[data-type-mark="podcast"] { --mark: #ffb8d9; }
 .commune-type-mark[data-type-mark="field"] { --mark: #c9d4ff; }
 .commune-type-mark[data-type-mark="popculture"] { --mark: #fff3a8; }
+.commune-type-mark[data-type-mark="mogul"] { --mark: #f0c36a; }
 .commune-card-why {
   font-size: 0.78rem;
 }

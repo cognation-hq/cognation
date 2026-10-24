@@ -1,17 +1,13 @@
-/**
- * Top-right search suggests commonly typed names. Personal and professional
- * pages share one list. The letter P examples are a starting mix, not a
- * closed directory: a name someone types can be suggested later.
- * Run: node js/people-search-suggestions.test.js
- */
+/* Signed-up personal and professional pages. Demo records are not suggested.
+   Run: node js/people-search-suggestions.test.js */
 "use strict";
 var assert = require("assert");
 var fs = require("fs");
 var path = require("path");
 var vm = require("vm");
 
-function memoryStorage() {
-  var data = {};
+function memoryStorage(seed) {
+  var data = seed || {};
   return {
     getItem: function (key) { return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null; },
     setItem: function (key, value) { data[key] = String(value); },
@@ -19,7 +15,14 @@ function memoryStorage() {
   };
 }
 
-var storage = memoryStorage();
+var profiles = {
+  "prof-lana": { id: "prof-lana", kind: "personal", accountUsername: "lana", handle: "lana", displayName: "Lana Ortiz" },
+  "prof-lumen": { id: "prof-lumen", kind: "professional", accountUsername: "lumen", handle: "lumen", displayName: "Lumen Studio" },
+  "prof-demo-mira-pro": { id: "prof-demo-mira-pro", kind: "professional", accountUsername: "mira-demo", handle: "mira-wellness", displayName: "Mira Chen · Wellness" },
+  "prof-alexa-personal": { id: "prof-alexa-personal", kind: "personal", accountUsername: "alexa", handle: "alexa", displayName: "Alexa" },
+  "prof-seed": { id: "prof-seed", kind: "personal", accountUsername: "pat", handle: "seed-pat-1", displayName: "Chris Patel" }
+};
+var storage = memoryStorage({ "cognation.profiles.v1": JSON.stringify({ profiles: profiles }) });
 var document = {
   readyState: "complete",
   addEventListener: function () {},
@@ -31,24 +34,23 @@ var ctx = vm.createContext({
   console: console, setTimeout: setTimeout, clearTimeout: clearTimeout
 });
 vm.runInContext(fs.readFileSync(path.join(__dirname, "people-search.js"), "utf8"), ctx);
-var dir = ctx.window.CognationPeopleDirectory;
 
 function names(rows) {
   return Array.prototype.map.call(rows, function (row) { return String(row.name); });
 }
-var typedP = dir.search("p");
-assert.strictEqual(names(typedP).slice(0, 3).join("|"), "Peter Thomas Roth|Prada|Pablo Thompson");
-assert.strictEqual(typedP[0].kind, "professional");
-assert.strictEqual(typedP[1].kind, "professional");
-assert.strictEqual(typedP[2].kind, "personal");
-assert.ok(typedP.length > 3, "P suggests more than the three examples");
+var src = fs.readFileSync(path.join(__dirname, "people-search.js"), "utf8");
+["Peter Thomas Roth", "Prada", "Pablo Thompson"].forEach(function (name) {
+  assert.strictEqual(src.indexOf(name), -1, name + " is not shipped");
+});
 
-assert.ok(names(dir.search("pr")).indexOf("Prada") !== -1);
-assert.ok(names(dir.search("pe")).indexOf("Peter Thomas Roth") !== -1);
-assert.ok(names(dir.search("pa")).indexOf("Pablo Thompson") !== -1);
-
-dir.remember("Nia Okoye");
-assert.ok(names(dir.search("ni")).indexOf("Nia Okoye") !== -1, "a typed name can be suggested");
-assert.ok(names(dir.search("a")).indexOf("Alex Rivera") !== -1);
+var listed = names(ctx.window.CognationPeopleDirectory.search("l"));
+assert.deepStrictEqual(listed, ["Lana Ortiz", "Lumen Studio"]);
+var kinds = {};
+ctx.window.CognationPeopleDirectory.search("l").forEach(function (row) { kinds[String(row.name)] = String(row.kind); });
+assert.strictEqual(kinds["Lana Ortiz"], "personal");
+assert.strictEqual(kinds["Lumen Studio"], "professional");
+assert.strictEqual(names(ctx.window.CognationPeopleDirectory.search("c")).indexOf("Chris Patel"), -1);
+assert.strictEqual(names(ctx.window.CognationPeopleDirectory.search("m")).indexOf("Mira Chen · Wellness"), -1);
+assert.strictEqual(names(ctx.window.CognationPeopleDirectory.search("a")).indexOf("Alexa"), -1);
 
 console.log("people-search-suggestions.test.js ok");

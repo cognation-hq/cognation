@@ -140,6 +140,7 @@
   PRO_MARK[PRO.PODCAST] = "Podcast";
   PRO_MARK[PRO.FIELD] = "Field";
   PRO_MARK[PRO.POP] = "Pop-culture";
+  PRO_MARK["pro-ai-work"] = "AI at work";
   /* Podcast cards stay, with no Demo badge (Alexa 2026-10-22 11:46 AM CT, via SeedOps:
      "this will also be a card when cognation goes live but doesnt need to be a demo"). */
   var PRO_PODCASTS = [
@@ -1830,7 +1831,18 @@
 
   function sampleDeck(count, mode) {
     if ((mode || getMode()) === MODE.PROFESSIONAL) {
-      return paceProfessional(buildProfessionalLanes(), count || 18);
+      var deck = paceProfessional(buildProfessionalLanes(), count || 18);
+      var aiWork = window.CognationAiAtWork;
+      /* No AI at work interest: the card is not in the algorithm. */
+      if (aiWork && hasInterest(aiWork.INTERESTS)) {
+        omitPassed(aiWork.cards()).forEach(function (card) {
+          if (deck.length >= (count || 18)) return;
+          if (!professionalCardAllowed(card)) return;
+          if (deck.some(function (c) { return stableCardId(c.id) === stableCardId(card.id); })) return;
+          deck.push(card);
+        });
+      }
+      return deck;
     }
     var built = buildLanes();
     return paceDeck(built.lanes, built.dating, count || 18);
@@ -2138,7 +2150,11 @@
         });
         html += "</ul>";
       }
+      if (card.type === "pro-ai-work" && window.CognationAiAtWork) {
+        card.why = window.CognationAiAtWork.displayWhy(card.why, hasInterest(window.CognationAiAtWork.INTERESTS));
+      }
       if (card.why) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
+      if (card.type === "pro-ai-work") html += '<button type="button" class="btn btn-primary" data-ai-work-open>Enter room</button>';
       el.innerHTML = html;
       return el;
     }
@@ -2307,6 +2323,11 @@
     /* Alexa's rule: an ECHO card opens its own full-screen window or a Tower profile, nothing else. */
     if (card.type === TYPE.CHAT) {
       wireClassroomCardClick(el, card, function () { openRoom(card.id, true); });
+    }
+    if (card.type === "pro-ai-work") {
+      var openAi = el.querySelector("[data-ai-work-open]");
+      if (openAi) openAi.addEventListener("click", function (ev) { ev.stopPropagation(); openAiAtWork(card.id); });
+      wireClassroomCardClick(el, card, openAiAtWork);
     }
     if ((card.type === TYPE.KNOW || card.type === TYPE.FRIEND) && (card.profileId || card.handle)) {
       el.setAttribute("data-commune-opens-profile", "");
@@ -3062,6 +3083,24 @@
     });
   }
 
+  function openAiAtWork(cardOrId) {
+    var api = window.CognationAiAtWork;
+    var panel = roomEl();
+    var id = cardOrId && cardOrId.id ? cardOrId.id : String(cardOrId || "");
+    if (!api || !panel || !id || !state.shell) return false;
+    var me = currentProfileId();
+    var joined = api.join(id, me);
+    if (joined && joined.kicked) { setStatus("You were removed from this chatroom."); return false; }
+    closeClassroom();
+    ensureRoomHeader(panel);
+    api.paint(panel, id, me);
+    showRoom(true);
+    state.roomId = id;
+    state.aiAtWorkRoom = true;
+    state.liveRoom = false;
+    return true;
+  }
+
   function openRoom(roomId, scroll) {
     roomId = String(roomId || "");
     var rooms = ensureSiteRooms();
@@ -3104,6 +3143,7 @@
     var sqlId = state.roomSqlId;
     state.roomId = "";
     state.liveRoom = false;
+    state.aiAtWorkRoom = false;
     state.roomSqlId = "";
     state.liveMessages = [];
     showRoom(false);
@@ -3764,6 +3804,9 @@
     (roomEl() || shell).addEventListener("click", function (ev) {
       var roomPanel = roomEl();
       if (!roomPanel || roomPanel.hidden) return;
+      if (state.aiAtWorkRoom && window.CognationAiAtWork && window.CognationAiAtWork.onClick(ev, {
+        panel: roomPanel, roomId: state.roomId, me: currentProfileId(), status: setStatus
+      })) return;
       var moreBtn = ev.target && ev.target.closest("[data-commune-room-more]");
       if (moreBtn && roomPanel.contains(moreBtn)) {
         ev.preventDefault();
@@ -3838,6 +3881,14 @@
         var body = input ? String(input.value || "").trim() : "";
         if (!body || !state.roomId) return;
         body = body.slice(0, 500);
+        if (state.aiAtWorkRoom && window.CognationAiAtWork) {
+          var aiApi = window.CognationAiAtWork;
+          var aiRes = aiApi.comment(state.roomId, currentProfileId(), viewerDisplayName(), body);
+          if (input) input.value = "";
+          aiApi.paint(roomEl(), state.roomId, currentProfileId());
+          setStatus(aiRes && aiRes.kicked ? "You were removed from this chatroom." : "Sent.");
+          return;
+        }
         if (state.liveRoom && state.roomSqlId) {
           var sqlId = state.roomSqlId;
           setStatus("Sending…");

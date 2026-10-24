@@ -61,8 +61,8 @@ assert.ok(!/"On "/.test(pub), "no more \"On \" prefix");
 assert.ok(/\(owner \? "" : "Busy · "\) \+\s*escapeHtml\(owner \? formatCalendarDayLabel\(selected\) : selected\)/.test(pub), "owner heading is the display label; visitor path unchanged");
 assert.ok(!/formatCalendarDayLabel/.test(fnSrc("visitorDayHeading")), "the visitor Calendar card keeps its own formatter");
 assert.strictEqual((tower.match(/formatCalendarDayLabel\(/g) || []).length, 2, "defined once, used once");
-var priv = fnSrc("renderPrivateCalendar");
-assert.ok(/type="date" required value="' \+\s*escapeHtml\(formDate\)/.test(priv), "date input keeps the raw YYYY-MM-DD value");
+var editor = fnSrc("calendarEditorHtml");
+assert.ok(/type="date" required value="' \+\s*escapeHtml\(formDate\)/.test(editor), "date input keeps the raw YYYY-MM-DD value");
 
 /* Oswald headers, scoped to Edit profile > Calendar, no new font loaded. */
 var rule = /#panel-tower \[data-tower-edit-calendar\] :is\(\.tower-cal-label, \.tower-cal-dow\) \{\s*font-family: "Oswald", system-ui, sans-serif !important;\s*\}/;

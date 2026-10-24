@@ -8709,13 +8709,6 @@ body { padding-top: 0 !important; }
   color: var(--color-navy);
 }
 
-.commune-swipe-dek {
-  margin: 0;
-  color: var(--color-muted);
-  font-size: 0.98rem;
-  line-height: 1.45;
-}
-
 .commune-swipe-hint {
   margin: 0 0 1rem;
   text-align: center;

@@ -7596,6 +7596,10 @@
         minAge: 16, payInRoom: false,
       };
     }
+    if (ev.kind === "podcast") {
+      normalized.kind = "podcast";
+      if (ev.roomId) normalized.roomId = String(ev.roomId).slice(0, 80);
+    }
     return normalized;
   }
 
@@ -7799,7 +7803,11 @@
             '<span class="tower-cal-event-title">' +
             escapeHtml(e.title) +
             (e.kind === "classroom" ? " · Classroom" : "") +
+            (e.kind === "podcast" ? " · Podcast" : "") +
             "</span>" +
+            (e.kind === "podcast" && e.roomId
+              ? '<button type="button" class="btn btn-secondary tower-cal-mini" data-podcast-cal-open="' + escapeHtml(e.roomId) + '">Open chat</button>'
+              : "") +
             badge +
             who +
             (e.notes
@@ -8368,6 +8376,7 @@
       escapeHtml(owner ? formatCalendarDayLabel(selected) : selected) +
       "</h5>" +
       renderDayEventList(events, selected, { ownerControls: owner, busyOnly: !owner }) +
+      (owner && window.CognationEchoPodcast && window.CognationEchoPodcast.addBar ? window.CognationEchoPodcast.addBar() : "") +
       "</div>" +
       schedulerHtml;
   }
@@ -8509,6 +8518,9 @@
     document.addEventListener("cognation:classroom-sessions-updated", function () {
       try { renderVisitorCalendar(root); } catch (eSess) {}
     });
+    document.addEventListener("cognation:podcast-calendar", function () {
+      try { refreshTowerCalendars(root); } catch (ePod) {}
+    });
 
     root.addEventListener("click", function (ev) {
       var t = ev.target;
@@ -8619,6 +8631,22 @@
           }
         }
         refreshTowerCalendars(root);
+        return;
+      }
+
+      var podAdd = t.closest("[data-podcast-cal-add]");
+      if (podAdd && window.CognationEchoPodcast) {
+        ev.preventDefault();
+        var podType = podAdd.parentNode && podAdd.parentNode.querySelector("[data-podcast-cal-type]");
+        var podDay = getCalendarViewState(root, "public").selected;
+        window.CognationEchoPodcast.addOwn(podType && podType.value, podDay);
+        refreshTowerCalendars(root);
+        return;
+      }
+      var podOpen = t.closest("[data-podcast-cal-open]");
+      if (podOpen && window.CognationEchoPodcast) {
+        ev.preventDefault();
+        window.CognationEchoPodcast.open(podOpen.getAttribute("data-podcast-cal-open"));
         return;
       }
 

@@ -26,8 +26,9 @@ function memoryStorage() {
   };
 }
 
-function loadSwipe(localStorage, sessionStorage) {
+function loadSwipe(localStorage, sessionStorage, proLive) {
   var windowStub = {};
+  if (proLive) windowStub.CognationProLive = proLive;
   var documentStub = {
     readyState: "complete",
     querySelector: function () { return null; },
@@ -265,7 +266,10 @@ function testSiteRooms() {
   assertPaced(paced);
   var chatRun = 0;
   paced.forEach(function (card) { if (card.type === "chatroom") chatRun += 1; });
-  assert.ok(chatRun > 0 && chatRun <= 8);
+  /* No live Professional page: no Classroom, and chat rooms + content split 1:1. */
+  assert.ok(chatRun > 0);
+  assert.ok(paced.every(function (card) { return card.type !== "classroom"; }));
+  assertFeaturedOneToOne(paced, false);
 }
 
 function testAdsAndNoInventedCafe() {
@@ -454,17 +458,30 @@ function testRightSwipeStillKeeps() {
 
 function testClassroomSurface() {
   var api = loadSwipe(memoryStorage(), memoryStorage());
-  var catalog = api.classroomCatalog();
+  /* No live Professional page: no Classroom cards at all (Alexa 2026-10-20). */
+  assert.strictEqual(api.classroomCatalog().length, 0);
+
+  var liveApi = loadSwipe(memoryStorage(), memoryStorage(), {
+    livePages: function () {
+      return [
+        { profileId: "pro-a", handle: "ada-pro", displayName: "Ada", live: true, kind: "professional" },
+        { profileId: "pro-b", handle: "bo-pro", displayName: "Bo", live: true, kind: "professional" },
+        { profileId: "pro-c", handle: "cy-pro", displayName: "Cy", live: true, kind: "professional" },
+      ];
+    },
+  });
+  var catalog = liveApi.classroomCatalog();
   assert.strictEqual(catalog.length, 3);
   assert.strictEqual(
     catalog.map(function (c) { return String(c.id); }).join(","),
-    "class-insurance,class-voting,class-business"
+    "class-live-pro-a,class-live-pro-b,class-live-pro-c"
   );
   catalog.forEach(function (card) {
     assert.strictEqual(card.type, "classroom");
-    assert.strictEqual(card.host, "Cognation");
+    assert.ok(card.live);
     assert.ok(card.minAge >= 18);
   });
+  api = liveApi;
 
   api.setMemberProfile({ age: 16, interests: ["insurance"] });
   api.setDatingBirthAge(16); /* dating age now comes from user_birth only */
@@ -520,11 +537,11 @@ function testClassroomAgeGateToast() {
   api.setMemberProfile({ age: 16, interests: ["insurance"] });
   api.setDatingBirthAge(16); /* dating age now comes from user_birth only */
   assert.strictEqual(api.classroomAllowed(), false);
-  assert.strictEqual(api.openClassroom("class-insurance", false), false);
+  assert.strictEqual(api.openClassroom("class-live-pro-a", false), false);
 
   api.setMemberProfile({ age: null, interests: ["insurance"] });
   assert.strictEqual(api.classroomAllowed(), false);
-  assert.strictEqual(api.openClassroom("class-insurance", false), false);
+  assert.strictEqual(api.openClassroom("class-live-pro-a", false), false);
 
   api.setMemberProfile({ age: 28, interests: ["insurance"] });
   api.setDatingBirthAge(28); /* dating age now comes from user_birth only */

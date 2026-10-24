@@ -767,6 +767,7 @@
         });
         copy.createdAt = new Date(now - i * 7 * 60 * 1000).toISOString();
         copy.id = (p.id || "ht") + "-" + now.toString(36) + "-" + i;
+        if (p.id) copy.sourceId = p.sourceId || p.id;
         return copy;
       });
     }
@@ -791,6 +792,7 @@
           copy[k] = p[k];
         });
         copy.id = "statewide-refresh-" + Date.now().toString(36) + "-" + i;
+        copy.sourceId = p.sourceId || p.id || "";
         copy.body =
           "@statewide refresh · " +
           (p.body || "").replace(/^@statewide[^\—]*—\s*/, "");
@@ -800,11 +802,12 @@
       if (!feedList) return;
       feedList.innerHTML = "";
       wirePage = 0;
-      posts.forEach(function (post, idx) {
+      posts.slice(0, TIMES_SLOTS).forEach(function (post, idx) {
         appendPostEl(post, { lead: idx === 0 });
       });
       setEndlessUi(endlessOn);
       if (endlessOn) bindEndlessObserver();
+      syncFeedEmpty();
       setStatus(
         feedStatus,
         "Statewide hot topics reshuffled from most-liked Tower hits.",
@@ -901,6 +904,8 @@
     var wirePage = 0;
     var wireLoading = false;
     var WIRE_BATCH = 8;
+    /* Cognation Times prints exactly 10 story slots: 1 headliner + 9 (Alexa, Oct 20). */
+    var TIMES_SLOTS = 10;
     var feedObserver = null;
 
     try {
@@ -966,6 +971,10 @@
     }
 
     var floorUnder13AtRender = null;
+    var towerPlateKeyAtRender = null;
+    function towerPlateKey(posts) {
+      return posts.slice(0, TIMES_SLOTS).map(function (p) { return p.id || ""; }).join("|");
+    }
     function natIntlFloor(posts) {
       return newsNatIntlFloor(posts, editionId);
     }
@@ -989,6 +998,28 @@
         seeded: true,
         wire: true,
       };
+    }
+
+    function timesHeadline(body) {
+      var text = String(body || "").replace(/\s+/g, " ").trim().replace(/^(?:@[\w-]+\s*)+(?:[·•]\s*)?/, "");
+      var dash = text.search(/\s+[—–]\s+/);
+      var stop = text.search(/[.!?](?:\s|$)/);
+      if (dash > 0 && dash <= 90) text = text.slice(0, dash);
+      else if (stop > 0 && stop < 90 && stop < text.length - 1) text = text.slice(0, stop);
+      text = text.replace(/[.!?…]+$/, "").trim();
+      if (text.length > 84) text = text.slice(0, 81).replace(/\s+\S*$/, "").trim() + "…";
+      return text || "From the Feed";
+    }
+
+    function postScore(post) {
+      var score = Number(post && post.likes) || 0;
+      var reactions = post && post.reactions;
+      if (reactions && typeof reactions === "object") {
+        Object.keys(reactions).forEach(function (face) {
+          if (Array.isArray(reactions[face])) score += reactions[face].length;
+        });
+      }
+      return score;
     }
 
     function appendPostEl(post, opts) {
@@ -1030,40 +1061,53 @@
             : "") +
           "</p>";
       }
+      var bodyText = String(post.body || "");
+      if (opts.lead && bodyText.length > 320) {
+        bodyText = bodyText.slice(0, 300).replace(/\s+\S*$/, "").trim() + "…";
+      }
+      var bodyHtml = (function () {
+        var safe = escapeHtml(bodyText);
+        if (editionId === "statewide" || editionId === "local") {
+          safe = safe.replace(/@([a-z0-9_-]+)/gi, function (_, h) {
+            var href =
+              h.toLowerCase() === "statewide"
+                ? "#tab-signal"
+                : "#tower-profile-" + h.toLowerCase();
+            return (
+              '<a class="commune-at-link" href="' +
+              href +
+              '">@' +
+              h +
+              "</a>"
+            );
+          });
+        }
+        return safe;
+      })();
+      var topHtml = opts.lead
+        ? '<h4 class="times-lead-headline">' + escapeHtml(timesHeadline(post.body)) + "</h4>" +
+          '<p class="times-lead-byline">By ' +
+          '<span class="commune-feed-author">' + authorHtml + "</span>" +
+          ' · <time datetime="' + escapeHtml(post.createdAt) + '">' +
+          escapeHtml(formatTime(post.createdAt)) +
+          "</time></p>"
+        : '<header class="commune-feed-meta">' +
+          '<span class="commune-social-kind">' +
+          escapeHtml(kind === "social" ? "Social" : kind === "wire" ? "Wire" : "Desk") +
+          "</span>" +
+          '<span class="commune-feed-author">' +
+          authorHtml +
+          "</span>" +
+          '<time datetime="' +
+          escapeHtml(post.createdAt) +
+          '">' +
+          escapeHtml(formatTime(post.createdAt)) +
+          "</time>" +
+          "</header>";
       article.innerHTML =
-        '<header class="commune-feed-meta">' +
-        '<span class="commune-social-kind">' +
-        escapeHtml(kind === "social" ? "Social" : kind === "wire" ? "Wire" : "Desk") +
-        "</span>" +
-        '<span class="commune-feed-author">' +
-        authorHtml +
-        "</span>" +
-        '<time datetime="' +
-        escapeHtml(post.createdAt) +
-        '">' +
-        escapeHtml(formatTime(post.createdAt)) +
-        "</time>" +
-        "</header>" +
+        topHtml +
         '<p class="commune-feed-body">' +
-        (function () {
-          var safe = escapeHtml(post.body);
-          if (editionId === "statewide" || editionId === "local") {
-            safe = safe.replace(/@([a-z0-9_-]+)/gi, function (_, h) {
-              var href =
-                h.toLowerCase() === "statewide"
-                  ? "#tab-signal"
-                  : "#tower-profile-" + h.toLowerCase();
-              return (
-                '<a class="commune-at-link" href="' +
-                href +
-                '">@' +
-                h +
-                "</a>"
-              );
-            });
-          }
-          return safe;
-        })() +
+        bodyHtml +
         "</p>" +
         sourceLine +
         '<footer class="news-report-bar" data-news-report>' +
@@ -1071,6 +1115,7 @@
         '<div class="news-report-menu" data-news-report-menu hidden>' +
         '<button type="button" class="news-report-option" data-news-report-reason="harmful">Harmful</button>' +
         '<button type="button" class="news-report-option" data-news-report-reason="untruthful">Untruthful</button>' +
+        '<button type="button" class="news-report-option" data-news-report-reason="misrated">Not right for my age</button>' +
         '<button type="button" class="news-report-option" data-news-report-block>Block</button>' +
         "</div>" +
         '<span class="news-report-status" data-news-report-status hidden role="status"></span>' +
@@ -1078,10 +1123,19 @@
       var postId = post.id || ("news-" + String(post.createdAt || Date.now()) + "-" + Math.random().toString(36).slice(2, 7));
       article.setAttribute("data-news-post", "");
       article.setAttribute("data-post-id", postId);
+      /* Comments thread key: a reshuffled copy keeps its story's thread. */
+      var storyKey = post.sourceId || postId;
+      article.setAttribute("data-news-story-key", storyKey);
+      /* Real Tower post id for the server report (display ids carry a prefix). */
+      if (post.towerPostId) article.setAttribute("data-tower-post-id", String(post.towerPostId));
+      if (post.authorProfileId) article.setAttribute("data-author-profile-id", String(post.authorProfileId));
       if (post.rating) article.setAttribute("data-news-rating", String(post.rating));
+      /* Insert before mounting comments: the Times "Comments" line attaches only to
+         stories already inside SIGNAL (news-comments.js wireTimesToggle). */
+      feedList.appendChild(article);
       try {
         if (window.CognationNewsComments && window.CognationNewsComments.mount) {
-          window.CognationNewsComments.mount(article, { id: postId, rating: post.rating || "" });
+          window.CognationNewsComments.mount(article, { id: storyKey, rating: post.rating || "" });
         }
         if (window.CognationSeedOpsNewsLog && window.CognationSeedOpsNewsLog.onNewsPostRendered) {
           window.CognationSeedOpsNewsLog.onNewsPostRendered(post, editionId, {
@@ -1097,7 +1151,13 @@
           if (authorEl) window.CognationSeedOpsBadge.ensureBadge(authorEl, post);
         }
       } catch (eSeedRender) {}
-      feedList.appendChild(article);
+    }
+
+    /* Empty-paper line: shown whenever the Times has no visible story. Wire
+       filler is display:none in SIGNAL, so it does not count. */
+    function syncFeedEmpty() {
+      if (!feedEmpty || !feedList) return;
+      feedEmpty.hidden = !!feedList.querySelector("[data-news-post]:not(.is-wire)");
     }
 
     function setEndlessUi(on) {
@@ -1118,7 +1178,7 @@
         appendPostEl(makeWirePost(start + i));
       }
       wirePage += 1;
-      if (feedEmpty) feedEmpty.hidden = true;
+      syncFeedEmpty();
       wireLoading = false;
       if (feedList) feedList.setAttribute("aria-busy", "false");
       if (feedLoading) feedLoading.hidden = true;
@@ -1151,7 +1211,11 @@
       if (!window.CognationTowerStore || typeof window.CognationTowerStore.newsList !== "function") {
         return [];
       }
-      var list = window.CognationTowerStore.newsList();
+      /* Cognation Times places the top of the hidden like-ranked desk. */
+      var rate = window.CognationFeedRating;
+      var list = rate && typeof rate.forPaper === "function"
+        ? rate.forPaper()
+        : window.CognationTowerStore.newsList();
       return list.map(function (p) {
         var author = p.authorName || "Neighbor";
         /* Author link by profile id (handle only when there is no id), never by
@@ -1199,11 +1263,13 @@
         var seedMeta = {};
         try {
           if (window.CognationSeedOps && window.CognationSeedOps.classify) {
+            /* Account fields only (no handle): server posts carry them
+               from supabase-social mapPost, local SeedOps posts from buildPost. */
             seedMeta = window.CognationSeedOps.classify({
               displayName: author,
-              handle: slug,
               accountKind: p.accountKind,
               isSeed: p.isSeed,
+              isOpsBot: p.isOpsBot,
               seedFleetId: p.seedFleetId,
               id: p.authorProfileId || p.profileId,
             });
@@ -1223,6 +1289,9 @@
           seeded: true,
           fromTower: true,
           towerPostId: p.id,
+          /* Author's profile id: the Times Report spots the reader's own post
+             (the server refuses those with cannot_report_own). */
+          authorProfileId: p.authorProfileId || "",
           accountKind: seedMeta.accountKind || p.accountKind || "",
           isSeed: !!(seedMeta.isSeed || p.isSeed),
           seedFleetId: p.seedFleetId || "",
@@ -1237,6 +1306,7 @@
       if (!feedList) return;
       /* Front page prefers the rated Feed plate (personal and professional). */
       var towerPlate = postsFromTower();
+      towerPlateKeyAtRender = towerPlateKey(towerPlate);
       var posts = towerPlate.length || editionId === "local" || editionId === "statewide"
         ? towerPlate
         : natIntlFloor(FeedStore.listPosts(editionId));
@@ -1262,11 +1332,22 @@
         if (feedEmpty) feedEmpty.hidden = false;
       } else {
         if (feedEmpty) feedEmpty.hidden = true;
-        posts.forEach(function (post, idx) {
-          appendPostEl(post, { lead: idx === 0 });
+        var printed = posts.slice(0, TIMES_SLOTS);
+        var leadAt = 0;
+        var best = -1;
+        printed.forEach(function (post, idx) {
+          var score = postScore(post);
+          if (score > best) {
+            best = score;
+            leadAt = idx;
+          }
         });
-        /* Fill the last row so the three columns stay the same height. */
-        var spare = (3 - (posts.length % 3)) % 3;
+        if (printed.length) appendPostEl(printed[leadAt], { lead: true });
+        printed.forEach(function (post, idx) {
+          if (idx !== leadAt) appendPostEl(post, { lead: false });
+        });
+        /* Fill the last row so the three columns stay the same height. The lead spans the page. */
+        var spare = (3 - (printed.length % 3)) % 3;
         for (var pad = 0; pad < spare; pad++) {
           var blank = document.createElement("div");
           blank.className = "commune-feed-item times-column-pad";
@@ -1282,6 +1363,7 @@
         feedObserver.disconnect();
         feedObserver = null;
       }
+      syncFeedEmpty();
       if (briefLatest) {
         if (posts.length) {
           var latest = posts[0];
@@ -1351,6 +1433,12 @@
 
     function setEdition(id) {
       editionId = EditionStore.setId(id);
+      /* Open comment threads stay open across same-edition redraws only. */
+      try {
+        if (window.CognationNewsComments && window.CognationNewsComments.resetTimesOpen) {
+          window.CognationNewsComments.resetTimesOpen();
+        }
+      } catch (eOpen) {}
       applyEditionChrome();
       var pulled = null;
       if (FeedStore.isCuratedAutopullEdition(editionId)) {
@@ -1503,6 +1591,14 @@
     document.addEventListener("cognation:member-profile-updated", function () {
       if (editionId !== "nationwide" && editionId !== "international") return;
       if (floorUnder13AtRender !== newsViewerUnder13()) renderFeed();
+    });
+    /* Signed-in Feed posts land after first paint (TowerStore.setRemotePosts,
+       SeedOps hydrate): redraw the Times when its plate changed. Prints only
+       what is real; empty and filler behavior stay renderFeed's. */
+    document.addEventListener("cognation:tower-updated", function (e) {
+      var detail = (e && e.detail) || {};
+      if (!detail.remote && !detail.hydrate) return;
+      if (towerPlateKey(postsFromTower()) !== towerPlateKeyAtRender) renderFeed();
     });
   }
 

@@ -130,8 +130,9 @@
     PODCAST: "pro-podcast",
     FIELD: "pro-field",
     POP: "pro-popculture",
+    BUSINESS: "pro-business",
   };
-  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.FIELD, PRO.POP];
+  var PRO_ORDER = [PRO.WEBINAR, PRO.KNOW, PRO.RESEARCH, PRO.AUCTION, PRO.PODCAST, PRO.BUSINESS, PRO.FIELD, PRO.POP];
   var PRO_MARK = {};
   PRO_MARK[PRO.WEBINAR] = "Webinar";
   PRO_MARK[PRO.KNOW] = "Professionals you might know";
@@ -140,6 +141,7 @@
   PRO_MARK[PRO.PODCAST] = "Podcast";
   PRO_MARK[PRO.FIELD] = "Field";
   PRO_MARK[PRO.POP] = "Pop-culture";
+  PRO_MARK[PRO.BUSINESS] = "Business";
   /* Podcast cards stay, with no Demo badge (Alexa 2026-10-22 11:46 AM CT, via SeedOps:
      "this will also be a card when cognation goes live but doesnt need to be a demo"). */
   var PRO_PODCASTS = [
@@ -1781,6 +1783,11 @@
     return [];
   }
 
+  function businessCards() {
+    var api = window.CognationEchoBusiness;
+    return api && typeof api.cards === "function" ? api.cards(viewerInterestTokens()) : [];
+  }
+
   function buildProfessionalLanes() {
     var lanes = {};
     /* Webinar cards only while a Professional page is live. None live: lane empty. */
@@ -1791,6 +1798,7 @@
       return { id: w.id, type: PRO.PODCAST, title: w.title, body: w.body,
         why: "Picked by topic: ethics, async work, continuing education.", rating: "G", minAge: 0, keepOnly: true };
     });
+    lanes[PRO.BUSINESS] = businessCards();
     /* Research, Field update and Pop culture have no real feed: no cards. */
     lanes[PRO.RESEARCH] = [];
     lanes[PRO.FIELD] = [];
@@ -2138,7 +2146,7 @@
         });
         html += "</ul>";
       }
-      if (card.why) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
+      if (card.why && (card.type !== PRO.BUSINESS || hasInterest(["business", "businesses"]))) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
       el.innerHTML = html;
       return el;
     }
@@ -2308,6 +2316,7 @@
     if (card.type === TYPE.CHAT) {
       wireClassroomCardClick(el, card, function () { openRoom(card.id, true); });
     }
+    if (card.type === PRO.BUSINESS) wireClassroomCardClick(el, card, openBusiness);
     if ((card.type === TYPE.KNOW || card.type === TYPE.FRIEND) && (card.profileId || card.handle)) {
       el.setAttribute("data-commune-opens-profile", "");
       wireClassroomCardClick(el, card, function () { openPersonTower(card); });
@@ -3008,6 +3017,7 @@
     if (members) { members.hidden = true; members.textContent = ""; }
     ensureRoomHeader(panel);
     wireRoomSwipe(panel);
+    if (window.CognationEchoBusiness) window.CognationEchoBusiness.clearChrome(panel);
     if (log) paintLiveLog(opts.messages || state.liveMessages || []);
     showRoom(true);
     state.roomId = room.id;
@@ -3089,6 +3099,19 @@
     }
     return liveRoomUnavailable(supabaseLiveSession() ? "Live rooms aren't ready yet. Try again soon." : "Sign in to join live rooms.");
   }
+  function openBusiness(cardId) {
+    var api = window.CognationEchoBusiness, card = null, panel = roomEl();
+    [state.cards, businessCards()].forEach(function (list) {
+      (list || []).forEach(function (c) { if (!card && c && (c.id === cardId || c.roomId === cardId)) card = c; });
+    });
+    if (!api || !card || !panel) return false;
+    var joined = api.join(card.roomId);
+    if (!joined.ok) { setStatus(joined.message || "That Business room is not available."); if (joined.full) rebuildDeck(); return false; }
+    state.roomId = card.roomId; state.liveRoom = false; state.roomSqlId = "";
+    ensureRoomHeader(panel); wireRoomSwipe(panel); api.paint(panel, card.roomId); showRoom(true);
+    setStatus("You're in the Business chatroom.");
+    return true;
+  }
   function clearPointer() {
     var el = state.pointer && state.pointer.el;
     if (el) {
@@ -3100,6 +3123,7 @@
 
   function releaseRoomSurface() {
     /* Drop open-room lock and restore deck/actions so the card can swipe again. */
+    if (window.CognationEchoBusiness) window.CognationEchoBusiness.clearChrome(roomEl());
     var wasLive = state.liveRoom;
     var sqlId = state.roomSqlId;
     state.roomId = "";
@@ -3838,6 +3862,13 @@
         var body = input ? String(input.value || "").trim() : "";
         if (!body || !state.roomId) return;
         body = body.slice(0, 500);
+        if (window.CognationEchoBusiness && window.CognationEchoBusiness.isRoom(state.roomId)) {
+          var sent = window.CognationEchoBusiness.post(state.roomId, body);
+          if (input) input.value = "";
+          window.CognationEchoBusiness.paint(roomEl(), state.roomId);
+          setStatus(sent && sent.ok ? "Sent." : (sent && sent.message) || "Couldn't send.");
+          return;
+        }
         if (state.liveRoom && state.roomSqlId) {
           var sqlId = state.roomSqlId;
           setStatus("Sending…");

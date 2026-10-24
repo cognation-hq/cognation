@@ -2183,7 +2183,7 @@
       }
       if (card.type === TYPE.CLASSROOM) {
         html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
-        html += '<p class="commune-card-meta">Life skills · ~18+</p>';
+        if (!card.classroomEvent) html += '<p class="commune-card-meta">Life skills · ~18+</p>';
       }
       if (card.type === TYPE.CONTENT) html += '<span class="commune-card-badge">Live</span>';
       if (card.type === TYPE.AD) html += '<span class="commune-card-badge commune-card-badge--ad">Ad</span>';

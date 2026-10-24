@@ -145,6 +145,7 @@
   PRO_MARK[PRO.ETHICS] = "Ethics board";
   PRO_MARK[PRO.FIELD] = "Field";
   PRO_MARK[PRO.POP] = "Pop-culture";
+  PRO_MARK["pro-industry"] = "Industry";
   PRO_MARK["pro-licensure"] = "Licensure";
   /* Podcast cards stay, with no Demo badge (Alexa 2026-10-22 11:46 AM CT, via SeedOps:
      "this will also be a card when cognation goes live but doesnt need to be a demo"). */
@@ -2009,6 +2010,18 @@
 
   function sampleDeck(count, mode) {
     if ((mode || getMode()) === MODE.PROFESSIONAL) {
+      var limit = count || 18;
+      var deck = paceProfessional(buildProfessionalLanes(), limit);
+      var industry = window.CognationIndustry;
+      /* No Industry interest: the card is not in the algorithm. */
+      if (industry && hasInterest(industry.INTERESTS)) {
+        omitPassed(industry.cards()).filter(professionalCardAllowed).forEach(function (card) {
+          if (deck.some(function (c) { return stableCardId(c.id) === stableCardId(card.id); })) return;
+          deck.unshift(card);
+        });
+        if (deck.length > limit) deck.length = limit;
+      }
+      return deck;
       var deck = paceProfessional(buildProfessionalLanes(), count || 18);
       var cap = count || 18;
       var extra = omitPassed(proInterestCards()).filter(professionalCardAllowed);
@@ -2325,7 +2338,12 @@
         });
         html += "</ul>";
       }
-      if (card.why && (card.type !== PRO.ETHICS || hasInterest(["ethics board"]))) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
+      if (card.type === "pro-industry") {
+        html += '<button type="button" class="btn btn-primary" data-industry-open>Enter room</button>';
+      }
+      /* Shown without the interest: do not claim they listed Industry. */
+      var industryOff = card.type === "pro-industry" && !hasInterest((window.CognationIndustry || {}).INTERESTS || []);
+      if (card.why && !industryOff) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
       if (card.type === PRO.RESEARCH) {
         html += '<button type="button" class="btn btn-primary" data-research-enter>Enter Research</button>';
         if (card.full) html += '<p class="commune-card-meta">Full — another Research card is open.</p>';
@@ -2531,6 +2549,12 @@
     if (card.type === TYPE.CHAT) {
       wireClassroomCardClick(el, card, function () { openRoom(card.id, true); });
     }
+    if (card.type === "pro-industry") {
+      var openIndustryBtn = el.querySelector("[data-industry-open]");
+      if (openIndustryBtn) openIndustryBtn.addEventListener("click", function (ev) { ev.stopPropagation(); openIndustry(card.id); });
+      wireClassroomCardClick(el, card, openIndustry);
+    }
+
     if (card.type === PRO.RESEARCH) {
       var openResearch = function () {
         var api = window.CognationResearchRoom;
@@ -3295,7 +3319,26 @@
     });
   }
 
+  function openIndustry(cardOrId) {
+    var api = window.CognationIndustry;
+    var panel = roomEl();
+    var id = cardOrId && cardOrId.id ? cardOrId.id : String(cardOrId || "");
+    if (!api || !panel || !id || !state.shell) return false;
+    var me = currentProfileId();
+    var joined = api.join(id, me);
+    if (joined && joined.kicked) { setStatus("You were removed from this chatroom."); return false; }
+    closeClassroom();
+    ensureRoomHeader(panel);
+    api.paint(panel, id, me);
+    showRoom(true);
+    state.roomId = id;
+    state.industryRoom = true;
+    state.liveRoom = false;
+    return true;
+  }
+
   function openRoom(roomId, scroll) {
+    state.industryRoom = false;
     roomId = String(roomId || "");
     var rooms = ensureSiteRooms();
     var room = null;
@@ -3364,6 +3407,7 @@
     var sqlId = state.roomSqlId;
     state.roomId = "";
     state.liveRoom = false;
+    state.industryRoom = false;
     state.roomSqlId = "";
     state.liveMessages = [];
     showRoom(false);
@@ -4035,6 +4079,9 @@
     (roomEl() || shell).addEventListener("click", function (ev) {
       var roomPanel = roomEl();
       if (!roomPanel || roomPanel.hidden) return;
+      if (state.industryRoom && window.CognationIndustry && window.CognationIndustry.onClick(ev, {
+        panel: roomPanel, roomId: state.roomId, me: currentProfileId(), status: setStatus
+      })) return;
       var moreBtn = ev.target && ev.target.closest("[data-commune-room-more]");
       if (moreBtn && roomPanel.contains(moreBtn)) {
         ev.preventDefault();
@@ -4109,6 +4156,14 @@
         var body = input ? String(input.value || "").trim() : "";
         if (!body || !state.roomId) return;
         body = body.slice(0, 500);
+        if (state.industryRoom && window.CognationIndustry) {
+          var industryApi = window.CognationIndustry;
+          var industryRes = industryApi.comment(state.roomId, currentProfileId(), viewerDisplayName(), body);
+          if (input) input.value = "";
+          industryApi.paint(roomEl(), state.roomId, currentProfileId());
+          setStatus(industryRes && industryRes.kicked ? "You were removed from this chatroom." : "Sent.");
+        }
+
         if (window.CognationEchoEthics && window.CognationEchoEthics.isRoom(state.roomId)) {
           var ethicsSent = window.CognationEchoEthics.post(state.roomId, body);
           if (input) input.value = "";

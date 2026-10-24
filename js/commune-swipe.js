@@ -140,6 +140,7 @@
   PRO_MARK[PRO.PODCAST] = "Podcast";
   PRO_MARK[PRO.FIELD] = "Field";
   PRO_MARK[PRO.POP] = "Pop-culture";
+  PRO_MARK["pro-licensure"] = "Licensure";
   /* Podcast cards stay, with no Demo badge (Alexa 2026-10-22 11:46 AM CT, via SeedOps:
      "this will also be a card when cognation goes live but doesnt need to be a demo"). */
   var PRO_PODCASTS = [
@@ -1828,9 +1829,34 @@
     return out;
   }
 
+  function proInterestCards() {
+    var api = window.CognationProInterest;
+    if (!api || typeof api.cards !== "function") return [];
+    var mine = {};
+    viewerIds().forEach(function (id) { mine[String(id)] = true; });
+    var session = currentSession();
+    var user = session && session.username ? String(session.username) : "";
+    var people = [];
+    eachProfile(function (rec) {
+      if (!rec || rec.kind !== "professional" || mine[String(rec.id)]) return;
+      if (user && rec.accountUsername && String(rec.accountUsername) === user) return;
+      if (profileLooksSeed(rec) !== (resolveViewerSeedStatus() === true)) return;
+      people.push(rec);
+    });
+    return api.cards(people, Object.keys(mine));
+  }
+
   function sampleDeck(count, mode) {
     if ((mode || getMode()) === MODE.PROFESSIONAL) {
-      return paceProfessional(buildProfessionalLanes(), count || 18);
+      var deck = paceProfessional(buildProfessionalLanes(), count || 18);
+      var cap = count || 18;
+      var extra = omitPassed(proInterestCards()).filter(professionalCardAllowed);
+      for (var xi = extra.length - 1; xi >= 0; xi--) {
+        var add = extra[xi];
+        if (deck.some(function (c) { return stableCardId(c.id) === stableCardId(add.id); })) continue;
+        deck.unshift(add);
+      }
+      return deck.length > cap ? deck.slice(0, cap) : deck;
     }
     var built = buildLanes();
     return paceDeck(built.lanes, built.dating, count || 18);
@@ -3575,6 +3601,8 @@
     }
     if (PRO_MARK[card.type]) {
       like(card);
+      /* Right swipe shows interest. Left already returned as a pass. */
+      if (card.interest && window.CognationProInterest) window.CognationProInterest.note(card.interest);
       if (card.type === PRO.KNOW && card.profileId && !card.people) {
         if (!isFollowing(card.profileId)) toggleFollow(card.profileId);
         setStatus("Following this professional page.");

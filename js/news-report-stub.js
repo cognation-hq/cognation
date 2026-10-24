@@ -1,11 +1,98 @@
 /**
- * CGN-009 — NEWS report control (demo).
- * Hooks: [data-news-report], [data-news-report-reason="harmful|untruthful"],
- * [data-news-post] + data-post-id. Queues via window.CognationModeration.enqueue.
+ * CGN-009 — NEWS story report control.
+ * Hooks: [data-news-report], [data-news-report-reason="harmful|untruthful|misrated"],
+ * ("misrated" is the "Not right for my age" option; same reason the server's
+ * report_tower_post already accepts),
+ * [data-news-post] + data-post-id. Files through CognationContentReport.reportTowerPost
+ * (report_tower_post RPC -> content_reports) with the real Tower post id; the
+ * "Reported" line shows only after the server accepts it. Then it is remembered
+ * on this device via CognationModeration.enqueue (serverFiled, no second call).
  * No user bans.
  */
 (function () {
   "use strict";
+
+  var REASON_LABELS = {
+    harmful: "Harmful",
+    untruthful: "Untruthful",
+    misrated: "Not right for my age",
+  };
+
+  var REPORT_FAILED = "Couldn't send report, try again";
+  /* Plain words for the server's known refusals (report_tower_post raises
+     these codes). Anything else stays "Couldn't send report, try again". */
+  var OWN_POST = "This is your own post, so it can't be reported.";
+  var REFUSALS = {
+    cannot_report_own: OWN_POST,
+    post_not_found: "This post was taken down, so there's nothing to report.",
+    report_suspended: "Reporting is paused on your account.",
+    "sign in first": "Sign in to report.",
+  };
+  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  /* The Times prints Tower posts under display ids ("from-tower-personal-<uuid>",
+     Statewide Refresh copies "statewide-refresh-…"). The server only knows the
+     Tower post id: data-tower-post-id (commune.js), else the uuid after a
+     from-tower-<kind>- prefix on the post id or its story key. */
+  function serverPostId(post) {
+    if (!post) return "";
+    var direct = post.getAttribute("data-tower-post-id") || "";
+    if (UUID_RE.test(direct)) return direct;
+    var ids = [post.getAttribute("data-post-id") || "", post.getAttribute("data-news-story-key") || ""];
+    for (var i = 0; i < ids.length; i++) {
+      var id = ids[i];
+      if (UUID_RE.test(id)) return id;
+      var m = /^from-tower-[a-z]+-(.+)$/i.exec(id);
+      if (m && UUID_RE.test(m[1])) return m[1];
+    }
+    return "";
+  }
+
+  /* The reader's own post (any of their profiles): the server refuses it, so
+     say so plainly instead of "try again". */
+  function isOwnPost(post) {
+    var author = post && post.getAttribute("data-author-profile-id");
+    if (!author) return false;
+    var social = window.CognationSupabaseSocial;
+    if (!social || typeof social.getMyProfiles !== "function") return false;
+    var mine = [];
+    try { mine = social.getMyProfiles() || []; } catch (e) { mine = []; }
+    for (var i = 0; i < mine.length; i++) {
+      if (mine[i] && String(mine[i].id) === String(author)) return true;
+    }
+    return false;
+  }
+
+  function failureText(err) {
+    var code = String((err && (err.message || (err.body && err.body.message))) || "").trim().toLowerCase();
+    if (code && window.console && typeof console.warn === "function") {
+      /* Server code only (e.g. cannot_report_own): no names, ids or addresses. */
+      console.warn("[times-report] not filed:", code.slice(0, 60));
+    }
+    return Object.prototype.hasOwnProperty.call(REFUSALS, code) ? REFUSALS[code] : REPORT_FAILED;
+  }
+
+  /* Resolves only when the server filed the report (report_tower_post RPC ->
+     content_reports, the Investigator queue). */
+  window.CognationNewsStoryReport = {
+    serverPostId: serverPostId,
+    isOwnPost: isOwnPost,
+    failureText: failureText,
+    REPORT_FAILED: REPORT_FAILED,
+    OWN_POST: OWN_POST,
+  };
+
+  function sendServerReport(post, reason, note) {
+    var api = window.CognationContentReport;
+    var id = serverPostId(post);
+    if (!api || typeof api.reportTowerPost !== "function") return Promise.reject(new Error("report_unavailable"));
+    if (!id) return Promise.reject(new Error("no_server_post"));
+    try {
+      return Promise.resolve(api.reportTowerPost({ postId: id, reason: reason, note: note }));
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  }
 
   function closestPost(el) {
     return el && el.closest("[data-news-post], .paper-article, .commune-feed-item");
@@ -30,11 +117,16 @@
     return "local";
   }
 
+  /* Hidden for you: the story collapses to its report line (CSS keys off
+     data-news-reported-hidden), so the "Reported" / "Blocked" text stays readable.
+     Outside SIGNAL (no report line to show) the story is removed as before. */
   function applyHide(post) {
     if (!post) return;
-    post.hidden = true;
     post.setAttribute("data-news-reported-hidden", "true");
-    post.style.display = "none";
+    if (!post.closest || !post.closest("#panel-signal") || !post.querySelector("[data-news-report]")) {
+      post.hidden = true;
+      post.style.display = "none";
+    }
   }
 
   function init() {
@@ -72,41 +164,67 @@
       if (!reasonBtn) return;
       ev.preventDefault();
       var reason = reasonBtn.getAttribute("data-news-report-reason");
-      if (reason !== "harmful" && reason !== "untruthful") return;
+      if (!REASON_LABELS[reason]) return;
       var bar2 = reasonBtn.closest("[data-news-report]");
       var post = closestPost(reasonBtn);
-      var postId = post && post.getAttribute("data-post-id");
+      if (!post || post.getAttribute("data-news-report-sending") === "true") return;
+      var postId = post.getAttribute("data-post-id") || "";
       var status = bar2 && bar2.querySelector("[data-news-report-status]");
       var menu2 = bar2 && bar2.querySelector("[data-news-report-menu]");
-      if (menu2) menu2.hidden = true;
-
-      var result = { ok: false };
-      if (window.CognationModeration && typeof window.CognationModeration.enqueue === "function") {
-        var bodyEl = post && post.querySelector(".commune-feed-body, .paper-article-body");
-        var authorEl = post && post.querySelector(".commune-feed-author");
-        result = window.CognationModeration.enqueue({
-          postId: postId || "",
-          reason: reason,
-          edition: currentEdition(),
-          status: "queued",
-          post: {
-            id: postId || "",
-            authorName: authorEl ? authorEl.textContent.trim() : "",
-            kind: "news",
-            body: bodyEl ? bodyEl.textContent.trim().slice(0, 2000) : "",
-            createdAt: new Date().toISOString(),
-            temporarilyRemoved: true,
-          },
-        });
+      var options = menu2 ? menu2.querySelectorAll("[data-news-report-reason]") : [];
+      function setOptionsDisabled(on) {
+        for (var i = 0; i < options.length; i++) options[i].disabled = on;
       }
-      applyHide(post);
-      if (status) {
+      function say(text, failed) {
+        if (!status) return;
         status.hidden = false;
-        status.textContent =
-          "Reported as " +
-          reason +
-          " · saved in this browser only. Demo / local only.";
+        status.textContent = text;
+        /* Styling hook for the Couldn't-send line (css: Designer, Oct 21). */
+        if (failed) status.setAttribute("data-news-report-failed", "");
+        else status.removeAttribute("data-news-report-failed");
       }
+      if (isOwnPost(post)) {
+        /* No server call: report_tower_post refuses your own post. */
+        say(OWN_POST, true);
+        return;
+      }
+      post.setAttribute("data-news-report-sending", "true");
+      setOptionsDisabled(true);
+      say("Sending report…");
+      var note = "User report: " + REASON_LABELS[reason];
+      sendServerReport(post, reason, note).then(function () {
+        post.removeAttribute("data-news-report-sending");
+        if (menu2) menu2.hidden = true;
+        /* Filed on the server: remember it on this device and hide the story. */
+        if (window.CognationModeration && typeof window.CognationModeration.enqueue === "function") {
+          var bodyEl = post.querySelector(".commune-feed-body, .paper-article-body");
+          var authorEl = post.querySelector(".commune-feed-author");
+          window.CognationModeration.enqueue({
+            postId: postId,
+            reason: reason,
+            edition: currentEdition(),
+            status: "queued",
+            serverFiled: true,
+            post: {
+              id: postId,
+              authorName: authorEl ? authorEl.textContent.trim() : "",
+              kind: "news",
+              body: bodyEl ? bodyEl.textContent.trim().slice(0, 2000) : "",
+              createdAt: new Date().toISOString(),
+              temporarilyRemoved: true,
+              reporterNote: note,
+            },
+          });
+        }
+        applyHide(post);
+        say("Reported: " + REASON_LABELS[reason] + ". Hidden for you.");
+      }, function (err) {
+        /* Not filed: say why when the server said, keep the story and the options. */
+        post.removeAttribute("data-news-report-sending");
+        setOptionsDisabled(false);
+        if (menu2) menu2.hidden = false;
+        say(failureText(err), true);
+      });
     });
 
     document.addEventListener("cognation:news-post-reported", function (ev) {

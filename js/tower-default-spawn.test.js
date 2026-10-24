@@ -25,9 +25,9 @@ vm.runInContext(code + "\nthis.PROFILE_STACK_GAP = PROFILE_STACK_GAP; this.packS
 
 /* Spec order. */
 assert.deepStrictEqual(JSON.parse(JSON.stringify(ctx.SPAWN_ROWS.personal)),
-  [["avatar"], ["identity"], ["slogan"], ["music"], ["friends"], ["__socials__"], ["badges", "calendar"], ["polaroid", "html"], ["instax"]]);
+  [["avatar"], ["identity"], ["slogan"], ["visitor-calendar"], ["music"], ["friends"], ["__socials__"], ["badges", "calendar"], ["polaroid", "html"], ["instax"]]);
 assert.deepStrictEqual(JSON.parse(JSON.stringify(ctx.SPAWN_ROWS.professional)),
-  [["avatar"], ["identity"], ["slogan"], ["youtube"], ["__socials__"], ["badges"], ["followers", "calendar"], ["html"]]);
+  [["avatar"], ["identity"], ["slogan"], ["visitor-calendar"], ["youtube"], ["__socials__"], ["badges"], ["followers", "calendar"], ["html"]]);
 assert.ok(JSON.stringify(ctx.SPAWN_ROWS).indexOf('"social"') === -1, "no grouped social slot in SPAWN_ROWS");
 assert.ok(!/going-live/.test(JSON.stringify(ctx.SPAWN_ROWS)), "Going live is not a public default");
 assert.ok(JSON.stringify(ctx.SPAWN_ROWS.professional).indexOf("music") === -1, "no music on Professional");
@@ -120,8 +120,11 @@ function expandForTest(kind) {
     var o = ctx.packSpawn(rows2, sz3, [], phone ? 390 : 1120, phone);
     assert.strictEqual(o.identity.y, o.avatar.y + sz3.avatar.h + ctx.PROFILE_STACK_GAP, kind + " name under avatar");
     assert.strictEqual(o.slogan.y, o.identity.y + sz3.identity.h + ctx.PROFILE_STACK_GAP, kind + " slogan under name");
+    /* Calendar card: its own full row right under the bio card, then the next widget. */
+    assert.strictEqual(o["visitor-calendar"].y, o.slogan.y + sz3.slogan.h + 24, kind + " calendar card 24px after the bio card");
+    assert.strictEqual(o["visitor-calendar"].x, o.avatar.x, kind + " calendar card lines up with the bio card");
     var next = kind === "personal" ? "music" : "youtube";
-    assert.strictEqual(o[next].y, o.slogan.y + sz3.slogan.h + 24, kind + " 24px after the card");
+    assert.strictEqual(o[next].y, o["visitor-calendar"].y + sz3["visitor-calendar"].h + 24, kind + " 24px after the calendar card");
   });
 });
 

@@ -76,22 +76,25 @@
     if (!record || typeof record !== "object") {
       return { accountKind: ACCOUNT_KINDS.real, isSeed: false, isOpsBot: false };
     }
+    /* Account fields decide: profiles.account_kind (accountKind / account_kind),
+       then the seed/ops flags, then profiles.seed_fleet_id. An explicit "real"
+       wins, so a handle never turns a real member into a seed. Handles and
+       usernames are not read at all. */
+    var fleet = String(record.seedFleetId || record.seed_fleet_id || "").toLowerCase();
     var kind =
-      normalizeKind(record.accountKind) ||
+      normalizeKind(record.accountKind || record.account_kind) ||
       (record.isOpsBot || record.opsBot ? ACCOUNT_KINDS.ops : "") ||
-      (record.isSeed || record.seeded === true || record.demo === true || record.seedFleetId
-        ? ACCOUNT_KINDS.seed
-        : "") ||
-      ACCOUNT_KINDS.real;
-    /* Username / id heuristics for fleet records */
-    var uname = String(record.accountUsername || record.username || record.handle || "").toLowerCase();
-    var fleetId = String(record.seedFleetId || record.id || "");
-    if (kind === ACCOUNT_KINDS.real) {
-      if (/^seed-/.test(uname) || /^seed-/.test(fleetId) || /^prof-seed-/.test(String(record.id || ""))) {
-        kind = ACCOUNT_KINDS.seed;
-      } else if (/^ops-/.test(uname) || /^ops-/.test(fleetId)) {
-        kind = ACCOUNT_KINDS.ops;
-      }
+      (fleet ? (/^ops[-_]/.test(fleet) ? ACCOUNT_KINDS.ops : ACCOUNT_KINDS.seed) : "") ||
+      (record.isSeed || record.seeded === true || record.demo === true ? ACCOUNT_KINDS.seed : "");
+    if (!kind) {
+      /* Fallback only when every account field is missing: app-made local ids
+         (fleet "seed-0001" / "ops-mod", registry "prof-seed-0001" /
+         "prof-ops-mod"). Members never choose these; server ids are UUIDs.
+         Anything else is real (no badge). */
+      var id = String(record.id || "").toLowerCase();
+      if (/^(prof-)?seed-/.test(id)) kind = ACCOUNT_KINDS.seed;
+      else if (/^(prof-)?ops-/.test(id)) kind = ACCOUNT_KINDS.ops;
+      else kind = ACCOUNT_KINDS.real;
     }
     return {
       accountKind: kind,

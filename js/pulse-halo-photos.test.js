@@ -41,9 +41,9 @@ Promise.all([rel._fetchBundle(ok, me), rel._fetchBundle(bad, me)]).then(function
 
   /* Halo spot paints the photo through the shared safe helper after the letter. */
   assert.ok(/spot\.textContent = String\(person\.name\)[\s\S]{0,600}photoApi\.applyPhoto\(spot, person\.photoUrl\)/.test(tower), "halo spot uses photo, letter first");
-  /* Kept: friend-tap opens that friend's Tower, 6,000 falling friends with photos. */
+  /* Kept: friend-tap opens that friend's Tower, falling friends with photos (cap 30 since the 2026-10-20 spec). */
   var fall = fs.readFileSync(path.join(__dirname, "pulse-falling-friends.js"), "utf8");
-  assert.ok(/var PULSE_FALL_CAP = 6000;/.test(fall), "6k falling kept");
+  assert.ok(/var PULSE_FALL_CAP = 30;/.test(fall), "falling cap 30");
   assert.ok(/BASE_COLS \+ ",photo_url"/.test(fall) && /paintPhotoWhenLoaded\(el, friend\.photoUrl\)/.test(fall) && /paintLetter\(el, friend\)/.test(fall), "falling friends use photo_url");
   assert.ok(/opts\.open\(friend\.handle, friend\)/.test(fall) && /CognationTowerOpenProfile\(handle\)/.test(tower), "friend tap opens that friend's Tower");
   var tabs = fs.readFileSync(path.join(__dirname, "tabs.js"), "utf8");

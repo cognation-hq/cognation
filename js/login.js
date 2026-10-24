@@ -2,9 +2,9 @@
  * Cognation login gate — required username/password (client-side gate on Pages).
  * Not a substitute for server auth; fine for a private $0 preview.
  *
- * After credentials succeed, if the account has 2 Tower profiles, show a
- * Choose profile step (Personal / Professional). Session records
- * activeProfileId + profileKind.
+ * After credentials succeed, either email on the account opens that same
+ * account on the personal page. Personal and Professional are a toggle
+ * after login. Sign-in does not ask which page to open.
  *
  * Session: cognation.session.v2
  * Production sign-in uses the configured account provider.
@@ -69,60 +69,6 @@
     pendingUsername = null;
     pendingProfiles = null;
     pendingAuth = null;
-  }
-
-  function showPickerStep(username, profiles) {
-    pendingUsername = username;
-    pendingProfiles = profiles || [];
-    if (credentialsStep) credentialsStep.hidden = true;
-    if (pickerEl) pickerEl.hidden = false;
-    gate.classList.add("login-gate--picker");
-    renderPicker(pendingProfiles);
-    setStatus("");
-    window.setTimeout(function () {
-      var first =
-        (pickerList && pickerList.querySelector('input[name="loginProfile"]')) ||
-        pickerContinue;
-      if (first && typeof first.focus === "function") first.focus();
-    }, 10);
-  }
-
-  function renderPicker(profiles) {
-    if (!pickerList) return;
-    pickerList.innerHTML = "";
-    profiles.forEach(function (p, idx) {
-      var id = "login-profile-" + (p.id || idx);
-      var label = document.createElement("label");
-      label.className = "login-profile-card";
-      label.setAttribute("for", id);
-
-      var input = document.createElement("input");
-      input.type = "radio";
-      input.name = "loginProfile";
-      input.id = id;
-      input.value = p.id;
-      if (idx === 0) input.checked = true;
-
-      var kind = p.kind === "professional" ? "Professional" : "Personal";
-      var title = document.createElement("span");
-      title.className = "login-profile-card-kind";
-      title.textContent = kind + " page";
-
-      var name = document.createElement("span");
-      name.className = "login-profile-card-name";
-      name.textContent = p.displayName || kind;
-
-      var handle = document.createElement("span");
-      handle.className = "login-profile-card-handle";
-      var h = String(p.handle || "").replace(/^@/, "");
-      handle.textContent = h ? "@" + h : "No handle yet";
-
-      label.appendChild(input);
-      label.appendChild(title);
-      label.appendChild(name);
-      label.appendChild(handle);
-      pickerList.appendChild(label);
-    });
   }
 
   function openGate(opts) {
@@ -233,15 +179,17 @@
   }
 
   function finishWithProfileChoice(username, profiles, auth) {
+    /* One account. Do not ask Personal or Professional, and do not create
+       a second account when the other email is used. */
     profiles = profiles || [];
-    if (profiles.length <= 1) {
-      return establishSession(username, profiles[0] || null, auth);
+    var personal = null;
+    for (var i = 0; i < profiles.length; i++) {
+      if (profiles[i] && profiles[i].kind !== "professional") {
+        personal = profiles[i];
+        break;
+      }
     }
-    if (auth) {
-      pendingAuth = auth;
-    }
-    showPickerStep(username, profiles);
-    return null;
+    return establishSession(username, personal || profiles[0] || null, auth);
   }
 
   function login(username, password, opts) {
@@ -409,34 +357,6 @@
       }
     );
   });
-
-  if (pickerContinue) {
-    pickerContinue.addEventListener("click", function () {
-      if (!pendingUsername || !pendingProfiles || !pendingProfiles.length) return;
-      var chosen = null;
-      var selected = pickerList && pickerList.querySelector('input[name="loginProfile"]:checked');
-      if (selected) {
-        for (var i = 0; i < pendingProfiles.length; i++) {
-          if (pendingProfiles[i].id === selected.value) {
-            chosen = pendingProfiles[i];
-            break;
-          }
-        }
-      }
-      if (!chosen) chosen = pendingProfiles[0];
-      establishSession(pendingUsername, chosen, pendingAuth || null);
-      pendingAuth = null;
-    });
-  }
-
-  if (pickerBack) {
-    pickerBack.addEventListener("click", function () {
-      showCredentialsStep();
-      setStatus("");
-      var first = form.querySelector('input[name="username"]');
-      if (first) first.focus();
-    });
-  }
 
   if (openBtn) {
     openBtn.addEventListener("click", function () {

@@ -16,7 +16,7 @@
   <title data-brand-page="Home">COGNATION — Home</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Great+Vibes&family=Rozha+One&family=IM+Fell+English:ital@0;1&family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&family=Special+Elite&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Great+Vibes&family=Rozha+One&family=IM+Fell+English:ital@0;1&family=Old+Standard+TT:ital,wght@0,400;0,700;1,400&family=Special+Elite&family=UnifrakturMaguntia&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body class="login-gate-open">
@@ -108,6 +108,7 @@
               <option value="Japan">Japan</option>
               <option value="Other">Other</option>
             </select>
+            <p class="login-area-block" data-login-area-block hidden role="status">The site isn't available to users in your area at this time.</p>
           </div>
           <div class="form-group" data-login-state-group>
             <label for="state">State / region</label>
@@ -242,17 +243,6 @@
         <p class="form-hint login-demo-storage-hint">Your account is secured by Cognation sign-in.</p>
       </form>
       </div>
-
-      <div id="login-profile-picker" class="login-profile-picker" hidden data-login-profile-picker>
-        <h3 class="login-profile-picker-title">Choose profile</h3>
-        <p class="login-profile-picker-desc">This account has two Tower pages. Pick which one to enter.</p>
-        <div id="login-profile-picker-list" class="login-profile-picker-list" role="radiogroup" aria-label="Tower profiles"></div>
-        <div class="form-actions login-form-actions login-profile-picker-actions">
-          <button type="button" class="btn btn-secondary" id="login-profile-back">Back</button>
-          <button type="button" class="btn btn-primary" id="login-profile-continue">Continue</button>
-        </div>
-        <p class="form-hint login-demo-storage-hint">Up to 2 profiles per phone · demo registry in localStorage.</p>
-      </div>
     </div>
   </div>
   <script>
@@ -282,9 +272,11 @@
           placeholder="Search friends and professional profiles"
           autocomplete="off"
           spellcheck="false"
+          aria-autocomplete="list"
+          aria-controls="people-search-results"
           data-people-search-input
         >
-        <div class="people-search-results" data-people-search-results hidden role="listbox" aria-label="People results"></div>
+        <div class="people-search-results" id="people-search-results" data-people-search-results hidden role="listbox" aria-label="Name suggestions"></div>
       </div>
     </div>
   </header>
@@ -516,6 +508,13 @@
                         </div>
                       </div>
                       <div class="tower-under-photo" data-tower-under-photo>
+                        <div class="tower-pro-links" data-tower-pro-links hidden></div>
+                        <div class="tower-pro-pay-confirm" data-tower-pro-pay-confirm hidden>
+                          <label class="visually-hidden" for="tower-pro-pay-for">What this payment is for</label>
+                          <input id="tower-pro-pay-for" data-tower-pro-pay-for type="text" maxlength="120" placeholder="What this payment is for" autocomplete="off">
+                          <button type="button" class="tower-pro-link" data-tower-pro-pay-go>Confirm</button>
+                        </div>
+                        <p class="tower-pro-pay-note" data-tower-pro-pay-note hidden role="status"></p>
                         <button type="button" class="tower-follow-btn" data-tower-add-friends aria-label="Find friends">Find friends</button>
                         <p class="tower-mutual-friends" data-tower-mutual-friends>Mutual friends</p>
                         <button type="button" class="tower-go-live-btn" data-go-live aria-label="Go live">Go live</button>
@@ -552,14 +551,14 @@
                           <input id="tower-social-tiktok" name="socialTiktok" type="url" maxlength="500" placeholder="https://tiktok.com/@…" data-tower-social="tiktok" inputmode="url">
                           <label for="tower-social-linkedin">LinkedIn</label>
                           <input id="tower-social-linkedin" name="socialLinkedin" type="url" maxlength="500" placeholder="https://linkedin.com/in/…" data-tower-social="linkedin" inputmode="url">
-                          <label for="tower-social-linktree">Website</label>
+                          <label for="tower-social-shop">Shop</label>
+                          <input id="tower-social-shop" name="socialShop" type="url" maxlength="500" placeholder="https://…" data-tower-social="shop" inputmode="url">
+                          <label for="tower-social-linktree">Linktree</label>
                           <input id="tower-social-linktree" name="socialLinktree" type="url" maxlength="500" placeholder="https://linktr.ee/…" data-tower-social="linktree" inputmode="url">
-                          <label for="tower-social-venmo">Venmo</label>
-                          <input id="tower-social-venmo" name="socialVenmo" type="text" maxlength="500" placeholder="@handle or https://venmo.com/…" data-tower-social="venmo" autocomplete="off">
-                          <label for="tower-social-services">Pay for services link</label>
-                          <input id="tower-social-services" name="socialServices" type="url" maxlength="500" placeholder="https://… (your booking page)" data-tower-social="services" inputmode="url">
-                          <label for="tower-social-ads">Buy ads link</label>
-                          <input id="tower-social-ads" name="socialAds" type="url" maxlength="500" placeholder="https://… (your ad page)" data-tower-social="ads" inputmode="url">
+                          <label for="tower-social-applepay">Apple Pay</label>
+                          <input id="tower-social-applepay" name="socialApplePay" type="text" maxlength="120" placeholder="Payee name, not a card number" data-tower-social="applepay" autocomplete="off">
+                          <label for="tower-social-appleamt">Amount</label>
+                          <input id="tower-social-appleamt" name="socialAppleAmt" type="text" maxlength="12" placeholder="Amount you charge" data-tower-social="appleamt" inputmode="decimal" autocomplete="off">
                           <div class="form-actions tower-social-actions">
                             <button type="submit" class="btn btn-primary" data-tower-save-profile>Save profile</button>
                           </div>
@@ -737,7 +736,7 @@
                         </div>
                       </div>
                       <input type="file" accept="image/*" data-tower-avatar-file class="tower-offscreen-file" tabindex="-1" aria-label="Upload profile photo">
-                      <input type="file" accept="image/*" data-tower-instax-file class="tower-offscreen-file" tabindex="-1" aria-label="Upload a photo">
+                      <input type="file" accept="image/*" multiple data-tower-instax-file class="tower-offscreen-file" tabindex="-1" aria-label="Upload a photo">
 
                       <div class="tower-sticker tower-sticker--going-live" data-tower-widget="going-live" data-sticker-label="Going live" hidden>
                         <button type="button" class="tower-sticker-handle" data-tower-sticker-handle aria-label="Move Going live sticker" tabindex="-1" hidden>⋮⋮</button>
@@ -1010,6 +1009,11 @@
                         <div class="form-group">
                           <label for="tower-files">Files</label>
                           <input id="tower-files" name="files" type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif,.webp,.mp4,.mov">
+                          <div class="signal-subtabs site-switch tower-compose-audience" data-tower-compose-audience role="tablist" aria-label="Post audience">
+                            <button type="button" class="signal-subtab site-switch-side is-selected is-active" role="tab" data-tower-compose-kind="personal" aria-selected="true">Personal</button>
+                            <span class="signal-subtab-sep site-switch-sep" aria-hidden="true">|</span>
+                            <button type="button" class="signal-subtab site-switch-side" role="tab" data-tower-compose-kind="professional" aria-selected="false">Professional</button>
+                          </div>
                         </div>
                       </div>
                       <p class="commune-status" data-tower-status hidden role="status" aria-live="polite"></p>
@@ -1346,6 +1350,8 @@
   <script src="js/pulse-falling-friends.js" defer></script>
   <script src="js/tower-layout-sync.js" defer></script>
   <script src="js/tower.js" defer></script>
+  <script src="js/feed-rating.js" defer></script>
+  <script src="js/signal-featured-songs.js" defer></script>
   <script src="js/pro-job-title.js" defer></script>
   <script src="js/social-graph.js" defer></script>
   <script src="js/tower-follow.js" defer></script>
@@ -1353,10 +1359,25 @@
   <script src="js/moderation.js" defer></script>
   <script src="js/commune.js" defer></script>
   <script src="js/commune-messages.js" defer></script>
+  <script src="js/message-apple-pay.js" defer></script>
   <script src="js/dating-flag.js" defer></script>
   <script src="js/echo-group.js" defer></script>
   <script src="js/classroom-sessions.js" defer></script>
   <script src="js/tower-classroom-sessions.js" defer></script>
+  <script src="js/chatroom-rules.js" defer></script>
+  <script src="js/college-programs-room.js" defer></script>
+  <script src="js/content-creator-room.js" defer></script>
+  <script src="js/peer-review-room.js" defer></script>
+  <script src="js/echo-mogul.js" defer></script>
+  <script src="js/licensure-room.js" defer></script>
+  <script src="js/echo-executives.js" defer></script>
+  <script src="js/echo-business.js" defer></script>
+  <script src="js/ai-at-work-room.js" defer></script>
+  <script src="js/echo-doctoral.js" defer></script>
+  <script src="js/industry-room.js" defer></script>
+  <script src="js/pro-interest.js" defer></script>
+  <script src="js/echo-ethics.js" defer></script>
+  <script src="js/research-room.js" defer></script>
   <script src="js/commune-swipe.js" defer></script>
   <script src="js/seedops-commune-alive.js" defer></script>
   <script src="js/seedops-dating-hydrate.js" defer></script>

@@ -374,7 +374,6 @@ vm.runInContext([
 function net(id) { return ctx.nets.filter(function (n) { return n.id === id; })[0]; }
 assert.ok(net("venmo") && ctx.allowed(net("venmo"), "personal") && ctx.allowed(net("venmo"), "professional"), "Venmo on Personal and Pro");
 assert.strictEqual(ctx.href("venmo", "@alexa"), "https://venmo.com/u/alexa", "Venmo handle links out");
-assert.ok(/data-tower-social="venmo"/.test(html), "Venmo field in Edit profile");
 ["services", "ads"].forEach(function (id) {
   var n = net(id);
   assert.ok(n && n.label === (id === "services" ? "Pay for services" : "Buy ads") && n.quiet && !n.cta, id + " link defined, quiet");
@@ -385,7 +384,6 @@ assert.ok(/data-tower-social="venmo"/.test(html), "Venmo field in Edit profile")
     assert.strictEqual(ctx.href(id, bad), "", id + " rejected: " + bad);
     assert.strictEqual(ctx.stored(id, bad), "", id + " not stored: " + bad);
   });
-  assert.ok(new RegExp('<input id="tower-social-' + id + '"[^>]*type="url"[^>]*data-tower-social="' + id + '"').test(html), "owner sets " + id + " in Edit profile");
 });
 assert.ok(!net("hire") && !/is-cta/.test(tower) && !/data-tower-social="hire"/.test(html), "single Hire/Buy CTA gone");
 var css = fs.readFileSync(path.join(__dirname, "..", "css", "styles.css"), "utf8");
@@ -424,9 +422,9 @@ assert.ok(/a\.target = "_blank";\s*a\.rel = "noopener noreferrer";/.test(tower),
   vm.runInContext(tower.slice(tower.indexOf("  function renderSchedulerPanel("), tower.indexOf("  /* Visitor books an open time")), ctx);
   assert.ok(!/data-tower-cal-book=/.test(ctx.renderSchedulerPanel([], "2026-10-20", { visitor: true, picked: "" })), "no Book before a time is picked");
   assert.ok(/data-tower-cal-book="09:00"[^>]*>Book</.test(ctx.renderSchedulerPanel([], "2026-10-20", { visitor: true, picked: "09:00" })), "Book shows once a time is selected");
-  assert.ok(/var HANGOUT_BOOKING_LIVE = false;/.test(tower), "Book does not send until the owner inbox ships");
-  assert.ok(/if \(!HANGOUT_BOOKING_LIVE\) \{[\s\S]{0,200}Booking is coming soon\.[\s\S]{0,80}return;/.test(tower), "Book says coming soon and returns before request_hangout");
-  assert.ok(!/Request sent\./.test(tower.slice(tower.indexOf("if (!HANGOUT_BOOKING_LIVE)") - 400, tower.indexOf("if (!HANGOUT_BOOKING_LIVE)"))), "no sent claim before the flag");
+  assert.ok(!/Booking is coming soon\./.test(tower), "booking no longer stops at coming soon");
+  assert.ok(/function addScheduledHangout\(/.test(tower), "a hangout is saved as a calendar event");
+  assert.ok(/updateProfileTower\(rec\.id, \{ calendarEvents: list \}\)/.test(tower), "a visitor booking is stored on the profile");
   /* Designer color lock */
   assert.ok(/\.tower-cal-event \{[^}]*border: 1px solid var\(--cgn-border, rgba\(255, 255, 255, 0\.14\)\);[^}]*background: rgba\(18, 16, 38, 0\.92\);[^}]*color: #f7f9ff;/.test(css), "card bg/border/title lock");
   assert.ok(/\.tower-cal-event\.is-pending \{[^}]*background: rgba\(44, 30, 18, 0\.92\);/.test(css), "pending bg lock");

@@ -12944,6 +12944,7 @@ a.site-switch-side:focus-visible {
 .commune-type-mark[data-type-mark="podcast"] { --mark: #ffb8d9; }
 .commune-type-mark[data-type-mark="field"] { --mark: #c9d4ff; }
 .commune-type-mark[data-type-mark="popculture"] { --mark: #fff3a8; }
+.commune-type-mark[data-type-mark="creator"] { --mark: #f0c8ff; }
 .commune-type-mark[data-type-mark="peer-review"] { --mark: #9ee7c4; }
 .commune-room[data-peer-review] .commune-room-line { display: flex; flex-wrap: wrap; gap: 0.35rem 0.6rem; align-items: baseline; }
 .commune-room[data-peer-review] .news-report-option { margin-left: auto; }

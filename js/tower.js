@@ -7596,10 +7596,7 @@
         minAge: 16, payInRoom: false,
       };
     }
-    if (ev.kind === "podcast") {
-      normalized.kind = "podcast";
-      if (ev.roomId) normalized.roomId = String(ev.roomId).slice(0, 80);
-    }
+    if (ev.kind === "podcast") normalized.kind = "podcast";
     return normalized;
   }
 
@@ -7803,11 +7800,7 @@
             '<span class="tower-cal-event-title">' +
             escapeHtml(e.title) +
             (e.kind === "classroom" ? " · Classroom" : "") +
-            (e.kind === "podcast" ? " · Podcast" : "") +
             "</span>" +
-            (e.kind === "podcast" && e.roomId
-              ? '<button type="button" class="btn btn-secondary tower-cal-mini" data-podcast-cal-open="' + escapeHtml(e.roomId) + '">Open chat</button>'
-              : "") +
             badge +
             who +
             (e.notes
@@ -8641,12 +8634,6 @@
         var podDay = getCalendarViewState(root, "public").selected;
         window.CognationEchoPodcast.addOwn(podType && podType.value, podDay);
         refreshTowerCalendars(root);
-        return;
-      }
-      var podOpen = t.closest("[data-podcast-cal-open]");
-      if (podOpen && window.CognationEchoPodcast) {
-        ev.preventDefault();
-        window.CognationEchoPodcast.open(podOpen.getAttribute("data-podcast-cal-open"));
         return;
       }
 

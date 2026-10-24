@@ -52,21 +52,19 @@
     if (!rec || rec.kind !== "personal" || String(rec.handle || "").replace(/^@/, "").toLowerCase() === "cognation") return null;
     return rec;
   }
-  function ownEvent(room, date) {
-    var accounts = window.CognationAccounts, rec = personalRecord();
-    if (!room || !rec || typeof accounts.saveProfileRecord !== "function") return false;
-    var id = "podcast-" + room.id, events = Array.isArray(rec.calendarEvents) ? rec.calendarEvents.slice() : [], prev = null, found = false;
-    events.forEach(function (e) { if (e && e.id === id) prev = e; });
-    var event = { id: id, title: room.title || "Podcast", date: /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : ((prev && prev.date) || today()), time: "", notes: "", status: "accepted", source: "owner", kind: "podcast", roomId: room.id };
-    events = events.map(function (e) { if (e && e.id === id) { found = true; return event; } return e; });
-    if (!found) events.push(event);
+  function ownEvent(kind, date) {
+    var accounts = window.CognationAccounts, rec = personalRecord(), names = { podcast: "Podcast", classroom: "Classroom", webinar: "Webinar" };
+    kind = names[kind] ? kind : "";
+    if (!kind || !rec || typeof accounts.saveProfileRecord !== "function") return false;
+    var events = Array.isArray(rec.calendarEvents) ? rec.calendarEvents.slice() : [];
+    events.push({ id: kind + "-" + Date.now().toString(36), title: names[kind], date: /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? date : today(), time: "", notes: "", status: "accepted", source: "owner", kind: kind });
     rec.calendarEvents = events;
     if (!accounts.saveProfileRecord(rec)) return false;
     try { document.dispatchEvent(new CustomEvent("cognation:podcast-calendar")); } catch (e2) {}
     return true;
   }
   function topicCard(topic, title) { return { id: topic, podcastId: topic, title: title || "Podcast", type: "pro-podcast" }; }
-  function join(roomId, card, date) {
+  function join(roomId, card) {
     var d = store(), r = d.rooms[roomId], id = me();
     if (!r && card) r = openFor(d, card);
     if (!r) return { ok: false, message: "That podcast room is not available." };
@@ -77,7 +75,6 @@
       if (r.members.length >= CAP) openFor(d, topicCard(r.topic, r.title));
     }
     if (!write(d)) return { ok: false };
-    ownEvent(r, date);
     return { ok: true, roomId: r.id };
   }
   function post(roomId, text) {
@@ -143,13 +140,12 @@
     });
   }
   function addBar() {
-    return '<div class="tower-cal-podcast-add"><select data-podcast-cal-type aria-label="Event type">' + TOPICS.map(function (t) { return '<option value="' + esc(t.id) + '">Podcast · ' + esc(t.title) + "</option>"; }).join("") + '</select><button type="button" class="btn btn-secondary" data-podcast-cal-add>Add</button></div>';
+    return '<div class="tower-cal-podcast-add"><select data-podcast-cal-type aria-label="Event type"><option value="podcast">Podcast</option><option value="classroom">Classroom</option><option value="webinar">Webinar</option></select><button type="button" class="btn btn-secondary" data-podcast-cal-add>Add</button></div>';
   }
-  function addOwn(topicId, date) { var topic = TOPICS[0]; TOPICS.forEach(function (t) { if (t.id === topicId) topic = t; }); return join(topic.id, topicCard(topic.id, topic.title), date); }
-  function open(roomId) { var swipe = window.CognationCommuneSwipe, tab = document.getElementById && document.getElementById("tab-commune"); if (swipe && swipe.setMode) swipe.setMode("professional"); if (tab && tab.click) tab.click(); if (swipe && swipe.openPodcast) swipe.openPodcast(roomId); }
+  function addOwn(kind, date) { return ownEvent(kind, date); }
   window.CognationEchoPodcast = {
     CAP: CAP, CAM: CAM, KICK_AT: KICK_AT, KEY: KEY, present: present, join: join, post: post, report: report,
-    requestCamera: requestCamera, paint: paint, addBar: addBar, addOwn: addOwn, open: open,
+    requestCamera: requestCamera, paint: paint, addBar: addBar, addOwn: addOwn,
     isRoom: function (id) { return String(id || "").indexOf("pod-") === 0; },
     clearChrome: function (panel) { if (!panel || !panel.querySelector) return; panel.removeAttribute("data-podcast-room"); var cam = panel.querySelector("[data-podcast-camera]"); if (cam && cam.remove) cam.remove(); },
   };

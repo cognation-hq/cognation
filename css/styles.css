@@ -15862,43 +15862,15 @@ body.cgn-cal-page {
   opacity: 1;
 }
 
-/* Header lockup only. Soft shade on the word and the brain, and a
-   plain light behind the letter shadow. No ring. Tagline unchanged. */
-.cognation-masthead-home {
-  position: relative;
-  z-index: 1;
-  text-shadow:
-    0 6px 12px rgba(8, 10, 24, 0.5),
-    0 0 14px #fff,
-    0 0 36px rgba(255, 255, 255, 0.96),
-    0 0 72px rgba(255, 255, 255, 0.8);
-}
-.cognation-masthead-home::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  left: -4%;
-  right: -4%;
-  top: 48%;
-  height: 1.2em;
-  transform: translateY(-50%);
-  pointer-events: none;
-  border-radius: 50%;
-  background: radial-gradient(ellipse at center,
-    #fff 0%,
-    rgba(255, 255, 255, 0.96) 34%,
-    rgba(255, 255, 255, 0.78) 58%,
-    rgba(255, 255, 255, 0.28) 76%,
-    transparent 86%);
-  filter: blur(6px);
-}
+/* Header lockup only. Shade plus a plain light that follows the
+   letter shapes. No disk, ring, or oval. Tagline unchanged. */
+.cognation-masthead-home,
 .cognation-masthead-home:hover,
 .cognation-masthead-home:focus-visible {
   text-shadow:
-    0 8px 14px rgba(8, 10, 24, 0.52),
-    0 0 16px #fff,
-    0 0 42px rgba(255, 255, 255, 1),
-    0 0 80px rgba(255, 255, 255, 0.86);
+    0 5px 8px rgba(8, 10, 24, 0.5),
+    0 0 7px #fff,
+    0 0 16px rgba(255, 255, 255, 0.92);
 }
 .cognation-masthead-brain {
   filter: none;

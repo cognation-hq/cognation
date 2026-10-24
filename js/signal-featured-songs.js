@@ -1,6 +1,7 @@
 /**
  * Placeholder song titles only — no catalog, audio, or licensing call.
  * Attach one only when the artist, or a beneficiary of an artist who died, opted into the Cognation musician policy.
+ * The composer has one Add song control. The list stays closed until that control is opened.
  * News (most reacted Feed posts) drops the song. Existing buttons and post text; no music widget.
  */
 (function (root) {
@@ -134,27 +135,52 @@
     var form = doc.querySelector("[data-signal-feed-host] [data-tower-compose]");
     if (!form || form.querySelector("[data-signal-featured-songs]")) return;
     var row = doc.createElement("div");
-    row.className = "form-actions";
+    row.className = "signal-add-song";
     row.setAttribute("data-signal-featured-songs", "");
+    var toggle = doc.createElement("button");
+    toggle.type = "button";
+    toggle.className = "btn btn-secondary";
+    toggle.setAttribute("data-signal-add-song", "");
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-controls", "signal-song-list");
+    toggle.textContent = "Add song";
+    var list = doc.createElement("div");
+    list.id = "signal-song-list";
+    list.className = "signal-song-list";
+    list.hidden = true;
+    list.setAttribute("data-signal-song-list", "");
+    list.setAttribute("role", "group");
+    list.setAttribute("aria-label", "Songs");
     SONGS.forEach(function (song) {
       var button = doc.createElement("button");
       button.type = "button";
       button.className = "btn btn-secondary";
       button.setAttribute("data-signal-song", song.id);
       button.textContent = song.title + " — " + song.artist + " (" + song.note + ")";
-      row.appendChild(button);
+      if (!allowed(song.id)) button.disabled = true;
+      list.appendChild(button);
     });
+    row.appendChild(toggle);
+    row.appendChild(list);
     var actions = form.querySelector(".form-actions");
     form.insertBefore(row, actions);
-    row.addEventListener("click", function (ev) {
+    toggle.addEventListener("click", function () {
+      var open = list.hidden;
+      list.hidden = !open;
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    list.addEventListener("click", function (ev) {
       var button = ev.target && ev.target.closest && ev.target.closest("[data-signal-song]");
-      if (!button || !row.contains(button)) return;
+      if (!button || !list.contains(button) || button.disabled) return;
       ev.preventDefault();
       var song = choose(button.getAttribute("data-signal-song"));
       if (!song) {
         say("That song cannot be added. The artist and beneficiary have not opted into the Cognation musician policy.", true);
         return;
       }
+      list.querySelectorAll("[data-signal-song]").forEach(function (el) {
+        el.setAttribute("aria-pressed", el === button ? "true" : "false");
+      });
       say(song.title + " — " + song.artist, false);
     });
   }

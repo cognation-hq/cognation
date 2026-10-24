@@ -9449,7 +9449,7 @@
       cam.hidden = false;
       cam.classList.remove("is-widget-off");
     }
-    if (!personal || (p && p.polaroidRemoved)) {
+    if (!personal) {
       nodes.forEach(function (el) {
         el.hidden = true;
         el.classList.add("is-widget-off");
@@ -9458,9 +9458,7 @@
         el.hidden = true;
         el.classList.add("is-widget-off");
       });
-      /* Owner may still see the camera after removing prints so they can re-add. */
-      if (owner && personal && p && p.polaroidRemoved) showCam();
-      else hideCam();
+      hideCam();
       return;
     }
     while (nodes.length > 1) {
@@ -9468,7 +9466,10 @@
       if (dup && dup.parentNode) dup.parentNode.removeChild(dup);
     }
     var el = nodes[0];
-    if (!el) {
+    /* The empty frame is the original shell. Camera upload must not create another one,
+       and must not put this one back after the owner removed it. */
+    var shellOff = !owner || !!(p && p.polaroidRemoved);
+    if (!el && !shellOff) {
       el = document.createElement("div");
       el.className = "tower-sticker tower-sticker--polaroid";
       el.setAttribute("data-tower-widget", "polaroid");
@@ -9476,12 +9477,13 @@
       el.innerHTML = polaroidMarkup();
       stage.appendChild(el);
     }
-    var showShell = !!owner;
-    el.hidden = !showShell;
-    el.classList.toggle("is-widget-off", !showShell);
-    el.removeAttribute("title");
-    paintPolaroidPhoto(el.querySelector("[data-tower-polaroid-photo]"), "");
-    applyPolaroidPrintScale(el, 1);
+    if (el) {
+      el.hidden = shellOff;
+      el.classList.toggle("is-widget-off", shellOff);
+      el.removeAttribute("title");
+      paintPolaroidPhoto(el.querySelector("[data-tower-polaroid-photo]"), "");
+      applyPolaroidPrintScale(el, 1);
+    }
     showCam();
     var needed = prints.length;
     var extras = Array.prototype.slice.call(stage.querySelectorAll("[data-tower-polaroid-extra]"));
@@ -12782,9 +12784,8 @@
           if (prior && prior.indexOf("data:image/") === 0 && prior !== dataUrl && !polaroidHasUrl(normalized, prior)) {
             normalized.push({ url: prior, scale: 1 });
           }
-          normalized.push({ url: dataUrl, scale: 1 });
+          if (dataUrl && dataUrl.indexOf("data:image/") === 0) normalized.push({ url: dataUrl, scale: 1 });
           p.polaroidPrints = normalized;
-          p.polaroidRemoved = false;
         });
       }, done);
     }

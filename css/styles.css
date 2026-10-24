@@ -15863,42 +15863,42 @@ body.cgn-cal-page {
 }
 
 /* Header lockup only. Soft shade on the word and the brain, and a
-   cyan/purple glow behind the letter shadow. No ring. Tagline unchanged. */
+   plain light behind the letter shadow. No ring. Tagline unchanged. */
 .cognation-masthead-home {
   position: relative;
   z-index: 1;
   text-shadow:
-    0 6px 12px rgba(6, 8, 22, 0.5),
-    0 0 16px rgba(220, 252, 255, 1),
-    0 0 42px rgba(120, 230, 255, 0.95),
-    0 0 96px rgba(186, 150, 255, 0.85);
+    0 6px 12px rgba(8, 10, 24, 0.5),
+    0 0 14px #fff,
+    0 0 36px rgba(255, 255, 255, 0.96),
+    0 0 72px rgba(255, 255, 255, 0.8);
 }
 .cognation-masthead-home::before {
   content: "";
   position: absolute;
   z-index: -1;
-  left: -6%;
-  right: -6%;
-  top: 46%;
-  height: 1.35em;
+  left: -4%;
+  right: -4%;
+  top: 48%;
+  height: 1.2em;
   transform: translateY(-50%);
   pointer-events: none;
   border-radius: 50%;
   background: radial-gradient(ellipse at center,
-    rgba(214, 251, 255, 0.95) 0%,
-    rgba(110, 226, 255, 0.82) 24%,
-    rgba(176, 140, 255, 0.62) 50%,
-    rgba(150, 100, 230, 0.22) 70%,
-    transparent 80%);
-  filter: blur(8px);
+    #fff 0%,
+    rgba(255, 255, 255, 0.96) 34%,
+    rgba(255, 255, 255, 0.78) 58%,
+    rgba(255, 255, 255, 0.28) 76%,
+    transparent 86%);
+  filter: blur(6px);
 }
 .cognation-masthead-home:hover,
 .cognation-masthead-home:focus-visible {
   text-shadow:
-    0 8px 14px rgba(6, 8, 22, 0.52),
-    0 0 20px rgba(230, 253, 255, 1),
-    0 0 52px rgba(120, 230, 255, 1),
-    0 0 110px rgba(186, 150, 255, 0.9);
+    0 8px 14px rgba(8, 10, 24, 0.52),
+    0 0 16px #fff,
+    0 0 42px rgba(255, 255, 255, 1),
+    0 0 80px rgba(255, 255, 255, 0.86);
 }
 .cognation-masthead-brain {
   filter: none;
@@ -15907,10 +15907,7 @@ body.cgn-cal-page {
   content: none;
 }
 .cognation-masthead-brain img {
-  filter:
-    drop-shadow(0 10px 14px rgba(6, 8, 22, 0.38))
-    drop-shadow(0 0 18px rgba(125, 239, 255, 0.72))
-    drop-shadow(0 0 46px rgba(199, 140, 255, 0.48));
+  filter: drop-shadow(0 10px 14px rgba(6, 8, 22, 0.4));
 }
 
 

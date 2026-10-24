@@ -1,5 +1,5 @@
 /**
- * Top friends stay on the viewed profile, Go live is owner-only, reaction faces are 22/14.
+ * Top friends stay on the viewed profile, Go live is owner-only, reaction faces are 7px.
  * Run: node js/profile-fixes.test.js
  */
 "use strict";
@@ -17,12 +17,12 @@ function src(rel) {
 
 var css = src("css/styles.css");
 assert.ok(
-  /\.tower-react-face\s*\{[^}]*width:\s*22px;[^}]*height:\s*22px;[^}]*font-size:\s*14px;/.test(css),
-  "tower reaction face is 22px and the mark is 14px"
+  /\.tower-react-face\s*\{[^}]*width:\s*7px;[^}]*height:\s*7px;[^}]*font-size:\s*7px;/.test(css),
+  "tower reaction face is 7px"
 );
 assert.ok(
-  /\.news-comment-react-chip\s*\{[^}]*height:\s*22px;[^}]*min-width:\s*22px;[^}]*font-size:\s*14px;/.test(css),
-  "news comment reaction face is 22px and the mark is 14px"
+  /\.news-comment-react-chip\s*\{[^}]*height:\s*7px;[^}]*min-width:\s*0;[^}]*font-size:\s*7px;/.test(css),
+  "news comment reaction face is 7px"
 );
 assert.ok(
   /\.news-comment-react-count\s*\{\s*font-size:\s*0\.62rem;/.test(css),

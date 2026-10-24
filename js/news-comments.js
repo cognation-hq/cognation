@@ -86,11 +86,12 @@
     });
     return {
       id: row.id, storyId: row[cfg.parentCol], authorName: author.display_name || "Member", authorUserId: author.user_id ? String(author.user_id) : "",
+      authorProfileId: row.author_profile_id ? String(row.author_profile_id) : "",
       accountKind: author.account_kind || "real", body: row.body, createdAt: row.created_at, reactions: reactions,
     };
   }
   function pullStory(storyId) {
-    var q = "select=id," + cfg.parentCol + ",body,created_at,author:profiles!author_profile_id(display_name,account_kind,user_id)" +
+    var q = "select=id," + cfg.parentCol + ",author_profile_id,body,created_at,author:profiles!author_profile_id(display_name,account_kind,user_id)" +
       (cfg.reactionsTable ? ",reactions:" + cfg.reactionsTable + "(face,profile_id)" : "") + "&" + cfg.parentCol + "=eq." +
       encodeURIComponent(storyId) + "&order=created_at.desc&limit=" + MAX;
     return window.CognationSupabase.rest(cfg.table, { query: q }).then(function (rows) {
@@ -188,6 +189,43 @@
     } catch (e) {}
     return "";
   }
+  function isMine(c) {
+    if (!c) return false;
+    var signed = sessionAuthor();
+    if (signed && c.authorProfileId && String(c.authorProfileId) === String(signed.profileId)) return true;
+    var sess = window.CognationAuth && typeof window.CognationAuth.getSession === "function" && window.CognationAuth.getSession();
+    var uid = sess && sess.supabaseUserId ? String(sess.supabaseUserId) : "";
+    if (uid && c.authorUserId && String(c.authorUserId) === uid) return true;
+    if (remoteOn()) return false;
+    return !!c.authorName && c.authorName === (signed ? signed.authorName : who().authorName);
+  }
+  function findComment(storyId, commentId) {
+    var d = read(), list = d.byStory[storyId] || [], i;
+    for (i = 0; i < list.length; i++) if (list[i] && String(list[i].id) === String(commentId)) return { d: d, found: list[i] };
+    return { d: d, found: null };
+  }
+  function writeMine(storyId, commentId, body) {
+    var hit = findComment(storyId, commentId);
+    if (!hit.found || !isMine(hit.found)) return null;
+    if (body == null) hit.d.byStory[storyId] = (hit.d.byStory[storyId] || []).filter(function (c) { return c && String(c.id) !== String(commentId); });
+    else hit.found.body = body;
+    return write(hit.d) ? { ok: true } : { ok: false };
+  }
+  function saveBody(storyId, commentId, body) {
+    body = String(body || "").trim().slice(0, 500);
+    var hit = findComment(storyId, commentId);
+    if (!body || !hit.found || !isMine(hit.found)) return Promise.resolve({ ok: false, error: "missing" });
+    if (!(remoteOn() && UUID_RE.test(String(commentId)))) return Promise.resolve(writeMine(storyId, commentId, body) || { ok: false });
+    return window.CognationSupabase.rest(cfg.table, { method: "PATCH", query: "id=eq." + encodeURIComponent(commentId), body: { body: body } })
+      .then(function () { return writeMine(storyId, commentId, body) || { ok: false }; }, function () { return { ok: false, error: "shared" }; });
+  }
+  function removeComment(storyId, commentId) {
+    var hit = findComment(storyId, commentId);
+    if (!hit.found || !isMine(hit.found)) return Promise.resolve({ ok: false, error: "missing" });
+    if (!(remoteOn() && UUID_RE.test(String(commentId)))) return Promise.resolve(writeMine(storyId, commentId, null) || { ok: false });
+    return window.CognationSupabase.rest(cfg.table, { method: "DELETE", query: "id=eq." + encodeURIComponent(commentId) })
+      .then(function () { return writeMine(storyId, commentId, null) || { ok: false }; }, function () { return { ok: false, error: "shared" }; });
+  }
   function toggleReactShared(storyId, commentId, face) {
     var author = sessionAuthor();
     if (!author || !face) return Promise.resolve({ ok: false, error: "signed_in_required" });
@@ -237,6 +275,7 @@
     var c = {
       id: "nc-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
       storyId: storyId, authorName: opts.authorName || w.authorName,
+      authorProfileId: opts.authorProfileId || (sessionAuthor() && sessionAuthor().profileId) || "",
       accountKind: opts.accountKind || w.accountKind, body: body,
       createdAt: opts.createdAt || new Date().toISOString(), reactions: {},
     };
@@ -283,16 +322,19 @@
       return !(mod && mod.isPostHidden && mod.isPostHidden(c.id));
     });
     var under13 = age() < 13;
-    /* ⋯ menu with Report: signed-in shared comments only (never signed out). */
+    /* ⋯ follows the author: Delete and Edit on yours, Report and Block on someone else's. */
     var canReport = remoteOn() && !!signed;
     function more(c) {
-      if (!canReport) return "";
+      var own = isMine(c);
+      if (!canReport && !own) return "";
       var option = c.reportedByMe
         ? '<button type="button" class="news-report-option" disabled data-news-comment-reported>Reported</button>'
         : '<button type="button" class="news-report-option" data-news-comment-report data-comment-id="' + esc(c.id) + '">Report</button>';
       var blockBtn = '<button type="button" class="news-report-option" data-news-comment-block data-comment-id="' + esc(c.id) + '">Block</button>';
+      var ownMenu = '<button type="button" class="news-report-option" data-news-comment-delete data-comment-id="' + esc(c.id) + '">Delete</button>' +
+        '<button type="button" class="news-report-option" data-news-comment-edit data-comment-id="' + esc(c.id) + '">Edit</button>';
       return '<button type="button" class="news-comment-more" data-news-comment-more aria-haspopup="true" aria-expanded="false" aria-label="More for this comment">⋯</button>' +
-        '<div class="news-report-menu" data-news-comment-menu hidden>' + option + blockBtn + "</div>";
+        '<div class="news-report-menu" data-news-comment-menu hidden>' + (own ? ownMenu : option + blockBtn) + "</div>";
     }
     host.innerHTML =
       '<ul class="news-comment-list">' +
@@ -427,6 +469,17 @@
     if (!host.__bound) {
       host.__bound = true;
       host.addEventListener("submit", function (ev) {
+        var editForm = ev.target && ev.target.closest && ev.target.closest("[data-news-comment-edit-form]");
+        if (editForm && host.contains(editForm)) {
+          ev.preventDefault();
+          var editInput = editForm.querySelector("[data-news-comment-edit-input]");
+          var next = editInput ? String(editInput.value || "").trim() : "";
+          if (!next) return;
+          saveBody(storyId, editInput.getAttribute("data-comment-id"), next).then(function (res) {
+            if (res && res.ok) renderThread(host, storyId, rating);
+          });
+          return;
+        }
         var form = ev.target && ev.target.closest("[data-news-comment-form]");
         if (!form || !host.contains(form)) return;
         ev.preventDefault();
@@ -473,6 +526,32 @@
             menu.hidden = !menu.hidden;
             moreBtn.setAttribute("aria-expanded", menu.hidden ? "false" : "true");
           }
+          return;
+        }
+        var editBtn = ev.target && ev.target.closest("[data-news-comment-edit]");
+        if (editBtn && host.contains(editBtn)) {
+          ev.preventDefault();
+          var item = editBtn.closest(".news-comment-item");
+          var para = item && item.querySelector(".news-comment-body");
+          var cid = editBtn.getAttribute("data-comment-id");
+          var hit = findComment(storyId, cid);
+          if (!item || !para || !hit.found || item.querySelector("[data-news-comment-edit-form]")) return;
+          var form = document.createElement("form");
+          form.className = "news-comment-edit";
+          form.setAttribute("data-news-comment-edit-form", "");
+          form.innerHTML = '<input type="text" maxlength="500" class="news-comment-edit-input" data-news-comment-edit-input data-comment-id="' + esc(cid) + '"><button type="submit" class="news-comment-edit-save">Save</button>';
+          form.querySelector("[data-news-comment-edit-input]").value = hit.found.body || "";
+          para.replaceWith(form);
+          var open = item.querySelector("[data-news-comment-menu]");
+          if (open) open.hidden = true;
+          return;
+        }
+        var delBtn = ev.target && ev.target.closest("[data-news-comment-delete]");
+        if (delBtn && host.contains(delBtn)) {
+          ev.preventDefault();
+          removeComment(storyId, delBtn.getAttribute("data-comment-id")).then(function (res) {
+            if (res && res.ok) renderThread(host, storyId, rating);
+          });
           return;
         }
         var blockBtn = ev.target && ev.target.closest("[data-news-comment-block]");

@@ -13725,15 +13725,19 @@ a.site-switch-side:focus-visible {
 .news-comment-item .news-report-menu {
   flex-direction: column;
   align-items: flex-start;
-  position: static;
+  position: absolute;
+  top: 22px;
+  right: 0;
   z-index: 5;
   width: max-content;
-  margin: 0.2rem 0 0 auto;
+  margin: 0;
   padding: 0.15rem;
   background: #101330;
   border: 1px solid var(--cgn-border, rgba(255,255,255,.2));
   border-radius: 0.45rem;
 }
+/* Open menu is pinned under that comment's ⋯; the row grows so it does not cover the post. */
+.news-comment-item:has(.news-report-menu:not([hidden])) { padding-bottom: 4.25rem; }
 
 /* Dark shell: mute pink News .news-report-option pills so Report/Block match (Designer LOOK nit). */
 .news-comment-item .news-report-option {

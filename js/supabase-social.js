@@ -419,6 +419,7 @@
       likes: hearts,
       reactions: reactions,
       visibility: row.visibility || "friends",
+      profileKind: author && author.kind === "professional" ? "professional" : "personal",
       /* Server auto-rate (tower_posts.rating); read-only for everyone but Investigator. */
       rating: row.rating || "PG-13",
     };
@@ -486,7 +487,7 @@
   function createTowerPost(fields) {
     var me = identity();
     var body = String((fields && fields.body) || "").trim();
-    var profileId = me && me.activeProfileId;
+    var profileId = String((fields && fields.authorProfileId) || (me && me.activeProfileId) || "");
     if (!me || !profileId) {
       return Promise.reject(new Error("Sign in before posting to Tower."));
     }

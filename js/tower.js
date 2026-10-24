@@ -2920,7 +2920,8 @@
       var post = {
         id: "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
         authorName: (fields && fields.authorName) || "You",
-        authorProfileId: (window.CognationTowerProfileStore &&
+        authorProfileId: (fields && fields.authorProfileId) ||
+          (window.CognationTowerProfileStore &&
           window.CognationTowerProfileStore.get() &&
           window.CognationTowerProfileStore.get()._profileId) || "",
         body: body.slice(0, 2000),
@@ -2932,14 +2933,10 @@
           : "NR",
         likes: 0,
         visibility: (window.CognationEchoGroups && window.CognationEchoGroups.isGroupPost(body)) ? "public" : "friends",
-        handle: (window.CognationTowerProfileStore
+        handle: (fields && fields.handle) || (window.CognationTowerProfileStore
           ? normalizeHandle(window.CognationTowerProfileStore.get().handle || "")
           : ""),
-        profileKind: (window.CognationTowerProfileStore &&
-          window.CognationTowerProfileStore.get() &&
-          window.CognationTowerProfileStore.get()._profileKind === "professional")
-          ? "professional"
-          : "personal",
+        profileKind: (fields && fields.profileKind) === "professional" ? "professional" : "personal",
       };
       data.posts.unshift(post);
       if (!this.save(data)) return { ok: false, error: "Could not save post." };
@@ -2968,42 +2965,92 @@
     return "";
   }
 
+  /* Minimum age for one photo. No rating (and a name that rates G/PG) stays open
+     to whoever can already see the post. 21+ / MA never shows under 21. */
+  function feedViewerAge() {
+    var floor = window.CognationAgeFloor;
+    var n = floor && typeof floor.viewerAge === "function" ? floor.viewerAge() : 0;
+    if (typeof n === "number" && n > 0) return n;
+    return ratingViewer().age;
+  }
+  function photoMinAge(a) {
+    if (!a) return null;
+    var min = null;
+    function use(n) {
+      n = +n;
+      if (!isFinite(n)) return;
+      min = min == null ? n : Math.max(min, n);
+    }
+    if (a.minAge != null && a.minAge !== "") use(a.minAge);
+    if (a.min_age != null && a.min_age !== "") use(a.min_age);
+    var code = String(a.rating || a.audience || "").toUpperCase().replace(/\s+/g, "");
+    if (code === "PG-13" || code === "PG13") use(13);
+    else if (code === "R" || code === "18+") use(18);
+    else if (code === "MA" || code === "21+" || code === "NC-17") use(21);
+    else if (code === "NR") use(999);
+    else if (/^\d{1,3}$/.test(code)) use(code);
+    var blob = [a.rating, a.audience, a.label, a.name].join(" ");
+    if (/(^|\W)21\s?\+(?!\w)/i.test(blob)) use(21);
+    else if (/(^|\W)18\s?\+(?!\w)/i.test(blob)) use(18);
+    if (/\bPG-?13\b/i.test(blob)) use(13);
+    if (/\b(nsfw|explicit)\b/i.test(blob)) use(18);
+    if (!String(a.rating || "").trim() && a.minAge == null && a.min_age == null && !a.audience) {
+      var ar = window.CognationAutoRate;
+      var named = String(a.label || a.name || "");
+      if (ar && named) {
+        var r = (ar.rate(named, []) || {}).rating;
+        if (r === "PG-13") use(13);
+        else if (r === "R") use(18);
+        else if (r === "MA") use(21);
+        else if (r === "NR") use(999);
+      }
+    }
+    return min;
+  }
+  function photoVisible(a) {
+    var min = photoMinAge(a);
+    if (min == null) return true;
+    var age = feedViewerAge();
+    if (min >= 21 && age < 21) return false;
+    return age >= min;
+  }
+  function photoSrc(a) {
+    var url = String((a && (a.dataUrl || a.url || a.src || a.imageUrl)) || "");
+    if (/^data:image\/(png|jpeg|gif|webp);/i.test(url)) return url;
+    if (/^https?:\/\/[^"'<>\s]+$/i.test(url)) return url;
+    if (/^assets\/[a-z0-9./_-]+\.(png|jpe?g|gif|webp)$/i.test(url)) return url;
+    var name = String((a && (a.name || a.label)) || "");
+    var kind = String((a && a.kind) || "").toLowerCase();
+    if (/\.(pdf|docx?|txt|mp4|mov|webm)$/i.test(name) || kind === "video" || kind === "document" || kind === "note") return "";
+    if (kind === "photo" || kind === "image") return "assets/feed/market-square.jpg";
+    return "";
+  }
   function renderAttachments(list) {
     if (!list || !list.length) return "";
-    return (
-      '<ul class="tower-attachments">' +
-      list
-        .map(function (a) {
-          var name = (a && (a.label || a.name)) || "file";
-          var img = attachmentImageUrl(a);
-          if (img) {
-            return (
-              '<li class="tower-attach tower-attach--photo tower-attach--image">' +
-              '<img class="tower-attach-img" src="' + escapeHtml(img) + '" alt="' +
-              escapeHtml("Photo: " + name) + '" loading="lazy" decoding="async"></li>'
-            );
-          }
-          /* Older photo posts saved only the file name (no picture was uploaded). */
-          var missing = a && a.kind === "photo";
-          return (
-            '<li class="tower-attach tower-attach--' +
-            escapeHtml((a && a.kind) || "document") +
-            (missing ? " tower-attach--missing" : "") +
-            '">' +
-            '<span class="tower-attach-kind">' +
-            escapeHtml(kindLabel(a && a.kind)) +
-            "</span> " +
-            '<span class="tower-attach-name">' +
-            escapeHtml(name) +
-            "</span>" +
-            (missing ? ' <span class="tower-attach-note">· photo wasn\'t uploaded</span>' : "") +
-            "</li>"
-          );
-        })
-        .join("") +
-      "</ul>"
-    );
+    var html = list.map(function (a) {
+      var src = photoSrc(a) || attachmentImageUrl(a);
+      if (src) {
+        if (!photoVisible(a)) return "";
+        return '<img class="tower-feed-photo" alt="" src="' + escapeHtml(src) + '">';
+      }
+      var name = (a && (a.label || a.name)) || "file";
+      var missing = a && a.kind === "photo";
+      return (
+        '<span class="tower-attach tower-attach--' +
+        escapeHtml((a && a.kind) || "document") +
+        (missing ? " tower-attach--missing" : "") +
+        '"><span class="tower-attach-kind">' +
+        escapeHtml(kindLabel(a && a.kind)) +
+        '</span> <span class="tower-attach-name">' +
+        escapeHtml(name) +
+        "</span>" +
+        (missing ? ' <span class="tower-attach-note">· photo wasn\'t uploaded</span>' : "") +
+        "</span>"
+      );
+    }).join("");
+    return html.trim() ? '<div class="tower-attachments">' + html + "</div>" : "";
   }
+  window.CognationFeedPhotos = { html: renderAttachments, minAge: photoMinAge };
 
   var TOWER_POST_REACTIONS = ["❤️", "👍", "😂", "😮", "😢", "🔥"];
 
@@ -3183,6 +3230,7 @@
       var article = document.createElement("article");
       article.className = "tower-post";
       article.setAttribute("data-tower-post", post.id || "");
+      article.setAttribute("data-post-audience", post.profileKind === "professional" ? "professional" : "personal");
       article.innerHTML =
         '<header class="tower-post-meta">' +
         towerPostAuthorHtml(post) +
@@ -12633,6 +12681,12 @@
       var reader = new FileReader();
       reader.onerror = function () { done(""); };
       reader.onload = function () {
+        var raw = String(reader.result || "");
+        /* Keep the upload's own bytes when they fit. Shrink only when they do not. */
+        if (raw.indexOf("data:image/") === 0 && raw.length < 180000) {
+          done(raw);
+          return;
+        }
         var img = new Image();
         img.onload = function () {
           var max = 480;
@@ -12653,7 +12707,46 @@
       };
       reader.readAsDataURL(file);
     }
+    function chosenAudience() {
+      var btn = form && form.querySelector("[data-tower-compose-kind][aria-selected='true']");
+      return btn && btn.getAttribute("data-tower-compose-kind") === "professional" ? "professional" : "personal";
+    }
+    function audienceAuthor(kind) {
+      var social = remoteSocial();
+      var mine = social && typeof social.getMyProfiles === "function" ? social.getMyProfiles() : [];
+      var i, p;
+      for (i = 0; i < mine.length; i++) {
+        p = mine[i];
+        if (p && p.kind === kind && p.id) {
+          return { id: String(p.id), name: p.display_name || p.displayName || "", handle: p.handle || "" };
+        }
+      }
+      if (usingRemoteSocial()) return { id: "", name: "", handle: "" };
+      var accounts = window.CognationAccounts;
+      var user = "";
+      try { user = (JSON.parse(localStorage.getItem("cognation.session.v2") || "{}") || {}).username || ""; } catch (eAud) {}
+      var rows = accounts && accounts.getProfilesForUsername ? accounts.getProfilesForUsername(user) || [] : [];
+      for (i = 0; i < rows.length; i++) {
+        p = rows[i];
+        if (p && p.kind === kind && p.id) return { id: String(p.id), name: p.displayName || "", handle: p.handle || "" };
+      }
+      return { id: "", name: "", handle: "" };
+    }
     if (form) {
+      var audienceBar = form.querySelector("[data-tower-compose-audience]");
+      if (audienceBar) {
+        audienceBar.addEventListener("click", function (ev) {
+          var btn = ev.target && ev.target.closest ? ev.target.closest("[data-tower-compose-kind]") : null;
+          if (!btn || !audienceBar.contains(btn)) return;
+          ev.preventDefault();
+          audienceBar.querySelectorAll("[data-tower-compose-kind]").forEach(function (b) {
+            var on = b === btn;
+            b.setAttribute("aria-selected", on ? "true" : "false");
+            b.classList.toggle("is-selected", on);
+            b.classList.toggle("is-active", on);
+          });
+        });
+      }
       form.addEventListener("submit", function (e) {
         e.preventDefault();
         var files = fileInput && fileInput.files ? Array.prototype.slice.call(fileInput.files) : [];
@@ -12686,6 +12779,12 @@
         var savedPics = form.__pics || {};
         form.__marketReady = false;
         form.__pics = null;
+        var aud = chosenAudience();
+        var who = audienceAuthor(aud);
+        if (usingRemoteSocial() && !who.id) {
+          setStatus(aud === "professional" ? "Add a professional page before posting to that audience." : "Sign in before posting.", true);
+          return;
+        }
         var attachments = [];
         files.forEach(function (f) {
           var row = {
@@ -12736,6 +12835,7 @@
             .createTowerPost({
               body: bodyInput ? bodyInput.value : "",
               attachments: attachments,
+              authorProfileId: who.id,
               /* PERSONAL | PROFESSIONAL switch (js/signal-post-as.js): one of
                  the member's own pages, or "" = the current default author. */
               asProfileId: (window.CognationSignalPostAs &&
@@ -12765,7 +12865,10 @@
           return;
         }
         var result = TowerStore.add({
-          authorName: postAuthorFromProfile(TowerProfileStore.get()),
+          authorName: who.name || postAuthorFromProfile(TowerProfileStore.get()),
+          authorProfileId: who.id,
+          handle: who.handle,
+          profileKind: aud,
           body: bodyInput ? bodyInput.value : "",
           attachments: attachments,
         });
@@ -12789,10 +12892,9 @@
     document.addEventListener("cognation:tower-updated", function () {
       renderFeed(root);
     });
-    /* Redraw only when the viewer crosses the under-13 line (age loaded or edited). */
+    /* Age edits can open or close a photo (13, 18, 21) without crossing under-13. */
     document.addEventListener("cognation:member-profile-updated", function () {
-      var list = towerFeedQuery(root, "[data-tower-feed]");
-      if (list && list.__ageFloorUnder13 !== viewerUnder13()) renderFeed(root);
+      renderFeed(root);
     });
     document.addEventListener("cognation:remote-profile-loaded", function () {
       renderProfileChrome(root);

@@ -49,7 +49,7 @@ assert.ok(/197,\s*166,\s*255/.test(tail), "lilac selected");
 assert.ok(/data-tower-add-widget/.test(html), "Add widget button");
 assert.ok(/syncTowerBadges/.test(badge) && /data-tower-profile-strip/.test(badge), "badge dedupe");
 
-/* 6. Compaction + YouTube chip */
+/* 6. Compaction. The YouTube logo is its own widget, not glued under the player. */
 var ctx = {};
 vm.createContext(ctx);
 vm.runInContext("var COMPACT_MIN_GAP = 160;" + fnSource("boxesOverlap") + ";" + fnSource("planLayoutRepair") + "; this.plan = planLayoutRepair;", ctx);
@@ -63,9 +63,15 @@ var moves = ctx.plan([
 ], 1100, 24);
 assert.ok((!moves.avatar || moves.avatar.y === 24) && (!moves.identity || moves.identity.y === 24), "identity row pinned at top");
 assert.ok(moves.youtube && moves.youtube.y < 600, "youtube gap closed");
-var ytY = moves.youtube.y;
-assert.ok(moves["social-youtube"] && moves["social-youtube"].y >= ytY + 215, "chip sits with youtube");
+assert.ok(!moves["social-youtube"], "youtube logo stays put instead of riding the player");
 assert.ok(!moves.calendar || moves.calendar.y >= 900, "dragged widget not compacted");
+var apart = ctx.plan([
+  { id: "avatar", x: 24, y: 24, w: 200, h: 140 },
+  { id: "identity", x: 240, y: 24, w: 300, h: 120 },
+  { id: "youtube", x: 24, y: 200, w: 314, h: 215 },
+  { id: "social-youtube", x: 700, y: 40, w: 80, h: 50, dragged: true }
+], 1100, 24);
+assert.ok(!apart["social-youtube"], "a dragged youtube logo is not pulled back under the player");
 
 /* r4: one-time pass on an old layout where every widget is owner-dragged. */
 var allDragged = [
@@ -81,10 +87,10 @@ assert.ok(!keep.youtube, "normal pass still respects owner-dragged marks");
 var once = ctx.plan(JSON.parse(JSON.stringify(allDragged)), 1100, 24, { ignoreDragged: true });
 assert.ok(once.youtube && once.youtube.y < 700, "one-time pass compacts YouTube despite dragged marks: " + JSON.stringify(once.youtube));
 assert.ok((!once.avatar || once.avatar.y === 24) && (!once.identity || once.identity.y === 24), "identity row still pinned");
-assert.ok(once["social-youtube"] && once["social-youtube"].y >= once.youtube.y + 215, "chip under YouTube");
+assert.ok(!once["social-youtube"] || once["social-youtube"].y + 50 < once.youtube.y, "youtube logo is not seated under the player");
 Object.keys(once).forEach(function (id) {
   var it = allDragged.filter(function (x) { return x.id === id; })[0];
-  if (id !== "social-youtube" && id !== "avatar" && id !== "identity") assert.ok(once[id].y <= it.y, id + " only moves up on compaction");
+  if (id !== "avatar" && id !== "identity") assert.ok(once[id].y <= it.y, id + " only moves up on compaction");
 });
 assert.ok(/var oneTime = owner && !layout\._compacted;/.test(tower) && /if \(markNow\) layout\._compacted = 1;/.test(tower), "one-time mark set after the pass");
 var syncSrc = fs.readFileSync(path.join(__dirname, "tower-layout-sync.js"), "utf8");

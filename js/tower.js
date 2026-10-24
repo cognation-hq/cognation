@@ -7253,6 +7253,7 @@
       normalized.signupFriendIds = ev.signupFriendIds.map(function (id) { return String(id || ""); }).filter(Boolean);
     }
     if (ev.hostHandle) normalized.hostHandle = String(ev.hostHandle).replace(/^@/, "").slice(0, 80);
+    if (ev.kind === "classroom") normalized.kind = "classroom";
     return normalized;
   }
 
@@ -7455,6 +7456,7 @@
             "</span>" +
             '<span class="tower-cal-event-title">' +
             escapeHtml(e.title) +
+            (e.kind === "classroom" ? " · Classroom" : "") +
             "</span>" +
             badge +
             who +
@@ -7804,6 +7806,7 @@
       '<input id="tower-cal-edit-notes" name="notes" type="text" maxlength="240" value="' +
       escapeHtml(formNotes) +
       '" data-tower-cal-edit-notes></div>' +
+      (window.CognationClassroomEvent ? window.CognationClassroomEvent.pillHtml(!!(editing && editing.kind === "classroom")) : "") +
       '<div class="form-actions">' +
       '<button type="submit" class="btn btn-primary">' +
       (editing ? "Save changes" : "Add event") +
@@ -7862,6 +7865,19 @@
     return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   }
 
+  /* Owner Add event on the Edit profile calendar. Classroom is checked before that event is a classroom. */
+  function classroomAddFormHtml(selected) {
+    if (!window.CognationClassroomEvent) return "";
+    return '<form class="tower-cal-editor" data-tower-cal-editor action="#" method="post"><h5>Add event</h5>' +
+      window.CognationClassroomEvent.pillHtml(false) +
+      '<label for="tower-cal-add-title">Title</label>' +
+      '<input id="tower-cal-add-title" type="text" maxlength="120" required data-tower-cal-edit-title>' +
+      '<label for="tower-cal-add-date">Date</label>' +
+      '<input id="tower-cal-add-date" type="date" required value="' + escapeHtml(selected || "") + '" data-tower-cal-edit-date>' +
+      '<div class="form-actions"><button type="submit" class="btn btn-primary">Add event</button></div>' +
+      '<p class="commune-status" data-tower-cal-editor-status hidden role="status" aria-live="polite"></p></form>';
+  }
+
   function renderPublicCalendar(root) {
     var body = root.querySelector("[data-tower-cal-public-body]");
     if (!body) return;
@@ -7911,6 +7927,7 @@
       "</h5>" +
       renderDayEventList(events, selected, { ownerControls: owner, busyOnly: !owner }) +
       "</div>" +
+      (owner ? classroomAddFormHtml(selected) : "") +
       schedulerHtml;
   }
 
@@ -8134,6 +8151,7 @@
             return e.id !== did;
           });
         });
+        if (window.CognationClassroomEvent) window.CognationClassroomEvent.drop(did);
         var ph = root.querySelector("[data-tower-cal-private]");
         if (ph && ph.getAttribute("data-editing-id") === did) ph.removeAttribute("data-editing-id");
         refreshTowerCalendars(root);
@@ -8290,6 +8308,9 @@
         var date = dateEl ? dateEl.value : "";
         var time = timeEl ? timeEl.value : "";
         var notes = notesEl ? notesEl.value.trim().slice(0, 240) : "";
+        var classroomOn = !!(form.querySelector("[data-tower-cal-classroom]") || {}).checked;
+        var kind = classroomOn ? "classroom" : "";
+        if (classroomOn && !time) time = "12:00";
         var statusEl = form.querySelector("[data-tower-cal-editor-status]");
         function setEdStatus(msg, isError) {
           if (!statusEl) return;
@@ -8307,6 +8328,7 @@
           return;
         }
         var editId = idEl ? idEl.value : "";
+        var madeId = editId || newCalendarEventId();
         saveCalendarToProfile(function (p) {
           if (editId) {
             var found = false;
@@ -8316,32 +8338,27 @@
                 e.date = date;
                 e.time = time;
                 e.notes = notes;
+                e.kind = kind;
                 found = true;
               }
             });
             if (!found) {
               p.calendarEvents.push({
-                id: editId,
-                title: title,
-                date: date,
-                time: time,
-                notes: notes,
-                status: "accepted",
-                source: "owner",
+                id: editId, title: title, date: date, time: time, notes: notes,
+                status: "accepted", source: "owner", kind: kind,
               });
             }
           } else {
             p.calendarEvents.push({
-              id: newCalendarEventId(),
-              title: title,
-              date: date,
-              time: time,
-              notes: notes,
-              status: "accepted",
-              source: "owner",
+              id: madeId, title: title, date: date, time: time, notes: notes,
+              status: "accepted", source: "owner", kind: kind,
             });
           }
         });
+        if (window.CognationClassroomEvent) {
+          if (classroomOn) window.CognationClassroomEvent.publish({ id: madeId, title: title, date: date, time: time, notes: notes });
+          else if (editId) window.CognationClassroomEvent.drop(editId);
+        }
         var priv3 = root.querySelector("[data-tower-cal-private]");
         if (priv3) priv3.removeAttribute("data-editing-id");
         var view3 = getCalendarViewState(root, "private");
@@ -8349,7 +8366,7 @@
         var dp = date.split("-");
         view3.year = parseInt(dp[0], 10);
         view3.month0 = parseInt(dp[1], 10) - 1;
-        setEdStatus(editId ? "Event updated." : "Event added.", false);
+        setEdStatus(classroomOn ? "Classroom added to the Cognation calendar. Echo card ready." : (editId ? "Event updated." : "Event added."), false);
         refreshTowerCalendars(root);
         return;
       }

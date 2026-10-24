@@ -953,7 +953,13 @@
   /* A live session is a Classroom (Personal deck) or a Webinar (Professional deck).
      A live page with no session kind fills both, as #193 did. */
   function classroomCatalog() {
-    return liveProPages().filter(function (page) { return page.sessionKind !== "webinar"; }).map(classroomCard);
+    var live = liveProPages().filter(function (page) { return page.sessionKind !== "webinar"; }).map(classroomCard);
+    var extra = [];
+    try {
+      var api = window.CognationClassroomEvent;
+      if (api && api.echoCards) extra = api.echoCards() || [];
+    } catch (eEv) {}
+    return live.concat(extra);
   }
 
   function visibleClassroomSessions() {
@@ -3180,13 +3186,18 @@
   }
 
   function paintClassroom(session) {
-    var notesText =
-      "Live session on this Professional page.";
+    var ce = window.CognationClassroomEvent;
+    var eventRoom = !!(session && session.classroomEvent && ce);
+    var notesText = eventRoom ? "" : "Live session on this Professional page.";
     if (paintCardView("classroom", {
       title: session && session.title || "Classroom",
-      body: (session && session.topic ? "Topic · " + session.topic + " — " : "") + (session && session.body || CLASSROOM_BODY),
+      body: eventRoom ? (session.body || "") : ((session && session.topic ? "Topic · " + session.topic + " — " : "") + (session && session.body || CLASSROOM_BODY)),
     }, notesText)) {
       state.classroomId = session.id;
+      if (eventRoom) {
+        var log = roomEl() && roomEl().querySelector("[data-commune-room-log]");
+        if (log) log.innerHTML = ce.stageHtml(session.eventId || session.id);
+      }
       return;
     }
     var panel = state.shell && state.shell.querySelector(CLASSROOM_PANEL_SEL);
@@ -3904,6 +3915,10 @@
     document.addEventListener("cognation:tower-updated", function () { rebuildDeck(); });
     document.addEventListener("cognation:echo-group-notice", function () { renderNotices(); });
     document.addEventListener("cognation:classroom-sessions-updated", onLiveSessionsUpdated);
+    document.addEventListener("cognation:classroom-event", function () {
+      if (state.roomId || state.classroomId) return;
+      rebuildDeck();
+    });
     refreshSeedGates();
   }
 

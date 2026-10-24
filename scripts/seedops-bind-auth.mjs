@@ -24,6 +24,7 @@
  * See docs/seedops-provision.md
  */
 import crypto from "crypto";
+import { pathToFileURL } from "url";
 
 const FLEET_SIZE = 1000;
 const DEMO_CAP = 250; // free-trial Demo max (+3 ops); Alexa unlock to exceed
@@ -251,14 +252,24 @@ async function createUser(baseUrl, key, payload) {
   return adminFetch(baseUrl, key, "POST", "/auth/v1/admin/users", payload);
 }
 
-function authPayload(spec, password) {
+/* Neutral handle for a NEW auth user. The signup trigger
+   (create_profile_for_new_user) copies user_metadata.handle into the new
+   profile row, and real members may not hold "seed-"/"seed_"/"ops-"/"ops_"
+   handles (supabase/migrations/20261020_reserved_handle_prefix.sql). So the
+   auth user is created with this neutral handle, and the reserved fleet handle
+   is set afterwards by stampProfile's service_role PATCH. */
+function neutralAuthHandle(spec) {
+  return "fleet_" + String(spec.userId || "").replace(/-/g, "").slice(0, 12);
+}
+
+function authPayload(spec, password, handleOverride) {
   return {
     email: spec.email,
     password,
     email_confirm: true,
     ban_duration: "none",
     user_metadata: {
-      handle: spec.handle,
+      handle: handleOverride || spec.handle,
       display_name: spec.displayName,
       seed_fleet_id: spec.fleetId,
       account_kind: spec.accountKind
@@ -335,8 +346,9 @@ async function bindOne(baseUrl, key, spec, password, opts) {
       result.detail = "stub auth.users not found; run provision_seed_wave first";
       return result;
     }
+    /* Create with a neutral handle; stampProfile below sets spec.handle. */
     const created = await createUser(baseUrl, key, {
-      ...authPayload(spec, password),
+      ...authPayload(spec, password, neutralAuthHandle(spec)),
       id: spec.userId
     });
     if (!created.ok) {
@@ -353,9 +365,15 @@ async function bindOne(baseUrl, key, spec, password, opts) {
     return result;
   }
 
+  /* service_role PATCH: this is where the seed-/ops- handle is set. */
   const prof = await stampProfile(baseUrl, key, spec);
   result.profile = prof;
-  result.ok = true;
+  /* A failed stamp would leave a new account on its neutral handle: report it. */
+  result.ok = !!(prof && prof.ok);
+  if (!result.ok) {
+    result.status = prof && prof.status;
+    result.detail = prof && prof.detail;
+  }
   return result;
 }
 
@@ -454,7 +472,12 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+export { seedSpec, opsSpec, neutralAuthHandle, authPayload, bindOne, OPS_BOTS };
+
+/* Run only as a script; tests import the helpers above without side effects. */
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

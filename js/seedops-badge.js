@@ -90,21 +90,69 @@
     });
   }
 
+  /* Record for a search result: local registry, then the server profile cache
+     (account_kind / seed_fleet_id), by id then handle. */
+  /* #233: same owner check as Tower (supabase-social effectiveAccountKind). A 'seed-'
+     Pro page saved before seed-pulse-sql/02 has account_kind 'real' and no fleet id;
+     an explicit 'real' wins in classify, so the raw row never badged. Take the owner's
+     kind when its Personal page is a seed/ops account. Real members stay real. */
+  function withOwnerKind(row) {
+    var social = window.CognationSupabaseSocial;
+    if (!row || !social || typeof social.effectiveAccountKind !== "function") return row;
+    var kind = "";
+    try { kind = String(social.effectiveAccountKind(row) || "").toLowerCase(); } catch (eKind) { return row; }
+    if (kind !== "seed" && kind !== "ops") return row;
+    if (String(row.account_kind || "").toLowerCase() === kind) return row;
+    var copy = Object.assign({}, row);
+    copy.account_kind = kind;
+    if (!copy.seed_fleet_id && typeof social.effectiveFleetId === "function") {
+      try { copy.seed_fleet_id = social.effectiveFleetId(row) || null; } catch (eFleet) {}
+    }
+    return copy;
+  }
+
+  function peopleSearchRecord(id, handle) {
+    var rec = null;
+    if (window.CognationAccounts) {
+      if (id) rec = window.CognationAccounts.getProfileById(id);
+      if (!rec && handle && window.CognationAccounts.getProfileByHandle) {
+        rec = window.CognationAccounts.getProfileByHandle(handle);
+      }
+    }
+    /* Signed in: server profile cache carries account_kind / seed_fleet_id. */
+    var social = window.CognationSupabaseSocial;
+    if (!rec && id && social && typeof social.getProfile === "function") {
+      var row = social.getProfile(id);
+      if (row && row.account_kind) rec = withOwnerKind(row);
+    }
+    if (!rec && handle && social && typeof social.getProfileForHandle === "function") {
+      var byHandle = social.getProfileForHandle(handle);
+      if (byHandle && byHandle.account_kind) rec = withOwnerKind(byHandle);
+    }
+    return rec;
+  }
+
   function syncPeopleSearch() {
     document.querySelectorAll("[data-people-search-results] li, .people-search-results li").forEach(function (li) {
       var id = li.getAttribute("data-profile-id") || li.getAttribute("data-friend-id") || "";
       var handle = li.getAttribute("data-handle") || "";
-      var rec = null;
-      if (window.CognationAccounts) {
-        if (id) rec = window.CognationAccounts.getProfileById(id);
-        if (!rec && handle && window.CognationAccounts.getProfileByHandle) {
-          rec = window.CognationAccounts.getProfileByHandle(handle);
-        }
-      }
+      var rec = peopleSearchRecord(id, handle);
       if (!rec && (li.textContent || "").indexOf("seed-") >= 0) {
         rec = { accountKind: "seed", isSeed: true };
       }
       var host = li.querySelector("[data-seedops-badge-slot]") || li;
+      ensureBadge(host, rec);
+    });
+    /* people-search.js renders each result as button.people-search-row. Badge it
+       by the account's own field (account_kind), not by handle text. */
+    document.querySelectorAll("[data-people-search-results] .people-search-row, .people-search-results .people-search-row").forEach(function (row) {
+      if (row.tagName && String(row.tagName).toLowerCase() === "li") return;
+      var id = row.getAttribute("data-profile-id") || "";
+      var handle = String(row.getAttribute("data-result-handle") || "").replace(/^@/, "");
+      var rec = peopleSearchRecord(id, handle);
+      var kind = row.getAttribute("data-account-kind");
+      if (!rec && kind) rec = { accountKind: kind };
+      var host = row.querySelector("[data-seedops-badge-slot]") || row;
       ensureBadge(host, rec);
     });
   }
@@ -121,6 +169,7 @@
     ensureBadge: ensureBadge,
     syncAll: syncAll,
     syncTowerBadges: syncTowerBadges,
+    syncPeopleSearch: syncPeopleSearch,
   };
 
   function boot() {

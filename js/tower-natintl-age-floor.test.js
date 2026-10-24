@@ -156,6 +156,11 @@ function renderEdition(viewer, edition) {
   var root = fakeEl("section");
   root.__root = true;
   var feedList = root.appendChild(fakeEl("div"));
+  /* commune.js syncFeedEmpty: is any visible (non-wire) story printed? */
+  feedList.querySelector = function (sel) {
+    if (sel !== "[data-news-post]:not(.is-wire)") return null;
+    return this.children.filter(function (c) { return c.getAttribute("data-news-post") !== null && !c.classList.contains("is-wire"); })[0] || null;
+  };
   var feedEmpty = root.appendChild(fakeEl("p"));
   feedEmpty.hidden = true;
   var refreshBtn = root.appendChild(fakeEl("button"));

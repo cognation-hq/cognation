@@ -142,7 +142,7 @@
 
   function defaultProfessionalTower() {
     return {
-      displayName: "Alexa J Thomas",
+      displayName: "Cognation",
       handle: DEMO_ALEXA.professionalHandle,
       slogan: "",
       socialLinks: {},
@@ -395,6 +395,7 @@
       rec[k] = tower[k];
     });
 
+    if (kind === "personal") rec.friendIds = ["cognation"];
     saveProfileRecord(rec);
     var acct = getAccountByUsername(username);
     var ids = (acct && acct.profileIds) || [];
@@ -502,6 +503,8 @@
       saveProfilesDoc(profilesDoc);
     }
 
+    ensureCognationFriend(DEMO_ALEXA.username);
+
     var ids = [];
     if (personal) ids.push(personal.id);
     if (professional) ids.push(professional.id);
@@ -542,11 +545,70 @@
     };
   }
 
+  /* Signup puts Cognation first. It is not added with a button, and it is not removed. */
+  function ensureCognationFriend(username) {
+    var list = getProfilesForUsername(username);
+    var personal = null;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].kind !== "professional") {
+        personal = list[i];
+        break;
+      }
+    }
+    if (!personal) return false;
+    var ids = Array.isArray(personal.friendIds) ? personal.friendIds : [];
+    if (ids[0] === "cognation") return true;
+    personal.friendIds = ["cognation"].concat(ids.filter(function (id) { return id !== "cognation"; }));
+    return !!saveProfileRecord(personal);
+  }
+
   function profilesForLogin(username) {
     ensureSeeded();
     return getProfilesForUsername(username);
   }
 
+
+  /* The 5 hard-coded demo professional posts are retired (Oct 20): they printed in
+     the Times as if real. Removed: prof-demo-mira-pro fp1 "Neighborhood stretch
+     drop-in", fp2 "Breathwork for busy weeks"; prof-demo-jordan-pro fp1 "Zoning
+     packet office hours", fp2 "Tenant rights clinic"; Alexa's local professional
+     record alexa-svc-1 "Cognation concierge office hours". Copies already saved in
+     this browser are dropped only when both the post id and its page (author)
+     match; every other featured post stays. The demo page records themselves
+     (mira-pro, jordan-pro, DEMO_ALEXA) are kept. */
+  var RETIRED_DEMO_PRO_POSTS = {
+    "prof-demo-mira-pro": ["fp1", "fp2"],
+    "prof-demo-jordan-pro": ["fp1", "fp2"],
+  };
+  var RETIRED_ALEXA_PRO_POST = "alexa-svc-1";
+
+  function retiredDemoProPostIds(rec) {
+    if (!rec || rec.kind !== "professional") return null;
+    if (RETIRED_DEMO_PRO_POSTS[rec.id]) return RETIRED_DEMO_PRO_POSTS[rec.id];
+    if (rec.id === DEMO_ALEXA.professionalId || rec.accountUsername === DEMO_ALEXA.username) {
+      return [RETIRED_ALEXA_PRO_POST];
+    }
+    return null;
+  }
+
+  function dropRetiredDemoProPosts() {
+    var doc = loadProfilesDoc();
+    var changed = false;
+    Object.keys(doc.profiles || {}).forEach(function (key) {
+      var rec = doc.profiles[key];
+      var ids = retiredDemoProPostIds(rec);
+      if (!ids || !Array.isArray(rec.featuredPosts) || !rec.featuredPosts.length) return;
+      var kept = rec.featuredPosts.filter(function (post) {
+        return !(post && ids.indexOf(String(post.id || "")) !== -1);
+      });
+      if (kept.length !== rec.featuredPosts.length) {
+        rec.featuredPosts = kept;
+        changed = true;
+      }
+    });
+    if (changed) saveProfilesDoc(doc);
+    return changed;
+  }
 
   function ensureDemoProfessionals() {
     ensureSeeded();
@@ -558,10 +620,6 @@
         phone: "(312) 555-0201",
         handle: "mira-wellness",
         displayName: "Mira Chen · Wellness",
-        featuredPosts: [
-          { id: "fp1", title: "Neighborhood stretch drop-in", body: "Saturday mornings on the green · sliding scale. Walk-ins welcome." },
-          { id: "fp2", title: "Breathwork for busy weeks", body: "15-minute noon reset · free demo seat this month." },
-        ],
       },
       {
         id: "prof-demo-jordan-pro",
@@ -570,23 +628,10 @@
         phone: "(312) 555-0202",
         handle: "jordan-civic",
         displayName: "Jordan Lee · Civic Help",
-        featuredPosts: [
-          { id: "fp1", title: "Zoning packet office hours", body: "Free 20-minute consults for block petitions and neighbor letters." },
-          { id: "fp2", title: "Tenant rights clinic", body: "Thursday evenings · bring your lease questions (demo)." },
-        ],
       },
     ];
     demos.forEach(function (d) {
-      var existing = getProfileById(d.id);
-      if (existing) {
-        if (!Array.isArray(existing.featuredPosts) || !existing.featuredPosts.length) {
-          existing.featuredPosts = d.featuredPosts;
-          existing.displayName = existing.displayName || d.displayName;
-          existing.handle = existing.handle || d.handle;
-          saveProfileRecord(existing);
-        }
-        return;
-      }
+      if (getProfileById(d.id)) return;
       var rec = {
         id: d.id,
         kind: "professional",
@@ -594,28 +639,12 @@
         phone: d.phone,
         handle: d.handle,
         displayName: d.displayName,
-        featuredPosts: d.featuredPosts,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
       saveProfileRecord(rec);
     });
-    /* Seed featured posts on Alexa professional too */
-    var alexaPro =
-      getProfileById(DEMO_ALEXA.professionalId) ||
-      getProfilesForUsername(DEMO_ALEXA.username).filter(function (p) {
-        return p.kind === "professional";
-      })[0];
-    if (alexaPro && (!Array.isArray(alexaPro.featuredPosts) || !alexaPro.featuredPosts.length)) {
-      alexaPro.featuredPosts = [
-        {
-          id: "alexa-svc-1",
-          title: "Cognation concierge office hours",
-          body: "Book a guided intro to Tower + COMMUNE features · demo professional post.",
-        },
-      ];
-      saveProfileRecord(alexaPro);
-    }
+    dropRetiredDemoProPosts();
     return demos.map(function (d) {
       return d.id;
     });
@@ -648,6 +677,7 @@
     updateProfileTower: updateProfileTower,
     stripMeta: stripMeta,
     profilesForLogin: profilesForLogin,
+    ensureCognationFriend: ensureCognationFriend,
     ensureDemoProfessionals: ensureDemoProfessionals,
     saveProfileRecord: saveProfileRecord,
   };

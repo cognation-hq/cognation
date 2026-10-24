@@ -17,7 +17,7 @@ assert.ok(/root\.__cognationBadgesShelfRemoved = !on/.test(tower) && /__cognatio
 assert.ok(/offerUndo \? 7000 : 5000/.test(tower), "popup dismisses on its own");
 assert.ok(/showStatusPopup\("Your professional page is set up\.", false, \{ once: true \}\)/.test(tower), "setup notice is a popup");
 assert.ok(/function setProfileStatusOn\(root, msg, isError\) \{\s*showStatusPopup\(msg, isError\);/.test(tower), "profile status uses the popup");
-assert.ok(/function setProfileStatusSafe\(msg, isError\) \{\s*showStatusPopup\(msg, isError\);/.test(tower), "removal notice uses the popup");
+assert.ok(/function setProfileStatusSafe\(msg, isError, removal\) \{\s*if \(removal\) showStageRemovalNotice\(root, msg\);\s*showStatusPopup\(msg, isError\);/.test(tower), "removal notice uses the popup and the stage notice");
 var sync = tower.slice(tower.indexOf("function syncAddProfileUi"), tower.indexOf("function initAddProfile"));
 assert.ok(!/status\.hidden = false/.test(sync), "setup status does not unhide a box in the page");
 assert.ok(/\[data-tower-profile-status\],\s*\[data-tower-add-profile-status\] \{\s*display: none !important;/.test(css), "inline status boxes stay off the page");

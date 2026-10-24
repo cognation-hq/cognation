@@ -18,7 +18,7 @@ assert.strictEqual((swipe.match(/CLASSROOM_PANEL_SEL/g) || []).length, 4, "all t
 // 2. Pro "you might know" uses real server profiles when signed in.
 assert.ok(/listProfiles: function \(\)/.test(social), "social exposes server profiles");
 assert.ok(/if \(liveSignedIn\(\)\) \{\s*each = function/.test(swipe), "live: server profiles only");
-assert.ok(/if \(!out\.length && !liveSignedIn\(\)\) \{\s*out\.push\(proPlaceholder\(PRO\.KNOW, "pro-know-placeholder"/.test(swipe), "live: zero real pages -> no PYMK card (fallback only signed-out local)");
+assert.ok(!/pro-know-placeholder/.test(swipe), "zero real pages -> no PYMK card (no placeholder, signed in or out)");
 // PR A hides nothing.
 assert.ok(!/SHOW_PRO_PLACEHOLDERS/.test(swipe), "no placeholder hiding in this PR");
 

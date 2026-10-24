@@ -359,11 +359,9 @@
     if (!lines.length) {
       /* Cap 250 empty state = ring + five empty spots, not blank copy. */
       list.classList.add("is-empty");
-      fillRingSpots([]);
       return;
     }
     list.classList.remove("is-empty");
-    fillRingSpots(peopleForSpots(lines));
     lines.forEach(function (line) {
       var item = document.createElement("li");
       item.setAttribute("data-circle-relation", line.type);
@@ -413,7 +411,6 @@
         if (result && result.message) {
           list.classList.remove("is-loading", "is-empty");
           message(list, result.message);
-          fillRingSpots([]);
         } else {
           paint(list, (result && result.lines) || []);
         }
@@ -422,7 +419,6 @@
         if (!list.parentNode) return;
         list.classList.remove("is-loading", "is-empty");
         message(list, "Friendships and follows could not be loaded.");
-        fillRingSpots([]);
       }
     );
   }

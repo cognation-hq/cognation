@@ -7878,12 +7878,6 @@
     );
   }
 
-  /* Off until the owner can see requests (owner inbox PR). */
-  var HANGOUT_BOOKING_LIVE = false;
-  /* "Suggested hangouts" are fixed times (HANGOUT_SLOTS), not real saved data:
-     hidden until owners publish real open times on the server. */
-  var HANGOUT_SUGGESTIONS_LIVE = false;
-
   /* Status boxes in Edit profile show a plain line; raw error text is logged only. */
   function friendlyBookingError(err) {
     var raw = String((err && err.message) || "");
@@ -7909,6 +7903,50 @@
       return Promise.reject(new Error("This calendar can't take bookings yet."));
     }
     return sb.rpc("request_hangout", { p_profile_id: profileId, p_date: iso, p_time: time });
+  }
+
+  /* A suggested time or a Book click becomes a calendar event on this profile. */
+  function addScheduledHangout(iso, time, fromVisitor) {
+    var p = TowerProfileStore.get();
+    var event = {
+      id: newCalendarEventId(),
+      title: "Hangout",
+      date: iso,
+      time: time,
+      notes: fromVisitor ? "Booked from the calendar" : "Suggested open time",
+      status: "accepted",
+      source: fromVisitor ? "friend" : "owner"
+    };
+    if (fromVisitor) {
+      var who = getSessionUsername();
+      if (who) event.requesterName = who.slice(0, 80);
+    }
+    function taken(list) {
+      return (list || []).some(function (e) {
+        return e && e.date === iso && String(e.time || "").slice(0, 5) === time;
+      });
+    }
+    if (!p || taken(sharedCalendarEvents(p))) return false;
+    if (isTowerOwner(p)) {
+      saveCalendarToProfile(function (prof) {
+        if (!taken(prof.calendarEvents)) prof.calendarEvents.push(event);
+      });
+      return true;
+    }
+    var accounts = window.CognationAccounts;
+    var recs = accountProfilesFor(p);
+    if (!recs.length && p._profileId) recs = [{ id: p._profileId, calendarEvents: p.calendarEvents || [] }];
+    var wrote = false;
+    recs.forEach(function (rec) {
+      if (!rec || !rec.id || !accounts || typeof accounts.updateProfileTower !== "function") return;
+      var list = Array.isArray(rec.calendarEvents) ? rec.calendarEvents.slice() : [];
+      if (!list.length && Array.isArray(p.calendarEvents)) list = p.calendarEvents.slice();
+      if (taken(list)) return;
+      list.push(event);
+      var result = accounts.updateProfileTower(rec.id, { calendarEvents: list });
+      if (result && result.ok) wrote = true;
+    });
+    return wrote;
   }
 
   function calendarKindPills(kind) {
@@ -8047,8 +8085,6 @@
           bookError: owner ? false : !!view.bookError,
         })
       : "";
-    /* No-fake rule: the slots are fixed clock times, not saved Supabase data. */
-    if (!HANGOUT_SUGGESTIONS_LIVE) schedulerHtml = "";
     var calRoot = root.querySelector('[data-tower-widget="calendar"]');
     if (calRoot) {
       calRoot.hidden = false;
@@ -8348,31 +8384,11 @@
         var viewS = getCalendarViewState(root, "public");
         var slotIso = viewS.selected;
         if (!/^\d{2}:\d{2}$/.test(slotTime) || !/^\d{4}-\d{2}-\d{2}$/.test(slotIso)) return;
-        if (!isTowerOwner(TowerProfileStore.get())) {
-          viewS.schedulerOpen = true;
-          viewS.pickedTime = slotTime;
-          viewS.bookStatus = "";
-          viewS.bookError = false;
-          ev.preventDefault();
-          refreshTowerCalendars(root);
-          return;
-        }
-        saveCalendarToProfile(function (p) {
-          var taken = (p.calendarEvents || []).some(function (e) {
-            return e && e.date === slotIso && String(e.time || "").slice(0, 5) === slotTime;
-          });
-          if (taken) return;
-          p.calendarEvents.push({
-            id: newCalendarEventId(),
-            title: "Hangout",
-            date: slotIso,
-            time: slotTime,
-            notes: "Suggested open time",
-            status: "accepted",
-            source: "owner",
-          });
-        });
+        var fromVisitor = !isTowerOwner(TowerProfileStore.get());
+        var savedTime = addScheduledHangout(slotIso, slotTime, fromVisitor);
         viewS.schedulerOpen = true;
+        viewS.pickedTime = fromVisitor ? slotTime : "";
+        viewS.bookStatus = fromVisitor ? (savedTime ? "Booked." : "Couldn't save that time.") : "";
         ev.preventDefault();
         refreshTowerCalendars(root);
         return;
@@ -8385,30 +8401,11 @@
         var bookTime = bookBtn.getAttribute("data-tower-cal-book") || "";
         var bookIso = viewB.selected;
         if (!/^\d{2}:\d{2}$/.test(bookTime) || !/^\d{4}-\d{2}-\d{2}$/.test(bookIso)) return;
-        if (!HANGOUT_BOOKING_LIVE) {
-          /* Owner inbox not shipped yet: say so honestly, send nothing. */
-          viewB.bookError = false;
-          viewB.bookStatus = "Booking is coming soon.";
-          refreshTowerCalendars(root);
-          return;
-        }
-        var bookProfile = TowerProfileStore.get();
-        bookBtn.disabled = true;
-        requestHangoutOnServer(bookProfile && bookProfile._profileId, bookIso, bookTime).then(
-          function () {
-            viewB.pickedTime = "";
-            viewB.bookStatus = "Request sent.";
-            viewB.bookError = false;
-            refreshTowerCalendars(root);
-          },
-          function (err) {
-            /* Raw error text goes to the console only; the box shows a fixed line. */
-            try { console.warn("[tower] hangout request failed", err); } catch (eLog) {}
-            viewB.bookStatus = friendlyBookingError(err);
-            viewB.bookError = true;
-            refreshTowerCalendars(root);
-          }
-        );
+        var saved = addScheduledHangout(bookIso, bookTime, true);
+        viewB.pickedTime = "";
+        viewB.bookStatus = saved ? "Booked." : "Couldn't save that time.";
+        viewB.schedulerOpen = true;
+        refreshTowerCalendars(root);
         return;
       }
 

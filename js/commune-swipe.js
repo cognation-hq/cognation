@@ -2393,8 +2393,12 @@
       keep.disabled = needs;
       keep.setAttribute("aria-disabled", needs ? "true" : "false");
     }
+    /* No numbered card on the deck ("Card 10" and the rest of that counter). */
     var idx = state.shell && state.shell.querySelector("[data-commune-index]");
-    if (idx) idx.textContent = state.cards.length ? "Card " + (state.seen + 1) : "";
+    if (idx) {
+      idx.textContent = "";
+      idx.hidden = true;
+    }
     var dots = state.shell && state.shell.querySelector("[data-commune-dots]");
     if (dots) dots.innerHTML = "";
   }
@@ -4244,7 +4248,7 @@
       recordShare(card);
       setStatus(
         viewerIsSeedOrOps()
-          ? "Kept."
+          ? ""
           : ("Shared with friends" + (adTags.length ? " · confirmed \"" + adTags[0] + "\"" : "") + ".")
       );
       friction("complete", "ad");
@@ -4267,14 +4271,14 @@
           confirmInterestTags(card);
           recordShare(card);
         }
-        setStatus(card.keepOnly ? "Kept." : "Shared with friends · interest confirmed.");
+        setStatus(card.keepOnly ? "" : "Shared with friends · interest confirmed.");
       }
       friction("complete", pathway);
       return;
     }
     if (card.type === TYPE.CLASSROOM) {
       like(card);
-      setStatus("Kept. Open the session anytime from a Classroom card.");
+      setStatus("Open the session anytime from a Classroom card.");
       friction("complete", "classroom");
       return;
     }
@@ -4285,17 +4289,17 @@
         recordShare(card);
         setStatus(
           viewerIsSeedOrOps() || card.type === TYPE.FRIEND
-            ? "Kept · interest confirmed."
+            ? ""
             : "Shared with friends · interest confirmed."
         );
       } else {
-        setStatus("Kept.");
+        setStatus("");
       }
       friction("complete", pathway);
       return;
     }
     like(card);
-    setStatus("Kept.");
+    setStatus("");
     friction("complete", pathway);
   }
 

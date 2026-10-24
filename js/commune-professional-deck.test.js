@@ -37,6 +37,12 @@ function loadSwipe(localStorage, sessionStorage) {
     querySelector: function () { return null; },
     addEventListener: function () {},
     dispatchEvent: function () {},
+    createElement: function () {
+      var el = { className: "", innerHTML: "" };
+      el.setAttribute = function () {};
+      el.classList = { add: function () {} };
+      return el;
+    },
   };
   var context = vm.createContext({
     window: windowStub,
@@ -209,12 +215,16 @@ assert.ok(!/getUserMedia|RTCPeer|payout|\bcourse\b/i.test(ccSrc), "no media serv
 assert.strictEqual(adult.buildProfessionalLanes()["pro-creator"].length, 0, "without the interest the algorithm hides it");
 adult.settleSwipe({ id: "content-creator-shown", type: "pro-creator", interests: ["content creator"], roomKind: "content-creator" }, "left");
 assert.ok(JSON.parse(stores.local.getItem("cognation.commune.swipe.dismissed.v1")).ada.indexOf("content-creator-shown") >= 0, "left swipe passes it");
+var passedCard = adult.renderCard({ id: "content-creator-shown", type: "pro-creator", title: "Content Creator", body: "Chatroom for people who make things. Up to 100 people.", why: "You listed Content Creator as an interest.", roomKind: "content-creator", interests: ["content creator"] });
+assert.ok(passedCard.innerHTML.indexOf("You listed Content Creator as an interest") < 0, "passed card does not claim the interest");
 var makerLocal = memoryStorage();
 makerLocal.setItem("cognation.member.profile.v1", JSON.stringify({ age: 30, interests: ["content creator"] }));
 var makerSession = memoryStorage();
 makerSession.setItem("cognation.commune.mode", "professional");
 var maker = loadSwipe(makerLocal, makerSession);
-assert.ok(maker.sampleDeck(8).some(function (c) { return c.type === "pro-creator" && c.roomKind === "content-creator"; }), "interest shows the card");
+var makerCard = maker.sampleDeck(8).filter(function (c) { return c.type === "pro-creator" && c.roomKind === "content-creator"; })[0];
+assert.ok(makerCard, "interest shows the card");
+assert.ok(maker.renderCard(makerCard).innerHTML.indexOf("You listed Content Creator as an interest") >= 0, "interest keeps the why line");
 var cc = maker.contentCreator;
 var room = cc.cards(true)[0];
 var msg = cc.send(room.id, "bad", "Bad", "spam");

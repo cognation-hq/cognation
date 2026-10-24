@@ -2183,7 +2183,9 @@
         html += '<button type="button" class="btn btn-primary" data-creator-enter>Enter room</button>';
         html += '<p class="commune-card-meta">Chatroom · 100 people · up to 15 camera requests · no presenter · no calendar</p>';
       }
-      if (card.why) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
+      /* A card shown without the interest must not claim they listed it. */
+      var creatorOff = card.roomKind === "content-creator" && !hasInterest((window.CognationContentCreator || {}).INTERESTS);
+      if (card.why && !creatorOff) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
       el.innerHTML = html;
       return el;
     }

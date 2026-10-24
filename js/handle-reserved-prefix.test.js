@@ -193,6 +193,7 @@ function bootSocial(rowHandle) {
   vm.createContext(ctx);
   var names = ["normalizeHandle", "updateCurrentProfile", "createProfessionalProfile"];
   if (social.indexOf("function reservedHandle(") >= 0) names.push("reservedHandle", "reservedHandleMessage");
+  if (social.indexOf("function ownerIsFleet(") >= 0) names.push("ownerIsFleet", "fleetKindOf");
   vm.runInContext(names.map(function (n) { return fnSource(social, n); }).join("\n"), ctx);
   return { ctx: ctx, sent: sent };
 }

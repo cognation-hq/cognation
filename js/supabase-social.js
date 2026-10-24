@@ -134,8 +134,20 @@
     document.dispatchEvent(new CustomEvent(name, { detail: detail || {} }));
   }
 
-  /* "seed-" / "seed_" / "ops-" / "ops_" handles are SeedOps-only (js/handle-reserved.js). */
+  /* "seed-" / "seed_" / "ops-" / "ops_" handles are SeedOps-only (js/handle-reserved.js).
+     The one exception: a seed/ops account, i.e. the signed-in owner's own Personal page
+     is fleet-labelled (account_kind seed/ops or a seed_fleet_id), may use them, e.g. for
+     its Pro page (seed-skye-0252-pro). Real members stay blocked. Server backstop:
+     seed-pro-create-sql (owner-fleet check in profiles_block_reserved_handle). */
+  function ownerIsFleet() {
+    var me = identity();
+    if (!me || !me.supabaseUserId) return false;
+    return (state.myProfiles || []).some(function (row) {
+      return !!row && row.kind === "personal" && String(row.user_id) === String(me.supabaseUserId) && !!fleetKindOf(row);
+    });
+  }
   function reservedHandle(value) {
+    if (ownerIsFleet()) return false;
     var rules = window.CognationHandleRules;
     return rules ? rules.isReserved(value) : /^(seed|ops)[-_]/.test(normalizeHandle(value));
   }
@@ -991,6 +1003,7 @@
     acceptFriendRequest: acceptFriendRequest,
     memberResults: memberResults,
     effectiveAccountKind: effectiveAccountKind,
+    ownerIsFleet: ownerIsFleet,
     effectiveFleetId: effectiveFleetId,
     openProfile: openProfile,
     getProfile: profileForId,

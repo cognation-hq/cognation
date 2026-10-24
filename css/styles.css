@@ -8651,6 +8651,14 @@ body { padding-top: 0 !important; }
 .tower-cal-pill:has(input:checked) { outline: 2px solid #7fd6ff; background: rgba(127, 214, 255, 0.14); }
 .tower-cal-pills .form-hint { flex: 1 0 100%; margin: 0.15rem 0 0; }
 [data-tower-cal-auction-fields][hidden] { display: none; }
+.tower-webinar { margin: 0 0 0.65rem; }
+.tower-webinar[hidden] { display: none !important; }
+.tower-webinar-stage { position: relative; height: 7.5rem; margin: 0 0 0.4rem; background: #14141c; border-radius: 0.45rem; overflow: hidden; }
+.tower-webinar-stage::before { content: ""; position: absolute; left: 50%; top: 1.15rem; width: 2.3rem; height: 2.3rem; margin-left: -1.15rem; border-radius: 50%; background: #d7d0ea; }
+.tower-webinar-stage::after { content: ""; position: absolute; left: 50%; top: 3.65rem; width: 4.4rem; height: 2.8rem; margin-left: -2.2rem; border-radius: 1.3rem 1.3rem 0 0; background: #9b93b0; }
+.tower-webinar-stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; }
+.tower-webinar-stage video[data-webinar-live] { opacity: 1; }
+.tower-webinar-stage .tower-webinar-name { position: absolute; left: 0.45rem; bottom: 0.35rem; z-index: 1; color: #fff !important; -webkit-text-fill-color: #fff !important; font-size: 0.75rem; }
 .tower-cal-editor,
 .tower-cal-google {
   margin-top: 0.75rem;

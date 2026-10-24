@@ -7456,6 +7456,10 @@
       normalized.signupFriendIds = ev.signupFriendIds.map(function (id) { return String(id || ""); }).filter(Boolean);
     }
     if (ev.hostHandle) normalized.hostHandle = String(ev.hostHandle).replace(/^@/, "").slice(0, 80);
+    if (ev.kind === "webinar") {
+      normalized.kind = "webinar";
+      normalized.webinar = webinarLimits(ev.webinar && ev.webinar.record === "internal");
+    }
     return normalized;
   }
 
@@ -7615,7 +7619,7 @@
               : e.source === "friend"
               ? '<span class="tower-cal-badge">Friend</span>'
               : "";
-          if (opts.busyOnly || e.busy) {
+          if ((opts.busyOnly || e.busy) && e.kind !== "webinar") {
             return (
               '<li class="tower-cal-event is-busy" data-calendar-busy="true">' +
               '<div class="tower-cal-event-main">' +
@@ -7666,6 +7670,9 @@
               : "") +
             "</div>" +
             actions +
+            (e.kind === "webinar"
+              ? '<div class="tower-webinar" data-webinar-room>' + webinarRoomHtml(e.webinar && e.webinar.record === "internal") + "</div>"
+              : "") +
             "</li>"
           );
         })
@@ -7725,6 +7732,9 @@
     return (events || []).filter(function (e) {
       return e && e.status !== "pending";
     }).map(function (e) {
+      if (e.kind === "webinar") {
+        return { id: e.id, date: e.date, time: e.time || "", title: e.title, notes: "", status: "accepted", source: "owner", kind: "webinar", webinar: webinarLimits(e.webinar && e.webinar.record === "internal") };
+      }
       return {
         id: "busy-" + e.id,
         date: e.date,
@@ -7955,6 +7965,23 @@
     return sb.rpc("request_hangout", { p_profile_id: profileId, p_date: iso, p_time: time });
   }
 
+  /* Capacity only. Not a count of people watching. */
+  function webinarLimits(record) {
+    return { viewers: 200000, live: 50, presenters: 1, comments: false, speak: "raise-hand", record: record ? "internal" : "" };
+  }
+
+  function webinarRoomHtml(record) {
+    return '<div class="tower-webinar-stage"><video data-webinar-presenter muted playsinline></video><span class="tower-webinar-name">Main presenter</span></div>' +
+      '<p class="tower-webinar-limits">Up to 200,000 viewers · Up to 50 live</p>' +
+      '<p class="tower-webinar-actions"><button type="button" class="btn btn-secondary" data-webinar-join>Join on video</button> ' +
+      '<button type="button" class="btn btn-secondary" data-webinar-hand>Raise your hand</button></p>' +
+      '<p class="tower-webinar-speak">Join on video, then raise your hand to speak.</p>' +
+      '<label class="tower-cal-pill"><input type="checkbox" data-webinar-record' + (record ? " checked" : "") + "> Record internally</label>" +
+      '<p class="tower-webinar-record-note">Saved on Cognation only.</p>' +
+      '<p class="tower-webinar-actions"><button type="button" class="btn btn-secondary" data-webinar-export>Export</button> ' +
+      '<button type="button" class="btn btn-secondary" data-webinar-post>Post on YouTube</button></p>';
+  }
+
   /* A suggested time or a Book click becomes a calendar event on this profile. */
   function addScheduledHangout(iso, time, fromVisitor) {
     var p = TowerProfileStore.get();
@@ -8029,6 +8056,7 @@
   }
 
   function calendarEditorHtml(editing, selected) {
+    var on = !!(editing && editing.kind === "webinar");
     var formTitle = editing ? editing.title : "";
     var formDate = editing ? editing.date : selected;
     var formTime = editing ? editing.time || "" : "";
@@ -8037,6 +8065,9 @@
       "<h5>" + (editing ? "Edit event" : "Add event") + "</h5>" +
       calendarKindPills(editing && editing.kind) +
       auctionSaleFields(editing) +
+      '<div class="tower-cal-pills" role="group" aria-label="Event kind"><label class="tower-cal-pill"><input type="checkbox" name="eventKind" value="webinar" data-tower-cal-webinar' +
+      (on ? " checked" : "") + "> Webinar</label></div>" +
+      '<div class="tower-webinar" data-webinar-room' + (on ? "" : " hidden") + ">" + webinarRoomHtml(editing && editing.webinar && editing.webinar.record === "internal") + "</div>" +
       (editing ? '<input type="hidden" name="id" value="' + escapeHtml(editing.id) + '" data-tower-cal-edit-id>' : "") +
       '<div class="form-group"><label for="tower-cal-edit-title">Title</label>' +
       '<input id="tower-cal-edit-title" name="title" type="text" maxlength="120" required value="' + escapeHtml(formTitle) + '" data-tower-cal-edit-title></div>' +
@@ -8304,6 +8335,56 @@
       var t = ev.target;
       if (!t || !root.contains(t)) return;
 
+      var joinBtn = t.closest("[data-webinar-join]");
+      if (joinBtn) {
+        ev.preventDefault();
+        var room = joinBtn.closest("[data-webinar-room]");
+        if (!room) return;
+        room.setAttribute("data-webinar-joined", "true");
+        joinBtn.textContent = "On video";
+        var video = room.querySelector("[data-webinar-presenter]");
+        var media = navigator.mediaDevices;
+        if (media && video && media.getUserMedia) {
+          media.getUserMedia({ video: true, audio: false }).then(function (stream) {
+            video.srcObject = stream;
+            video.setAttribute("data-webinar-live", "true");
+            video.play();
+          }).catch(function () {});
+        }
+        return;
+      }
+      var handBtn = t.closest("[data-webinar-hand]");
+      if (handBtn) {
+        ev.preventDefault();
+        var roomH = handBtn.closest("[data-webinar-room]");
+        var line = roomH && roomH.querySelector(".tower-webinar-speak");
+        if (!roomH || roomH.getAttribute("data-webinar-joined") !== "true") {
+          if (line) line.textContent = "Join on video, then raise your hand to speak.";
+          return;
+        }
+        var up = handBtn.getAttribute("aria-pressed") !== "true";
+        handBtn.setAttribute("aria-pressed", up ? "true" : "false");
+        handBtn.textContent = up ? "Hand raised" : "Raise your hand";
+        if (line) line.textContent = up ? "Your hand is raised." : "Join on video, then raise your hand to speak.";
+        return;
+      }
+      var share = t.closest("[data-webinar-export], [data-webinar-post]");
+      if (share) {
+        ev.preventDefault();
+        var roomX = share.closest("[data-webinar-room]");
+        var noteX = roomX && roomX.querySelector(".tower-webinar-record-note");
+        var recorded = roomX && roomX.querySelector("[data-webinar-record]:checked");
+        if (!recorded) { if (noteX) noteX.textContent = "Saved on Cognation only."; return; }
+        if (share.hasAttribute("data-webinar-export")) {
+          roomX.setAttribute("data-webinar-exported", "1");
+          if (noteX) noteX.textContent = "Exported. Not posted.";
+          return;
+        }
+        if (roomX.getAttribute("data-webinar-exported") !== "1") { if (noteX) noteX.textContent = "Export first. Not posted."; return; }
+        if (noteX) noteX.textContent = "Not posted. No YouTube connection.";
+        return;
+      }
+
       var prev = t.closest("[data-tower-cal-prev]");
       var next = t.closest("[data-tower-cal-next]");
       if (prev || next) {
@@ -8393,10 +8474,6 @@
         var eid = editBtn.getAttribute("data-tower-cal-edit");
         var priv = root.querySelector("[data-tower-cal-public]");
         if (priv) priv.setAttribute("data-editing-id", eid);
-        /* Switch to private side if editing from public */
-        if (editBtn.closest("[data-tower-cal-public], [data-tower-widget=\"calendar\"]")) {
-          if (isTowerOwner(TowerProfileStore.get())) applyTowerSide(root, "private");
-        }
         refreshTowerCalendars(root);
         var focusTitle = root.querySelector("[data-tower-cal-edit-title]");
         if (focusTitle) {
@@ -8482,6 +8559,19 @@
       var viewG = getCalendarViewState(root, "public");
       viewG.schedulerOpen = true;
       refreshTowerCalendars(root);
+    }, true);
+
+    root.addEventListener("change", function (ev) {
+      var box = ev.target && ev.target.matches && ev.target.matches("[data-tower-cal-webinar]") ? ev.target : null;
+      if (!box || !root.contains(box)) return;
+      var room = box.form && box.form.querySelector("[data-webinar-room]");
+      if (room) room.hidden = !box.checked;
+      if (!box.checked) return;
+      var form = box.form;
+      if (!form) return;
+      form.querySelectorAll("[data-tower-cal-kind]").forEach(function (el) { el.checked = false; });
+      var saleFields = form.querySelector("[data-tower-cal-auction-fields]");
+      if (saleFields) saleFields.hidden = true;
     });
 
     root.addEventListener("change", function (ev) {
@@ -8490,8 +8580,13 @@
       var group = box.closest("[data-tower-cal-pills]");
       if (!group) return;
       group.querySelectorAll("[data-tower-cal-kind]").forEach(function (el) { if (el !== box) el.checked = false; });
-      var saleFields = box.closest("form") && box.closest("form").querySelector("[data-tower-cal-auction-fields]");
+      var formK = box.closest("form");
+      var saleFields = formK && formK.querySelector("[data-tower-cal-auction-fields]");
       if (saleFields) saleFields.hidden = box.value !== "auction";
+      var webinarBox = formK && formK.querySelector("[data-tower-cal-webinar]");
+      if (webinarBox) webinarBox.checked = false;
+      var webinarRoom = formK && formK.querySelector("[data-webinar-room]");
+      if (webinarRoom) webinarRoom.hidden = true;
     });
     root.addEventListener("submit", function (ev) {
       var form = ev.target;
@@ -8524,14 +8619,19 @@
           setEdStatus("Title and a valid date are required.", true);
           return;
         }
+        var webinarOn = !!form.querySelector("[data-tower-cal-webinar]:checked");
         var kindBox = form.querySelector("[data-tower-cal-kind]:checked");
         var kind = kindBox ? kindBox.value : "";
-        if (kind !== "classroom" && kind !== "auction") {
+        if (webinarOn && (kind === "classroom" || kind === "auction")) {
+          setEdStatus("Check Webinar.", true);
+          return;
+        }
+        if (!webinarOn && kind !== "classroom" && kind !== "auction") {
           setEdStatus("Check Classroom or Auction.", true);
           return;
         }
         var sale = {};
-        if (kind === "auction") {
+        if (!webinarOn && kind === "auction") {
           var sellEl = form.querySelector("[data-tower-cal-selling]");
           var startEl = form.querySelector("[data-tower-cal-start]");
           sale.item = sellEl ? sellEl.value.trim().slice(0, 120) : "";
@@ -8543,6 +8643,10 @@
         }
         var editId = idEl ? idEl.value : "";
         saveCalendarToProfile(function (p) {
+          function applyWebinar(e) {
+            e.kind = "webinar";
+            e.webinar = webinarLimits(!!form.querySelector("[data-webinar-record]:checked"));
+          }
           if (editId) {
             var found = false;
             (p.calendarEvents || []).forEach(function (e) {
@@ -8551,28 +8655,27 @@
                 e.date = date;
                 e.time = time;
                 e.notes = notes;
-                applyEventKind(e, kind, p, sale);
+                if (webinarOn) applyWebinar(e);
+                else applyEventKind(e, kind, p, sale);
                 found = true;
               }
             });
             if (!found) {
-              var revived = {
-                id: editId, title: title, date: date, time: time, notes: notes, status: "accepted", source: "owner",
-              };
-              applyEventKind(revived, kind, p, sale);
+              var revived = { id: editId, title: title, date: date, time: time, notes: notes, status: "accepted", source: "owner" };
+              if (webinarOn) applyWebinar(revived);
+              else applyEventKind(revived, kind, p, sale);
               p.calendarEvents.push(revived);
             }
           } else {
-            var added = {
-              id: newCalendarEventId(), title: title, date: date, time: time, notes: notes, status: "accepted", source: "owner",
-            };
-            applyEventKind(added, kind, p, sale);
+            var added = { id: newCalendarEventId(), title: title, date: date, time: time, notes: notes, status: "accepted", source: "owner" };
+            if (webinarOn) applyWebinar(added);
+            else applyEventKind(added, kind, p, sale);
             p.calendarEvents.push(added);
           }
         });
         var priv3 = root.querySelector("[data-tower-cal-public]");
         if (priv3) priv3.removeAttribute("data-editing-id");
-        var view3 = getCalendarViewState(root, "private");
+        var view3 = getCalendarViewState(root, "public");
         view3.selected = date;
         var dp = date.split("-");
         view3.year = parseInt(dp[0], 10);

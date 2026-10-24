@@ -14924,6 +14924,46 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   .circle-fall[data-pulse-bg] a.pulse-fall-circle,
   a.pulse-fall-circle { animation: none !important; transform: none !important; }
   .circle-fall[data-pulse-bg]::after { animation: none !important; transform: none !important; }
+  .circle-fall[data-pulse-bg] .circle-ring-spin,
+  .circle-fall[data-pulse-bg] .circle-ring-spin::before { animation: none; }
+}
+.circle-fall[data-pulse-bg] .circle-ring-spin { animation: pulse-halo-bob 4.4s ease-in-out infinite; }
+.circle-fall[data-pulse-bg] .circle-ring-spin::before {
+  content: ""; position: absolute; pointer-events: none; border-radius: 50%;
+  width: min(640px, 94vw); height: min(640px, 94vw);
+  left: calc(min(640px, 94vw) / -2); top: calc(min(640px, 94vw) / -2);
+  background: conic-gradient(#f7feff, #9cf6ff 10%, #3ecbff 22%, #6d78ff 40%, #b44bff 58%, #c5a6ff 78%, #3ecbff 92%, #f7feff);
+  -webkit-mask: radial-gradient(circle, #0000 63%, #000 70% 78%, #0000 86%);
+  mask: radial-gradient(circle, #0000 63%, #000 70% 78%, #0000 86%);
+  transform: rotateX(80deg);
+  animation: pulse-halo-3d 8s linear infinite, pulse-halo-ghost 4.8s ease-in-out infinite;
+}
+@keyframes pulse-halo-3d { to { transform: rotateX(80deg) rotateZ(1turn); } }
+@keyframes pulse-halo-ghost {
+  0%, 100% { opacity: 0.4; filter: drop-shadow(0 0 6px rgba(62, 203, 255, 0.32)) drop-shadow(0 0 14px rgba(180, 75, 255, 0.26)); }
+  50% { opacity: 1; filter: drop-shadow(0 0 22px rgba(62, 203, 255, 0.95)) drop-shadow(0 0 42px rgba(180, 75, 255, 0.72)); }
+}
+@keyframes pulse-halo-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-32px); } }
+.pulse-side-toggle {
+  position: absolute; z-index: 6; top: 8px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; pointer-events: auto;
+}
+.pulse-side-toggle button {
+  margin: 0; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(197, 166, 255, 0.45); background: rgba(18, 16, 38, 0.88);
+  color: #f7fbff; font: 600 13px/1 var(--cgn-ui, system-ui);
+}
+.pulse-side-toggle button[aria-pressed="true"] {
+  border-color: rgba(168, 244, 255, 0.95); box-shadow: 0 0 12px rgba(62, 203, 255, 0.45);
+}
+.pulse-fall-actions {
+  position: absolute; z-index: 4; display: flex; flex-direction: column; align-items: center;
+  gap: 1px; transform: translateX(-50%); pointer-events: auto;
+}
+.pulse-fall-act {
+  margin: 0; padding: 1px 4px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  border: 1px solid rgba(217, 210, 240, 0.5); background: rgba(18, 16, 38, 0.92);
+  color: #f7fbff; font: 600 10px/1.2 var(--cgn-ui, system-ui);
 }
 
 /* COGNATION | WAYMAKERS switch is hidden (index.html `hidden`) until Waymakers has a

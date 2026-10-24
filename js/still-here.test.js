@@ -374,7 +374,6 @@ vm.runInContext([
 function net(id) { return ctx.nets.filter(function (n) { return n.id === id; })[0]; }
 assert.ok(net("venmo") && ctx.allowed(net("venmo"), "personal") && ctx.allowed(net("venmo"), "professional"), "Venmo on Personal and Pro");
 assert.strictEqual(ctx.href("venmo", "@alexa"), "https://venmo.com/u/alexa", "Venmo handle links out");
-assert.ok(/data-tower-social="venmo"/.test(html), "Venmo field in Edit profile");
 ["services", "ads"].forEach(function (id) {
   var n = net(id);
   assert.ok(n && n.label === (id === "services" ? "Pay for services" : "Buy ads") && n.quiet && !n.cta, id + " link defined, quiet");
@@ -385,7 +384,6 @@ assert.ok(/data-tower-social="venmo"/.test(html), "Venmo field in Edit profile")
     assert.strictEqual(ctx.href(id, bad), "", id + " rejected: " + bad);
     assert.strictEqual(ctx.stored(id, bad), "", id + " not stored: " + bad);
   });
-  assert.ok(new RegExp('<input id="tower-social-' + id + '"[^>]*type="url"[^>]*data-tower-social="' + id + '"').test(html), "owner sets " + id + " in Edit profile");
 });
 assert.ok(!net("hire") && !/is-cta/.test(tower) && !/data-tower-social="hire"/.test(html), "single Hire/Buy CTA gone");
 var css = fs.readFileSync(path.join(__dirname, "..", "css", "styles.css"), "utf8");

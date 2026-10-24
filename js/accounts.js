@@ -142,7 +142,7 @@
 
   function defaultProfessionalTower() {
     return {
-      displayName: "Alexa J Thomas",
+      displayName: "Cognation",
       handle: DEMO_ALEXA.professionalHandle,
       slogan: "",
       socialLinks: {},
@@ -395,6 +395,7 @@
       rec[k] = tower[k];
     });
 
+    if (kind === "personal") rec.friendIds = ["cognation"];
     saveProfileRecord(rec);
     var acct = getAccountByUsername(username);
     var ids = (acct && acct.profileIds) || [];
@@ -502,6 +503,8 @@
       saveProfilesDoc(profilesDoc);
     }
 
+    ensureCognationFriend(DEMO_ALEXA.username);
+
     var ids = [];
     if (personal) ids.push(personal.id);
     if (professional) ids.push(professional.id);
@@ -540,6 +543,23 @@
       personal: personal,
       professional: professional,
     };
+  }
+
+  /* Signup puts Cognation first. It is not added with a button, and it is not removed. */
+  function ensureCognationFriend(username) {
+    var list = getProfilesForUsername(username);
+    var personal = null;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].kind !== "professional") {
+        personal = list[i];
+        break;
+      }
+    }
+    if (!personal) return false;
+    var ids = Array.isArray(personal.friendIds) ? personal.friendIds : [];
+    if (ids[0] === "cognation") return true;
+    personal.friendIds = ["cognation"].concat(ids.filter(function (id) { return id !== "cognation"; }));
+    return !!saveProfileRecord(personal);
   }
 
   function profilesForLogin(username) {
@@ -657,6 +677,7 @@
     updateProfileTower: updateProfileTower,
     stripMeta: stripMeta,
     profilesForLogin: profilesForLogin,
+    ensureCognationFriend: ensureCognationFriend,
     ensureDemoProfessionals: ensureDemoProfessionals,
     saveProfileRecord: saveProfileRecord,
   };

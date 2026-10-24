@@ -3028,6 +3028,7 @@
   function renderAttachments(list) {
     if (!list || !list.length) return "";
     var html = list.map(function (a) {
+      if (a && a.kind === "event") return "";
       var src = photoSrc(a) || attachmentImageUrl(a);
       if (src) {
         if (!photoVisible(a)) return "";
@@ -3240,8 +3241,9 @@
         escapeHtml(formatTime(post.createdAt)) +
         "</time></header>" +
         (post.body
-          ? '<p class="tower-post-body">' + escapeHtml(post.body) + "</p>"
+          ? '<p class="tower-post-body">' + escapeHtml(post.body).replace(/(^|[^A-Za-z0-9_])(#addevent)\b/ig, '$1<a class="tower-invite-tag" href="#addevent" data-feed-add-event="' + escapeHtml(post.id || "") + '">$2</a>') + "</p>"
           : "") +
+        feedInviteHtml(post) +
         renderAttachments(post.attachments);
       article.appendChild(buildTowerPostReactBar(post, root));
       list.appendChild(article);
@@ -3251,6 +3253,128 @@
           window.CognationFeedComments.mount(article, { id: post.id || "" });
         }
       } catch (eComments) {}
+    });
+    bindFeedInvites(list);
+  }
+
+  var INVITE_MONTHS = { january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12 };
+  function proseInviteDate(body) {
+    var m = String(body || "").match(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b/i);
+    if (!m) return "";
+    var mo = INVITE_MONTHS[m[1].toLowerCase()];
+    var day = parseInt(m[2], 10);
+    if (!mo || day < 1 || day > 31) return "";
+    return m[3] + "-" + pad2(mo) + "-" + pad2(day);
+  }
+  function proseInviteTitle(body) {
+    var m = String(body || "").match(/\bhosting\s+(?:an?\s+)?(.+?)\s+on\s+/i);
+    if (!m) return "";
+    var t = m[1].trim();
+    return t ? t.charAt(0).toUpperCase() + t.slice(1) : "";
+  }
+  function eventFromPost(post) {
+    var list = (post && post.attachments) || [];
+    var i;
+    for (i = 0; i < list.length; i++) {
+      if (list[i] && list[i].kind === "event") {
+        var parts = String(list[i].label || "").split("|");
+        return { when: parts[0] || "", what: parts.slice(1).join("|") };
+      }
+    }
+    return { when: "", what: "" };
+  }
+  function inviteHostSlug(post) {
+    var slug = "";
+    try { slug = towerPostAuthorSlug(post); } catch (eSlug) {}
+    if (!slug) slug = String((post && post.handle) || "").replace(/^@/, "").trim();
+    return slug;
+  }
+  function feedInvite(post) {
+    var body = String((post && post.body) || "");
+    if (!/(^|[^A-Za-z0-9_])#addevent\b/i.test(body)) return null;
+    var ev = eventFromPost(post);
+    var iso = coerceEventWhen(ev.when);
+    var date = iso ? iso.slice(0, 10) : proseInviteDate(body);
+    var time = iso ? iso.slice(11, 16) : "";
+    var what = String(ev.what || "").trim();
+    var title = what ? what.charAt(0).toUpperCase() + what.slice(1) : (proseInviteTitle(body) || "Event");
+    return { title: title.slice(0, 120), date: date, time: time, slug: inviteHostSlug(post), name: (post && post.authorName) || "Host" };
+  }
+  function inviteWhenLabel(invite) {
+    if (!invite || !invite.date) return "";
+    var parts = invite.date.split("-");
+    var names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    var label = (names[parseInt(parts[1], 10) - 1] || "") + " " + parseInt(parts[2], 10) + ", " + parts[0];
+    if (invite.time) label += " · " + formatEventTime(invite.time);
+    return label;
+  }
+  function feedInviteHtml(post) {
+    var invite = feedInvite(post);
+    if (!invite) return "";
+    var where = invite.slug
+      ? '<a class="tower-invite-where" href="#tower-profile-' + escapeHtml(encodeURIComponent(invite.slug)) + '" data-tower-author-open="' + escapeHtml(invite.slug) + '">' + escapeHtml(invite.name + "\u2019s Tower page") + "</a>"
+      : "";
+    return '<div class="tower-post-invite">' +
+      '<p class="tower-invite-title">' + escapeHtml(invite.title) + "</p>" +
+      (inviteWhenLabel(invite) ? '<p class="tower-invite-when">' + escapeHtml(inviteWhenLabel(invite)) + "</p>" : "") +
+      (where ? '<p class="tower-invite-line">Where: ' + where + "</p>" : "") + "</div>";
+  }
+  function addInviteToOwnCalendar(post) {
+    var invite = feedInvite(post);
+    if (!invite || !/^\d{4}-\d{2}-\d{2}$/.test(invite.date)) return false;
+    var personal = viewerPersonalRecord();
+    var accounts = window.CognationAccounts;
+    if (!personal || !accounts || typeof accounts.saveProfileRecord !== "function") return false;
+    var who = String(personal.accountUsername || "").toLowerCase();
+    var handle = String(personal.handle || "").replace(/^@/, "").toLowerCase();
+    if (who === "cognation" || handle === "cognation") return false;
+    var id = "invite-" + String(post.id || invite.date).replace(/[^a-z0-9-]/gi, "").slice(0, 48);
+    var event = normalizeCalendarEvent({
+      id: id, title: invite.title, date: invite.date, time: invite.time || "",
+      notes: "", status: "accepted", source: "owner", hostHandle: invite.slug,
+    });
+    var list = normalizeCalendarEventsList(personal.calendarEvents || []);
+    var found = false;
+    list = list.map(function (e) {
+      if (e && e.id === id) { found = true; return event; }
+      return e;
+    });
+    if (!found) list.push(event);
+    personal.calendarEvents = list;
+    if (!accounts.saveProfileRecord(personal)) return false;
+    var app = document.querySelector("[data-tower-app]");
+    if (app) { try { refreshTowerCalendars(app); } catch (eCal) {} }
+    return true;
+  }
+  function openOutlookInvite(invite) {
+    if (!invite || !invite.date) return;
+    var slug = invite.slug || "";
+    var loc = slug ? ((location.origin || "") + (location.pathname || "/") + "#tower-profile-" + encodeURIComponent(slug)) : "";
+    var start = invite.time ? invite.date + "T" + invite.time + ":00" : invite.date;
+    var end = invite.time ? invite.date + "T" + invite.time + ":00" : towerCalAddDaysIso(invite.date, 1);
+    var url = "https://outlook.live.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent" +
+      (invite.time ? "" : "&allday=true") +
+      "&subject=" + encodeURIComponent(invite.title || "Event") +
+      "&startdt=" + encodeURIComponent(start) +
+      "&enddt=" + encodeURIComponent(end) +
+      "&location=" + encodeURIComponent(loc) +
+      "&body=" + encodeURIComponent((invite.title || "Event") + (loc ? "\n" + loc : ""));
+    window.open(url, "_blank", "noopener");
+  }
+  function bindFeedInvites(list) {
+    if (!list || list.__feedInviteBound) return;
+    list.__feedInviteBound = true;
+    list.addEventListener("click", function (ev) {
+      var btn = ev.target && ev.target.closest ? ev.target.closest("[data-feed-add-event]") : null;
+      if (!btn || !list.contains(btn)) return;
+      ev.preventDefault();
+      var id = btn.getAttribute("data-feed-add-event") || "";
+      var post = null;
+      TowerStore.list().forEach(function (p) { if (p && p.id === id) post = p; });
+      if (!post) return;
+      var invite = feedInvite(post);
+      if (!addInviteToOwnCalendar(post)) return;
+      openOutlookInvite(invite);
     });
   }
 
@@ -7681,6 +7805,9 @@
             (e.notes
               ? '<span class="tower-cal-event-notes">' + escapeHtml(e.notes) + "</span>"
               : "") +
+            (e.hostHandle
+              ? '<a class="tower-cal-event-where" href="#tower-profile-' + escapeHtml(encodeURIComponent(String(e.hostHandle).replace(/^@/, ""))) + '" data-tower-author-open="' + escapeHtml(String(e.hostHandle).replace(/^@/, "")) + '">' + escapeHtml("Tower page") + "</a>"
+              : "") +
             "</div>" +
             actions +
             (e.kind === "webinar"
@@ -7761,9 +7888,37 @@
     });
   }
 
+  function coerceEventWhen(raw) {
+    var s = String(raw || "").replace(/[\u200e\u200f]/g, "").trim();
+    var iso = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+    if (iso) return iso[1] + "-" + iso[2] + "-" + iso[3] + "T" + iso[4] + ":" + iso[5];
+    var us = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4}),?\s+(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (!us) return "";
+    var h = parseInt(us[4], 10);
+    var ap = (us[6] || "").toUpperCase();
+    if (ap === "PM" && h < 12) h += 12;
+    if (ap === "AM" && h === 12) h = 0;
+    var mo = parseInt(us[1], 10);
+    var day = parseInt(us[2], 10);
+    if (mo < 1 || mo > 12 || day < 1 || day > 31 || h > 23) return "";
+    return us[3] + "-" + pad2(mo) + "-" + pad2(day) + "T" + pad2(h) + ":" + us[5];
+  }
+  function readEventWhen(input) {
+    if (!input) return "";
+    var direct = coerceEventWhen(input.value);
+    if (direct) return direct;
+    var n = input.valueAsNumber;
+    if (typeof n === "number" && isFinite(n)) {
+      var d = new Date(n);
+      if (!isNaN(d.getTime())) {
+        return d.getUTCFullYear() + "-" + pad2(d.getUTCMonth() + 1) + "-" + pad2(d.getUTCDate()) + "T" + pad2(d.getUTCHours()) + ":" + pad2(d.getUTCMinutes());
+      }
+    }
+    return "";
+  }
   function normalizeGoingLive(raw) {
     if (!raw || typeof raw !== "object") return null;
-    var when = String(raw.when || raw.liveAt || "").trim().slice(0, 16);
+    var when = coerceEventWhen(raw.when || raw.liveAt || "");
     var where = String(raw.where || "").trim().slice(0, 120);
     var what = String(raw.what || raw.title || "").trim().slice(0, 240);
     if (!what) what = String(raw.details || raw.notes || "").trim().slice(0, 240);
@@ -8205,8 +8360,6 @@
       publicCal.setAttribute("aria-label", "Calendar");
       publicCal.setAttribute("data-calendar-busy", owner ? "false" : "true");
     }
-    var editingId = publicCal && publicCal.getAttribute("data-editing-id") || "";
-    var editing = editingId ? (events.filter(function (e) { return e && e.id === editingId; })[0] || null) : null;
     body.innerHTML =
       renderTowerMonthGrid(view, events, { gridLabel: "Calendar" }) +
       '<div class="tower-cal-day-panel">' +
@@ -8216,8 +8369,7 @@
       "</h5>" +
       renderDayEventList(events, selected, { ownerControls: owner, busyOnly: !owner }) +
       "</div>" +
-      schedulerHtml +
-      (owner ? calendarEditorHtml(editing, selected) : "");
+      schedulerHtml;
   }
 
   function visitorSessionRowHtml(sess, api) {
@@ -12160,39 +12312,82 @@
     try { ensurePersonalPolaroid(root, p); } catch (ePol) {}
   }
 
+  function submitSignalEvent(body, when, what) {
+    var text = String(body || "");
+    if (!/\S/.test(text)) return Promise.resolve(false);
+    var attachments = [{ kind: "event", label: String(when || "") + "|" + String(what || "").slice(0, 120) }];
+    if (usingRemoteSocial()) {
+      var social = remoteSocial();
+      if (!social || typeof social.createTowerPost !== "function") return Promise.resolve(false);
+      var asId = "";
+      try {
+        if (window.CognationSignalPostAs && typeof window.CognationSignalPostAs.currentAuthorProfileId === "function") {
+          asId = window.CognationSignalPostAs.currentAuthorProfileId() || "";
+        }
+      } catch (eAs) {}
+      return social.createTowerPost({ body: text, attachments: attachments, asProfileId: asId }).then(function () {
+        return true;
+      }, function () { return false; });
+    }
+    var added = TowerStore.add({
+      authorName: postAuthorFromProfile(TowerProfileStore.get()),
+      body: text,
+      attachments: attachments,
+    });
+    return Promise.resolve(!!(added && added.ok));
+  }
+
   function initGoingLive(root) {
     if (!root || root.__cognationGoingLiveBound) return;
     root.__cognationGoingLiveBound = true;
     var postBtn = towerFeedQuery(root, "[data-tower-event-post]");
     if (postBtn) {
       postBtn.addEventListener("click", function () {
-        var whenIn = towerFeedQuery(root, "[data-tower-event-when]");
-        var whereIn = towerFeedQuery(root, "[data-tower-event-where]");
-        var whatIn = towerFeedQuery(root, "[data-tower-event-what]");
-        var status = towerFeedQuery(root, "[data-tower-event-status]");
+        var box = postBtn.closest("[data-tower-event-fields]") || document;
+        var whenIn = box.querySelector("[data-tower-event-when]");
+        var whereIn = box.querySelector("[data-tower-event-where]");
+        var whatIn = box.querySelector("[data-tower-event-what]");
+        var status = box.querySelector("[data-tower-event-status]");
         function say(msg, isError) {
           if (!status) return;
           status.hidden = !msg;
           status.textContent = msg || "";
           status.classList.toggle("is-error", !!isError);
         }
-        var live = normalizeGoingLive({
-          when: whenIn ? whenIn.value : "",
-          where: whereIn ? whereIn.value : "",
-          what: whatIn ? whatIn.value : "",
-        });
-        if (!live) {
+        var when = readEventWhen(whenIn);
+        var what = whatIn ? String(whatIn.value || "").trim() : "";
+        var who = TowerProfileStore.get() || {};
+        var where = (who.displayName || who.handle || "Host") + "\u2019s Tower page";
+        if (!when || !what) {
           say("Add when and what.", true);
           return;
         }
-        if (!publishGoingLive(live)) {
+        var bodyEl = document.getElementById("tower-body");
+        var text = bodyEl ? bodyEl.value : "";
+        /* #addevent stays in the signal text: that tag is the invite. */
+        if (/(^|[^A-Za-z0-9_])#addevent\b/i.test(text)) {
+          submitSignalEvent(text, when, what).then(function (ok) {
+            if (!ok) { say("Could not post that event.", true); return; }
+            if (whenIn) whenIn.value = "";
+            if (whereIn) whereIn.value = "";
+            if (whatIn) whatIn.value = "";
+            if (bodyEl) bodyEl.value = "";
+            var dropInvite = box.closest("[data-tower-event-dropdown]");
+            if (dropInvite) dropInvite.open = false;
+            say("", false);
+            renderFeed(root);
+          });
+          return;
+        }
+        var live = normalizeGoingLive({ when: when, where: where, what: what });
+        if (!live || !publishGoingLive(live)) {
           say("Could not post that event.", true);
           return;
         }
         if (whenIn) whenIn.value = "";
         if (whereIn) whereIn.value = "";
         if (whatIn) whatIn.value = "";
-        var drop = towerFeedQuery(root, "[data-tower-event-dropdown]");
+        var drop = box.closest("[data-tower-event-dropdown]");
         if (drop) drop.open = false;
         say("Posted on your personal and professional pages.", false);
         renderGoingLiveWidget(root);

@@ -397,13 +397,28 @@
     return { generated: generated };
   }
 
+  /* Who this tab hydrated for. The sessionStorage flag only skips a re-hydrate
+     for the same viewer: after a sign-out in this tab (or a reload after it) the
+     signed-out viewer hydrates again, so the seed posts and templates come back. */
+  function viewerKey() {
+    try {
+      var social = window.CognationSupabaseSocial;
+      if (social && typeof social.active === "function" && social.active()) {
+        var auth = window.CognationAuth;
+        var s = auth && typeof auth.getSession === "function" ? auth.getSession() : null;
+        return "member:" + String((s && s.supabaseUserId) || "");
+      }
+    } catch (e) {}
+    return "signed-out";
+  }
+
   function hydrate(opts) {
     opts = opts || {};
     if (!isConfigured() && !opts.forceLocal) {
       return Promise.resolve({ ok: false, error: "supabase_not_configured", skipped: true });
     }
     var prior = readJson(sessionStorage, BOOT_FLAG, null);
-    if (prior && prior.ok && !opts.force) {
+    if (prior && prior.ok && prior.viewer === viewerKey() && !opts.force) {
       return Promise.resolve({ ok: true, cached: true, prior: prior });
     }
     if (hydrating) {
@@ -449,6 +464,7 @@
           cap: HARD_CAP,
           at: new Date().toISOString(),
           error: merged.error,
+          viewer: viewerKey(),
         };
         /* ok when we attempted a clean hydrate even if the fleet was already local. */
         if (merged.ok) out.ok = true;
@@ -488,6 +504,11 @@
         sessionStorage.removeItem(BOOT_FLAG);
       } catch (e) {}
       run(true);
+    });
+    /* Sign-out in this tab: hydrate again for the signed-out viewer (same-viewer
+       loads still reuse the flag, so a signed-out page load does not refetch). */
+    document.addEventListener("cognation:session-ended", function () {
+      run(false);
     });
     document.addEventListener("cognation:auth-changed", function () {
       try {

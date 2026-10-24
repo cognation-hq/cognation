@@ -94,8 +94,8 @@
   var SPAWN_ROWS = {
     /* LOOK v3.3: each social/link is its own widget. __socials__ expands to opted-in
        chips (pairs on desktop). No grouped LINKS box. */
-    personal: [["avatar"], ["identity"], ["slogan"], ["music"], ["friends"], ["__socials__"], ["badges", "calendar"], ["polaroid", "html"], ["instax"]],
-    professional: [["avatar"], ["identity"], ["slogan"], ["youtube"], ["__socials__"], ["badges"], ["followers", "calendar"], ["html"]],
+    personal: [["avatar"], ["identity"], ["slogan"], ["visitor-calendar"], ["music"], ["friends"], ["__socials__"], ["badges", "calendar"], ["polaroid", "html"], ["instax"]],
+    professional: [["avatar"], ["identity"], ["slogan"], ["visitor-calendar"], ["youtube"], ["__socials__"], ["badges"], ["followers", "calendar"], ["html"]],
   };
   /* Factory seeds that were never a user's choice. An entry equal to one of these
      is treated as unplaced, so old overlapping defaults get a real spawn spot. */
@@ -104,6 +104,11 @@
     { avatar: [4, 4], identity: [4, 26], slogan: [28, 18], social: [4, 26], music: [4, 34], badges: [4, 44], friends: [4, 56], html: [28, 4] },
     { identity: [4, 18] },
   ];
+  /* Calendar card (visitors): its own widget, one full row directly under the bio
+     card in every default layout (Personal and Professional). The owner's own
+     Calendar stays in Edit profile; this card is hidden on the owner's view. It
+     is never dragged or saved, so a saved layout never holds a spot for it. */
+  var VISITOR_CALENDAR_ID = "visitor-calendar";
   var spawnCache = {};
   /* Avatar, name and slogan read as one profile card: a tight gap between them. */
   var PROFILE_STACK = { avatar: true, identity: true, slogan: true };
@@ -141,6 +146,19 @@
 
   function socialWidgetId(netId) {
     return "social-" + String(netId || "");
+  }
+
+  /* Pro money links (Venmo, Pay for services, Buy ads): one card, stacked pills
+     (Designer spec). Each link is still its own saved field; only the widget on
+     the page is one group. Personal keeps Venmo as its own logo chip. */
+  var PAY_LINKS_ID = "pay-links";
+  var PAY_LINK_NETS = ["venmo", "services", "ads"];
+  var PAGE_BUTTON_NETS = ["shop", "linktree", "applepay", "appleamt"];
+  function isPayLinkNet(netId, p) {
+    return isProTower(p) && PAY_LINK_NETS.indexOf(String(netId || "")) >= 0;
+  }
+  function isPageButtonNet(netId) {
+    return PAGE_BUTTON_NETS.indexOf(String(netId || "")) >= 0;
   }
 
   function socialNetIdFromWidget(wid) {
@@ -181,7 +199,9 @@
       var b = extra && extra[net.id] ? extra[net.id] : "";
       out[net.id] = a || b || "";
     });
-    if (!out.youtube && p.musicUrl && looksLikeYoutubeUrl(p.musicUrl)) out.youtube = String(p.musicUrl).trim();
+    /* The YouTube video box (musicUrl) is the YouTube widget on Pro. It no
+       longer also makes a YouTube logo chip: that copy could not be removed
+       (it came back from musicUrl) and sat as a lone red logo under the video. */
     return out;
   }
 
@@ -203,11 +223,15 @@
     var out = [];
     (rows || []).forEach(function (row) {
       if (row.length === 1 && row[0] === "__socials__") {
-        var ids = optedInSocialNetIds(p).map(socialWidgetId);
+        var opted = optedInSocialNetIds(p);
+        var pay = opted.filter(function (id) { return isPayLinkNet(id, p); });
+        var ids = opted.filter(function (id) { return pay.indexOf(id) < 0 && !isPageButtonNet(id); }).map(socialWidgetId);
         var i;
         for (i = 0; i < ids.length; i += 2) {
           out.push(ids.slice(i, i + 2));
         }
+        /* Venmo / Pay for services / Buy ads: one full-width card after the chips. */
+        if (pay.length) out.push([PAY_LINKS_ID]);
         return;
       }
       out.push(row.slice());
@@ -230,6 +254,22 @@
       if (!p.widgetLayout[wid]) p.widgetLayout[wid] = old;
     }
     delete p.widgetLayout.social;
+  }
+
+  /* A saved layout from before the pay-links card: the card takes the spot of the
+     first Venmo / Pay / Buy ads chip the owner placed. The old keys stay as they
+     are (nothing is deleted), so no saved position is lost. */
+  function seedPayLinksLayout(p) {
+    if (!p || !isProTower(p) || !p.widgetLayout || typeof p.widgetLayout !== "object") return;
+    var layout = p.widgetLayout;
+    if (layout[PAY_LINKS_ID]) return;
+    for (var i = 0; i < PAY_LINK_NETS.length; i++) {
+      var old = layout[socialWidgetId(PAY_LINK_NETS[i])];
+      if (old && typeof old === "object" && isPlacedPos(layout, socialWidgetId(PAY_LINK_NETS[i]))) {
+        layout[PAY_LINKS_ID] = JSON.parse(JSON.stringify(old));
+        return;
+      }
+    }
   }
 
   function rectsOverlap(a, b, gap) {
@@ -379,6 +419,14 @@
     /* Phone ignores saved x/y entirely (it is the website's layout). */
     var layout = phone ? {} : getWidgetLayout(p) || {};
     var rows = spawnRowsFor(p).slice();
+    var printListed = {};
+    rows.forEach(function (r) { r.forEach(function (id) { printListed[id] = true; }); });
+    stage.querySelectorAll("[data-tower-polaroid-extra]").forEach(function (el) {
+      var wid = el.getAttribute("data-tower-widget");
+      if (!wid || printListed[wid] || el.hidden || el.classList.contains("is-widget-off")) return;
+      printListed[wid] = true;
+      rows.push([wid]);
+    });
     if (phone) {
       /* Widgets outside the spec order (emoji, quotes, extra prints) follow in DOM order. */
       var listed = {};
@@ -412,6 +460,8 @@
           var el = stage.querySelector('[data-tower-widget="' + id + '"]');
           if (!el || el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
           if (el.classList.contains("is-dragging")) return;
+          if (id === VISITOR_CALENDAR_ID) el.style.removeProperty("--visitor-cal-w");
+          if (id === "youtube") el.style.removeProperty("--yt-col-w");
           el.classList.add("is-spawned");
           el.classList.toggle("is-spawn-full", row.length === 1);
           el.classList.toggle("is-spawn-half", row.length > 1);
@@ -427,7 +477,15 @@
           gridCache[id] = { x: 0, y: 0, z: 2, tilt: 0 };
         });
       });
-      ordered.forEach(function (el) { stage.appendChild(el); });
+      /* Re-append only when the order changed: moving a node drops keyboard focus,
+         so a re-render used to knock focus off any link in the grid (Tab to a pay
+         link, and focus jumped back to the page). Same final order as before. */
+      var kids = stage.children;
+      var tailOk = kids.length >= ordered.length;
+      for (var oi = 0; tailOk && oi < ordered.length; oi++) {
+        if (kids[kids.length - ordered.length + oi] !== ordered[oi]) tailOk = false;
+      }
+      if (!tailOk) ordered.forEach(function (el) { stage.appendChild(el); });
       ensureProfileStrip(stage, p);
       /* Friend pins: in default grid they sit inside the Top Friends card flow via CSS;
          clear absolute spawn marks so they do not float over the grid. */
@@ -459,10 +517,28 @@
     var sizes = {};
     var occupied = [];
     var colW = phone ? stageW - 32 : (stageW - 48 - SPAWN_GAP) / 2;
+    var avatarEl = stage.querySelector('[data-tower-widget="avatar"]');
+    var calSeat = null;
     stage.querySelectorAll("[data-tower-widget]").forEach(function (el) {
       if (el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
       var id = el.getAttribute("data-tower-widget");
       el.classList.remove("is-spawn-full", "is-spawn-half", "is-grid-friend-pin");
+      /* YouTube (#234/#235 width:100% + 16:9 inside): a free-layout card is
+         absolutely placed and shrink-to-fit, so a % width collapsed it to its
+         padding (21.5x16.8 live). Give it its column width; CSS reads this. */
+      if (id === "youtube") el.style.setProperty("--yt-col-w", Math.floor(colW) + "px");
+      if (id === VISITOR_CALENDAR_ID) {
+        /* Same width as the bio card. When the bio card has a saved spot, seat
+           the calendar right under it (below); otherwise it packs in its row. */
+        el.classList.add("is-spawned");
+        var aw = avatarEl && avatarEl.parentNode === stage && !avatarEl.hidden ? avatarEl.offsetWidth : 0;
+        if (aw) el.style.setProperty("--visitor-cal-w", aw + "px");
+        else el.style.removeProperty("--visitor-cal-w");
+        el.style.setProperty("--spawn-max-w", Math.floor(aw || colW) + "px");
+        if (aw && isPlacedPos(layout, "avatar")) calSeat = el;
+        else sizes[id] = { w: el.offsetWidth || 0, h: el.offsetHeight || 0 };
+        return;
+      }
       if (spawnIds[id] && !isPlacedPos(layout, id) && !el.classList.contains("is-dragging")) {
         var full = rows.some(function (r) { return r.length === 1 && r[0] === id; });
         el.classList.add("is-spawned");
@@ -521,7 +597,21 @@
       rows.forEach(function (r, i) { if (r.indexOf("music") >= 0) mi = i; });
       rows.splice(mi >= 0 ? mi + 1 : rows.length, 0, ["__friendpins"]);
     }
+    var calPos = null;
+    if (calSeat) {
+      calPos = {
+        x: avatarEl.offsetLeft,
+        y: avatarEl.offsetTop + avatarEl.offsetHeight + SPAWN_GAP,
+        w: calSeat.offsetWidth || 0,
+        h: calSeat.offsetHeight || 0,
+      };
+      occupied.push({ x: calPos.x, y: calPos.y, w: calPos.w, h: calPos.h });
+    }
     var placed = packSpawn(rows, sizes, occupied, stageW, phone);
+    if (calPos) {
+      placed[VISITOR_CALENDAR_ID] = { x: calPos.x, y: calPos.y };
+      placed.__bottom = Math.max(placed.__bottom, calPos.y + calPos.h + (phone ? 16 : 24));
+    }
     var stageH = Math.max(stage.clientHeight || 0, placed.__bottom);
     if (placed.__bottom > (stage.clientHeight || 0)) stage.style.minHeight = Math.ceil(placed.__bottom) + "px";
     spawnCache = {};
@@ -625,40 +715,22 @@
     /* Second pass (r146): compact upward. A widget with a big empty band above it
        (more than COMPACT_MIN_GAP px, e.g. YouTube parked far down on an old saved
        layout) moves up to the nearest free spot; the identity row stays pinned.
-       The YouTube link chip is seated right under the YouTube widget. Smaller gaps
-       are kept, and owner-dragged widgets never move up, so a spot the owner
-       chose is not touched. */
+       The YouTube logo is its own widget and is never seated on the video window.
+       Smaller gaps are kept, and owner-dragged widgets never move up, so a spot
+       the owner chose is not touched. */
     var rowCount = rowItems.length;
     var seated = fixed.slice(0, rowCount);
     var rest = fixed.slice(rowCount).sort(function (a, b) { return a.y - b.y || a.x - b.x; });
-    var chip = null;
-    rest = rest.filter(function (b) {
-      if (b.id === "social-youtube") { chip = b; return false; }
-      return true;
-    });
-    var yt = rest.filter(function (b) { return b.id === "youtube"; })[0] || null;
-    /* YouTube widget not on screen yet (still loading): leave the chip where it is. */
     /* One-time compaction of an old layout (no _compacted mark yet): every widget
        in those rows carries an owner-dragged mark, so the marks are ignored on
        this pass only. The identity row stays pinned (seated above). */
     if (opts.ignoreDragged) rest.forEach(function (b) { b.dragged = false; });
-    if (chip && !yt) { chip.dragged = true; rest.push(chip); }
     function freeAt(cand) {
       return !seated.some(function (f) { return boxesOverlap(cand, f); });
     }
-    function seat(b, forceY) {
+    function seat(b) {
       var startY = b.y;
-      if (typeof forceY === "number") {
-        var c0 = { x: b.x, y: forceY, w: b.w, h: b.h };
-        if (freeAt(c0)) b.y = forceY;
-        else {
-          var ysF = seated.map(function (f) { return f.y + f.h + gap; }).filter(function (y) { return y >= forceY; }).sort(function (m, n) { return m - n; });
-          for (var k = 0; k < ysF.length; k++) {
-            var cf = { x: b.x, y: ysF[k], w: b.w, h: b.h };
-            if (freeAt(cf)) { b.y = ysF[k]; break; }
-          }
-        }
-      } else if (!b.dragged) {
+      if (!b.dragged) {
         var ups = [gap].concat(seated.map(function (f) { return f.y + f.h + gap; }))
           .filter(function (y) { return y < b.y; })
           .sort(function (m, n) { return m - n; });
@@ -679,14 +751,7 @@
         moves[b.id] = { x: m0 ? m0.x : b.x, y: b.y };
       }
     }
-    rest.forEach(function (b) {
-      seat(b);
-      if (chip && b === yt) {
-        var cx = Math.max(0, Math.min(Math.max(0, stageW - chip.w), yt.x));
-        if (chip.x !== cx) { chip.x = cx; moves[chip.id] = { x: cx, y: chip.y }; }
-        seat(chip, yt.y + yt.h + 8);
-      }
-    });
+    rest.forEach(function (b) { seat(b); });
     return moves;
   }
   var COMPACT_MIN_GAP = 160;
@@ -820,6 +885,7 @@
     var spots = [];
     stage.querySelectorAll("[data-tower-widget]").forEach(function (el) {
       if (el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
+      if (isAddedSticker(el)) return;
       var r = el.getBoundingClientRect();
       spots.push({ el: el, left: r.left - sr.left, top: r.top - sr.top, w: r.width, half: el.classList.contains("is-spawn-half") });
     });
@@ -1023,6 +1089,15 @@
     return changed;
   }
 
+  /* A Quote keeps its own spot in quoteStickers. Every Quote shares the widget
+     id "quote", so pinning one into the widget layout wrote a stray layout.quote
+     from the on-screen spot (#223). Emoji stay: each has its own layout key. */
+  function isAddedSticker(el) {
+    if (!el || !el.getAttribute) return false;
+    if (el.getAttribute("data-tower-quote-id") != null) return true;
+    return !!(el.classList && el.classList.contains("tower-sticker--quote"));
+  }
+
   /* Before saving any layout, pin every on-screen spawned widget where it is now,
      so moving one widget never makes the others jump. */
   function freezeSpawnedWidgets(root, layout) {
@@ -1034,6 +1109,7 @@
     stage.querySelectorAll("[data-tower-widget].is-spawned").forEach(function (el) {
       var id = el.getAttribute("data-tower-widget");
       if (!id || el.hidden || el.classList.contains("is-widget-off")) return;
+      if (isAddedSticker(el)) return;
       if (isPlacedPos(layout, id)) return;
       layout[id] = {
         x: parseFloat(el.getAttribute("data-sticker-x") || "0"),
@@ -1139,7 +1215,49 @@
         out[id] = defaultOn;
       }
     });
+    /* Owner-only Instax camera switch (#223): not a public widget, but an
+       explicit on/off is kept so "camera removed" survives reload (it rides in
+       the layout row's _widgets.publicWidgets). No key = on. */
+    if (raw && typeof raw === "object" && typeof raw.instax === "boolean") out.instax = raw.instax;
+    /* Owner's Remove on Music, Badges and Calendar: "shown.<id>": false (see
+       OWNER_REMOVABLE_WIDGET_IDS). Kept as saved; no key = shown. */
+    ["music", "badges", "calendar"].forEach(function (id) {
+      var k = "shown." + id;
+      if (raw && typeof raw === "object" && typeof raw[k] === "boolean") out[k] = raw[k];
+    });
     return out;
+  }
+
+  /* Remove on Music, Badges and Calendar (Oct 22). Their old flags can't tell
+     "the owner hid it" from "it's empty": the page turns music and badges off
+     by itself when they have nothing to show, and that copy is saved with the
+     next edit. So the owner's Remove has its own switch, "shown.<id>", in the
+     same publicWidgets map (it rides in the layout row's _widgets). Only
+     Remove sets it off; only Show in Edit profile (or Undo) turns it back on.
+     Nothing on load writes it, and the old music/badges/calendar flags are
+     left as they are and no longer hide these three. No key = shown.
+     Calendar: Remove hides the visitors' Calendar card; the Calendar sticker
+     in Edit profile > Calendar stays, since owners manage sessions and
+     bookings there. */
+  var OWNER_REMOVABLE_WIDGET_IDS = ["music", "badges", "calendar"];
+
+  function ownerShownKey(id) {
+    return "shown." + id;
+  }
+
+  function widgetRemovedByOwner(p, id) {
+    if (OWNER_REMOVABLE_WIDGET_IDS.indexOf(id) < 0) return false;
+    var raw = p && p.publicWidgets && typeof p.publicWidgets === "object" ? p.publicWidgets : null;
+    return !!raw && raw[ownerShownKey(id)] === false;
+  }
+
+  function instaxRemoved(p) {
+    return !!(p && p.publicWidgets && typeof p.publicWidgets === "object" && p.publicWidgets.instax === false);
+  }
+
+  function setInstaxSwitch(p, on) {
+    p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
+    p.publicWidgets.instax = !!on;
   }
 
   var TOWER_SIDE_KEY = "cognation.tower.side";
@@ -1377,6 +1495,85 @@
     return String(slug || "").trim().replace(/^@/, "");
   }
 
+  /* The signed-in viewer's own profiles, from the server (getMyProfiles) only.
+     Never the viewed page, never a cached handle from another account. */
+  function viewerOwnProfiles() {
+    var social = remoteSocial();
+    if (!social || typeof social.getMyProfiles !== "function") return [];
+    var mine = social.getMyProfiles() || [];
+    return Array.isArray(mine) ? mine.filter(function (row) { return row && row.id; }) : [];
+  }
+
+  /* Own profile row for this kind ("personal" | "professional"). Null when the
+     viewer has no page of that kind: no Pro page means no Pro link. */
+  function viewerOwnProfileOfKind(kind) {
+    var mine = viewerOwnProfiles();
+    for (var i = 0; i < mine.length; i++) {
+      if (String(mine[i].kind || "") === String(kind || "")) return mine[i];
+    }
+    return null;
+  }
+
+  /* True when a #tower-profile-{slug} names one of the viewer's own pages.
+     Live sessions trust getMyProfiles only; before it loads, the session's own
+     active id/handle counts (it is replaced once the list arrives). */
+  function slugIsViewerOwn(slug) {
+    slug = String(slug || "").trim().replace(/^@/, "");
+    if (!slug) return false;
+    var norm = normalizeHandle(slug);
+    var mine = viewerOwnProfiles();
+    if (mine.length) {
+      for (var i = 0; i < mine.length; i++) {
+        if (String(mine[i].id) === slug || normalizeHandle(mine[i].handle || "") === norm) return true;
+      }
+      return false;
+    }
+    var s = getSessionObject();
+    if (!s) return false;
+    if (s.activeProfileId && String(s.activeProfileId) === slug) return true;
+    return !!(s.profileHandle && normalizeHandle(s.profileHandle) === norm);
+  }
+
+  /* A session whose active profile is not one of the viewer's own (a stale id
+     left from another account or a test) is reset to the viewer's own page. */
+  function dropForeignActiveProfile() {
+    var s = getSessionObject();
+    var mine = viewerOwnProfiles();
+    if (!s || s.source !== "supabase" || !mine.length) return false;
+    var active = String(s.activeProfileId || "");
+    for (var i = 0; i < mine.length; i++) {
+      if (String(mine[i].id) === active) {
+        if (s.profileHandle && normalizeHandle(s.profileHandle) === normalizeHandle(mine[i].handle || "")) return false;
+        break;
+      }
+    }
+    var keep = null;
+    for (var j = 0; j < mine.length; j++) {
+      if (String(mine[j].id) === active) keep = mine[j];
+    }
+    keep = keep || mine.filter(function (r) { return r.kind === "personal"; })[0] || mine[0];
+    var social = remoteSocial();
+    if (social && typeof social.setActiveProfile === "function") social.setActiveProfile(keep);
+    return true;
+  }
+
+  /* Tapping TOWER or PULSE yourself means your own space: drop a left-over
+     #tower-profile-* that names someone else's page. */
+  function clearForeignTowerHash() {
+    var slug = towerProfileSlug();
+    if (!slug || slugIsViewerOwn(slug)) return false;
+    try {
+      if (window.history && typeof window.history.replaceState === "function") {
+        window.history.replaceState(null, "", (location.pathname || "/") + (location.search || ""));
+      } else {
+        location.hash = "";
+      }
+    } catch (eClear) {
+      try { location.hash = ""; } catch (e2) {}
+    }
+    return true;
+  }
+
   /* Live Supabase session (not the local demo). */
   function liveSignedInForTower() {
     var s = getSessionObject();
@@ -1402,7 +1599,7 @@
          Add friend on your own page, and drags never saved. */
       var sessLive = getSessionObject();
       var slugNorm = normalizeHandle(slug);
-      if (sessLive && sessLive.activeProfileId &&
+      if (sessLive && sessLive.activeProfileId && slugIsViewerOwn(slug) &&
           (String(sessLive.activeProfileId) === slug ||
            (sessLive.profileHandle && normalizeHandle(sessLive.profileHandle) === slugNorm))) {
         return String(sessLive.activeProfileId);
@@ -1536,10 +1733,8 @@
     }
     add(p && (p._profileId || p.id));
     add(p && p.handle);
-    try {
-      var hash = String(location.hash || "").replace(/^#/, "");
-      if (hash.indexOf("tower-profile-") === 0) add(decodeURIComponent(hash.slice("tower-profile-".length)));
-    } catch (eHash) {}
+    /* The URL hash is not a key: a left-over #tower-profile-* must not read or
+       save this page's layout under another page's key. */
     if (!keys.length) keys.push("default");
     return keys;
   }
@@ -2248,7 +2443,13 @@
       writeScrapbookLayout(data, { keepLayout: !opts.geometry });
       /* Account layout row is written only on a real geometry edit (drag end,
          rotate, resize). Opening the Tower must never POST a layout. */
-      if (opts.geometry && window.CognationTowerLayoutSync) window.CognationTowerLayoutSync.save(data);
+      /* Signed-in owner only (this save already returned for anyone else):
+         drag end uploads positions + added widgets; an add / remove / switch
+         uploads the added widgets when they changed. localStorage is a cache. */
+      if (window.CognationTowerLayoutSync && liveSignedInForTower()) {
+        if (opts.geometry) window.CognationTowerLayoutSync.save(data);
+        else if (window.CognationTowerLayoutSync.saveWidgetsIfChanged) window.CognationTowerLayoutSync.saveWidgetsIfChanged(data);
+      }
       var id = data._profileId || resolveActiveProfileId();
       /* A drop only changes x/y. Never PATCH the profile: that reload paints
          the remote row, which has no sticker coordinates, and the widget
@@ -2355,55 +2556,21 @@
 
   window.CognationTowerProfileStore = TowerProfileStore;
 
-  var SEED = [
-    {
-      id: "tower-1",
-      authorName: "Alex Rivera",
-      authorProfileId: "alex-rivera",
-      body: "East wing library late night — brought notes from the zoning packet.",
-      createdAt: "2026-09-15T18:30:00.000Z",
-      attachments: [{ kind: "note", label: "Zoning notes.pdf", name: "Zoning notes.pdf" }],
-      likes: 42,
-    },
-    {
-      id: "tower-2",
-      authorName: "Sam Okonkwo",
-      authorProfileId: "sam-okonkwo",
-      body: "@friendsoffriends Market square this morning. Peach stand line hit the fountain again.",
-      createdAt: "2026-09-15T17:05:00.000Z",
-      attachments: [{ kind: "photo", label: "Square photo", name: "market-square.jpg" }],
-      likes: 128,
-      audience: "friends_of_friends",
-      shareBeyondFriends: true,
-    },
-    {
-      id: "tower-3",
-      authorName: "Jordan Lee",
-      authorProfileId: "jordan-lee",
-      body: "Saturday block party invite — bring a dish if you can.",
-      createdAt: "2026-09-15T15:40:00.000Z",
-      attachments: [{ kind: "document", label: "Party invitation", name: "block-party-invite.pdf" }],
-      likes: 96,
-    },
-    {
-      id: "tower-4",
-      authorName: "Mira Chen",
-      authorProfileId: "mira-chen",
-      body: "Short clip from the river walk mural going up.",
-      createdAt: "2026-09-15T14:10:00.000Z",
-      attachments: [{ kind: "video", label: "Mural clip", name: "mural-walk.mp4" }],
-      likes: 77,
-    },
-    {
-      id: "tower-5",
-      authorName: "Chris Patel",
-      authorProfileId: "chris-patel",
-      body: "Creative study: cyan ink wash of the tower silhouette.",
-      createdAt: "2026-09-15T12:55:00.000Z",
-      attachments: [{ kind: "art", label: "Tower silhouette", name: "tower-ink.png" }],
-      likes: 61,
-    },
-  ];
+  /* The 5 local demo Feed posts (ids tower-1..tower-5: Alex Rivera, Sam Okonkwo,
+     Jordan Lee, Mira Chen, Chris Patel) are retired (Oct 20): they painted in the
+     Times and TOWER Feed as if real. Copies already saved in this browser are
+     dropped on load; anything else stays. */
+  var RETIRED_DEMO_POSTS = {
+    "tower-1": "alex-rivera",
+    "tower-2": "sam-okonkwo",
+    "tower-3": "jordan-lee",
+    "tower-4": "mira-chen",
+    "tower-5": "chris-patel",
+  };
+  function isRetiredDemoPost(post) {
+    return !!(post && post.id && RETIRED_DEMO_POSTS[post.id] &&
+      RETIRED_DEMO_POSTS[post.id] === String(post.authorProfileId || ""));
+  }
 
   function escapeHtml(str) {
     return String(str)
@@ -2562,6 +2729,50 @@
     }
   }
 
+  /* Local SeedOps template posts (js/seedops-tower-posts.js buildPost:
+     seedopsTower, never _remote) are written into this store while signed out.
+     They stay there for signed-out visitors, but never enter the signed-in
+     feed: setRemotePosts drops them while signed in, and a remote store that
+     already holds copies reads without them while signed in. Server posts,
+     seed ones included, are kept. Signed out, nothing changes. */
+  function isLocalSeedTemplate(post) {
+    return !!(post && post.seedopsTower && !post._remote);
+  }
+
+  /* Signed out, the Feed is the normal signed-out seed set only: SeedOps local
+     templates (never _remote) plus server posts by seed/ops accounts that are
+     PUBLIC (what an anonymous visitor can read anyway). Any other server post
+     copied here while someone was signed in is hidden signed out and purged on
+     sign-out: a member's post, and (PM ruling on #209, 2026-10-21) a seed's or
+     ops account's friends-only/private post. A server post with no visibility
+     recorded is treated as not public. Name kept for the #209 callers. */
+  function isSignedOutSeedPost(post) {
+    if (!post || !post._remote) return false;
+    var kind = String(post.accountKind || "").toLowerCase();
+    var seedOrOps = !!(post.isSeed || post.isOpsBot || kind === "seed" || kind === "ops" || post.seedFleetId);
+    return seedOrOps && String(post.visibility || "").toLowerCase() === "public";
+  }
+  function isMemberCachePost(post) {
+    if (!post || !post._remote) return false;
+    return !isSignedOutSeedPost(post);
+  }
+
+  /* SeedOps overlay (seedops-tower-hydrate keeps server seed rows there too):
+     on sign-out drop its non-public server rows the same way. */
+  var SEEDOPS_OVERLAY_KEY = "cognation.seedops.tower.posts.v1";
+  function clearOverlayNonPublic() {
+    try {
+      var raw = localStorage.getItem(SEEDOPS_OVERLAY_KEY);
+      if (!raw) return 0;
+      var doc = JSON.parse(raw);
+      if (!doc || !Array.isArray(doc.posts)) return 0;
+      var kept = doc.posts.filter(function (p) { return !isMemberCachePost(p); });
+      var dropped = doc.posts.length - kept.length;
+      if (dropped) { doc.posts = kept; localStorage.setItem(SEEDOPS_OVERLAY_KEY, JSON.stringify(doc)); }
+      return dropped;
+    } catch (e) { return 0; }
+  }
+
   var TowerStore = {
     load: function () {
       try {
@@ -2569,6 +2780,10 @@
         if (!raw) return null;
         var data = JSON.parse(raw);
         if (!data || !Array.isArray(data.posts)) return null;
+        if (!data.remote && data.posts.some(isRetiredDemoPost)) {
+          data.posts = data.posts.filter(function (post) { return !isRetiredDemoPost(post); });
+          TowerStore.save(data);
+        }
         return data;
       } catch (e) {
         return null;
@@ -2587,17 +2802,17 @@
       if (usingRemoteSocial() && (!data || !data.remote)) {
         return [];
       }
-      if (!data) {
-        data = { version: 1, posts: JSON.parse(JSON.stringify(SEED)) };
-        this.save(data);
-      }
+      if (!data) return [];
       if (clearLegacyReactionSelections(data)) this.save(data);
-      return data.posts.slice().sort(function (a, b) {
+      var posts = usingRemoteSocial()
+        ? (data.remote ? data.posts.filter(function (p) { return !isLocalSeedTemplate(p); }) : data.posts)
+        : data.posts.filter(function (p) { return !isMemberCachePost(p); });
+      return posts.slice().sort(function (a, b) {
         return String(b.createdAt).localeCompare(String(a.createdAt));
       });
     },
-    /* NEWS reads this: most reacted personal and professional Feed posts (signals). */
-    newsList: function () {
+    /* Hidden desk ranks this plate: every personal and professional Feed post. */
+    feedPlate: function () {
       var personal = this.list().map(function (post) {
         var copy = {};
         Object.keys(post || {}).forEach(function (key) { copy[key] = post[key]; });
@@ -2606,8 +2821,11 @@
           : "personal";
         return copy;
       });
-      var professional = newsProfessionalPosts();
-      return personal.concat(professional).map(function (post) {
+      return personal.concat(newsProfessionalPosts());
+    },
+    /* NEWS reads this: most reacted personal and professional Feed posts (signals). */
+    newsList: function () {
+      return this.feedPlate().map(function (post) {
         post.rating = postRating(post); /* rating carries unchanged into SIGNAL and ECHO */
         return post;
       }).filter(function (post) {
@@ -2618,11 +2836,31 @@
         return String(b.createdAt || "").localeCompare(String(a.createdAt || ""));
       });
     },
+    /* Sign-out: drop cached server posts that are not public seed/ops posts
+       (member posts, and seed/ops friends-only posts). Public seed/ops posts and
+       local templates stay. Returns how many went from the Feed store. */
+    clearMemberCache: function () {
+      clearOverlayNonPublic();
+      var data = this.load();
+      if (!data) return 0;
+      var kept = data.posts.filter(function (p) { return !isMemberCachePost(p); });
+      var dropped = data.posts.length - kept.length;
+      if (!dropped) return 0;
+      data.posts = kept;
+      if (!kept.some(function (p) { return p && p._remote; })) data.remote = false;
+      this.save(data);
+      document.dispatchEvent(
+        new CustomEvent("cognation:tower-updated", { detail: { remote: true, signedOut: true } })
+      );
+      return dropped;
+    },
     setRemotePosts: function (posts) {
       var data = {
         version: 2,
         remote: true,
-        posts: Array.isArray(posts) ? posts.slice() : [],
+        posts: !Array.isArray(posts) ? [] : usingRemoteSocial()
+          ? posts.filter(function (p) { return !isLocalSeedTemplate(p); })
+          : posts.slice(),
       };
       this.save(data);
       document.dispatchEvent(
@@ -2641,9 +2879,7 @@
         return social.togglePostReaction(postId, face);
       }
       var data = this.load();
-      if (!data) {
-        data = { version: 1, posts: JSON.parse(JSON.stringify(SEED)) };
-      }
+      if (!data) return { ok: false, error: "Post not found." };
       var me = "you";
       try {
         var sess = localStorage.getItem("cognation.session.v2");
@@ -2695,6 +2931,7 @@
           ? window.CognationAutoRate.rate(body, (fields && fields.attachments) || []).rating
           : "NR",
         likes: 0,
+        visibility: (window.CognationEchoGroups && window.CognationEchoGroups.isGroupPost(body)) ? "public" : "friends",
         handle: (window.CognationTowerProfileStore
           ? normalizeHandle(window.CognationTowerProfileStore.get().handle || "")
           : ""),
@@ -2714,6 +2951,22 @@
   };
 
   window.CognationTowerStore = TowerStore;
+  /* Signing out in this tab clears the member's Feed cache right away. */
+  document.addEventListener("cognation:session-ended", function () {
+    if (usingRemoteSocial()) return;
+    try { TowerStore.clearMemberCache(); } catch (eClear) {}
+  });
+
+  /* Feed photos: the post row carries the picture itself (attachments[i].dataUrl, a
+     shrunk JPEG saved with the post) or an https URL. Only image data/https URLs are
+     drawn; anything else stays a label. */
+  function attachmentImageUrl(a) {
+    if (!a || a.kind === "removed") return "";
+    var url = String(a.dataUrl || a.url || a.src || a.imageUrl || "");
+    if (/^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+\/=]+$/i.test(url)) return url;
+    if (/^https:\/\/[^\s"'<>]+$/i.test(url)) return url;
+    return "";
+  }
 
   function renderAttachments(list) {
     if (!list || !list.length) return "";
@@ -2721,16 +2974,30 @@
       '<ul class="tower-attachments">' +
       list
         .map(function (a) {
+          var name = (a && (a.label || a.name)) || "file";
+          var img = attachmentImageUrl(a);
+          if (img) {
+            return (
+              '<li class="tower-attach tower-attach--photo tower-attach--image">' +
+              '<img class="tower-attach-img" src="' + escapeHtml(img) + '" alt="' +
+              escapeHtml("Photo: " + name) + '" loading="lazy" decoding="async"></li>'
+            );
+          }
+          /* Older photo posts saved only the file name (no picture was uploaded). */
+          var missing = a && a.kind === "photo";
           return (
             '<li class="tower-attach tower-attach--' +
-            escapeHtml(a.kind || "document") +
+            escapeHtml((a && a.kind) || "document") +
+            (missing ? " tower-attach--missing" : "") +
             '">' +
             '<span class="tower-attach-kind">' +
-            escapeHtml(kindLabel(a.kind)) +
+            escapeHtml(kindLabel(a && a.kind)) +
             "</span> " +
             '<span class="tower-attach-name">' +
-            escapeHtml(a.label || a.name || "file") +
-            "</span></li>"
+            escapeHtml(name) +
+            "</span>" +
+            (missing ? ' <span class="tower-attach-note">· photo wasn\'t uploaded</span>' : "") +
+            "</li>"
           );
         })
         .join("") +
@@ -2827,9 +3094,84 @@
     return document.querySelector(sel);
   }
 
+  /* Seed / ops authors carry the shared SeedOps Demo badge (js/seedops-badge.js),
+     same markup as the Times byline. Judged by the author, not the post's
+     `seeded` flag, so real members never get it. */
+  function towerPostSeedBadge(post) {
+    var api = window.CognationSeedOpsBadge;
+    if (!post || !api || typeof api.badgeHtml !== "function") return "";
+    try {
+      return api.badgeHtml({
+        accountKind: post.accountKind || "",
+        isSeed: !!post.isSeed,
+        isOpsBot: !!post.isOpsBot,
+        seedFleetId: post.seedFleetId || "",
+        /* No handle: the badge follows the account fields (server posts carry
+           them from profiles.account_kind / seed_fleet_id via supabase-social
+           mapPost). */
+        id: post.authorProfileId || "",
+      }) || "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  /* Empty Send a signal post (PM wording): shown before any request is sent. */
+  var EMPTY_POST_LINE = "Write something before posting.";
+
+  /* Post failure line (js/signal-post-as.js postErrorLine; PM wording). */
+  function towerPostErrorLine(error) {
+    var pa = typeof window !== "undefined" ? window.CognationSignalPostAs : null;
+    if (pa && typeof pa.postErrorLine === "function") return pa.postErrorLine(error);
+    return "Couldn't post. Try again.";
+  }
+
+  /* Feed card byline. Server posts name the page that wrote them (Personal or
+     Professional: post.authorKind from tower_posts.author_profile_id) with its
+     picture (profiles.photo_url, else initials) and link to that page. Local
+     posts keep the plain name. */
+  function towerPostAuthorSlug(post) {
+    if (!post || !post._remote) return "";
+    return String(post.handle || post.authorProfileId || "").trim();
+  }
+
+  function towerPostAuthorHtml(post) {
+    var name = escapeHtml(post.authorName || "Neighbor");
+    var slug = towerPostAuthorSlug(post);
+    if (!slug) {
+      return '<span class="tower-author">' + name + towerPostSeedBadge(post) + "</span>";
+    }
+    var photo = String(post.authorPhotoUrl || "");
+    var avatar = /^https:\/\//i.test(photo)
+      ? '<span class="tower-author-avatar has-photo" aria-hidden="true"><img src="' + escapeHtml(photo) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>'
+      : '<span class="tower-author-avatar" aria-hidden="true">' + escapeHtml(initials(post.authorName || "Neighbor")) + "</span>";
+    return '<span class="tower-author">' +
+      '<a class="tower-author-link" href="#tower-profile-' + escapeHtml(encodeURIComponent(slug)) + '"' +
+      ' data-tower-author-open="' + escapeHtml(slug) + '"' +
+      ' data-author-kind="' + (post.authorKind === "professional" ? "professional" : "personal") + '">' +
+      avatar + '<span class="tower-author-name">' + name + "</span></a>" +
+      towerPostSeedBadge(post) + "</span>";
+  }
+
+  function bindTowerAuthorLinks(list) {
+    if (!list || list.__towerAuthorLinksBound || typeof list.addEventListener !== "function") return;
+    list.__towerAuthorLinksBound = true;
+    list.addEventListener("click", function (ev) {
+      var link = ev.target && ev.target.closest ? ev.target.closest("a[data-tower-author-open]") : null;
+      if (!link || !list.contains(link)) return;
+      var slug = link.getAttribute("data-tower-author-open") || "";
+      if (!slug || typeof window.CognationTowerOpenProfile !== "function") return;
+      ev.preventDefault();
+      try { window.CognationTowerOpenProfile(slug); } catch (eOpen) {
+        try { location.hash = "tower-profile-" + slug; } catch (eHash) {}
+      }
+    });
+  }
+
   function renderFeed(root) {
     var list = towerFeedQuery(root, "[data-tower-feed]");
     if (!list) return;
+    bindTowerAuthorLinks(list);
     list.__ageFloorUnder13 = viewerUnder13();
     var posts = TowerStore.list().filter(towerPostVisibleToViewer);
     list.innerHTML = "";
@@ -2843,9 +3185,7 @@
       article.setAttribute("data-tower-post", post.id || "");
       article.innerHTML =
         '<header class="tower-post-meta">' +
-        '<span class="tower-author">' +
-        escapeHtml(post.authorName || "Neighbor") +
-        "</span>" +
+        towerPostAuthorHtml(post) +
         '<time datetime="' +
         escapeHtml(post.createdAt) +
         '">' +
@@ -3153,10 +3493,59 @@
     });
   }
 
+  /* Share/copy link: live sessions link only to one of the viewer's own pages
+     (getMyProfiles). The viewed page's handle is never used; no own page of
+     that kind means no link. */
+  function viewerShareProfile(profile) {
+    var s = getSessionObject();
+    if (!s || s.source !== "supabase") return profile;
+    var mine = viewerOwnProfiles();
+    var id = String((profile && (profile._profileId || profile.id)) || "");
+    for (var i = 0; i < mine.length; i++) {
+      if (id && String(mine[i].id) === id) return { _profileId: mine[i].id, handle: mine[i].handle };
+    }
+    var kind = profile && profile._profileKind === "professional" ? "professional" : "personal";
+    var own = viewerOwnProfileOfKind(kind);
+    return own ? { _profileId: own.id, handle: own.handle } : null;
+  }
+
+  function viewerShareUrl(profile) {
+    var share = viewerShareProfile(profile);
+    return share ? profilePublicUrl(share) : "";
+  }
+
   function syncPublicUrlFields(root, profile) {
-    var url = profilePublicUrl(profile);
+    var url = viewerShareUrl(profile);
     root.querySelectorAll("[data-tower-public-url], [data-tower-public-url-preview]").forEach(function (el) {
       if (document.activeElement !== el) el.value = url;
+    });
+  }
+
+  /* The pill under your photo ([data-tower-add-friends]) jumps to people search.
+     Only the owner sees it (CSS hides it for visitors), so on your own Tower it
+     reads "Find friends" (Personal) / "Find people" (Pro), never "+ friend" /
+     "+ follow". Visitor views keep the old label on the hidden pill. */
+  function syncOwnerPeoplePill(root, profile, owner) {
+    if (!root) return;
+    var pro = profileIsProfessional(profile);
+    var houseHandle = String((profile && profile.handle) || "").replace(/^@/, "").toLowerCase();
+    var housePage = pro && (
+      String((profile && (profile._profileId || profile.id)) || "") === "prof-alexa-professional" ||
+      houseHandle === "alexa-pro" ||
+      houseHandle === "cognation"
+    );
+    root.querySelectorAll("[data-tower-add-friends]").forEach(function (el) {
+      if (housePage) {
+        el.hidden = true;
+        return;
+      }
+      if (owner) {
+        el.textContent = pro ? "Find people" : "Find friends";
+        el.setAttribute("aria-label", pro ? "Find people to follow" : "Find friends");
+      } else {
+        el.textContent = pro ? "+ follow" : "+ friend";
+        el.setAttribute("aria-label", pro ? "Follow this professional page" : "Add this person as a friend");
+      }
     });
   }
 
@@ -3166,10 +3555,11 @@
     var p = TowerProfileStore.get();
     var owner = isTowerOwner(p);
     root.setAttribute("data-tower-is-owner", owner ? "true" : "false");
-    /* Your own Tower never shows Add friend / Message. */
+    /* Your own Tower never shows Add friend / Follow / Message (the visitor row). */
     if (owner) {
       root.querySelectorAll("[data-tower-follow-row]").forEach(function (row) { row.hidden = true; });
     }
+    syncOwnerPeoplePill(root, p, owner);
     if (!owner) {
       root.querySelectorAll("[contenteditable='true']").forEach(function (el) {
         el.removeAttribute("contenteditable");
@@ -3358,8 +3748,9 @@
     root.__cognationPublicUrlBound = true;
     root.querySelectorAll("[data-tower-copy-public-url]").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var url = profilePublicUrl(TowerProfileStore.get());
+        var url = viewerShareUrl(TowerProfileStore.get());
         syncPublicUrlFields(root, TowerProfileStore.get());
+        if (!url) return;
         function ok() {
           var prev = btn.textContent;
           btn.textContent = "Copied";
@@ -3874,6 +4265,8 @@
       wrap.setAttribute("data-name-size", String(px));
     }
     if (sticker) sticker.style.setProperty("--tower-name-size", px + "px");
+    var stack = root.querySelector(".tower-avatar-stack");
+    if (stack) stack.style.setProperty("--tower-name-size", px + "px");
     var range = root.querySelector("[data-tower-name-size]");
     if (range && document.activeElement !== range) range.value = String(px);
     return px;
@@ -4005,7 +4398,10 @@
     { id: "tiktok", label: "TikTok", short: "TT", logo: "assets/social/tiktok.svg" },
     { id: "linkedin", label: "LinkedIn", short: "in", logo: "assets/social/linkedin.png", professionalOnly: true },
     { id: "venmo", label: "Venmo", short: "Vm", logo: "assets/social/venmo.svg" },
-    { id: "linktree", label: "Website", short: "Web", logo: "assets/social/linktree.svg", professionalOnly: true },
+    { id: "shop", label: "Shop", short: "Shop", professionalOnly: true },
+    { id: "linktree", label: "Linktree", short: "Linktree", professionalOnly: true },
+    { id: "applepay", label: "Apple Pay", short: "Apple Pay", professionalOnly: true },
+    { id: "appleamt", label: "Amount", short: "$", professionalOnly: true },
     /* NEW (not restored): owner-set outbound link on Pro. A plain https link out;
        Cognation takes no payment, stores no card data and calls no service. */
     { id: "services", label: "Pay for services", short: "Pay for services", professionalOnly: true, quiet: true, httpsOnly: true },
@@ -4173,19 +4569,29 @@
   }
 
   /* Professional page: empty box plus a link field. No pink player and no MP3 face. */
-  function showEmptyProYoutube(root) {
+  function showEmptyProYoutube(root, profileId) {
     var box = root.querySelector("[data-tower-pro-youtube]");
     var frame = root.querySelector("[data-tower-pro-youtube-frame]");
-    if (frame && !frame.querySelector("iframe")) frame.innerHTML = "";
+    /* #24 keeps this profile's video through a later blank read. A video that
+       belongs to another Pro page (the one viewed before) is cleared, so the
+       next page with no video shows an empty box. */
+    var ownerId = frame ? frame.getAttribute("data-tower-pro-youtube-profile") || "" : "";
+    var sameProfile = !!profileId && ownerId === String(profileId);
+    if (frame && (!frame.querySelector("iframe") || !sameProfile)) {
+      frame.innerHTML = "";
+      frame.removeAttribute("data-tower-pro-youtube-profile");
+    }
     if (!box) return;
     box.hidden = false;
     box.classList.remove("has-video");
   }
 
-  function ensureProYoutubeIframe(root, videoId) {
+  function ensureProYoutubeIframe(root, videoId, profileId) {
     var box = root.querySelector("[data-tower-pro-youtube]");
     var frame = root.querySelector("[data-tower-pro-youtube-frame]");
     if (!box || !frame || !videoId) return null;
+    if (profileId) frame.setAttribute("data-tower-pro-youtube-profile", String(profileId));
+    else frame.removeAttribute("data-tower-pro-youtube-profile");
     box.hidden = false;
     box.classList.add("has-video");
     var src = youtubeEmbedSrc(videoId, false, false);
@@ -4514,9 +4920,10 @@
     });
   }
 
-  function showMusicSticker(root, on) {
+  function showMusicSticker(root, on, p) {
     var musicSticker = root.querySelector('[data-tower-widget="music"]');
     if (!musicSticker) return;
+    if (on && widgetRemovedByOwner(p || TowerProfileStore.get(), "music")) on = false;
     musicSticker.hidden = !on;
     musicSticker.classList.toggle("is-widget-off", !on);
     if (!on) musicSticker.classList.remove("is-widget-selected");
@@ -4600,11 +5007,23 @@
       bindProYoutubeUrl(root);
       var proInput = root.querySelector("[data-tower-pro-youtube-url]");
       if (proInput && document.activeElement !== proInput) proInput.value = url;
-      if (ytId) ensureProYoutubeIframe(root, ytId);
-      else showEmptyProYoutube(root);
+      var proProfileId = (p && p._profileId) || "";
+      if (ytId) ensureProYoutubeIframe(root, ytId, proProfileId);
+      else showEmptyProYoutube(root, proProfileId);
       return;
     }
     showYoutubeSticker(root, false);
+    if (widgetRemovedByOwner(p, "music")) {
+      /* The owner removed Music: no player for anyone until Show. */
+      clearYoutubeEmbed(root);
+      clearTowerAudio(audio);
+      hideMusicSkins(root);
+      wrap.hidden = true;
+      wrap.removeAttribute("data-music-mode");
+      showMusicSticker(root, false, p);
+      if (proBox) proBox.hidden = true;
+      return;
+    }
     if (proBox) {
       proBox.hidden = true;
       proBox.classList.remove("has-video");
@@ -4622,7 +5041,7 @@
       if (ownerPublic && (skin === "none" || (!personal && !url))) {
         wrap.hidden = false;
         wrap.setAttribute("data-music-mode", "none");
-        showMusicSticker(root, true);
+        showMusicSticker(root, true, p);
         return;
       }
       wrap.hidden = true;
@@ -4631,7 +5050,7 @@
       return;
     }
 
-    showMusicSticker(root, true);
+    showMusicSticker(root, true, p);
     if (!url) {
       var keptOnScreen = savedPinkVideoId();
       if (keptOnScreen && skin === "classic") {
@@ -4913,14 +5332,25 @@
     return "https://venmo.com/u/" + handle;
   }
 
+  function hasCardNumber(raw) {
+    return /\d(?:[ -]*\d){12,18}/.test(String(raw || ""));
+  }
+
+  function plainLabel(raw, max) {
+    var t = String(raw || "").replace(/\s+/g, " ").trim().slice(0, max || 120);
+    return !t || hasCardNumber(t) ? "" : t;
+  }
+
   function socialHref(id, raw) {
     if (id === "venmo") return venmoHref(raw);
     if (id === "services" || id === "ads") return safeHttpsUrl(raw);
+    if (id === "applepay" || id === "appleamt") return "";
     return safeHttpUrl(raw);
   }
 
   function storedSocialValue(id, value) {
     if (id === "venmo") return String(value || "").trim().slice(0, 500);
+    if (id === "appleamt") return typedAmount(value); if (id === "applepay") return plainLabel(value, 120);
     if (id === "services" || id === "ads") return safeHttpsUrl(value);
     return safeHttpUrl(value);
   }
@@ -5021,11 +5451,112 @@
     try { spawnUnplacedWidgets(root, TowerProfileStore.get()); } catch (eSp) {}
   }
 
+  function typedAmount(raw) {
+    var n = typeof raw === "number" ? raw : Number(String(raw || "").replace(/[^0-9.]/g, ""));
+    if (!isFinite(n) || n <= 0 || n > 1e9) return "";
+    return "$" + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+  function proPayAttempt(o) {
+    o = o || {};
+    if (!o.signedIn) return { taken: false, text: "Sign in to pay. No payment was taken." };
+    if (o.owner) return { taken: false, text: "Only the payer can start this. No payment was taken." };
+    if (o.phase !== "confirm") return { taken: false, text: "", open: true };
+    if (!plainLabel(o.forText, 120)) return { taken: false, text: "Name what this payment is for. No payment was taken.", open: true };
+    return { taken: false, text: "No payment was taken." };
+  }
+  function payerSignedIn() {
+    var s = getSessionObject();
+    return !!(s && (s.username || s.supabaseUserId || s.activeProfileId));
+  }
+  function payNote(root, text) {
+    var note = root.querySelector("[data-tower-pro-pay-note]");
+    if (!note) return;
+    note.hidden = !text;
+    note.textContent = text || "";
+  }
+  function openProPay(root) {
+    var p = TowerProfileStore.get();
+    var res = proPayAttempt({ signedIn: payerSignedIn(), owner: isTowerOwner(p), phase: "open" });
+    var box = root.querySelector("[data-tower-pro-pay-confirm]");
+    if (!res.open) {
+      if (box) box.hidden = true;
+      payNote(root, res.text);
+      return;
+    }
+    if (box) box.hidden = false;
+    payNote(root, "");
+  }
+  function confirmProPay(root) {
+    var input = root.querySelector("[data-tower-pro-pay-for]");
+    var p = TowerProfileStore.get();
+    var res = proPayAttempt({
+      signedIn: payerSignedIn(),
+      owner: isTowerOwner(p),
+      phase: "confirm",
+      forText: input ? input.value : "",
+    });
+    payNote(root, res.text);
+  }
+  function bindProPay(root) {
+    if (!root || root.__proPay) return;
+    root.__proPay = true;
+    root.addEventListener("click", function (ev) {
+      var t = ev.target && ev.target.closest ? ev.target : null;
+      if (!t) return;
+      if (t.closest("[data-tower-pro-link='applepay']")) { ev.preventDefault(); openProPay(root); }
+      else if (t.closest("[data-tower-pro-pay-go]")) { ev.preventDefault(); confirmProPay(root); }
+    });
+  }
+  function addProAnchor(row, id, label, href) {
+    if (!href) return;
+    var a = document.createElement("a");
+    a.className = "tower-pro-link";
+    a.setAttribute("data-tower-pro-link", id);
+    a.href = href;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = label;
+    row.appendChild(a);
+  }
+  function renderProLinks(root, p) {
+    bindProPay(root);
+    var row = root.querySelector("[data-tower-pro-links]");
+    if (!row) return;
+    var pro = isProTower(p);
+    var links = (p && p.socialLinks) || {};
+    var shop = pro ? socialHref("shop", links.shop) : "";
+    var tree = pro ? socialHref("linktree", links.linktree) : "";
+    var payee = pro ? storedSocialValue("applepay", links.applepay) : "";
+    var amount = payee ? storedSocialValue("appleamt", links.appleamt) : "";
+    var sig = [shop, tree, payee, amount].join("\n");
+    if (row.getAttribute("data-sig") !== sig) {
+      row.setAttribute("data-sig", sig);
+      row.textContent = "";
+      addProAnchor(row, "shop", "Shop", shop);
+      addProAnchor(row, "linktree", "Linktree", tree);
+      if (payee) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "tower-pro-link";
+        b.setAttribute("data-tower-pro-link", "applepay");
+        b.textContent = amount ? "Apple Pay " + amount : "Apple Pay";
+        row.appendChild(b);
+      }
+    }
+    row.hidden = !row.firstChild;
+    if (!payee) {
+      var box = root.querySelector("[data-tower-pro-pay-confirm]");
+      if (box) box.hidden = true;
+      payNote(root, "");
+    }
+  }
   /* v3.3: one [data-tower-widget] per linked social — never a grouped LINKS box. */
   function renderSocialLinks(root, p) {
     if (!root) return;
     migrateGroupedSocialLayout(p);
+    seedPayLinksLayout(p);
     syncEditSocialFields(root, p);
+    renderProLinks(root, p);
     var stage = root.querySelector("[data-tower-scrapbook]");
     if (!stage) return;
     var links = chipSocialLinks(p);
@@ -5041,13 +5572,14 @@
       var wid = el.getAttribute("data-tower-widget") || "";
       var netId = socialNetIdFromWidget(wid);
       if (!netId) return;
-      if (!wanted[netId]) {
+      if (!wanted[netId] || isPayLinkNet(netId, p) || isPageButtonNet(netId) || netId === "venmo" || netId === "services" || netId === "ads") {
         if (el.parentNode) el.parentNode.removeChild(el);
       }
     });
 
     socialLinkDefs().forEach(function (net) {
       if (!wanted[net.id]) return;
+      if (isPayLinkNet(net.id, p) || isPageButtonNet(net.id) || net.id === "venmo" || net.id === "services" || net.id === "ads") return;
       var wid = socialWidgetId(net.id);
       var href = socialHref(net.id, links[net.id]);
       var el = stage.querySelector('[data-tower-widget="' + wid + '"]');
@@ -5107,6 +5639,63 @@
       if (x.parentNode) x.parentNode.removeChild(x);
     });
     syncOwnerStickerHandles(root);
+  }
+
+  /* One card, one group: Venmo, Pay for services, Buy ads as stacked pills (12px
+     gap). Each opens the owner's own saved link in a new tab; a link that is not
+     set is not shown, and with none set there is no card. Cognation takes no
+     payment here: plain outbound links only. */
+  function renderPayLinks(stage, p, links, wanted) {
+    var nets = isProTower(p)
+      ? socialLinkDefs().filter(function (net) { return wanted[net.id] && isPayLinkNet(net.id, p) && socialHref(net.id, links[net.id]); })
+      : [];
+    var el = stage.querySelector('[data-tower-widget="' + PAY_LINKS_ID + '"]');
+    if (!nets.length) {
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+      return;
+    }
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "tower-sticker tower-sticker--pay-links";
+      el.setAttribute("data-tower-widget", PAY_LINKS_ID);
+      el.setAttribute("data-sticker-label", "Venmo & Buy ads");
+      var handle = document.createElement("button");
+      handle.type = "button";
+      handle.className = "tower-sticker-handle";
+      handle.setAttribute("data-tower-sticker-handle", "");
+      handle.setAttribute("aria-label", "Move Venmo & Buy ads sticker");
+      handle.tabIndex = -1;
+      handle.hidden = true;
+      handle.textContent = "⋮⋮";
+      el.appendChild(handle);
+      var group = document.createElement("div");
+      group.className = "tower-pay-links";
+      group.setAttribute("role", "group");
+      group.setAttribute("aria-label", "Pay and ads links");
+      group.setAttribute("data-tower-pay-links", "");
+      el.appendChild(group);
+      stage.appendChild(el);
+    }
+    var box = el.querySelector("[data-tower-pay-links]");
+    el.hidden = false;
+    el.classList.remove("is-widget-off");
+    /* Same links as last time: leave the pills alone, so a re-render does not
+       drop keyboard focus or a hover ring. */
+    var sig = nets.map(function (net) { return net.id + "=" + socialHref(net.id, links[net.id]); }).join("|");
+    if (box.getAttribute("data-pay-sig") === sig && box.children.length === nets.length) return;
+    box.setAttribute("data-pay-sig", sig);
+    box.innerHTML = "";
+    nets.forEach(function (net) {
+      var a = document.createElement("a");
+      a.className = "tower-social-btn tower-pay-pill tower-social-btn--" + net.id;
+      a.setAttribute("data-tower-pay-link", net.id);
+      a.href = socialHref(net.id, links[net.id]);
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = net.label;
+      a.setAttribute("aria-label", "Open " + net.label + " (opens in a new tab)");
+      box.appendChild(a);
+    });
   }
 
   function getFriendPinLayout(p) {
@@ -5194,6 +5783,35 @@
 
   function profileIsProfessional(p) {
     return !!(p && (p._profileKind === "professional" || p.kind === "professional"));
+  }
+
+  function houseProfessional(p) {
+    if (!profileIsProfessional(p)) return false;
+    var id = String((p && (p._profileId || p.id)) || "");
+    var handle = String((p && p.handle) || "").replace(/^@/, "").toLowerCase();
+    return id === "prof-alexa-professional" || handle === "alexa-pro" || handle === "cognation";
+  }
+
+  function personalNameOnPro(name) {
+    var folded = String(name || "").trim().toLowerCase().replace(/\s+/g, " ");
+    return folded === "alexa" || folded === "alexa thomas" || folded === "alexa j thomas" || folded === "alexa j. thomas";
+  }
+
+  /* Professional pages keep their own name. The personal name stays off that page. */
+  function publicProfileName(p) {
+    var name = String((p && p.displayName) || "").trim();
+    if (!profileIsProfessional(p)) return name || "You";
+    if (personalNameOnPro(name) || (houseProfessional(p) && (!name || name.toLowerCase() === "you"))) {
+      return houseProfessional(p) ? "Cognation" : "";
+    }
+    return name;
+  }
+
+  function housePersonal(p) {
+    if (!p || profileIsProfessional(p)) return false;
+    var id = String(p._profileId || p.id || "");
+    var handle = String(p.handle || "").replace(/^@/, "").toLowerCase();
+    return id === "prof-alexa-personal" || handle === "alexa";
   }
 
   function recordIsSeed(rec) {
@@ -5284,7 +5902,11 @@
     }
     function allow(id) {
       if (!keep(id)) return false;
+      var idKey = String(id || "").toLowerCase();
+      /* Cognation is a friend on the personal page, not a top-friend pin and not a follower. */
+      if (idKey === "cognation" || idKey === "alexa-pro" || idKey === "prof-alexa-professional") return false;
       var rec = lookupFriendRecord(id);
+      if (rec && (rec.kind === "professional" || rec._profileKind === "professional")) return false;
       var seed = recordIsSeed(rec) || (!rec && recordIsSeed({ id: id, handle: id }));
       var ops = recordIsOps(rec) || (!rec && recordIsOps({ id: id, handle: id }));
       if (seedPage) return seed && !ops;
@@ -5309,7 +5931,7 @@
   function removeTopFriendPin(p, friendId) {
     if (!p || profileIsProfessional(p)) return false;
     friendId = String(friendId || "");
-    if (!friendId) return false;
+    if (!friendId || friendId.toLowerCase() === "cognation") return false;
     p.featuredFriendIds = resolveTopFriendIds(p).filter(function (id) { return id !== friendId; });
     if (!Array.isArray(p.removedFriendPinIds)) p.removedFriendPinIds = [];
     if (p.removedFriendPinIds.indexOf(friendId) < 0) p.removedFriendPinIds.push(friendId);
@@ -5356,7 +5978,7 @@
         pin = document.createElement("a");
         pin.className = "tower-friend-pin";
         pin.setAttribute("data-tower-friend-pin", id);
-        pin.href = profileHash ? ("#" + profileHash) : (location.hash || "#");
+        pin.href = profileHash ? ("#" + profileHash) : "#";
         pin.setAttribute("aria-label", friend.name + " tower profile");
         var av = document.createElement("span");
         av.className = "tower-friend-pin-avatar";
@@ -5378,7 +6000,7 @@
         pin.href = "#" + profileHash;
         pin.removeAttribute("data-tower-friend-stay");
       } else {
-        pin.href = location.hash && String(location.hash).indexOf("#tower-profile-") === 0 ? location.hash : "#";
+        pin.href = "#";
         pin.setAttribute("data-tower-friend-stay", "true");
       }
       pin.setAttribute("aria-label", friend.name + " tower profile");
@@ -5430,6 +6052,11 @@
   function addTowerFriend(id) {
     id = String(id || "");
     if (!id || id === "alexa-thomas") return { ok: false, error: "self" };
+    var idKey = id.toLowerCase();
+    /* Cognation is added at signup. There is no button that adds or removes it. */
+    if (idKey === "cognation" || idKey === "alexa-pro" || idKey === "prof-alexa-professional") {
+      return { ok: false, error: "not-a-friend" };
+    }
     var personal = viewerPersonalRecord();
     if (!personal || personal.kind === "professional") return { ok: false, error: "not-personal" };
     /* SeedOps: real ↛ seed/ops */
@@ -5663,9 +6290,11 @@
     }
     if (list) list.innerHTML = "";
     if (note) {
-      note.textContent = edges.length
-        ? edges.length + (edges.length === 1 ? " follower" : " followers")
-        : "No followers yet.";
+      note.textContent = houseProfessional(p)
+        ? "134k followers"
+        : edges.length
+          ? edges.length + (edges.length === 1 ? " follower" : " followers")
+          : "No followers yet.";
     }
     if (mutual) {
       var subject = String((p && (p.displayName || p.handle)) || "this person").trim() || "this person";
@@ -5678,6 +6307,7 @@
       var id = String(edge.id || "");
       var face = normalizeFollowerFace(edge.face);
       var label = followerDisplayName(id) || id;
+      if (personalNameOnPro(label)) return;
       var li = document.createElement("li");
       li.className = "tower-followers-hit";
       li.setAttribute("data-follower-face", face);
@@ -6054,7 +6684,7 @@
     var links = (p && p.socialLinks) || {};
     var defs = socialLinkDefs();
     for (var i = 0; i < defs.length; i++) {
-      if (socialHref(defs[i].id, links[defs[i].id])) return true;
+      if (storedSocialValue(defs[i].id, links[defs[i].id])) return true;
     }
     return false;
   }
@@ -6196,11 +6826,154 @@
     return p;
   }
 
+  /* Edit profile > "Show hidden widgets" (#242 follow-up). Lists the widgets an
+     owner hid with Remove that the page really hides by their publicWidgets
+     flag and that have something to show. Music, Badges and Calendar are
+     listed by their own "shown.<id>" switch (set only by Remove), not by
+     their old content-driven flags. Social follows the links and Friends
+     stays off, so they are not listed. Rendering never writes: only an
+     owner's Show click saves, and it turns on that one flag. */
+  var RESTORABLE_HIDDEN_WIDGETS = [
+    { id: "identity", label: "Name" },
+    { id: "slogan", label: "Quote / slogan" },
+    { id: "envelope", label: "Messages" },
+    { id: "html", label: "Custom HTML" },
+    { id: "music", label: "Music" },
+    { id: "badges", label: "Badges" },
+    { id: "calendar", label: "Calendar" },
+  ];
+
+  function hiddenWidgetRestorable(id) {
+    for (var i = 0; i < RESTORABLE_HIDDEN_WIDGETS.length; i++) {
+      if (RESTORABLE_HIDDEN_WIDGETS[i].id === id) return true;
+    }
+    return false;
+  }
+
+  function hiddenWidgetsToShow(p) {
+    if (!p || !isTowerOwner(p)) return [];
+    var raw = p.publicWidgets && typeof p.publicWidgets === "object" ? p.publicWidgets : {};
+    return RESTORABLE_HIDDEN_WIDGETS.filter(function (w) {
+      if (OWNER_REMOVABLE_WIDGET_IDS.indexOf(w.id) >= 0) {
+        if (!widgetRemovedByOwner(p, w.id)) return false;
+        /* Professional pages have no music player; Badges needs an applied milestone. */
+        if (w.id === "music") return !isProTower(p);
+        if (w.id === "badges") return appliedMilestoneList(p).length > 0;
+        return true;
+      }
+      if (raw[w.id] !== false) return false;
+      if (w.id === "slogan") return !!(typeof p.slogan === "string" && p.slogan.trim());
+      if (w.id === "html") return !!(typeof p.customHtml === "string" && p.customHtml.trim());
+      return true;
+    });
+  }
+
+  /* After Show: a dark glass notice ("<Name> is showing again.") sits in the
+     section where that row was, for ~4s or until Edit profile closes. If it was
+     the last hidden widget, the section hides once the notice clears. */
+  var HIDDEN_WIDGET_NOTICE_MS = 4000;
+
+  /* After Show, the Edit profile status box no longer says "<Name> removed…":
+     the removal line is cleared (the "<Name> is showing again." notice in Show
+     hidden widgets is the confirmation). Any other status line is left alone. */
+  function clearStaleRemovalStatus(root) {
+    var el = root && root.querySelector("[data-tower-profile-status]");
+    if (!el || !el.__towerRemovalLine) return;
+    if (el.textContent === el.__towerRemovalLine) {
+      el.textContent = "";
+      el.hidden = true;
+      el.classList.remove("is-error");
+    }
+    el.__towerRemovalLine = "";
+  }
+
+  function clearHiddenWidgetNotice(root) {
+    var box = root && root.querySelector("[data-tower-hidden-widgets]");
+    if (!box || !box.__towerShowNotice) return;
+    if (box.__towerShowNotice.timer) clearTimeout(box.__towerShowNotice.timer);
+    box.__towerShowNotice = null;
+    renderHiddenWidgetsList(root, TowerProfileStore.get());
+  }
+
+  function renderHiddenWidgetsList(root, p) {
+    var box = root && root.querySelector("[data-tower-hidden-widgets]");
+    if (!box) return;
+    var list = box.querySelector("[data-tower-hidden-widgets-list]");
+    if (!list) return;
+    var items = hiddenWidgetsToShow(p);
+    var notice = box.__towerShowNotice || null;
+    if (notice && (!p || !isTowerOwner(p))) notice = null;
+    if (notice) {
+      items = items.filter(function (w) { return w.id !== notice.id; });
+    }
+    list.innerHTML = "";
+    function addNotice() {
+      var n = document.createElement("p");
+      n.className = "tower-hidden-widget-notice";
+      n.setAttribute("role", "status");
+      n.setAttribute("aria-live", "polite");
+      n.setAttribute("data-tower-hidden-widget-notice", notice.id);
+      n.textContent = notice.label + " is showing again.";
+      list.appendChild(n);
+    }
+    items.forEach(function (w, i) {
+      if (notice && i === notice.index) addNotice();
+      var row = document.createElement("div");
+      row.className = "tower-hidden-widget-row";
+      var name = document.createElement("span");
+      name.className = "tower-hidden-widget-name";
+      name.textContent = w.label;
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-secondary tower-hidden-widget-show";
+      btn.setAttribute("data-tower-show-widget", w.id);
+      btn.setAttribute("aria-label", "Show " + w.label);
+      btn.textContent = "Show";
+      row.appendChild(name);
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+    if (notice && notice.index >= items.length) addNotice();
+    /* Nothing hidden (and no notice): the whole section stays out of the way. */
+    box.hidden = !items.length && !notice;
+    if (!box.__cognationShowBound) {
+      box.__cognationShowBound = true;
+      box.addEventListener("click", function (ev) {
+        var b = ev.target && ev.target.closest ? ev.target.closest("[data-tower-show-widget]") : null;
+        if (!b || !box.contains(b)) return;
+        ev.preventDefault();
+        var id = b.getAttribute("data-tower-show-widget");
+        if (!hiddenWidgetRestorable(id)) return;
+        var cur = TowerProfileStore.get();
+        if (!isTowerOwner(cur)) return;
+        var shown = hiddenWidgetsToShow(cur);
+        if (box.__towerShowNotice) {
+          var prevId = box.__towerShowNotice.id;
+          shown = shown.filter(function (w) { return w.id !== prevId; });
+          if (box.__towerShowNotice.timer) clearTimeout(box.__towerShowNotice.timer);
+        }
+        var index = 0;
+        var label = id;
+        shown.forEach(function (w, i) { if (w.id === id) { index = i; label = w.label; } });
+        box.__towerShowNotice = {
+          id: id,
+          label: label,
+          index: index,
+          timer: setTimeout(function () { clearHiddenWidgetNotice(root); }, HIDDEN_WIDGET_NOTICE_MS),
+        };
+        setPublicWidgetVisible(root, id, true);
+        clearStaleRemovalStatus(root);
+        renderHiddenWidgetsList(root, TowerProfileStore.get());
+      });
+    }
+  }
+
   function applyPublicWidgets(root, p) {
     try { renderSocialLinks(root, p); } catch (eSoc) {}
     applyPublicWidgetsInner(root, p);
     /* Visibility changed: give newly shown, unplaced widgets their spawn spot. */
     spawnUnplacedWidgets(root, p);
+    try { renderHiddenWidgetsList(root, p); } catch (eHidden) {}
     bindSpawnResize(root);
   }
 
@@ -6252,6 +7025,11 @@
       if (id === "badges") on = !!(milestones && milestones.length);
       /* The same Calendar sticker stays on the personal page and the professional page. */
       if (id === "calendar") on = true;
+      /* The owner removed it: hidden for the owner and visitors, whatever its
+         content. Calendar is the exception here: its sticker is what Edit
+         profile > Calendar shows the owner (sessions, bookings), so it stays;
+         a removed Calendar hides the visitors' Calendar card instead. */
+      if (id !== "calendar" && widgetRemovedByOwner(p, id)) on = false;
       var el = root.querySelector('[data-tower-widget="' + id + '"]');
       if (!el) return;
       if (id === "badges") {
@@ -6263,6 +7041,8 @@
       if (!on) el.classList.remove("is-widget-selected");
     });
     showYoutubeSticker(root, !!p && p._profileKind === "professional");
+    var visitorCal = root.querySelector("[data-tower-visitor-calendar]");
+    if (visitorCal && widgetRemovedByOwner(p, "calendar")) visitorCal.hidden = true;
     var avatar = root.querySelector('[data-tower-widget="avatar"]');
     if (avatar) {
       avatar.hidden = false;
@@ -6281,7 +7061,7 @@
         }
       });
       stage.querySelectorAll("[data-tower-badge-pin]").forEach(function (pin) {
-        if (!widgets.badges) {
+        if (!widgets.badges || widgetRemovedByOwner(p, "badges")) {
           pin.hidden = true;
           pin.classList.add("is-widget-off");
         } else {
@@ -6318,10 +7098,14 @@
     if (PUBLIC_WIDGET_IDS.indexOf(id) < 0) return;
     var p = TowerProfileStore.get();
     p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
-    p.publicWidgets[id] = !!on;
+    /* Music, Badges and Calendar: Remove / Show flip only the owner's own switch. */
+    if (OWNER_REMOVABLE_WIDGET_IDS.indexOf(id) >= 0) p.publicWidgets[ownerShownKey(id)] = !!on;
+    else p.publicWidgets[id] = !!on;
     TowerProfileStore.save(p);
     applyPublicWidgets(root, p);
     syncPublicWidgetsForm(root, p);
+    /* The player stops when removed and is rebuilt when shown again. */
+    if (id === "music") initTowerMusic(root, p);
     if (id === "friends") {
       if (on) renderFriendPins(root, p);
       else {
@@ -6453,6 +7237,20 @@
     }
     var wid = el.getAttribute("data-tower-widget");
     if (!wid || wid === "feed" || wid === "messages") return;
+    /* A Quote's tilt lives on its own quoteStickers entry, never under the
+       shared "quote" layout key (#223). */
+    var tiltQuoteId = el.getAttribute("data-tower-quote-id");
+    if (wid === "quote" && tiltQuoteId) {
+      p.quoteStickers = getQuoteStickers(p).map(function (q) {
+        if (!q || q.id !== tiltQuoteId) return q;
+        var nq = {};
+        Object.keys(q).forEach(function (k) { nq[k] = q[k]; });
+        nq.tilt = tilt;
+        return nq;
+      });
+      TowerProfileStore.save(p, { geometry: true });
+      return;
+    }
     var layout = freezeSpawnedWidgets(el.closest ? el.closest("[data-tower-app]") || document : document, getWidgetLayout(p) || {});
     var prev = layout[wid] || {};
     layout[wid] = {
@@ -6611,10 +7409,14 @@
     return normalized;
   }
 
+  /* Old builds seeded four sample events (ids cal-demo-1..4)
+     into every new calendar. They were never the owner's; drop them on read. */
+  var SAMPLE_CALENDAR_ID = /^cal-demo-[1-4]$/;
+
   function normalizeCalendarEventsList(list) {
     if (!Array.isArray(list)) return [];
     return list.map(normalizeCalendarEvent).filter(function (e) {
-      return e && /^\d{4}-\d{2}-\d{2}$/.test(e.date);
+      return e && !SAMPLE_CALENDAR_ID.test(String(e.id || "")) && /^\d{4}-\d{2}-\d{2}$/.test(e.date);
     });
   }
 
@@ -6628,46 +7430,8 @@
       p.calendarEvents = normalizeCalendarEventsList(p.calendarEvents);
       return false;
     }
-    var today = towerCalTodayIso();
-    p.calendarEvents = normalizeCalendarEventsList([
-      {
-        id: "cal-demo-1",
-        title: "Coffee with Jordan",
-        date: towerCalAddDaysIso(today, 2),
-        time: "10:00",
-        notes: "Neighborhood café",
-        status: "accepted",
-        source: "owner",
-      },
-      {
-        id: "cal-demo-2",
-        title: "Block scrapbook night",
-        date: towerCalAddDaysIso(today, 7),
-        time: "18:30",
-        notes: "Bring stickers + scissors",
-        status: "accepted",
-        source: "owner",
-      },
-      {
-        id: "cal-demo-3",
-        title: "Hang with Mira",
-        date: towerCalAddDaysIso(today, 4),
-        time: "15:00",
-        notes: "Requested via public calendar",
-        status: "pending",
-        source: "friend",
-        requesterName: "Mira Chen",
-      },
-      {
-        id: "cal-demo-4",
-        title: "Farmers market",
-        date: towerCalAddDaysIso(today, 11),
-        time: "09:00",
-        notes: "",
-        status: "accepted",
-        source: "owner",
-      },
-    ]);
+    /* No sample events: a new calendar starts empty (real data only). */
+    p.calendarEvents = [];
     return true;
   }
 
@@ -7105,7 +7869,7 @@
           escapeHtml(opts.picked) +
           '">Book</button>'
         : "") +
-      '<p class="commune-status" data-tower-cal-book-status' +
+      '<p class="commune-status' + (opts.bookError ? " is-error" : "") + '" data-tower-cal-book-status' +
       (opts.bookStatus ? "" : " hidden") +
       ' role="status" aria-live="polite">' +
       escapeHtml(opts.bookStatus || "") +
@@ -7120,6 +7884,21 @@
      hidden until owners publish real open times on the server. */
   var HANGOUT_SUGGESTIONS_LIVE = false;
 
+  /* Status boxes in Edit profile show a plain line; raw error text is logged only. */
+  function friendlyBookingError(err) {
+    var raw = String((err && err.message) || "");
+    if (/sign in/i.test(raw)) return "Sign in to book a time.";
+    if (/can't take/i.test(raw)) return "This calendar can't take bookings yet.";
+    return "Couldn't send the request. Try again.";
+  }
+
+  function friendlyAddProfileError(err) {
+    var raw = String((err && err.message) || err || "");
+    if (/sign in/i.test(raw)) return "Sign in to add a page.";
+    if (/handle/i.test(raw)) return "That page handle isn't available. Change your handle and try again.";
+    return "Couldn't create your professional page. Try again.";
+  }
+
   /* Visitor books an open time: one hangout request to the Tower owner, saved on the server. */
   function requestHangoutOnServer(profileId, iso, time) {
     var sb = window.CognationSupabase;
@@ -7132,6 +7911,60 @@
     return sb.rpc("request_hangout", { p_profile_id: profileId, p_date: iso, p_time: time });
   }
 
+  function calendarKindPills(kind) {
+    function one(value, label) {
+      return '<label class="tower-cal-pill"><input type="checkbox" name="eventKind" value="' + value + '" data-tower-cal-kind' + (kind === value ? " checked" : "") + "> " + label + "</label>";
+    }
+    return '<div class="tower-cal-pills" data-tower-cal-pills role="group" aria-label="Event kind">' +
+      one("classroom", "Classroom") + one("auction", "Auction") +
+      '<p class="form-hint">Check one before the event is added. Auction opens a chat room with video and a presenter who can hand off the live spot and take it back. No one under 16 can bid.</p></div>';
+  }
+  function auctionSaleFields(editing) {
+    var sale = (editing && editing.auction) || {};
+    var shown = editing && editing.kind === "auction";
+    return '<div data-tower-cal-auction-fields' + (shown ? "" : " hidden") + ">" +
+      '<div class="form-group"><label for="tower-cal-selling">Selling</label>' +
+      '<input id="tower-cal-selling" name="selling" type="text" maxlength="120" value="' + escapeHtml(sale.item || "") + '" data-tower-cal-selling></div>' +
+      '<div class="form-group"><label for="tower-cal-start">Starting bid</label>' +
+      '<input id="tower-cal-start" name="start" inputmode="decimal" maxlength="8" value="' + escapeHtml(sale.start == null ? "" : String(sale.start)) + '" data-tower-cal-start></div></div>';
+  }
+  function applyEventKind(event, kind, profile, sale) {
+    event.kind = kind === "auction" ? "auction" : "classroom";
+    if (event.kind !== "auction") { delete event.auction; return; }
+    sale = sale || {};
+    event.auction = {
+      chat: true, video: true, presenter: "handoff", bid: "message",
+      item: String(sale.item || "").trim(), start: Number(sale.start),
+      handle: String((profile && profile.handle) || "").replace(/^@/, ""),
+      minAge: 16, payInRoom: false,
+    };
+  }
+
+  function calendarEditorHtml(editing, selected) {
+    var formTitle = editing ? editing.title : "";
+    var formDate = editing ? editing.date : selected;
+    var formTime = editing ? editing.time || "" : "";
+    var formNotes = editing ? editing.notes || "" : "";
+    return '<form class="tower-cal-editor" data-tower-cal-editor action="#" method="post">' +
+      "<h5>" + (editing ? "Edit event" : "Add event") + "</h5>" +
+      calendarKindPills(editing && editing.kind) +
+      auctionSaleFields(editing) +
+      (editing ? '<input type="hidden" name="id" value="' + escapeHtml(editing.id) + '" data-tower-cal-edit-id>' : "") +
+      '<div class="form-group"><label for="tower-cal-edit-title">Title</label>' +
+      '<input id="tower-cal-edit-title" name="title" type="text" maxlength="120" required value="' + escapeHtml(formTitle) + '" data-tower-cal-edit-title></div>' +
+      '<div class="tower-cal-friend-row">' +
+      '<div class="form-group"><label for="tower-cal-edit-date">Date</label>' +
+      '<input id="tower-cal-edit-date" name="date" type="date" required value="' + escapeHtml(formDate) + '" data-tower-cal-edit-date></div>' +
+      '<div class="form-group"><label for="tower-cal-edit-time">Time</label>' +
+      '<input id="tower-cal-edit-time" name="time" type="time" value="' + escapeHtml(formTime) + '" data-tower-cal-edit-time></div></div>' +
+      '<div class="form-group"><label for="tower-cal-edit-notes">Notes</label>' +
+      '<input id="tower-cal-edit-notes" name="notes" type="text" maxlength="240" value="' + escapeHtml(formNotes) + '" data-tower-cal-edit-notes></div>' +
+      '<div class="form-actions"><button type="submit" class="btn btn-primary">' + (editing ? "Save changes" : "Add event") + "</button>" +
+      (editing ? '<button type="button" class="btn btn-secondary" data-tower-cal-cancel-edit>Cancel</button>' : "") +
+      "</div>" +
+      '<p class="commune-status" data-tower-cal-editor-status hidden role="status" aria-live="polite"></p></form>';
+  }
+
   function renderPrivateCalendar(root) {
     var host = root.querySelector("[data-tower-cal-private]");
     if (!host) return;
@@ -7142,53 +7975,6 @@
     var ownerFeed = isTowerOwner(p);
     var events = ownerFeed ? (p.calendarEvents || []) : busyBlocksOnly(p.calendarEvents || []);
     var selected = view.selected;
-    var editingId = host.getAttribute("data-editing-id") || "";
-    var editing = null;
-    if (editingId) {
-      editing = events.filter(function (e) {
-        return e.id === editingId;
-      })[0] || null;
-    }
-    var formTitle = editing ? editing.title : "";
-    var formDate = editing ? editing.date : selected;
-    var formTime = editing ? editing.time || "" : "";
-    var formNotes = editing ? editing.notes || "" : "";
-    var editorHtml = ownerFeed ? (
-      '<form class="tower-cal-editor" data-tower-cal-editor action="#" method="post">' +
-      "<h5>" +
-      (editing ? "Edit event" : "Add event") +
-      "</h5>" +
-      (editing
-        ? '<input type="hidden" name="id" value="' + escapeHtml(editing.id) + '" data-tower-cal-edit-id>'
-        : "") +
-      '<div class="form-group"><label for="tower-cal-edit-title">Title</label>' +
-      '<input id="tower-cal-edit-title" name="title" type="text" maxlength="120" required value="' +
-      escapeHtml(formTitle) +
-      '" data-tower-cal-edit-title></div>' +
-      '<div class="tower-cal-friend-row">' +
-      '<div class="form-group"><label for="tower-cal-edit-date">Date</label>' +
-      '<input id="tower-cal-edit-date" name="date" type="date" required value="' +
-      escapeHtml(formDate) +
-      '" data-tower-cal-edit-date></div>' +
-      '<div class="form-group"><label for="tower-cal-edit-time">Time</label>' +
-      '<input id="tower-cal-edit-time" name="time" type="time" value="' +
-      escapeHtml(formTime) +
-      '" data-tower-cal-edit-time></div></div>' +
-      '<div class="form-group"><label for="tower-cal-edit-notes">Notes</label>' +
-      '<input id="tower-cal-edit-notes" name="notes" type="text" maxlength="240" value="' +
-      escapeHtml(formNotes) +
-      '" data-tower-cal-edit-notes></div>' +
-      '<div class="form-actions">' +
-      '<button type="submit" class="btn btn-primary">' +
-      (editing ? "Save changes" : "Add event") +
-      "</button>" +
-      (editing
-        ? '<button type="button" class="btn btn-secondary" data-tower-cal-cancel-edit>Cancel</button>'
-        : "") +
-      "</div>" +
-      '<p class="commune-status" data-tower-cal-editor-status hidden role="status" aria-live="polite"></p>' +
-      "</form>"
-    ) : "";
     host.innerHTML =
       renderTowerMonthGrid(view, events, { gridLabel: ownerFeed ? "My calendar" : "Calendar" }) +
       '<div class="tower-cal-day-panel">' +
@@ -7197,8 +7983,7 @@
       escapeHtml(selected) +
       "</h5>" +
       renderDayEventList(events, selected, { ownerControls: ownerFeed, busyOnly: !ownerFeed }) +
-      "</div>" +
-      editorHtml;
+      "</div>";
 
     var icsInput = root.querySelector("[data-tower-cal-ics-url]");
     if (icsInput && document.activeElement !== icsInput) {
@@ -7219,6 +8004,21 @@
         gStatus.textContent = "";
       }
     }
+  }
+
+  /* Owner's Calendar day heading (Edit profile > Calendar): "Thu, Oct 22".
+     Display only: the stored date stays YYYY-MM-DD. The parts are read as a
+     local calendar date (never new Date("YYYY-MM-DD"), which is UTC midnight
+     and can land on the day before west of UTC). Anything else comes back as is. */
+  function formatCalendarDayLabel(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso == null ? "" : iso));
+    if (!m) return String(iso == null ? "" : iso);
+    var y = Number(m[1]), mo = Number(m[2]) - 1, d = Number(m[3]);
+    var date = new Date(y, mo, d, 12, 0, 0, 0);
+    if (isNaN(date.getTime()) || date.getFullYear() !== y || date.getMonth() !== mo || date.getDate() !== d) {
+      return String(iso);
+    }
+    return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   }
 
   function renderPublicCalendar(root) {
@@ -7244,6 +8044,7 @@
           visitor: !owner,
           picked: owner ? "" : view.pickedTime || "",
           bookStatus: owner ? "" : view.bookStatus || "",
+          bookError: owner ? false : !!view.bookError,
         })
       : "";
     /* No-fake rule: the slots are fixed clock times, not saved Supabase data. */
@@ -7260,20 +8061,102 @@
       publicCal.setAttribute("aria-label", "Calendar");
       publicCal.setAttribute("data-calendar-busy", owner ? "false" : "true");
     }
+    var editingId = publicCal && publicCal.getAttribute("data-editing-id") || "";
+    var editing = editingId ? (events.filter(function (e) { return e && e.id === editingId; })[0] || null) : null;
     body.innerHTML =
       renderTowerMonthGrid(view, events, { gridLabel: "Calendar" }) +
       '<div class="tower-cal-day-panel">' +
       '<h5 class="tower-cal-day-heading">' +
-      (owner ? "On " : "Busy · ") +
-      escapeHtml(selected) +
+      (owner ? "" : "Busy · ") +
+      escapeHtml(owner ? formatCalendarDayLabel(selected) : selected) +
       "</h5>" +
       renderDayEventList(events, selected, { ownerControls: owner, busyOnly: !owner }) +
       "</div>" +
-      schedulerHtml;
+      schedulerHtml +
+      (owner ? calendarEditorHtml(editing, selected) : "");
+  }
+
+  function visitorSessionRowHtml(sess, api) {
+    var live = api.isLiveNow(sess);
+    var when = new Date(sess.startsAt);
+    var day = when.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    return '<li class="tower-visitor-session' + (live ? " is-live" : "") + '" data-visitor-session="' + escapeHtml(sess.id) + '">' +
+      '<span class="cgn-cal-tag cgn-cal-tag--' + sess.kind + '">' + (sess.kind === "webinar" ? "Webinar" : "Classroom") + "</span>" +
+      (live ? '<span class="cgn-live-pill"><i class="cgn-live-dot" aria-hidden="true"></i>LIVE</span>' : "") +
+      '<span class="tower-visitor-session-title">' + escapeHtml(sess.title) + "</span>" +
+      '<span class="tower-visitor-session-time">' + escapeHtml(day + " · " + api.timeLabel(sess.startsAt) + " · " + api.minutesOf(sess) + " min") + "</span>" +
+      (live ? '<a class="cgn-cal-join" href="#classroom-' + escapeHtml(sess.id) + '">Join</a>' : "") +
+      "</li>";
+  }
+
+  /* Visitor day heading: "Tue, Oct 20" (Cognation Calendar format); "Busy · " only
+     when that day really has a (busy-only) event. */
+  function visitorDayHeading(events, iso) {
+    var api = window.CognationClassroomSessions;
+    var label = api && typeof api.dayDateLabel === "function"
+      ? api.dayDateLabel(iso)
+      : (function () {
+          var d = new Date(String(iso) + "T12:00:00");
+          return isNaN(d.getTime()) ? String(iso || "") : d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+        })();
+    return (eventsForDate(events || [], iso).length ? "Busy · " : "") + label;
+  }
+
+  /* Visitor Calendar (restored from #158): busy blocks only for personal events
+     (busyBlocksOnly), plus this host's public Classroom / Webinar sessions. */
+  function renderVisitorCalendar(root) {
+    var box = root.querySelector("[data-tower-visitor-calendar]");
+    if (!box) return;
+    var p = TowerProfileStore.get();
+    var wasHidden = box.hidden;
+    if (!p || isTowerOwner(p)) {
+      box.hidden = true;
+      if (!wasHidden) respawnVisitorCalendar(root, p);
+      return;
+    }
+    /* The owner removed Calendar: visitors don't get this card until Show. */
+    if (widgetRemovedByOwner(p, "calendar")) {
+      box.hidden = true;
+      if (!wasHidden) respawnVisitorCalendar(root, p);
+      return;
+    }
+    box.hidden = false;
+    var events = busyBlocksOnly(sharedCalendarEvents(p) || []);
+    var view = getCalendarViewState(root, "visitor");
+    var body = box.querySelector("[data-tower-cal-visitor-body]");
+    if (body) {
+      body.innerHTML =
+        renderTowerMonthGrid(view, events, { gridLabel: "Calendar" }) +
+        '<div class="tower-cal-day-panel"><h5 class="tower-cal-day-heading">' + escapeHtml(visitorDayHeading(events, view.selected)) + "</h5>" +
+        renderDayEventList(events, view.selected, { ownerControls: false, busyOnly: true }) + "</div>";
+    }
+    var sessionsBox = box.querySelector("[data-tower-visitor-sessions]");
+    if (!sessionsBox) return;
+    var api = window.CognationClassroomSessions;
+    var pro = profileIsProfessional(p);
+    var list = pro && api && typeof api.forHost === "function" ? api.forHost(p._profileId || p.id) : [];
+    sessionsBox.hidden = !pro;
+    if (!pro) sessionsBox.innerHTML = "";
+    else {
+      sessionsBox.innerHTML = '<h5 class="tower-visitor-sessions-title">Classroom sessions</h5>' +
+        (list.length
+          ? '<ul class="tower-visitor-session-list" role="list">' + list.map(function (sess) { return visitorSessionRowHtml(sess, api); }).join("") + "</ul>"
+          : '<p class="form-hint tower-cal-empty">No sessions booked yet.</p>');
+    }
+    /* The card just appeared (or changed height on a sessions list): give it its
+       spot under the bio card. */
+    if (wasHidden) respawnVisitorCalendar(root, p);
+  }
+
+  function respawnVisitorCalendar(root, p) {
+    try { spawnUnplacedWidgets(root, p); } catch (eSpawn) {}
   }
 
   function refreshTowerCalendars(root) {
     if (!root) return;
+    try {
+      renderVisitorCalendar(root);
+    } catch (eVis) {}
     try {
       renderPrivateCalendar(root);
     } catch (e) {}
@@ -7326,6 +8209,10 @@
   function initTowerCalendar(root) {
     if (!root || root.__cognationCalendarBound) return;
     root.__cognationCalendarBound = true;
+    /* Public sessions arrive after load: repaint the visitor Calendar. */
+    document.addEventListener("cognation:classroom-sessions-updated", function () {
+      try { renderVisitorCalendar(root); } catch (eSess) {}
+    });
 
     root.addEventListener("click", function (ev) {
       var t = ev.target;
@@ -7341,6 +8228,7 @@
         }
         if ((prev || next).closest("[data-tower-cal-public], [data-tower-widget=\"calendar\"]")) key = "public";
         if ((prev || next).closest("[data-tower-cal-private]")) key = "private";
+        if ((prev || next).closest("[data-tower-cal-visitor]")) key = "visitor";
         var view = getCalendarViewState(root, key);
         if (prev) {
           view.month0 -= 1;
@@ -7362,7 +8250,9 @@
       var dayBtn = t.closest("[data-tower-cal-day]");
       if (dayBtn) {
         var iso = dayBtn.getAttribute("data-tower-cal-day");
-        var key2 = dayBtn.closest("[data-tower-cal-public], [data-tower-widget=\"calendar\"]")
+        var key2 = dayBtn.closest("[data-tower-cal-visitor]")
+          ? "visitor"
+          : dayBtn.closest("[data-tower-cal-public], [data-tower-widget=\"calendar\"]")
           ? "public"
           : "private";
         var view2 = getCalendarViewState(root, key2);
@@ -7374,6 +8264,7 @@
           view2.schedulerOpen = true;
           view2.pickedTime = "";
           view2.bookStatus = "";
+          view2.bookError = false;
         } else {
           var privHost = root.querySelector("[data-tower-cal-private]");
           if (privHost && !privHost.getAttribute("data-editing-id")) {
@@ -7405,7 +8296,7 @@
             return e.id !== did;
           });
         });
-        var ph = root.querySelector("[data-tower-cal-private]");
+        var ph = root.querySelector("[data-tower-cal-public]");
         if (ph && ph.getAttribute("data-editing-id") === did) ph.removeAttribute("data-editing-id");
         refreshTowerCalendars(root);
         return;
@@ -7414,7 +8305,7 @@
       var editBtn = t.closest("[data-tower-cal-edit]");
       if (editBtn) {
         var eid = editBtn.getAttribute("data-tower-cal-edit");
-        var priv = root.querySelector("[data-tower-cal-private]");
+        var priv = root.querySelector("[data-tower-cal-public]");
         if (priv) priv.setAttribute("data-editing-id", eid);
         /* Switch to private side if editing from public */
         if (editBtn.closest("[data-tower-cal-public], [data-tower-widget=\"calendar\"]")) {
@@ -7431,7 +8322,7 @@
       }
 
       if (t.closest("[data-tower-cal-cancel-edit]")) {
-        var priv2 = root.querySelector("[data-tower-cal-private]");
+        var priv2 = root.querySelector("[data-tower-cal-public]");
         if (priv2) priv2.removeAttribute("data-editing-id");
         refreshTowerCalendars(root);
         return;
@@ -7461,6 +8352,7 @@
           viewS.schedulerOpen = true;
           viewS.pickedTime = slotTime;
           viewS.bookStatus = "";
+          viewS.bookError = false;
           ev.preventDefault();
           refreshTowerCalendars(root);
           return;
@@ -7495,6 +8387,7 @@
         if (!/^\d{2}:\d{2}$/.test(bookTime) || !/^\d{4}-\d{2}-\d{2}$/.test(bookIso)) return;
         if (!HANGOUT_BOOKING_LIVE) {
           /* Owner inbox not shipped yet: say so honestly, send nothing. */
+          viewB.bookError = false;
           viewB.bookStatus = "Booking is coming soon.";
           refreshTowerCalendars(root);
           return;
@@ -7505,12 +8398,14 @@
           function () {
             viewB.pickedTime = "";
             viewB.bookStatus = "Request sent.";
+            viewB.bookError = false;
             refreshTowerCalendars(root);
           },
           function (err) {
-            viewB.bookStatus = (err && err.message && /Sign in|can't take/.test(err.message))
-              ? err.message
-              : "Couldn't send the request. Try again.";
+            /* Raw error text goes to the console only; the box shows a fixed line. */
+            try { console.warn("[tower] hangout request failed", err); } catch (eLog) {}
+            viewB.bookStatus = friendlyBookingError(err);
+            viewB.bookError = true;
             refreshTowerCalendars(root);
           }
         );
@@ -7542,6 +8437,15 @@
       refreshTowerCalendars(root);
     });
 
+    root.addEventListener("change", function (ev) {
+      var box = ev.target && ev.target.matches && ev.target.matches("[data-tower-cal-kind]") ? ev.target : null;
+      if (!box || !box.checked || !root.contains(box)) return;
+      var group = box.closest("[data-tower-cal-pills]");
+      if (!group) return;
+      group.querySelectorAll("[data-tower-cal-kind]").forEach(function (el) { if (el !== box) el.checked = false; });
+      var saleFields = box.closest("form") && box.closest("form").querySelector("[data-tower-cal-auction-fields]");
+      if (saleFields) saleFields.hidden = box.value !== "auction";
+    });
     root.addEventListener("submit", function (ev) {
       var form = ev.target;
       if (!form || !root.contains(form)) return;
@@ -7573,6 +8477,23 @@
           setEdStatus("Title and a valid date are required.", true);
           return;
         }
+        var kindBox = form.querySelector("[data-tower-cal-kind]:checked");
+        var kind = kindBox ? kindBox.value : "";
+        if (kind !== "classroom" && kind !== "auction") {
+          setEdStatus("Check Classroom or Auction.", true);
+          return;
+        }
+        var sale = {};
+        if (kind === "auction") {
+          var sellEl = form.querySelector("[data-tower-cal-selling]");
+          var startEl = form.querySelector("[data-tower-cal-start]");
+          sale.item = sellEl ? sellEl.value.trim().slice(0, 120) : "";
+          sale.start = Number(String(startEl ? startEl.value : "").replace(/[$,]/g, ""));
+          if (!sale.item || !isFinite(sale.start) || sale.start < 0) {
+            setEdStatus("Type what you are selling and the starting bid.", true);
+            return;
+          }
+        }
         var editId = idEl ? idEl.value : "";
         saveCalendarToProfile(function (p) {
           if (editId) {
@@ -7583,33 +8504,26 @@
                 e.date = date;
                 e.time = time;
                 e.notes = notes;
+                applyEventKind(e, kind, p, sale);
                 found = true;
               }
             });
             if (!found) {
-              p.calendarEvents.push({
-                id: editId,
-                title: title,
-                date: date,
-                time: time,
-                notes: notes,
-                status: "accepted",
-                source: "owner",
-              });
+              var revived = {
+                id: editId, title: title, date: date, time: time, notes: notes, status: "accepted", source: "owner",
+              };
+              applyEventKind(revived, kind, p, sale);
+              p.calendarEvents.push(revived);
             }
           } else {
-            p.calendarEvents.push({
-              id: newCalendarEventId(),
-              title: title,
-              date: date,
-              time: time,
-              notes: notes,
-              status: "accepted",
-              source: "owner",
-            });
+            var added = {
+              id: newCalendarEventId(), title: title, date: date, time: time, notes: notes, status: "accepted", source: "owner",
+            };
+            applyEventKind(added, kind, p, sale);
+            p.calendarEvents.push(added);
           }
         });
-        var priv3 = root.querySelector("[data-tower-cal-private]");
+        var priv3 = root.querySelector("[data-tower-cal-public]");
         if (priv3) priv3.removeAttribute("data-editing-id");
         var view3 = getCalendarViewState(root, "private");
         view3.selected = date;
@@ -7873,11 +8787,25 @@
       });
       btn.hidden = hasRemoteProfessional;
       if (status) {
-        status.hidden = !hasRemoteProfessional;
-        status.textContent = hasRemoteProfessional
+        /* "Your professional page is set up." shows once: only in the moment
+           right after this tab created the Pro page, and only while the Pro
+           page is the one being edited. Closing Edit profile clears it, so it
+           never shows on a later open, after a reload, or in Personal Edit
+           profile. In memory only (no storage, no server write). */
+        var currentKindForNotice =
+          (TowerProfileStore.get() && TowerProfileStore.get()._profileKind) ||
+          (session && session.profileKind) ||
+          "personal";
+        var showSetupNotice =
+          hasRemoteProfessional &&
+          root.__cognationProSetupJustCreated === true &&
+          currentKindForNotice === "professional";
+        status.hidden = !showSetupNotice;
+        status.textContent = showSetupNotice
           ? "Your professional page is set up."
           : "";
         status.classList.remove("is-error");
+        status.classList.toggle("tower-pro-setup-notice", showSetupNotice);
       }
       return;
     }
@@ -7945,6 +8873,8 @@
               : "professional-page",
           })
           .then(function (profile) {
+            /* One-time "set up" notice for this moment only (see syncAddProfileUi). */
+            root.__cognationProSetupJustCreated = true;
             setSt("Professional page created.", false);
             if (profile && profile.handle) {
               location.hash = "tower-profile-" + profile.handle;
@@ -7955,10 +8885,9 @@
             applyTowerSide(root, "public");
           })
           .catch(function (error) {
-            setSt(
-              (error && error.message) || "Could not create a professional page.",
-              true
-            );
+            /* Raw error text goes to the console only; the box shows a fixed line. */
+            try { console.error("[tower] add professional page failed", error); } catch (eLog) {}
+            setSt(friendlyAddProfileError(error), true);
           })
           .finally(function () {
             btn.disabled = false;
@@ -7980,7 +8909,8 @@
       }
       var gate = window.CognationAccounts.canAddProfileForPhone(phone);
       if (!gate.ok) {
-        setSt(gate.reason, true);
+        try { console.warn("[tower] add page blocked", gate.reason); } catch (eLog) {}
+        setSt("This phone number already has a Personal and a Professional page.", true);
         return;
       }
       var kind = btn.getAttribute("data-add-kind") || "professional";
@@ -7990,10 +8920,11 @@
         phone: phone,
         kind: kind,
         handle: kind === "professional" ? handleBase + "-pro" : handleBase,
-        displayName: kind === "professional" ? "Alexa J Thomas" : "Alexa",
+        displayName: kind === "professional" ? "Cognation" : "Alexa",
       });
       if (!result.ok) {
-        setSt(result.error || "Could not create profile.", true);
+        try { console.warn("[tower] add page failed", result.error); } catch (eLog) {}
+        setSt(/taken/i.test(String(result.error || "")) ? "That page handle is already taken." : "Couldn't create the page. Try again.", true);
         return;
       }
       setSt((kind === "professional" ? "Professional" : "Personal") + " page created.", false);
@@ -8138,7 +9069,7 @@
       cam.classList.add("is-widget-off");
     }
     function showCam() {
-      if (!owner) {
+      if (!owner || instaxRemoved(p)) {
         hideCam();
         return;
       }
@@ -8167,21 +9098,9 @@
       else hideCam();
       return;
     }
-    if (!prints.length) {
-      nodes.forEach(function (el) {
-        el.hidden = true;
-        el.classList.add("is-widget-off");
-      });
-      stage.querySelectorAll("[data-tower-polaroid-extra]").forEach(function (el) {
-        el.hidden = true;
-        el.classList.add("is-widget-off");
-      });
-      showCam();
-      return;
-    }
     while (nodes.length > 1) {
-      var extra = nodes.pop();
-      if (extra && extra.parentNode) extra.parentNode.removeChild(extra);
+      var dup = nodes.pop();
+      if (dup && dup.parentNode) dup.parentNode.removeChild(dup);
     }
     var el = nodes[0];
     if (!el) {
@@ -8192,11 +9111,14 @@
       el.innerHTML = polaroidMarkup();
       stage.appendChild(el);
     }
-    el.hidden = false;
-    el.classList.remove("is-widget-off");
-    applyPolaroidPrintScale(el, prints[0] && prints[0].scale);
+    var showShell = !!owner;
+    el.hidden = !showShell;
+    el.classList.toggle("is-widget-off", !showShell);
+    if (showShell) el.setAttribute("title", "Upload a photo");
+    paintPolaroidPhoto(el.querySelector("[data-tower-polaroid-photo]"), "");
+    applyPolaroidPrintScale(el, 1);
     showCam();
-    var needed = Math.max(0, prints.length - 1);
+    var needed = prints.length;
     var extras = Array.prototype.slice.call(stage.querySelectorAll("[data-tower-polaroid-extra]"));
     while (extras.length > needed) {
       var gone = extras.pop();
@@ -8216,8 +9138,8 @@
       }
       printEl.hidden = false;
       printEl.classList.remove("is-widget-off");
-      paintPolaroidPhoto(printEl.querySelector("[data-tower-polaroid-photo]"), prints[i + 1].url);
-      applyPolaroidPrintScale(printEl, prints[i + 1].scale);
+      paintPolaroidPhoto(printEl.querySelector("[data-tower-polaroid-photo]"), prints[i].url);
+      applyPolaroidPrintScale(printEl, prints[i].scale);
     }
   }
 
@@ -8434,7 +9356,8 @@
         var next = normalizePolaroidScale(sticker.getAttribute("data-polaroid-scale") || startScale);
         var wid = sticker.getAttribute("data-tower-widget");
         var extra = sticker.getAttribute("data-tower-polaroid-extra");
-        var idx = wid === "polaroid" ? 0 : (parseInt(extra, 10) + 1);
+        if (wid === "polaroid" || extra == null || extra === "") return;
+        var idx = parseInt(extra, 10);
         var cur = TowerProfileStore.get();
         var prints = polaroidPrintList(cur);
         if (!prints[idx]) return;
@@ -8624,6 +9547,24 @@
     return p.quoteStickers;
   }
 
+  /* Quote text is public (any visitor, any age), so it must pass the same
+     word check Tower posts are rated with (js/auto-rate.js, the browser copy of
+     the database rater) at the level everyone can see (G or PG), and the
+     shared under-13 keyword floor (js/age-floor-keywords.js). Fails closed when
+     either helper is missing. */
+  var QUOTE_BLOCKED_MESSAGE = "This quote wasn't saved. It didn't pass the word check Tower uses for posts, and quotes show to everyone. Try different words.";
+  function quoteTextAllowed(text) {
+    var t = String(text || "");
+    var ar = window.CognationAutoRate;
+    var floor = window.CognationAgeFloor;
+    if (!ar || typeof ar.rate !== "function") return false;
+    if (!floor || typeof floor.isAdultKeyword !== "function") return false;
+    var r = ar.rate(t, []);
+    if (!r || (r.rating !== "G" && r.rating !== "PG")) return false;
+    return !floor.isAdultKeyword(t);
+  }
+  window.CognationTowerQuoteAllowed = quoteTextAllowed;
+
   function uidQuote() {
     return "quote-" + Date.now().toString(36) + "-" + Math.floor(Math.random() * 1e4).toString(36);
   }
@@ -8644,6 +9585,8 @@
   function addQuoteSticker(root, text, layout, existingId) {
     text = String(text || "").trim().slice(0, 400);
     if (!text) return null;
+    /* Blocked: nothing is written (no server row, no localStorage cache). */
+    if (!quoteTextAllowed(text)) return { blocked: true };
     var p = TowerProfileStore.get();
     var quotes = getQuoteStickers(p);
     var id = existingId || uidQuote();
@@ -8655,6 +9598,7 @@
       z: layout && typeof layout.z === "number" ? layout.z : 10,
       tilt: layout && typeof layout.tilt === "number" ? layout.tilt : 0,
     };
+    if (layout && typeof layout.yPx === "number" && isFinite(layout.yPx)) entry.yPx = layout.yPx;
     var found = false;
     quotes = quotes.map(function (q) {
       if (q.id === id) {
@@ -8678,7 +9622,14 @@
       el.remove();
     });
     var quotes = getQuoteStickers(p);
+    var ownerView = isTowerOwner(p);
+    var stageH = stage.clientHeight || 0;
     quotes.forEach(function (q) {
+      if (!q || !q.text) return;
+      /* A row written before the check (or edited elsewhere) never reaches a
+         visitor. The owner still sees it so they can remove it. */
+      if (!ownerView && !quoteTextAllowed(q.text)) return;
+      var yAt = stickerYFromLayout(q, stageH);
       var el = document.createElement("div");
       el.className = "tower-sticker tower-sticker--quote";
       el.setAttribute("data-tower-widget", "quote");
@@ -8686,19 +9637,129 @@
       el.setAttribute("data-sticker-label", "Quote");
       el.setAttribute("data-quote-text", q.text);
       el.setAttribute("data-sticker-x", String(q.x));
-      el.setAttribute("data-sticker-y", String(q.y));
+      el.setAttribute("data-sticker-y", String(yAt.pct));
       el.setAttribute("data-sticker-z", String(q.z || 10));
       el.style.setProperty("--sticker-x", q.x + "%");
-      el.style.setProperty("--sticker-y", q.y + "%");
+      /* Offset from the canvas top in px (yPx) when saved: the canvas height
+         differs between owner and visitor, so a % of it drifted. */
+      el.style.setProperty("--sticker-y", yAt.css);
       el.style.setProperty("--sticker-z", String(q.z || 10));
       el.style.setProperty("--sticker-tilt", (q.tilt || 0) + "deg");
       el.innerHTML = '<blockquote class="tower-quote-card"></blockquote>';
       el.querySelector(".tower-quote-card").textContent = q.text;
       if (typeof q.w === "number" && q.w > 0) setStickerWidth(el, q.w);
+      /* The saved spot: every clear-check starts from here, so a check run while
+         neighbours were still loading never sticks (#223). */
+      el.__cognationQuoteSpot = { x: q.x, yCss: yAt.css, yPct: yAt.pct };
       ensureResizeHandle(el, "Quote");
       stage.appendChild(el);
     });
     syncOwnerStickerHandles(root);
+    watchQuotesClear(stage);
+  }
+
+  /* A Quote never covers another widget (video box, profile card, widget
+     controls). After layout, a quote that overlaps one moves to the nearest
+     clear spot beside it (right, then left), else below everything. Display
+     only; the drop saves the clear spot it lands on. Phone stacks skip this. */
+  /* Top edge of a sticker measured from the canvas top-left, in px (the
+     tilt transform is ignored, so this is what --sticker-y: Npx restores). */
+  function stickerTopInStage(stage, el) {
+    if (!stage || !el) return NaN;
+    if (el.offsetParent === stage) return el.offsetTop;
+    return el.getBoundingClientRect().top - stage.getBoundingClientRect().top;
+  }
+
+  function keepQuoteClear(stage, el) {
+    if (!stage || !el || isPhoneStage(stage) || el.hidden) return false;
+    var sr = stage.getBoundingClientRect();
+    var sw = sr.width || 0;
+    if (!sw) return false;
+    var r = el.getBoundingClientRect();
+    var w = r.width;
+    var h = r.height;
+    if (!w || !h) return false;
+    var blocks = [];
+    stage.querySelectorAll("[data-tower-widget]").forEach(function (b) {
+      if (b === el || b.hidden || b.classList.contains("is-widget-off")) return;
+      if (b.classList.contains("tower-sticker--quote") || b.hasAttribute("data-tower-emoji")) return;
+      if (b.closest(".tower-sticker--quote")) return;
+      var br = b.getBoundingClientRect();
+      if (!br.width || !br.height) return;
+      blocks.push({ l: br.left - sr.left, t: br.top - sr.top, r: br.right - sr.left, b: br.bottom - sr.top });
+    });
+    var GAP = 12;
+    function hit(x, y) {
+      for (var i = 0; i < blocks.length; i++) {
+        var k = blocks[i];
+        if (x < k.r && k.l < x + w && y < k.b && k.t < y + h) return k;
+      }
+      return null;
+    }
+    var x0 = el.offsetParent === stage ? el.offsetLeft : r.left - sr.left;
+    var y0 = stickerTopInStage(stage, el);
+    if (!hit(x0, y0)) return false;
+    var best = null;
+    function consider(x, y) {
+      if (x < GAP || x + w > sw - GAP || y < 0 || hit(x, y)) return;
+      var d = Math.abs(x - x0) + Math.abs(y - y0);
+      if (!best || d < best.d) best = { x: x, y: y, d: d };
+    }
+    blocks.forEach(function (k) {
+      consider(k.r + GAP, y0);
+      consider(k.l - w - GAP, y0);
+    });
+    if (!best) {
+      var bottom = 0;
+      blocks.forEach(function (k) { if (k.b > bottom) bottom = k.b; });
+      best = { x: Math.max(GAP, Math.min(sw - GAP - w, x0)), y: bottom + GAP };
+    }
+    var xPct = Math.round((best.x / sw) * 1000) / 10;
+    var yPx = Math.round(best.y);
+    var sh = stage.clientHeight || 0;
+    el.style.setProperty("--sticker-x", xPct + "%");
+    el.style.setProperty("--sticker-y", yPx + "px");
+    el.setAttribute("data-sticker-x", String(xPct));
+    el.setAttribute("data-sticker-y", String(sh ? Math.round((yPx / sh) * 1000) / 10 : 0));
+    el.setAttribute("data-sticker-y-px", String(yPx));
+    return true;
+  }
+
+  function keepQuotesClear(stage) {
+    if (!stage) return;
+    /* Render only: every viewer (owner and visitor) shows the Quote at its
+       saved x / y / yPx. No per-viewer nudge and no save from here: the old
+       display-only nudge put the owner at 71.5 and visitors at 53.19 (#223).
+       Quotes are moved off widgets only when the owner drops them
+       (keepQuoteClear in the drop branch), and that drop is what gets saved. */
+    stage.querySelectorAll(".tower-sticker--quote").forEach(function (el) {
+      if (el.classList.contains("is-dragging")) return;
+      var spot = el.__cognationQuoteSpot;
+      if (!spot) return;
+      el.style.setProperty("--sticker-x", spot.x + "%");
+      el.style.setProperty("--sticker-y", spot.yCss);
+      el.setAttribute("data-sticker-x", String(spot.x));
+      el.setAttribute("data-sticker-y", String(spot.yPct));
+      el.removeAttribute("data-sticker-y-px");
+    });
+  }
+
+  /* Neighbours settle after the profile, video and fonts load: check again
+     whenever the canvas changes size, and once the frame after a render. */
+  function watchQuotesClear(stage) {
+    if (!stage) return;
+    var run = function () { keepQuotesClear(stage); };
+    if (window.requestAnimationFrame) window.requestAnimationFrame(run);
+    else setTimeout(run, 0);
+    if (!stage.__cognationQuoteRO && typeof window.ResizeObserver === "function") {
+      try {
+        stage.__cognationQuoteRO = new window.ResizeObserver(function () {
+          if (window.requestAnimationFrame) window.requestAnimationFrame(run);
+          else run();
+        });
+        stage.__cognationQuoteRO.observe(stage);
+      } catch (eRO) {}
+    }
   }
 
   function commitInlineName(root, el) {
@@ -8713,6 +9774,36 @@
     TowerProfileStore.save(p);
   }
 
+  /* Real members cannot take a "seed-" / "seed_" / "ops-" / "ops_" handle (js/handle-reserved.js). */
+  function reservedHandleChange(next) {
+    var rules = window.CognationHandleRules;
+    return rules ? rules.isReserved(next) : /^(seed|ops)[-_]/.test(normalizeHandle(next));
+  }
+
+  function reservedHandleMessage() {
+    var rules = window.CognationHandleRules;
+    return rules ? rules.message("Handles") : "Handles can't start with \"seed-\", \"seed_\", \"ops-\" or \"ops_\". Please pick a different one.";
+  }
+
+  /* Plain status line under the handle badge; reuses .commune-status styles. */
+  function showHandleStatus(badge, msg) {
+    if (!badge || !badge.parentNode) return;
+    var st = badge.parentNode.querySelector("[data-tower-handle-status]");
+    if (!msg) {
+      if (st) st.remove();
+      return;
+    }
+    if (!st) {
+      st = document.createElement("p");
+      st.className = "commune-status is-error";
+      st.setAttribute("data-tower-handle-status", "");
+      st.setAttribute("role", "status");
+      st.setAttribute("aria-live", "polite");
+      badge.insertAdjacentElement("afterend", st);
+    }
+    st.textContent = msg;
+  }
+
   function commitInlineHandle(root, el) {
     if (!isTowerOwner(TowerProfileStore.get())) return;
     var p = TowerProfileStore.get();
@@ -8722,6 +9813,12 @@
       el.textContent = prev ? "@" + prev : "@";
       return;
     }
+    if (next !== prev && reservedHandleChange(next)) {
+      el.textContent = prev ? "@" + prev : "@";
+      showHandleStatus(el, reservedHandleMessage());
+      return;
+    }
+    showHandleStatus(el, "");
     if (window.CognationAccounts && typeof window.CognationAccounts.getProfileByHandle === "function") {
       var clash = window.CognationAccounts.getProfileByHandle(next);
       if (clash && clash.id !== p._profileId) {
@@ -8922,7 +10019,23 @@
           if (sloganInput) sloganInput.value = p.slogan;
           setProfileStatusOn(root, "Slogan updated.", false);
         } else {
-          addQuoteSticker(root, text);
+          var added = addQuoteSticker(root, text);
+          var qStatus = dlg.querySelector("[data-tower-add-quote-status]");
+          if (added && added.blocked) {
+            /* Keep the dialog open with the words so the owner can change them. */
+            if (!qStatus && ta && ta.parentNode) {
+              qStatus = document.createElement("p");
+              qStatus.className = "commune-status is-error tower-add-quote-status";
+              qStatus.setAttribute("data-tower-add-quote-status", "");
+              qStatus.setAttribute("role", "status");
+              qStatus.setAttribute("aria-live", "polite");
+              ta.insertAdjacentElement("afterend", qStatus);
+            }
+            if (qStatus) { qStatus.hidden = false; qStatus.textContent = QUOTE_BLOCKED_MESSAGE; }
+            setProfileStatusOn(root, QUOTE_BLOCKED_MESSAGE, true);
+            return;
+          }
+          if (qStatus) { qStatus.hidden = true; qStatus.textContent = ""; }
           setProfileStatusOn(root, "Quote sticker added.", false);
         }
         closeAddWidgetDialog();
@@ -8954,6 +10067,184 @@
     }
   }
 
+  /* Remove with Edit profile closed (PM, Oct 22): the removal line also shows as
+     a short dark glass notice for ~4s; a new removal replaces it. 768px and up it
+     sits at the end of the owner-only toolbar above the stage. Below 768px it is
+     a fixed notice at the bottom of the viewport (Designer LOOK on #247), so the
+     stage and toolbar never move; it fades and slides in/out over 160ms (no
+     motion under prefers-reduced-motion). With Edit profile open, only the Edit
+     profile status line shows it (never both). Visitors never see it: the
+     toolbar is owner-only. Display only; nothing is saved. */
+  var STAGE_REMOVAL_NOTICE_MS = 4000;
+  var STAGE_REMOVAL_NOTICE_FADE_MS = 160;
+
+  function stageNoticeNarrow() {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia("(max-width: 767.98px)").matches;
+  }
+
+  function stageNoticeAnimates() {
+    if (!stageNoticeNarrow()) return false;
+    return !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+
+  /* Below 768 the notice is position: fixed. The public side's backdrop-filter
+     would make it the containing block (fixed to the page section, not the
+     viewport), so while it shows on a narrow screen the notice sits directly
+     in the Tower app root; it goes back to the end of the toolbar when it clears. */
+  function placeStageRemovalNotice(root, n, narrow) {
+    if (!n.__towerHome) {
+      n.__towerHome = n.parentNode;
+      /* Crossing 768 while it shows: put it straight back in the toolbar. */
+      try {
+        window.matchMedia("(max-width: 767.98px)").addEventListener("change", function () {
+          if (!n.hidden) clearStageRemovalNotice(root, true);
+        });
+      } catch (eMq) {}
+    }
+    var target = narrow ? root : n.__towerHome;
+    if (!narrow && n.classList) {
+      n.classList.remove("is-top");
+      if (n.style) n.style.removeProperty("--tower-stage-notice-top");
+    }
+    if (target && n.parentNode !== target && target.appendChild) target.appendChild(n);
+  }
+
+  function clearStageRemovalNotice(root, instant) {
+    var n = root && root.querySelector("[data-tower-stage-notice]");
+    if (!n) return;
+    if (n.__towerTimer) clearTimeout(n.__towerTimer);
+    n.__towerTimer = null;
+    if (n.__towerFadeTimer) clearTimeout(n.__towerFadeTimer);
+    n.__towerFadeTimer = null;
+    if (n.classList) n.classList.remove("is-in");
+    if (!instant && !n.hidden && stageNoticeAnimates()) {
+      n.__towerFadeTimer = setTimeout(function () {
+        n.__towerFadeTimer = null;
+        n.textContent = "";
+        n.hidden = true;
+        placeStageRemovalNotice(root, n, false);
+      }, STAGE_REMOVAL_NOTICE_FADE_MS);
+      return;
+    }
+    n.textContent = "";
+    n.hidden = true;
+    placeStageRemovalNotice(root, n, false);
+  }
+
+  function showStageRemovalNotice(root, msg) {
+    var n = root && root.querySelector("[data-tower-stage-notice]");
+    if (!n) return;
+    var panel = root.querySelector("[data-tower-profile-edit-panel]");
+    var editOpen = !!(panel && !panel.hidden);
+    if (!msg || editOpen || !isTowerOwner(TowerProfileStore.get())) {
+      clearStageRemovalNotice(root, true);
+      return;
+    }
+    if (n.__towerTimer) clearTimeout(n.__towerTimer);
+    if (n.__towerFadeTimer) clearTimeout(n.__towerFadeTimer);
+    n.__towerFadeTimer = null;
+    var wasShown = !n.hidden && n.classList && n.classList.contains("is-in");
+    placeStageRemovalNotice(root, n, stageNoticeNarrow());
+    n.textContent = msg;
+    n.hidden = false;
+    if (!wasShown && stageNoticeNarrow()) pickStageNoticeBand(root, n);
+    if (n.classList && !wasShown) {
+      /* One frame at the start state, then .is-in runs the 160ms fade/slide. */
+      if (typeof requestAnimationFrame === "function" && stageNoticeAnimates()) {
+        void n.offsetWidth;
+        requestAnimationFrame(function () { if (!n.hidden) n.classList.add("is-in"); });
+      } else {
+        n.classList.add("is-in");
+      }
+    }
+    n.__towerTimer = setTimeout(function () { clearStageRemovalNotice(root); }, STAGE_REMOVAL_NOTICE_MS);
+  }
+
+  /* Remove used to jump the page (SeedOps live check: scrollY 851 -> 185 at 390).
+     The removed widget leaves the stage, the stage and the page get shorter, and
+     when the viewer is within that height of the page bottom the browser clamps
+     scrollY to the new, shorter page. Keep the scroll position: note scrollY
+     before the re-render; afterwards, if the page is now too short to stay there,
+     hold the stage's height by exactly the missing amount (blank space at the
+     stage's foot, nothing else moves), then restore scrollY. The hold goes with
+     the next stage layout (Show, Reset layout, resize, reload). Display only.
+     Every width: no breakpoint check here or in keepTowerScrollAround, so the
+     hold (and the blank space at the stage's foot) is the same at 1280 as at 390. */
+  function holdTowerScroll(root, x, y) {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+    var doc = document.documentElement;
+    var stage = root && root.querySelector ? root.querySelector("[data-tower-scrapbook]") : null;
+    var missing = y + (window.innerHeight || 0) - (doc ? doc.scrollHeight : 0);
+    if (missing > 0 && stage && stage.getBoundingClientRect) {
+      stage.style.minHeight = Math.ceil(stage.getBoundingClientRect().height + missing) + "px";
+    }
+    var now = window.pageYOffset || 0;
+    /* "instant": the page uses smooth scrolling; the restore must land before the
+       next paint so the viewer never sees the page move. */
+    if (Math.abs(now - y) > 0.5 && typeof window.scrollTo === "function") {
+      window.scrollTo({ left: x, top: y, behavior: "instant" });
+    }
+  }
+
+  function keepTowerScrollAround(root, run) {
+    var x = typeof window !== "undefined" ? window.pageXOffset || 0 : 0;
+    var y = typeof window !== "undefined" ? window.pageYOffset || 0 : 0;
+    try {
+      run();
+    } finally {
+      holdTowerScroll(root, x, y);
+      /* Late re-renders (player teardown, spawn) settle within a frame; only
+         undo a clamp, never a scroll the viewer made since. */
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(function () {
+          if ((window.pageYOffset || 0) < y - 0.5) holdTowerScroll(root, x, y);
+        });
+      }
+    }
+  }
+
+  /* Below 768 (follow-up to #247): the bottom band can sit over the Mutual
+     friends, Go live and Messages envelope controls in the profile card. When it
+     would, the notice shows at the top of the viewport instead (below the tab
+     bar when that is on screen). Picked once as it shows, so it never jumps; it
+     ignores taps either way (pointer-events: none on it and its children). */
+  var STAGE_NOTICE_EDGE = 16;
+  var STAGE_NOTICE_CLEAR_SELECTORS = ["[data-tower-mutual-friends]", "[data-go-live]", "[data-tower-envelope]"];
+
+  function stageNoticeBandsClash(band, rects) {
+    return rects.some(function (r) { return r.bottom > band.top && r.top < band.bottom; });
+  }
+
+  function pickStageNoticeBand(root, n) {
+    n.classList.remove("is-top");
+    if (n.style) n.style.removeProperty("--tower-stage-notice-top");
+    var vh = window.innerHeight || 0;
+    var h = n.getBoundingClientRect().height || 0;
+    var rects = [];
+    STAGE_NOTICE_CLEAR_SELECTORS.forEach(function (sel) {
+      Array.prototype.forEach.call(root.querySelectorAll(sel), function (el) {
+        if (el.hidden || (el.closest && el.closest("[hidden]"))) return;
+        var r = el.getBoundingClientRect();
+        if (!r.width || !r.height || r.bottom <= 0 || r.top >= vh) return;
+        rects.push(r);
+      });
+    });
+    var bottomBand = { top: vh - STAGE_NOTICE_EDGE - h, bottom: vh - STAGE_NOTICE_EDGE };
+    if (!stageNoticeBandsClash(bottomBand, rects)) return "bottom";
+    var top = STAGE_NOTICE_EDGE;
+    var tabs = document.querySelector(".app-topbar");
+    if (tabs) {
+      var tr = tabs.getBoundingClientRect();
+      if (tr.bottom > 0 && tr.top < vh) top = Math.max(top, Math.ceil(tr.bottom) + 8);
+    }
+    var topBand = { top: top, bottom: top + h };
+    if (stageNoticeBandsClash(topBand, rects)) return "bottom";
+    n.style.setProperty("--tower-stage-notice-top", top + "px");
+    n.classList.add("is-top");
+    return "top";
+  }
+
   function setProfileStatusOn(root, msg, isError) {
     var el = root.querySelector("[data-tower-profile-status]");
     if (!el) return;
@@ -8975,11 +10266,15 @@
     var undoBtn = root.querySelector("[data-tower-undo-widget]");
     if (!root.__cognationWidgetUndo) root.__cognationWidgetUndo = [];
 
-    function setProfileStatusSafe(msg, isError) {
+    function setProfileStatusSafe(msg, isError, removal) {
+      /* removal: a Remove line; also shown near the stage when Edit profile is closed. */
+      if (removal) showStageRemovalNotice(root, msg);
       var el = root.querySelector("[data-tower-profile-status]");
       if (!el) return;
       el.hidden = !msg;
       el.textContent = msg || "";
+      /* Remembered so Show can clear a stale removal line (and nothing else). */
+      el.__towerRemovalLine = removal && msg ? String(msg) : "";
       el.classList.toggle("is-error", !!isError);
     }
 
@@ -9014,6 +10309,16 @@
       if (entry.type === "widget") {
         setPublicWidgetVisible(root, entry.id, true);
         setProfileStatusSafe("Restored " + (entry.label || entry.id) + ".", false);
+        return;
+      }
+      if (entry.type === "instax") {
+        var pCamUndo = TowerProfileStore.get();
+        if (!isTowerOwner(pCamUndo)) return;
+        setInstaxSwitch(pCamUndo, true);
+        TowerProfileStore.save(pCamUndo);
+        ensurePersonalPolaroid(root, pCamUndo);
+        applyWidgetLayout(root, pCamUndo);
+        setProfileStatusSafe("Restored Camera.", false);
         return;
       }
       if (entry.type === "emoji") {
@@ -9116,7 +10421,13 @@
         p.widgetLayout = {};
         if (p.widgetLayout && p.widgetLayout.feed) delete p.widgetLayout.feed;
         if (p.widgetLayout && p.widgetLayout.messages) delete p.widgetLayout.messages;
-        p.publicWidgets = JSON.parse(JSON.stringify(DEFAULT_PUBLIC_WIDGETS));
+        /* Reset restores positions and the camera only. It keeps the owner's
+           other visibility choices (social, music, badges, friends, html, ...):
+           copying the defaults over them turned hidden widgets back on with no
+           owner toggle to turn them off again (#242 follow-up).
+           Explicit camera "on" so a browser holding an old "camera off" copy
+           follows the reset (#223). */
+        setInstaxSwitch(p, true);
         p.polaroidRemoved = false;
         p.removedFriendPinIds = [];
         p.featuredFriendIds = [];
@@ -9130,7 +10441,7 @@
         syncOwnerStickerHandles(root);
         root.__cognationWidgetUndo = [];
         syncUndoButton();
-        setProfileStatusSafe("Layout reset — public widgets restored.", false);
+        setProfileStatusSafe("Layout reset.", false);
       });
     }
 
@@ -9295,7 +10606,11 @@
         if (!dragStarted) {
           if (Math.abs(dxPx) < 5 && Math.abs(dyPx) < 5) return;
           dragStarted = true;
-          if (liftDefaultGrid(stage)) {
+          /* A Quote floats over the page: moving it never lifts the other
+             widgets out of the default grid. That lift only lived in this
+             browser, so the drop spot sat next to different neighbours on the
+             next load (Designer LOOK NO on #223). */
+          if (wid !== "quote" && liftDefaultGrid(stage)) {
             rect = stage.getBoundingClientRect();
             startX = parseFloat(sticker.getAttribute("data-sticker-x") || "0");
             startY = parseFloat(sticker.getAttribute("data-sticker-y") || "0");
@@ -9360,18 +10675,33 @@
         }
         if (id === "quote") {
           var qid = sticker.getAttribute("data-tower-quote-id");
+          /* Land on a clear spot, then save it as an offset from the canvas
+             top-left (x as a share of the width, y in px). */
+          sticker.classList.remove("is-dragging");
+          sticker.removeAttribute("data-sticker-y-px");
+          keepQuoteClear(stage, sticker);
+          var qX = parseFloat(sticker.getAttribute("data-sticker-x") || String(dropX));
+          var qYpx = parseFloat(sticker.getAttribute("data-sticker-y-px") || "NaN");
+          if (!isFinite(qYpx)) qYpx = stickerTopInStage(stage, sticker);
+          if (!isFinite(qYpx)) qYpx = stickerYPxFromDrop(dropY, stage.clientHeight || 0);
           var quotes = getQuoteStickers(p);
           p.quoteStickers = quotes.map(function (q) {
             if (q.id !== qid) return q;
             var moved = {
               id: q.id,
               text: q.text,
-              x: dropX,
-              y: dropY,
+              x: qX,
+              y: parseFloat(sticker.getAttribute("data-sticker-y") || String(dropY)) || dropY,
               z: dropZ,
               tilt: dropTilt,
             };
+            if (typeof qYpx === "number" && isFinite(qYpx)) moved.yPx = Math.round(qYpx);
             if (typeof q.w === "number") moved.w = q.w;
+            sticker.__cognationQuoteSpot = {
+              x: moved.x,
+              yCss: typeof moved.yPx === "number" ? moved.yPx + "px" : moved.y + "%",
+              yPct: moved.y,
+            };
             return moved;
           });
           TowerProfileStore.save(p, { geometry: true });
@@ -9394,12 +10724,15 @@
           p.widgetLayout = layout;
           TowerProfileStore.save(p, { geometry: true });
         }
-        sticker.style.setProperty("--sticker-x", dropX + "%");
-        var dropYAt = id !== "quote" && layout[id] ? stickerYFromLayout(layout[id], stage.clientHeight || 0) : { css: dropY + "%" };
-        sticker.style.setProperty("--sticker-y", dropYAt.css);
+        if (id !== "quote") {
+          /* (A Quote already sits on its clamped spot from keepQuoteClear.) */
+          sticker.style.setProperty("--sticker-x", dropX + "%");
+          var dropYAt = layout[id] ? stickerYFromLayout(layout[id], stage.clientHeight || 0) : { css: dropY + "%" };
+          sticker.style.setProperty("--sticker-y", dropYAt.css);
+          sticker.setAttribute("data-sticker-x", String(dropX));
+          sticker.setAttribute("data-sticker-y", String(dropY));
+        }
         sticker.style.setProperty("--sticker-z", String(dropZ));
-        sticker.setAttribute("data-sticker-x", String(dropX));
-        sticker.setAttribute("data-sticker-y", String(dropY));
         sticker.setAttribute("data-sticker-z", String(dropZ));
         sticker.classList.remove("is-dragging");
         /* The drop itself may leave a neighbour overlapping (a full-row widget
@@ -9440,6 +10773,12 @@
         var justDragged = instaxHit.__cognationDraggedAt && Date.now() - instaxHit.__cognationDraggedAt < 700;
         var instaxFile = root.querySelector("[data-tower-instax-file]");
         if (!justDragged && instaxFile) instaxFile.click();
+      }
+      var polaroidShell = ev.target.closest('[data-tower-widget="polaroid"]');
+      if (polaroidShell && !polaroidShell.hasAttribute("data-tower-polaroid-extra") && stage.contains(polaroidShell) && !polaroidShell.hidden && !ev.target.closest("[data-tower-polaroid-resize], a, button, input, textarea, select, label, summary")) {
+        var justDraggedPol = polaroidShell.__cognationDraggedAt && Date.now() - polaroidShell.__cognationDraggedAt < 700;
+        var polFile = root.querySelector("[data-tower-instax-file]");
+        if (!justDraggedPol && polFile && !polFile.disabled) { polFile.click(); return; }
       }
       var handleClick = ev.target.closest("[data-tower-sticker-handle]");
       if (handleClick) {
@@ -9519,7 +10858,7 @@
         var selectedKey = stage.querySelector(".is-widget-selected");
         if (!selectedKey || !stage.contains(selectedKey)) return;
         ev.preventDefault();
-        removeSelectedWidget();
+        removeSelectedKeepingScroll();
       });
       /* One removal path for Backspace/Delete and the touch "Remove" button.
          Owner only, Public side only; never runs while typing (the key handler
@@ -9543,7 +10882,7 @@
           fp = TowerProfileStore.get();
           renderFriendsPicker(root, fp);
           renderFriendPins(root, fp);
-          setProfileStatusSafe("Friend pin removed — Undo to restore.", false);
+          setProfileStatusSafe("Friend pin removed. Reset layout to restore.", false, true);
           return;
         }
 
@@ -9553,7 +10892,7 @@
           clearWidgetSelection(stage);
           pushWidgetUndo({ type: "badge", id: badgeId });
           setBadgeVisibility(root, badgeId, false);
-          setProfileStatusSafe("Badge pin removed — Undo to restore.", false);
+          setProfileStatusSafe("Badge pin removed.", false, true);
           return;
         }
 
@@ -9590,7 +10929,7 @@
           });
           TowerProfileStore.save(pEmoji);
           renderEmojiStickers(root, TowerProfileStore.get());
-          setProfileStatusSafe("Emoji removed — Undo to restore.", false);
+          setProfileStatusSafe("Emoji removed.", false, true);
           return;
         }
 
@@ -9608,7 +10947,7 @@
           };
           pushWidgetUndo({ type: "quote", id: quoteId || selected.id, layout: qLayout });
           removeQuoteSticker(root, quoteId || selected.getAttribute("data-tower-quote-id"));
-          setProfileStatusSafe("Quote removed — Undo to restore.", false);
+          setProfileStatusSafe("Quote removed.", false, true);
           return;
         }
 
@@ -9619,10 +10958,15 @@
         syncRotateToolbar(root);
         /* Social link chip (the X button is gone): clear that link, same as the
            old X did, so it stays removed after reload. */
+        /* Pay-links card holds several links: each is cleared in Edit profile. */
+        if (id === PAY_LINKS_ID) {
+          setProfileStatusSafe("Venmo, Pay for services and Buy ads links are set in Edit profile.", false);
+          return;
+        }
         var socialNet = socialNetIdFromWidget(id);
         if (socialNet) {
           removeSocialWidget(root, socialNet);
-          setProfileStatusSafe((selected.getAttribute("data-sticker-label") || "Link") + " link removed. Add it again in Edit profile.", false);
+          setProfileStatusSafe((selected.getAttribute("data-sticker-label") || "Link") + " link removed. Add it again in Edit profile.", false, true);
           return;
         }
         var label = selected.getAttribute("data-sticker-label") || id;
@@ -9633,7 +10977,19 @@
           var pPol = TowerProfileStore.get();
           pPol.polaroidRemoved = true;
           TowerProfileStore.save(pPol);
-          setProfileStatusSafe(label + " removed — Reset layout to restore.", false);
+          setProfileStatusSafe(label + " removed. Reset layout to restore.", false, true);
+          return;
+        }
+        if (id === "instax") {
+          /* Owner-only camera (#223): save "off" in the layout row so it stays
+             removed after reload and in other browsers. Reset layout turns it back on. */
+          pushWidgetUndo({ type: "instax", id: id, label: label });
+          selected.hidden = true;
+          selected.classList.add("is-widget-off");
+          var pCam = TowerProfileStore.get();
+          setInstaxSwitch(pCam, false);
+          TowerProfileStore.save(pCam);
+          setProfileStatusSafe("Camera removed. Reset layout to restore.", false, true);
           return;
         }
         if (id === "friends") return;
@@ -9651,15 +11007,23 @@
             TowerProfileStore.save(pShell);
           }
         }
-        setProfileStatusSafe(label + " removed — Undo to restore.", false);
+        setProfileStatusSafe(
+          hiddenWidgetRestorable(id) ? label + " removed. Show it again in Edit profile." : label + " removed.",
+          false,
+          true
+        );
       };
-      root.__cognationRemoveSelected = removeSelectedWidget;
+      /* Remove keeps the page where it was (scroll position). */
+      var removeSelectedKeepingScroll = function () {
+        keepTowerScrollAround(root, removeSelectedWidget);
+      };
+      root.__cognationRemoveSelected = removeSelectedKeepingScroll;
       var removeBtn = root.querySelector("[data-tower-remove-selected]");
       if (removeBtn && !removeBtn.__cognationBound) {
         removeBtn.__cognationBound = true;
         removeBtn.addEventListener("click", function (ev) {
           ev.preventDefault();
-          removeSelectedWidget();
+          removeSelectedKeepingScroll();
           syncRotateToolbar(root);
         });
       }
@@ -9821,9 +11185,18 @@
         btn.setAttribute("aria-expanded", "true");
         var avatarSticker = wrap.closest('[data-tower-widget="avatar"]');
         if (avatarSticker) avatarSticker.classList.add("is-edit-open");
+        /* Never both: the Edit profile status line takes over from the stage notice. */
+        try { clearStageRemovalNotice(root, true); } catch (eStage) {}
       } else {
         /* Closing without Save still commits typed social URLs so circle buttons stick. */
         try { flushSocialFieldsFromForm(root); } catch (eFlush) {}
+        /* The one-time Pro "set up" notice is spent once Edit profile closes. */
+        if (root.__cognationProSetupJustCreated) {
+          root.__cognationProSetupJustCreated = false;
+          try { syncAddProfileUi(root); } catch (eSetup) {}
+        }
+        /* The Show hidden widgets notice is spent once Edit profile closes. */
+        try { clearHiddenWidgetNotice(root); } catch (eNotice) {}
         panel.hidden = true;
         returnPanelHome();
         wrap.classList.remove("is-open");
@@ -10335,13 +11708,38 @@
       /* Placeholder: the slot keeps the default label's width and height, but
          its text is hidden (css .is-loading) so no name shows. */
       nameEl.classList.toggle("is-loading", loading);
-      nameEl.textContent = loading ? "You" : p.displayName || "You";
+      nameEl.textContent = loading ? "You" : publicProfileName(p) || "You";
     }
     applyDisplayNameSize(root, p.displayNameSize || 28);
+    var mutual = root.querySelector("[data-tower-mutual-friends]");
+    if (mutual) {
+      var cognationFriend = mutual.parentNode && mutual.parentNode.querySelector("[data-cognation-friend]");
+      if (profileIsProfessional(p)) {
+        mutual.hidden = !houseProfessional(p);
+        if (houseProfessional(p)) mutual.textContent = "Following";
+        if (cognationFriend) cognationFriend.hidden = true;
+      } else {
+        mutual.hidden = false;
+        if (housePersonal(p)) mutual.textContent = "400 friends";
+        if (!cognationFriend && mutual.parentNode) {
+          cognationFriend = document.createElement("p");
+          cognationFriend.className = "tower-mutual-friends";
+          cognationFriend.setAttribute("data-cognation-friend", "");
+          mutual.parentNode.insertBefore(cognationFriend, mutual.nextSibling);
+        }
+        if (cognationFriend) {
+          cognationFriend.hidden = false;
+          cognationFriend.textContent = "Cognation";
+        }
+      }
+    }
     initDisplayNameResize(root);
     var handleBadge = root.querySelector("[data-tower-handle-badge]");
     var handleVal = normalizeHandle(p.handle || "");
-    if (handleBadge && document.activeElement !== handleBadge) {
+    if (handleBadge && houseProfessional(p) && !isTowerOwner(p)) {
+      handleBadge.hidden = true;
+      handleBadge.textContent = "";
+    } else if (handleBadge && document.activeElement !== handleBadge) {
       var ownerEditing = !loading && isTowerOwner(p) && root.getAttribute("data-tower-side") === "public";
       handleBadge.classList.toggle("is-owner-editable", ownerEditing);
       if (handleVal) {
@@ -10394,13 +11792,12 @@
       } else {
         avatar.style.removeProperty("background-image");
         if (avatarPhoto) avatarPhoto.remove();
-        avatar.textContent = loading ? "" : initials(p.displayName);
+        avatar.textContent = loading ? "" : initials(publicProfileName(p));
       }
     }
-    var polaroidPrints = polaroidPrintList(p);
     var primaryPhoto = root.querySelector('[data-tower-widget="polaroid"] [data-tower-polaroid-photo]');
     if (primaryPhoto && document.activeElement !== primaryPhoto) {
-      paintPolaroidPhoto(primaryPhoto, (polaroidPrints[0] && polaroidPrints[0].url) || "");
+      paintPolaroidPhoto(primaryPhoto, "");
     }
     var bgHint = root.querySelector("[data-tower-bg-image-status]");
     if (bgHint && !(p.backgroundImageDataUrl && document.activeElement && document.activeElement.matches && document.activeElement.matches("[data-tower-bg-image]"))) {
@@ -10473,18 +11870,14 @@
     if (profileIsProfessional(p)) {
       if (followBtn && followBtn.textContent !== "Following") followBtn.textContent = "+ follow";
       if (followBtn) followBtn.setAttribute("aria-label", "Follow this professional page");
-      /* Owner professional page shows this control where Add friends sat. */
-      if (addFriendsBtn) {
-        addFriendsBtn.textContent = "+ follow";
-        addFriendsBtn.setAttribute("aria-label", "Follow this professional page");
-      }
     } else {
       if (followBtn && (followBtn.textContent === "Follow" || followBtn.textContent === "+ follow" || followBtn.textContent === "friend")) {
         followBtn.textContent = "+ friend";
         followBtn.setAttribute("aria-label", "Add this person as a friend");
       }
-      if (addFriendsBtn && addFriendsBtn.textContent === "+ follow") addFriendsBtn.textContent = "Add friends";
     }
+    /* Owner pill under the photo: "Find friends" / "Find people" on your own Tower. */
+    if (addFriendsBtn) syncOwnerPeoplePill(root, p, isTowerOwner(p));
     try { syncProfileKindToggle(root); } catch (eKind) {}
     try { syncAddProfileUi(root); } catch (eAdd) {}
     try { syncRotateToolbar(root); } catch (eRot) {}
@@ -10606,6 +11999,15 @@
       status.classList.toggle("is-error", !!isError);
     }
 
+    var postSubmitBtn = form && form.querySelector ? form.querySelector("[data-tower-post-submit]") : null;
+    function setPostInFlight(on) {
+      if (form) form.__postInFlight = !!on;
+      if (!postSubmitBtn) return;
+      postSubmitBtn.disabled = !!on;
+      if (on) postSubmitBtn.setAttribute("aria-busy", "true");
+      else postSubmitBtn.removeAttribute("aria-busy");
+    }
+
     renderFeed(root);
     renderProfileChrome(root);
     initFramePicker(root);
@@ -10662,7 +12064,12 @@
           nameSizeIn ? nameSizeIn.value : p.displayNameSize
         );
         var handleInputSave = root.querySelector("[data-tower-handle]");
-        p.handle = normalizeHandle(handleInputSave ? handleInputSave.value : p.handle);
+        var handleNext = normalizeHandle(handleInputSave ? handleInputSave.value : p.handle);
+        if (handleNext !== normalizeHandle(p.handle) && reservedHandleChange(handleNext)) {
+          setProfileStatus(reservedHandleMessage(), true);
+          return;
+        }
+        p.handle = handleNext;
         p.socialLinks = p.socialLinks || {};
         socialLinkDefs().forEach(function (net) {
           var input = root.querySelector('[data-tower-social="' + net.id + '"]');
@@ -10738,7 +12145,13 @@
         /* keep widgetLayout as last dragged */
         if (!p.widgetLayout) p.widgetLayout = {};
         if (root.querySelector("[data-tower-public-widget]")) {
+          var keepInstax = p.publicWidgets && typeof p.publicWidgets.instax === "boolean" ? p.publicWidgets.instax : null;
+          var keepShown = normalizePublicWidgets(p.publicWidgets);
           p.publicWidgets = readPublicWidgetsFromForm(root);
+          if (keepInstax !== null) p.publicWidgets.instax = keepInstax;
+          OWNER_REMOVABLE_WIDGET_IDS.forEach(function (wid) {
+            if (ownerShownKey(wid) in keepShown) p.publicWidgets[ownerShownKey(wid)] = keepShown[ownerShownKey(wid)];
+          });
         }
         p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
         p.publicWidgets.social = profileHasSocialLinks(p);
@@ -10828,10 +12241,15 @@
       (statusFn || setProfileStatus)(okMsg, false);
     }
 
-    function readImageFile(file, statusFn, onUrl) {
-      if (!file) return;
+    function readImageFile(file, statusFn, onUrl, onSettled) {
+      function finish(url) {
+        if (url && onUrl) onUrl(url);
+        if (onSettled) onSettled();
+      }
+      if (!file) { finish(); return; }
       if (file.type && !looksLikeImage(file)) {
         (statusFn || setProfileStatus)("Choose an image file.", true);
+        finish();
         return;
       }
       var reader = new FileReader();
@@ -10858,16 +12276,20 @@
             maxEdge = Math.max(160, Math.round(maxEdge * 0.7));
             quality = Math.max(0.5, quality - 0.08);
           }
-          onUrl(dataUrl || raw);
+          finish(dataUrl || raw);
         };
         img.onerror = function () {
-          if (raw.indexOf("data:image/") === 0) onUrl(raw);
-          else (statusFn || setProfileStatus)("Could not read that image.", true);
+          if (raw.indexOf("data:image/") === 0) finish(raw);
+          else {
+            (statusFn || setProfileStatus)("Could not read that image.", true);
+            finish();
+          }
         };
         img.src = raw;
       };
       reader.onerror = function () {
         (statusFn || setProfileStatus)("Could not read that image.", true);
+        finish();
       };
       reader.readAsDataURL(file);
     }
@@ -10878,9 +12300,10 @@
       });
     }
 
-    function applyInstaxFile(file, statusFn) {
+    function applyInstaxFile(file, statusFn, done) {
       if (!isTowerOwner(TowerProfileStore.get())) {
         (statusFn || setProfileStatus)("Only the profile owner can add Polaroids.", true);
+        if (done) done();
         return;
       }
       readImageFile(file, statusFn, function (dataUrl) {
@@ -10905,7 +12328,25 @@
           p.polaroidPrints = normalized;
           p.polaroidRemoved = false;
         });
-      });
+      }, done);
+    }
+
+    function applyInstaxFiles(files, statusFn) {
+      var list = Array.prototype.slice.call(files || []).filter(Boolean);
+      var i = 0;
+      function next() {
+        if (i >= list.length) return;
+        applyInstaxFile(list[i], statusFn, function () { i += 1; next(); });
+      }
+      next();
+    }
+
+    function pullChosenPolaroids(input) {
+      if (!input || !input.files || !input.files.length) return;
+      var files = Array.prototype.slice.call(input.files);
+      if (input.__cognationAppliedFile === files[0]) return;
+      input.__cognationAppliedFile = files[0];
+      applyInstaxFiles(files, setProfileStatus);
     }
 
     function pullChosenImage(input, applyFn) {
@@ -10945,7 +12386,7 @@
         setTimeout(function () {
           pullChosenImage(root.querySelector("[data-tower-avatar-file]"), applyAvatarFile);
           pullChosenImage(root.querySelector("[data-tower-avatar-file-panel]"), applyAvatarFile);
-          pullChosenImage(root.querySelector("[data-tower-instax-file]"), applyInstaxFile);
+          pullChosenPolaroids(root.querySelector("[data-tower-instax-file]"));
         }, 0);
       });
     }
@@ -10953,7 +12394,7 @@
       if (input.__cognationInstaxBound) return;
       input.__cognationInstaxBound = true;
       input.addEventListener("change", function () {
-        pullChosenImage(input, applyInstaxFile);
+        pullChosenPolaroids(input);
         input.value = "";
       });
     });
@@ -11170,24 +12611,89 @@
       });
     }
 
+    function shrinkMarketPic(file, done) {
+      var reader = new FileReader();
+      reader.onerror = function () { done(""); };
+      reader.onload = function () {
+        var img = new Image();
+        img.onload = function () {
+          var max = 480;
+          var scale = Math.min(1, max / Math.max(img.width || 1, img.height || 1));
+          var canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round((img.width || 1) * scale));
+          canvas.height = Math.max(1, Math.round((img.height || 1) * scale));
+          var ctx = canvas.getContext("2d");
+          var out = "";
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            try { out = canvas.toDataURL("image/jpeg", 0.72); } catch (ePic) { out = ""; }
+          }
+          done(out.indexOf("data:image/") === 0 ? out : "");
+        };
+        img.onerror = function () { done(""); };
+        img.src = String(reader.result || "");
+      };
+      reader.readAsDataURL(file);
+    }
     if (form) {
       form.addEventListener("submit", function (e) {
         e.preventDefault();
-        var attachments = [];
         var files = fileInput && fileInput.files ? Array.prototype.slice.call(fileInput.files) : [];
         var kind = (kindSelect && kindSelect.value) || "photo";
+        var bodyNow = bodyInput ? bodyInput.value : "";
+        var marketPost = /(^|[^a-z0-9])#market(?![a-z0-9])/i.test(bodyNow);
+        /* Feed photos: every picture posted to Supabase is shrunk and saved on the post
+           row (attachments[].dataUrl), not only #market ones; before, other posts kept
+           just the file name. Local (signed-out) posts keep the #market-only rule. */
+        if ((marketPost || usingRemoteSocial()) && !form.__marketReady) {
+          var pics = files.filter(function (f) {
+            return /^image\//.test(String(f.type || "")) || /\.(png|jpe?g|gif|webp)$/i.test(String(f.name || ""));
+          });
+          if (pics.length) {
+            var left = pics.length;
+            form.__pics = {};
+            pics.forEach(function (f) {
+              shrinkMarketPic(f, function (url) {
+                if (url) form.__pics[f.name] = url;
+                if (--left === 0) {
+                  form.__marketReady = true;
+                  if (form.requestSubmit) form.requestSubmit();
+                  else form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+                }
+              });
+            });
+            return;
+          }
+        }
+        var savedPics = form.__pics || {};
+        form.__marketReady = false;
+        form.__pics = null;
+        var attachments = [];
         files.forEach(function (f) {
-          attachments.push({
+          var row = {
             kind: kind,
             label: f.name,
             name: f.name,
-            /* Demo only — we store metadata, not binary blobs */
             demoMeta: true,
             size: f.size,
             type: f.type || "",
-          });
+          };
+          if (savedPics[f.name]) row.dataUrl = savedPics[f.name];
+          attachments.push(row);
         });
+        if (marketPost) {
+          try {
+            var memberLoc = JSON.parse(localStorage.getItem("cognation.member.profile.v1") || "{}");
+            var savedLoc = JSON.parse(localStorage.getItem("cognation.member.location.v1") || "null");
+            var lat = Number(memberLoc && memberLoc.lat != null ? memberLoc.lat : savedLoc && savedLoc.lat);
+            var lng = Number(memberLoc && memberLoc.lng != null ? memberLoc.lng : savedLoc && savedLoc.lng);
+            if (isFinite(lat) && isFinite(lng)) attachments.push({ kind: "location", label: "location", lat: lat, lng: lng });
+          } catch (eLoc) {}
+        }
         if (usingRemoteSocial()) {
+          /* One post at a time: the Post button is disabled while a post is in
+             flight (no double posts) and re-enabled on success and on error. */
+          if (form.__postInFlight) return;
           var social = remoteSocial();
           if (!social || !social.createTowerPost) {
             setStatus("Tower is still connecting. Please try again.", true);
@@ -11196,26 +12702,44 @@
             } catch (frConn) {}
             return;
           }
-          setStatus("Posting to Feed…", false);
+          /* No notice on a post (Alexa, Oct 22 11:45 AM CT): the new post at
+             the top of the Feed and the cleared composer are the confirmation.
+             Only a failure shows the box. Clear any earlier error first. */
+          /* Empty post: its own plain line, checked here before any request
+             (PM, Oct 22). The button is never left disabled. */
+          if (!String(bodyInput ? bodyInput.value : "").trim()) {
+            setPostInFlight(false);
+            setStatus(EMPTY_POST_LINE, true);
+            return;
+          }
+          setStatus("", false);
+          setPostInFlight(true);
           social
             .createTowerPost({
               body: bodyInput ? bodyInput.value : "",
               attachments: attachments,
+              /* PERSONAL | PROFESSIONAL switch (js/signal-post-as.js): one of
+                 the member's own pages, or "" = the current default author. */
+              asProfileId: (window.CognationSignalPostAs &&
+                typeof window.CognationSignalPostAs.currentAuthorProfileId === "function")
+                ? window.CognationSignalPostAs.currentAuthorProfileId() : "",
             })
             .then(function () {
+              setPostInFlight(false);
               if (bodyInput) bodyInput.value = "";
               if (fileInput) fileInput.value = "";
-              setStatus("Posted to Feed.", false);
+              setStatus("", false);
               try {
                 if (window.CognationFriction) window.CognationFriction.complete("tower");
               } catch (frRemote) {}
               renderFeed(root);
             })
             .catch(function (error) {
-              setStatus(
-                (error && error.message) || "Could not post to Feed. Please try again.",
-                true
-              );
+              setPostInFlight(false);
+              /* PM wording: the raw server / database text goes to the console
+                 only; the page shows one of two plain lines. */
+              try { console.warn("[signal] post failed:", error); } catch (eLog) {}
+              setStatus(towerPostErrorLine(error), true);
               try {
                 if (window.CognationFriction) window.CognationFriction.retry("tower", "post_error");
               } catch (frCatch) {}
@@ -11236,7 +12760,7 @@
         }
         if (bodyInput) bodyInput.value = "";
         if (fileInput) fileInput.value = "";
-        setStatus("Posted to Feed. Local COMMUNE will pick this up.", false);
+        setStatus("", false);
         try {
           if (window.CognationFriction) window.CognationFriction.complete("tower");
         } catch (frOk) {}
@@ -12085,7 +13609,8 @@
         spot.classList.add("is-filled");
         spot.classList.remove("is-empty");
         spot.textContent = String(person.name).trim().charAt(0).toUpperCase() || "?";
-        spot.setAttribute("aria-label", person.activity ? person.name + ". " + person.activity : person.name);
+        var spotCaption = person.caption || person.activity || "";
+        spot.setAttribute("aria-label", person.caption || !person.activity ? person.name : person.name + ". " + person.activity);
         if (person.userId) spot.setAttribute("data-circle-person", person.userId);
         /* Tower picture: server photo_url, else that profile's Tower avatar. */
         var photoApi = window.CognationProfilePhoto;
@@ -12094,14 +13619,20 @@
         if (person.handle) {
           var handle = String(person.handle);
           spot.setAttribute("data-circle-handle", handle);
-          spot.addEventListener("click", openCircleProfile(handle));
+          spot.setAttribute("role", "link");
+          spot.setAttribute("tabindex", "0");
+          var openSpot = openCircleProfile(handle);
+          spot.addEventListener("click", openSpot);
+          spot.addEventListener("keydown", function (ev) {
+            if (ev && (ev.key === "Enter" || ev.key === " ")) { if (ev.preventDefault) ev.preventDefault(); openSpot(); }
+          });
         }
-        if (person.activity) {
+        if (spotCaption) {
           spot.classList.add("has-caption");
           var caption = document.createElement("span");
           caption.className = "circle-spot-caption";
           caption.setAttribute("data-circle-caption", "");
-          caption.textContent = person.activity;
+          caption.textContent = spotCaption;
           spot.appendChild(caption);
         }
       } else {
@@ -12117,11 +13648,57 @@
     placeCircleSpots();
   }
 
+  /* With Alexa's background on, the five spots sit where her five placeholder
+     squares were (image px, relative to the ring centre at 605,262), still. */
+  var PULSE_BG_SQUARES = {
+    left: { x: -478, y: -42, s: 1.15 },
+    center: { x: 12, y: 146, s: 1.4 },
+    right: { x: 503, y: -42, s: 1.15 },
+    "back-right": { x: 216, y: -202, s: 1 },
+    "back-left": { x: -192, y: -202, s: 1 }
+  };
+  function pinCircleSpotsToBackground(spots) {
+    var layer = document.querySelector("[data-circle-fall][data-pulse-bg]");
+    if (!layer) return false;
+    /* Phones: shrink the image so its strands (image x 58..1181, 576px right of the
+       ring centre) stay at least 8px inside the panel. Desktop keeps its CSS scale. */
+    var phone = window.matchMedia && window.matchMedia("(max-width: 600px)").matches;
+    layer.style.removeProperty("--pulse-bg-k");
+    var GROW_MIN = 0.55;
+    if (phone && layer.clientWidth > 0) {
+      var cssK = parseFloat(getComputedStyle(layer).getPropertyValue("--pulse-bg-k")) || 0.31;
+      var fitK = (layer.clientWidth / 2 - 8) / 576;
+      /* The left/right frames must also stay >= 8px inside the panel (live 390 check:
+         the right frame sat 7px from the edge). 10px target leaves room for rounding. */
+      for (var f = 0; f < spots.length; f++) {
+        var side = PULSE_BG_SQUARES[spots[f].getAttribute("data-circle-spot")];
+        if (!side || !side.x) continue;
+        var half = (spots[f].offsetWidth || 70.4) * side.s * Math.max(cssK, GROW_MIN) / 2;
+        var spotK = (layer.clientWidth / 2 - 10 - half) / Math.abs(side.x);
+        if (spotK < fitK) fitK = spotK;
+      }
+      if (fitK < cssK) layer.style.setProperty("--pulse-bg-k", fitK.toFixed(4));
+    }
+    var k = parseFloat(getComputedStyle(layer).getPropertyValue("--pulse-bg-k")) || 0.954;
+    var grow = Math.max(k, GROW_MIN);
+    for (var i = 0; i < spots.length; i++) {
+      var sq = PULSE_BG_SQUARES[spots[i].getAttribute("data-circle-spot")];
+      if (!sq) continue;
+      spots[i].style.transform = "translate(-50%, -50%) translate(" + (sq.x * k).toFixed(1) + "px," + (sq.y * k).toFixed(1) + "px) scale(" + (sq.s * grow).toFixed(3) + ")";
+      spots[i].style.zIndex = String(Math.round(sq.s * 100));
+      /* names under the frames divide by this so they land at true screen px */
+      spots[i].style.setProperty("--pulse-spot-s", (sq.s * grow).toFixed(3));
+    }
+    return true;
+  }
+
   function placeCircleSpots() {
     if (!circleFallState) return;
     var spots = document.querySelectorAll("[data-circle-ring] [data-circle-spot]");
     if (!spots.length) return;
-    var shift = ((performance.now() - circleFallState.ringStarted) / 28000) * CIRCLE_SPOTS.length;
+    pinCircleSpotsToBackground(spots);
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var shift = reduce ? 0 : ((performance.now() - circleFallState.ringStarted) / 28000) * CIRCLE_SPOTS.length;
     var i;
     var front = 0;
     var frontScale = -1;
@@ -12129,17 +13706,20 @@
       var pos = circleSpotAt(i + shift);
       var depth = pos.s / CIRCLE_SCALE;
       var scale = 0.8 + Math.max(0, depth - 0.68) * 0.4;
+      var bob = reduce ? 0 : Math.sin(performance.now() / 360 + i * 1.2) * 18;
       var size = 5.6;
       spots[i].style.width = size.toFixed(2) + "rem";
       spots[i].style.height = size.toFixed(2) + "rem";
       spots[i].style.transform =
-        "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + pos.y.toFixed(1) + "px) scale(" + scale.toFixed(3) + ")";
+        "translate(-50%, -50%) translate(" + pos.x.toFixed(1) + "px," + (pos.y + bob).toFixed(1) + "px) scale(" + scale.toFixed(3) + ")";
       spots[i].style.zIndex = String(Math.round(pos.s * 100));
+      spots[i].style.setProperty("--pulse-spot-s", scale.toFixed(3));
       if (scale > frontScale) { frontScale = scale; front = i; }
     }
     for (i = 0; i < spots.length; i++) {
       var cap = spots[i].querySelector("[data-circle-caption]");
       if (cap) cap.hidden = i !== front;
+      if (i === front) spots[i].style.zIndex = "30";
     }
   }
 
@@ -12267,6 +13847,8 @@
     layer.setAttribute("data-circle-count", "0");
     layer.removeAttribute("data-circle-refresh-ms");
     layer.setAttribute("data-circle-ring-shell", "");
+    /* Alexa's PULSE background image (pulse-background PR). */
+    layer.setAttribute("data-pulse-bg", "");
     paintCircleRingShell(layer, []);
     circleFallState = {
       bodies: [],
@@ -12281,18 +13863,21 @@
       var st = circleFallState;
       if (!st || !st.shellOnly) return;
       placeCircleSpots();
+      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { st.raf = 0; return; }
       st.raf = requestAnimationFrame(frameShell);
     }
+    if (!window.__cognationPulseBgResize) {
+      window.__cognationPulseBgResize = true;
+      window.addEventListener("resize", function () { if (circleFallState) placeCircleSpots(); });
+    }
     circleFallState.raf = requestAnimationFrame(frameShell);
-    var circlePage = document.querySelector("[data-circle-page]") || layer;
-    if (window.CognationCircleRelations && typeof window.CognationCircleRelations.mount === "function") {
-      window.CognationCircleRelations.mount(circlePage);
-    }
-    if (window.CognationPulseMutual && typeof window.CognationPulseMutual.mount === "function") {
-      window.CognationPulseMutual.mount();
-    }
-    /* PULSE falling friends restored (removed by #49 early return). Every
-       server friend's Tower circle falls BEHIND the halo ring; tap opens Tower. */
+    /* PM 2026-10-21 (Alexa's spec: PULSE shows your own friends only): the
+       "X and Y became friends." pairs list (CognationCircleRelations.mount) is no
+       longer mounted on PULSE. js/circle-saved-relations.js stays, unused here. */
+    /* Alexa final spec 2026-10-20: the five halo frames are the viewer's MOST engaged
+       friends and the falling circles are the LEAST engaged (js/pulse-falling-friends.js
+       fills both from public Supabase activity). The pulse_mutual_introductions
+       "friends doing one thing together" fill is no longer mounted here. */
     if (window.CognationPulseFall && typeof window.CognationPulseFall.mount === "function") {
       window.CognationPulseFall.mount(layer, {
         paint: function (el, friend, i) {
@@ -12462,43 +14047,17 @@
     refresh: function () {
       var layer = document.querySelector("[data-circle-fall]");
       if (layer) paintCircleRingShell(layer, []);
-      var page = document.querySelector("[data-circle-page]");
-      if (page && window.CognationCircleRelations && typeof window.CognationCircleRelations.mount === "function") {
-        window.CognationCircleRelations.mount(page);
-      }
+      /* no pairs list on PULSE (PM 2026-10-21) */
       return [];
     }
   };
 
   /* Return to the signed-in account's own Tower (clears a friend deep-link). */
   window.CognationTowerOpenOwn = function () {
-    var session = getSessionObject();
-    var social = remoteSocial();
-    var ownHandle = session && session.profileHandle
-      ? normalizeHandle(session.profileHandle)
-      : "";
-    if (!ownHandle && social && typeof social.getMyProfiles === "function") {
-      var mine = social.getMyProfiles() || [];
-      var active = session && session.activeProfileId ? String(session.activeProfileId) : "";
-      var hit = null;
-      for (var i = 0; i < mine.length; i++) {
-        if (active && String(mine[i].id) === active) { hit = mine[i]; break; }
-      }
-      if (!hit) hit = mine[0];
-      if (hit && hit.handle) ownHandle = normalizeHandle(hit.handle);
-    }
-    var slug = normalizeHandle(towerProfileSlug());
-    if (slug && ownHandle && slug !== ownHandle) {
-      try {
-        if (window.history && typeof window.history.replaceState === "function") {
-          window.history.replaceState(null, "", (location.pathname || "/") + (location.search || ""));
-        } else {
-          location.hash = ownHandle ? "tower-profile-" + ownHandle : "";
-        }
-      } catch (eClear) {
-        try { location.hash = ownHandle ? "tower-profile-" + ownHandle : ""; } catch (e2) {}
-      }
-    }
+    /* Own page comes from getMyProfiles; a stale session id/handle (another
+       account's page) is reset, and a #tower-profile-* that is not ours goes. */
+    dropForeignActiveProfile();
+    clearForeignTowerHash();
     document.querySelectorAll("[data-tower-app]").forEach(function (root) {
       applyTowerSide(root, "public");
       renderProfileChrome(root);
@@ -12508,6 +14067,8 @@
     document.dispatchEvent(new CustomEvent("cognation:tower-view-changed"));
     return true;
   };
+
+  window.CognationTowerClearForeignHash = clearForeignTowerHash;
 
   window.CognationTowerOpenProfile = function (handle) {
     handle = String(handle || "").trim().replace(/^@/, "");

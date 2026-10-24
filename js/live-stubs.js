@@ -389,6 +389,8 @@
     var live = getLive();
     var active = !!(live && live.active);
     document.querySelectorAll("[data-go-live]").forEach(function (btn) {
+      /* Professional pages: classroom-sessions.js owns the label. */
+      if (btn.hasAttribute("data-classroom-go-live")) return;
       btn.textContent = active ? "Offline" : "Go live";
       btn.setAttribute("aria-label", active ? "Offline" : "Go live");
     });
@@ -453,7 +455,8 @@
     });
   }
 
-  var echoShared = false;
+  /* The browser-only "X is live" ECHO card (echoCard / Share to Echo) is removed:
+     ECHO's live cards come only from real live sessions (js/classroom-sessions.js). */
   var SIGNAL_ID = "live-signal-share";
 
   function setSignalShare(on) {
@@ -475,24 +478,6 @@
     }
     store.save(data);
     document.dispatchEvent(new CustomEvent("cognation:tower-updated"));
-  }
-
-  function setEchoShare(on) {
-    echoShared = !!on;
-    var swipe = window.CognationCommuneSwipe;
-    if (swipe && swipe.rebuild) swipe.rebuild();
-  }
-
-  function echoCard() {
-    if (!echoShared) return null;
-    var who = profileOnScreen();
-    return {
-      id: "live-echo-share",
-      type: "live",
-      title: who.name + " is live",
-      body: "Anyone can join.",
-      liveJoin: true
-    };
   }
 
   function bindRoom(stage, name) {
@@ -542,19 +527,44 @@
     if (root.classList) root.classList.remove("is-live-open");
     releaseMedia(stage);
     var signalBtn = stage && stage.querySelector("[data-live-share-signal]");
-    var echoBtn = stage && stage.querySelector("[data-live-share-echo]");
     if (signalBtn && signalBtn.getAttribute("aria-pressed") === "true") {
       signalBtn.setAttribute("aria-pressed", "false");
       setSignalShare(false);
     }
-    if (echoBtn && echoBtn.getAttribute("aria-pressed") === "true") {
-      echoBtn.setAttribute("aria-pressed", "false");
-      setEchoShare(false);
-    }
+    refreshEcho();
     syncGoLiveButtons();
   }
 
-  function openLive() {
+  function refreshEcho() {
+    var swipe = window.CognationCommuneSwipe;
+    if (swipe && swipe.rebuild) swipe.rebuild();
+  }
+
+  function rememberBroadcaster(live) {
+    if (!live) return;
+    var who = profileOnScreen();
+    var p = null;
+    try { p = window.CognationTowerProfileStore && window.CognationTowerProfileStore.get(); } catch (e) {}
+    live.profileKind = who.kind === "Professional" ? "professional" : "personal";
+    live.profileId = p && (p._profileId || p.id) || "";
+    live.handle = (p && p.handle) || "";
+    live.displayName = who.name || "";
+    setLive(live);
+    if (live.profileKind === "professional") refreshEcho();
+  }
+
+  function professionalBroadcast() {
+    var live = getLive();
+    if (!live || !live.active || live.profileKind !== "professional" || !live.profileId) return null;
+    var accounts = window.CognationAccounts;
+    var rec = accounts && accounts.getProfileById && accounts.getProfileById(live.profileId);
+    if (!rec || rec.kind !== "professional") return null;
+    var handle = String(rec.handle || "").replace(/^@/, "");
+    if (!handle) return null;
+    return { profileId: rec.id, handle: handle, name: rec.displayName || live.displayName || handle };
+  }
+
+  function openLive(asBroadcaster) {
     var root = document.querySelector("[data-tower-app]") || document;
     var stage = root.querySelector("[data-live-stage]");
     if (!stage) return;
@@ -562,7 +572,8 @@
     stage.hidden = false;
     if (root.classList) root.classList.add("is-live-open");
     initStage(stage);
-    ensureLive(stage);
+    var live = ensureLive(stage);
+    if (asBroadcaster === true) rememberBroadcaster(live);
     refresh(stage);
     syncGoLiveButtons();
   }
@@ -577,13 +588,12 @@
         goOffline();
         return;
       }
-      var share = node && node.closest && node.closest("[data-live-share-signal], [data-live-share-echo]");
+      var share = node && node.closest && node.closest("[data-live-share-signal]");
       if (share) {
         ev.preventDefault();
         var on = share.getAttribute("aria-pressed") !== "true";
         share.setAttribute("aria-pressed", on ? "true" : "false");
-        if (share.hasAttribute("data-live-share-signal")) setSignalShare(on);
-        else setEchoShare(on);
+        setSignalShare(on);
         return;
       }
       var btn = node && node.closest && node.closest("[data-go-live]");
@@ -592,7 +602,11 @@
       ev.stopPropagation();
       var app = btn.closest && btn.closest("[data-tower-app]");
       if (btn.hidden || (app && app.getAttribute("data-tower-is-owner") !== "true")) return;
-      openLive();
+      /* Professional page: Go live / End session sets the booked session's status on the
+         server (js/classroom-sessions.js). No camera, no local live state. */
+      var sessions = window.CognationClassroomSessions;
+      if (sessions && typeof sessions.handleGoLive === "function" && sessions.handleGoLive(btn)) return;
+      openLive(true);
       var session = document.querySelector("[data-tower-app] [data-live-session]");
       connectMedia(session);
     }, true);
@@ -612,6 +626,6 @@
     getSession: getLive,
     memberAge: memberAge,
     open: openLive,
-    echoCard: echoCard,
+    professionalBroadcast: professionalBroadcast,
   };
 })();

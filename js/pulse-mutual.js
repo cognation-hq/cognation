@@ -47,6 +47,15 @@
     };
   }
 
+  /* A date-only calendar day (YYYY-MM-DD) starts at local midnight, like goingLive local times. */
+  function localDay(value) {
+    var s = String(value || "");
+    var t = Date.parse(s);
+    if (isNaN(t)) return 0;
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    return m ? new Date(+m[1], +m[2] - 1, +m[3]).getTime() : t;
+  }
+
   /* Shares, event posts, and attendance already stored on this device. */
   function localRows(store) {
     store = store || (root && root.localStorage);
@@ -85,7 +94,7 @@
       ((map[id] && map[id].calendarEvents) || []).forEach(function (ev) {
         var ids = ev && ev.signupFriendIds;
         if (!ids || ids.length < 2) return;
-        var at = Date.parse(ev.date || "") || 0;
+        var at = localDay(ev.date);
         keep(at, ids.map(function (fid) {
           return map[fid] ? rowFrom(map[fid], "They are going to the same event.", at) : null;
         }));

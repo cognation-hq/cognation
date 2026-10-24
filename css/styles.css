@@ -2920,9 +2920,6 @@ body.login-gate-open .app-topbar {
   flex: 1 0 100%;
 }
 
-.tower-compose-audience {
-  margin: 0.4rem 0 0;
-}
 
 
 /* TOWER layout: profile+messages rail | feed */
@@ -16299,14 +16296,41 @@ body.cgn-cal-page {
   background-color: rgba(255, 255, 255, 0.1) !important;
 }
 
+/* Send a signal: text, files, event, song, and post share one left edge.
+   Files sits with Event instead of across a two-column hole. The song list
+   stays closed until Add song opens it, then hugs its labels. */
+#panel-signal .signal-feed-host .tower-compose.tower-compose--compact {
+  gap: 0.28rem;
+}
+#panel-signal .signal-feed-host .tower-compose .tower-upload-row {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 0.28rem 0.45rem;
+}
+#panel-signal .signal-feed-host .tower-compose .tower-upload-row > .form-group {
+  width: auto;
+  max-width: 100%;
+  flex: 0 1 auto;
+}
+#panel-signal .signal-feed-host .tower-compose #tower-files {
+  width: auto;
+  max-width: 100%;
+}
+#panel-signal .signal-feed-host .tower-compose .form-actions {
+  justify-content: flex-start;
+}
+
 /* Signal composer: one Add song control. The list stays closed until it opens.
-   Same pill as the other composer controls. A song that is not opted in stays dim. */
+   Same control shape as Event and Post, sized to the words and left-aligned.
+   A song that is not opted in stays dim. */
 #panel-signal .tower-compose [data-signal-featured-songs] {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.4rem;
-  margin-top: 0.35rem;
+  gap: 0.22rem;
+  margin-top: 0;
 }
 #panel-signal .tower-compose [data-signal-featured-songs] .btn {
   background: rgba(16, 19, 48, 0.55) !important;
@@ -16325,9 +16349,10 @@ body.cgn-cal-page {
 #panel-signal .tower-compose [data-signal-song-list] {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 0.35rem;
-  width: 100%;
+  align-items: flex-start;
+  gap: 0.22rem;
+  width: auto;
+  max-width: 100%;
   margin: 0;
   padding: 0;
 }
@@ -16335,7 +16360,8 @@ body.cgn-cal-page {
   display: none !important;
 }
 #panel-signal .tower-compose [data-signal-song-list] .btn {
-  width: 100%;
+  width: auto;
+  max-width: 100%;
 }
 #panel-signal .tower-compose [data-signal-song]:disabled {
   opacity: 0.45;

@@ -14736,6 +14736,11 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   }
 }
 
+.message-apple-pay { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; margin: 0; padding: 0 1rem 0.4rem; background: none; border: 0; color: #1a2144; font-size: 0.78rem; font-weight: 400; letter-spacing: 0.01em; }
+.message-apple-pay input { width: 3.5rem; margin: 0 0 0 0.28rem; padding: 0.04rem 0.32rem; border: 1px solid rgba(26, 33, 68, 0.28) !important; border-radius: 2px !important; background: rgba(255, 255, 255, 0.45) !important; color: #1a2144 !important; box-shadow: none !important; font: inherit; font-size: 0.78rem; line-height: 1.25; }
+.message-apple-pay input::placeholder { color: rgba(26, 33, 68, 0.55) !important; }
+.message-apple-pay [data-apple-pay] { margin: 0; padding: 0.04rem 0.4rem !important; border: 1px solid rgba(26, 33, 68, 0.28) !important; border-radius: 2px !important; background: transparent !important; color: #1a2144 !important; box-shadow: none !important; font: inherit; font-size: 0.78rem; font-weight: 500; line-height: 1.25; }
+.message-apple-pay [data-apple-pay-note] { flex: 1 1 100%; margin: 0; padding: 0; border: 0; background: none; font-size: 0.75rem; font-weight: 400; line-height: 1.35; color: #1a2144 !important; }
 
 /* pulse-background PR: Alexa's PULSE background (refs/alexa-final-2026-10-15.png),
    used as-is with only the five placeholder squares removed. WebP with a JPEG

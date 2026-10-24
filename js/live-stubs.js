@@ -389,6 +389,8 @@
     var live = getLive();
     var active = !!(live && live.active);
     document.querySelectorAll("[data-go-live]").forEach(function (btn) {
+      /* Professional pages: classroom-sessions.js owns the label. */
+      if (btn.hasAttribute("data-classroom-go-live")) return;
       btn.textContent = active ? "Offline" : "Go live";
       btn.setAttribute("aria-label", active ? "Offline" : "Go live");
     });
@@ -414,10 +416,99 @@
     var who = profileOnScreen();
     var host = stage.querySelector("[data-live-host]");
     var kind = stage.querySelector("[data-live-kind]");
-    var fill = stage.querySelector("[data-live-session-name]");
     if (host) host.textContent = who.name;
     if (kind) kind.textContent = who.kind + " · live";
-    if (fill) fill.textContent = who.name;
+    bindRoom(stage, who.name);
+  }
+
+  function connectMedia(box) {
+    if (!box || box.__cognationMediaAsked) return;
+    box.__cognationMediaAsked = true;
+    var devices = navigator.mediaDevices;
+    if (!devices || !devices.getUserMedia) return;
+    devices.getUserMedia({ video: true, audio: true }).then(function (stream) {
+      if (!box.__cognationMediaAsked) {
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        return;
+      }
+      box.__cognationStream = stream;
+      var video = document.createElement("video");
+      video.className = "tower-live-preview";
+      video.autoplay = true;
+      video.playsInline = true;
+      video.muted = true;
+      video.srcObject = stream;
+      box.appendChild(video);
+      if (video.play) video.play().catch(function () {});
+    }, function () { box.__cognationMediaAsked = false; });
+  }
+
+  function releaseMedia(stage) {
+    if (!stage) return;
+    stage.querySelectorAll("[data-live-session], [data-live-join-slot]").forEach(function (box) {
+      if (box.__cognationStream) box.__cognationStream.getTracks().forEach(function (t) { t.stop(); });
+      box.__cognationStream = null;
+      box.__cognationMediaAsked = false;
+      var video = box.querySelector("video");
+      if (video) video.remove();
+      if (box.hasAttribute("data-live-join-slot")) { box.removeAttribute("data-requested"); box.textContent = "Request"; }
+    });
+  }
+
+  /* The browser-only "X is live" ECHO card (echoCard / Share to Echo) is removed:
+     ECHO's live cards come only from real live sessions (js/classroom-sessions.js). */
+  var SIGNAL_ID = "live-signal-share";
+
+  function setSignalShare(on) {
+    var store = window.CognationTowerStore;
+    if (!store || !store.load || !store.save) return;
+    var data = store.load() || { version: 1, posts: [] };
+    if (!Array.isArray(data.posts)) data.posts = [];
+    data.posts = data.posts.filter(function (p) { return !p || p.id !== SIGNAL_ID; });
+    if (on) {
+      var who = profileOnScreen();
+      data.posts.unshift({
+        id: SIGNAL_ID,
+        authorName: who.name,
+        body: who.name + " is live.",
+        createdAt: new Date().toISOString(),
+        attachments: [],
+        likes: 0
+      });
+    }
+    store.save(data);
+    document.dispatchEvent(new CustomEvent("cognation:tower-updated"));
+  }
+
+  function bindRoom(stage, name) {
+    if (!stage) return;
+    stage.__cognationRoomName = name;
+    if (stage.__cognationRoomBound) return;
+    stage.__cognationRoomBound = true;
+    stage.addEventListener("click", function (ev) {
+      var node = ev.target;
+      if (node && node.nodeType !== 1) node = node.parentElement;
+      var slot = node && node.closest && node.closest("[data-live-join-slot]");
+      if (!slot || slot.getAttribute("data-requested") === "1") return;
+      if (stage.querySelectorAll('[data-live-join-slot][data-requested="1"]').length >= 9) return;
+      slot.setAttribute("data-requested", "1");
+      slot.textContent = stage.__cognationRoomName || "Request";
+      connectMedia(slot);
+    });
+    var form = stage.querySelector("[data-live-room-chat-form]");
+    if (!form) return;
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      var input = form.querySelector("[data-live-room-chat-input]");
+      var text = input && String(input.value || "").trim();
+      if (!text) return;
+      var log = stage.querySelector("[data-live-chat-log]");
+      var line = document.createElement("p");
+      line.className = "tower-live-chat-line";
+      line.textContent = (stage.__cognationRoomName || "Viewer") + ": " + text.slice(0, 280);
+      if (log) log.appendChild(line);
+      input.value = "";
+    });
   }
 
   function goOffline() {
@@ -434,10 +525,46 @@
       refresh(stage);
     }
     if (root.classList) root.classList.remove("is-live-open");
+    releaseMedia(stage);
+    var signalBtn = stage && stage.querySelector("[data-live-share-signal]");
+    if (signalBtn && signalBtn.getAttribute("aria-pressed") === "true") {
+      signalBtn.setAttribute("aria-pressed", "false");
+      setSignalShare(false);
+    }
+    refreshEcho();
     syncGoLiveButtons();
   }
 
-  function openLive() {
+  function refreshEcho() {
+    var swipe = window.CognationCommuneSwipe;
+    if (swipe && swipe.rebuild) swipe.rebuild();
+  }
+
+  function rememberBroadcaster(live) {
+    if (!live) return;
+    var who = profileOnScreen();
+    var p = null;
+    try { p = window.CognationTowerProfileStore && window.CognationTowerProfileStore.get(); } catch (e) {}
+    live.profileKind = who.kind === "Professional" ? "professional" : "personal";
+    live.profileId = p && (p._profileId || p.id) || "";
+    live.handle = (p && p.handle) || "";
+    live.displayName = who.name || "";
+    setLive(live);
+    if (live.profileKind === "professional") refreshEcho();
+  }
+
+  function professionalBroadcast() {
+    var live = getLive();
+    if (!live || !live.active || live.profileKind !== "professional" || !live.profileId) return null;
+    var accounts = window.CognationAccounts;
+    var rec = accounts && accounts.getProfileById && accounts.getProfileById(live.profileId);
+    if (!rec || rec.kind !== "professional") return null;
+    var handle = String(rec.handle || "").replace(/^@/, "");
+    if (!handle) return null;
+    return { profileId: rec.id, handle: handle, name: rec.displayName || live.displayName || handle };
+  }
+
+  function openLive(asBroadcaster) {
     var root = document.querySelector("[data-tower-app]") || document;
     var stage = root.querySelector("[data-live-stage]");
     if (!stage) return;
@@ -445,7 +572,8 @@
     stage.hidden = false;
     if (root.classList) root.classList.add("is-live-open");
     initStage(stage);
-    ensureLive(stage);
+    var live = ensureLive(stage);
+    if (asBroadcaster === true) rememberBroadcaster(live);
     refresh(stage);
     syncGoLiveButtons();
   }
@@ -460,13 +588,27 @@
         goOffline();
         return;
       }
+      var share = node && node.closest && node.closest("[data-live-share-signal]");
+      if (share) {
+        ev.preventDefault();
+        var on = share.getAttribute("aria-pressed") !== "true";
+        share.setAttribute("aria-pressed", on ? "true" : "false");
+        setSignalShare(on);
+        return;
+      }
       var btn = node && node.closest && node.closest("[data-go-live]");
       if (!btn) return;
       ev.preventDefault();
       ev.stopPropagation();
       var app = btn.closest && btn.closest("[data-tower-app]");
       if (btn.hidden || (app && app.getAttribute("data-tower-is-owner") !== "true")) return;
-      openLive();
+      /* Professional page: Go live / End session sets the booked session's status on the
+         server (js/classroom-sessions.js). No camera, no local live state. */
+      var sessions = window.CognationClassroomSessions;
+      if (sessions && typeof sessions.handleGoLive === "function" && sessions.handleGoLive(btn)) return;
+      openLive(true);
+      var session = document.querySelector("[data-tower-app] [data-live-session]");
+      connectMedia(session);
     }, true);
     syncGoLiveButtons();
     var root = document.querySelector("[data-tower-app]") || document;
@@ -484,5 +626,6 @@
     getSession: getLive,
     memberAge: memberAge,
     open: openLive,
+    professionalBroadcast: professionalBroadcast,
   };
 })();

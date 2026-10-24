@@ -14,10 +14,96 @@
     myProfiles: [],
     feed: [],
     initialized: false,
+    /* profiles.job_title ships with its own SQL. null = not known yet,
+       true = readable, false = missing or not granted (name only). */
+    jobTitleColumn: null,
   };
 
   function client() {
-    return window.CognationSupabase || null;
+    var c = window.CognationSupabase || null;
+    return c ? jobTitleAware(c) : null;
+  }
+
+  /* Pro job title on profiles reads. Every profiles request that selects
+     PROFILE_RETURN_COLUMNS also asks for job_title until the server says the
+     column is missing (400: 42703 / PGRST204) or not readable (42501). Then
+     the same request runs once more without it and later requests leave it
+     out, so the page keeps working before the SQL runs. A PATCH that writes
+     job_title is never retried without it: that error goes to the caller. */
+  var jobTitleWrapFor = null;
+  var jobTitleWrap = null;
+  var jobTitleProbe = null;
+  function jobTitleAware(c) {
+    if (jobTitleWrapFor === c) return jobTitleWrap;
+    jobTitleWrapFor = c;
+    jobTitleWrap = Object.create(c);
+    jobTitleWrap.rest = function (table, options) {
+      return profilesRest(c, table, options || {});
+    };
+    return jobTitleWrap;
+  }
+  function withJobTitle(options) {
+    var q = String(options.query || "");
+    var base = "select=" + PROFILE_RETURN_COLUMNS;
+    var at = q.indexOf(base);
+    if (at === -1) return null;
+    var end = at + base.length;
+    if (end < q.length && q.charAt(end) !== "&") return null;
+    return Object.assign({}, options, { query: q.slice(0, end) + ",job_title" + q.slice(end) });
+  }
+  function writesJobTitle(options) {
+    return !!(options.body && typeof options.body === "object" &&
+      Object.prototype.hasOwnProperty.call(options.body, "job_title"));
+  }
+  function withoutJobTitle(options) {
+    if (!writesJobTitle(options)) return options;
+    var body = Object.assign({}, options.body);
+    delete body.job_title;
+    return Object.assign({}, options, { body: body });
+  }
+  function jobTitleUnavailable(err, options) {
+    if (!err) return false;
+    var body = err.body && typeof err.body === "object" ? err.body : {};
+    var code = String(body.code || err.code || "");
+    var text = [err.message, body.message, body.details, body.hint].join(" ");
+    if ((code === "42703" || code === "PGRST204") && /job_title/i.test(text)) return true;
+    /* Column exists but SELECT was not granted: Postgres names the table only. */
+    return code === "42501" && !writesJobTitle(options);
+  }
+  function setJobTitleColumn(value) {
+    if (state.jobTitleColumn === value) return;
+    state.jobTitleColumn = value;
+    emit("cognation:pro-job-title-support", { supported: value === true });
+  }
+  function profilesRest(c, table, options) {
+    if (table !== "profiles") return c.rest(table, options);
+    if (state.jobTitleColumn === false) return c.rest(table, withoutJobTitle(options));
+    var asked = withJobTitle(options);
+    if (!asked) return c.rest(table, options);
+    /* One request finds out; the others wait for its answer. */
+    if (state.jobTitleColumn !== true && jobTitleProbe) {
+      var again = function () { return profilesRest(c, table, options); };
+      return jobTitleProbe.then(again, again);
+    }
+    var req = c.rest(table, asked).then(
+      function (rows) {
+        setJobTitleColumn(true);
+        return rows;
+      },
+      function (err) {
+        if (!jobTitleUnavailable(err, options)) throw err;
+        return c.rest(table, withoutJobTitle(options)).then(function (rows) {
+          setJobTitleColumn(false);
+          return rows;
+        });
+      }
+    );
+    if (state.jobTitleColumn !== true) {
+      jobTitleProbe = req;
+      var clear = function () { if (jobTitleProbe === req) jobTitleProbe = null; };
+      req.then(clear, clear);
+    }
+    return req;
   }
 
   function session() {
@@ -48,6 +134,16 @@
     document.dispatchEvent(new CustomEvent(name, { detail: detail || {} }));
   }
 
+  /* "seed-" / "seed_" / "ops-" / "ops_" handles are SeedOps-only (js/handle-reserved.js). */
+  function reservedHandle(value) {
+    var rules = window.CognationHandleRules;
+    return rules ? rules.isReserved(value) : /^(seed|ops)[-_]/.test(normalizeHandle(value));
+  }
+  function reservedHandleMessage(noun) {
+    var rules = window.CognationHandleRules;
+    return rules ? rules.message(noun) : noun + " can't start with \"seed-\", \"seed_\", \"ops-\" or \"ops_\". Please pick a different one.";
+  }
+
   function normalizeHandle(value) {
     return String(value || "")
       .trim()
@@ -57,8 +153,21 @@
       .slice(0, 40);
   }
 
+  /* Pro job title: optional plain text, trimmed, inner whitespace collapsed,
+     capped at JOB_TITLE_MAX. Never HTML; callers render it as text. */
+  var JOB_TITLE_MAX = 60;
+  function normalizeJobTitle(value) {
+    return String(value == null ? "" : value)
+      .replace(/[\u0000-\u001f\u007f]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, JOB_TITLE_MAX)
+      .trim();
+  }
+
   function cacheProfile(profile) {
     if (!profile || !profile.id) return null;
+    var prev = state.profiles[String(profile.id)] || null;
     var item = {
       id: String(profile.id),
       user_id: String(profile.user_id || ""),
@@ -66,6 +175,14 @@
       handle: normalizeHandle(profile.handle),
       display_name: String(profile.display_name || "Member").slice(0, 80),
       bio: String(profile.bio || "").slice(0, 280),
+      /* profiles.account_kind / seed_fleet_id (20261002_seedops_account_kind.sql). */
+      account_kind: profile.account_kind ? String(profile.account_kind) : "",
+      seed_fleet_id: profile.seed_fleet_id ? String(profile.seed_fleet_id) : "",
+      /* profiles.job_title (optional). Rows fetched without the column keep
+         the cached value instead of wiping it. */
+      job_title: Object.prototype.hasOwnProperty.call(profile, "job_title")
+        ? normalizeJobTitle(profile.job_title)
+        : (prev && prev.job_title) || "",
     };
     state.profiles[item.id] = item;
     if (item.handle) state.handles[item.handle] = item.id;
@@ -97,7 +214,38 @@
     );
   }
 
-  var PROFILE_RETURN_COLUMNS = "id,user_id,kind,handle,display_name,bio";
+  /* Seed Pro pages saved before the relabel SQL (seed-pulse-sql/02) carry
+     account_kind 'real' and no fleet id. Treat a 'seed-' Pro page as its owner's
+     kind when the OWNER's Personal page is a seed/ops account (account_kind or
+     seed_fleet_id). A real member who picked a 'seed-' handle keeps 'real'.
+     Owner not loaded: unchanged (shown as before). */
+  function fleetKindOf(row) {
+    var k = String((row && row.account_kind) || "").toLowerCase();
+    if (k === "seed" || k === "ops") return k;
+    return row && row.seed_fleet_id ? "seed" : "";
+  }
+  function ownerFleetKind(profile) {
+    if (!profile || profile.kind !== "professional" || fleetKindOf(profile)) return "";
+    if (normalizeHandle(profile.handle).indexOf("seed-") !== 0 || !profile.user_id) return "";
+    return fleetKindOf(profileForUser(String(profile.user_id), "personal"));
+  }
+  function effectiveAccountKind(profile) {
+    return fleetKindOf(profile) || ownerFleetKind(profile) ||
+      String((profile && profile.account_kind) || "").toLowerCase();
+  }
+  function effectiveFleetId(profile) {
+    if (!profile) return "";
+    if (profile.seed_fleet_id) return String(profile.seed_fleet_id);
+    if (!ownerFleetKind(profile)) return "";
+    var owner = profileForUser(String(profile.user_id), "personal");
+    return owner && owner.seed_fleet_id ? String(owner.seed_fleet_id) : "";
+  }
+  /* Viewer is a seed/ops account (seeds still see seeds). */
+  function viewerIsFleet() {
+    return (state.myProfiles || []).some(function (row) { return !!fleetKindOf(row); });
+  }
+
+  var PROFILE_RETURN_COLUMNS = "id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id";
 
   /* Leave Sage (seed-0248, the under-13 test viewer) out of member lists. */
   function u13() {
@@ -114,7 +262,7 @@
     return client()
       .rest("profiles", {
         query:
-          "select=id,user_id,kind,handle,display_name,bio&order=created_at.desc&limit=400" + listFilter(),
+          "select=" + PROFILE_RETURN_COLUMNS + "&order=created_at.desc&limit=400" + listFilter(),
       })
       .then(cacheProfiles);
   }
@@ -125,7 +273,7 @@
     return client()
       .rest("profiles", {
         query:
-          "select=id,user_id,kind,handle,display_name,bio&user_id=eq." +
+          "select=" + PROFILE_RETURN_COLUMNS + "&user_id=eq." +
           encodeURIComponent(me.supabaseUserId),
       })
       .then(function (rows) {
@@ -162,6 +310,12 @@
       _remote: true,
       displayName: profile.display_name,
       handle: profile.handle,
+      /* Seed/ops Demo badge (syncTowerBadges) and the friend gate
+         (tower-follow "Unavailable") read these, never the handle. */
+      accountKind: effectiveAccountKind(profile),
+      isSeed: effectiveAccountKind(profile) === "seed",
+      isOpsBot: effectiveAccountKind(profile) === "ops",
+      seedFleetId: effectiveFleetId(profile),
       slogan: profile.bio,
       socialLinks: {},
       badges: { role: "", interest: "", status: "" },
@@ -224,6 +378,19 @@
     var display =
       (author && (author.display_name || author.displayName)) || "Cognation member";
     var handle = author ? normalizeHandle(author.handle) : "";
+    /* Seed/ops badges read these account fields, not the handle. Missing
+       (older cache) stays "" so classify falls back to "real". */
+    var accountKind = (author && effectiveAccountKind(author)) || String(
+      (embedded && embedded.account_kind) || ""
+    ).toLowerCase();
+    var seedFleetId = (author && effectiveFleetId(author)) || String(
+      (embedded && embedded.seed_fleet_id) || ""
+    );
+    /* Which of the author's pages wrote it (Personal or Professional), and
+       that page's picture (https only, else the card shows initials). */
+    var authorKind = String((author && author.kind) || (embedded && embedded.kind) || "personal");
+    var authorPhotoUrl = String((author && author.photo_url) || (embedded && embedded.photo_url) || "");
+    if (!/^https:\/\//i.test(authorPhotoUrl)) authorPhotoUrl = "";
     var reactions = reactionsMap(row && row.reactions);
     var hearts = reactions["❤️"] ? reactions["❤️"].length : 0;
     return {
@@ -232,6 +399,12 @@
       authorProfileId: row.author_profile_id,
       authorName: display,
       handle: handle,
+      authorKind: authorKind === "professional" ? "professional" : "personal",
+      authorPhotoUrl: authorPhotoUrl,
+      accountKind: accountKind,
+      isSeed: accountKind === "seed",
+      isOpsBot: accountKind === "ops",
+      seedFleetId: seedFleetId,
       body: row.body || "",
       createdAt: row.created_at,
       attachments: (function () {
@@ -263,7 +436,7 @@
   }
 
   var FEED_COLUMNS =
-    "id,author_profile_id,body,visibility,attachments,created_at,rating,hidden_attachment_indexes,author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,bio,seed_fleet_id),reactions:tower_post_reactions(face,profile_id)";
+    "id,author_profile_id,body,visibility,attachments,created_at,rating,hidden_attachment_indexes,author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id,photo_url),reactions:tower_post_reactions(face,profile_id)";
   var FEED_TAIL = "&order=created_at.desc&limit=100";
 
   /* The rating column is missing until 20261015_tower_auto_rate.sql runs. */
@@ -282,8 +455,11 @@
       }, function (err) {
         var missingRating = isMissingRatingColumn(err);
         var missingHide = /hidden_attachment_indexes/i.test(String((err && err.message) || err || ""));
-        if (!missingRating && !missingHide) throw err;
-        var q = FEED_COLUMNS;
+        /* profiles.photo_url arrives with 20261016_profiles_photo_url.sql; without
+           it the Feed still loads and author avatars fall back to initials. */
+        var missingPhoto = /photo_url/i.test(String((err && (err.message || err.details || err.hint)) || err || ""));
+        if (!missingRating && !missingHide && !missingPhoto) throw err;
+        var q = FEED_COLUMNS.replace(",photo_url)", ")");
         if (missingRating) q = q.replace(",rating,", ",").replace(",hidden_attachment_indexes,", ",");
         else if (missingHide) q = q.replace(",hidden_attachment_indexes,", ",");
         /* Fail closed: without server ratings, show only the viewer's own posts. */
@@ -314,6 +490,21 @@
     if (!me || !profileId) {
       return Promise.reject(new Error("Sign in before posting to Tower."));
     }
+    /* Post as: one of the member's OWN pages (Personal or Professional), never
+       anyone else's. The server insert policy "tower authors create their own
+       posts" enforces the same (profiles.user_id = auth.uid()). */
+    if (fields && fields.asProfileId) {
+      var asId = String(fields.asProfileId);
+      var own = state.myProfiles.filter(function (p) {
+        return p && String(p.id) === asId && String(p.user_id || "") === String(me.supabaseUserId);
+      })[0];
+      if (!own) {
+        var notOwn = new Error("You can only post as your own pages.");
+        notOwn.code = "post_as_not_own";
+        return Promise.reject(notOwn);
+      }
+      profileId = own.id;
+    }
     if (!body) {
       return Promise.reject(
         new Error("Add a written update before posting. File uploads are not connected yet.")
@@ -325,13 +516,16 @@
         body: {
           author_profile_id: profileId,
           body: body.slice(0, 2000),
-          visibility: "friends",
+          visibility: (window.CognationEchoGroups && window.CognationEchoGroups.isGroupPost(body)) ? "public" : "friends",
           attachments: Array.isArray(fields && fields.attachments)
             ? fields.attachments.map(function (attachment) {
-                return {
+                var item = {
                   kind: String(attachment.kind || "document"),
                   label: String(attachment.label || attachment.name || "Attachment").slice(0, 160),
                 };
+                var pic = String((attachment && attachment.dataUrl) || "");
+                if (pic.indexOf("data:image/") === 0 && pic.length < 180000) item.dataUrl = pic;
+                return item;
               })
             : [],
         },
@@ -423,9 +617,21 @@
     if (data && Object.prototype.hasOwnProperty.call(data, "bio")) {
       changes.bio = String(data.bio || "").trim().slice(0, 280);
     }
+    /* Job title: Pro pages only, once the column is known to be readable.
+       Blank clears it (null), so "" never reaches the length check. */
+    if (
+      data && Object.prototype.hasOwnProperty.call(data, "jobTitle") &&
+      state.jobTitleColumn === true && row.kind === "professional"
+    ) {
+      changes.job_title = normalizeJobTitle(data.jobTitle) || null;
+      if ((changes.job_title || "") === (row.job_title || "")) delete changes.job_title;
+    }
     Object.keys(changes).forEach(function (key) {
       if (changes[key] === row[key]) delete changes[key];
     });
+    if (changes.handle && reservedHandle(changes.handle)) {
+      return Promise.reject(new Error(reservedHandleMessage("Handles")));
+    }
     if (!Object.keys(changes).length) return Promise.resolve(row);
     return client()
       .rest("profiles", {
@@ -448,6 +654,7 @@
     if (!me) return Promise.reject(new Error("Sign in before creating a professional page."));
     var base = normalizeHandle(fields && fields.handle);
     if (!base) base = "member-" + me.supabaseUserId.slice(0, 8);
+    if (reservedHandle(base)) return Promise.reject(new Error(reservedHandleMessage("Handles")));
     return client()
       .rest("profiles", {
         method: "POST",
@@ -485,6 +692,17 @@
       })
       .filter(function (profile) {
         return (!me || profile.user_id !== me.supabaseUserId) && !isSageRow(profile);
+      })
+      /* Real viewers: hide a mislabelled seed Pro page (owner is a seed). */
+      .filter(function (profile) {
+        return viewerIsFleet() || !ownerFleetKind(profile);
+      })
+      .map(function (profile) {
+        if (!ownerFleetKind(profile)) return profile;
+        var copy = Object.assign({}, profile);
+        copy.account_kind = effectiveAccountKind(profile);
+        copy.seed_fleet_id = effectiveFleetId(profile);
+        return copy;
       });
     return list.slice(0, 8);
   }
@@ -722,6 +940,14 @@
       });
   }
 
+  /* Sign-out: forget the member's Feed held in memory (shared devices). The
+     Tower store copy is cleared by tower.js on the same event. */
+  document.addEventListener("cognation:session-ended", function () {
+    if (active()) return;
+    state.feed = [];
+    state.myProfiles = [];
+  });
+
   var sawSessionStart = false;
   document.addEventListener("cognation:session-started", function () {
     sawSessionStart = true;
@@ -760,6 +986,8 @@
     createProfessionalProfile: createProfessionalProfile,
     acceptFriendRequest: acceptFriendRequest,
     memberResults: memberResults,
+    effectiveAccountKind: effectiveAccountKind,
+    effectiveFleetId: effectiveFleetId,
     openProfile: openProfile,
     getProfile: profileForId,
     getProfileForHandle: profileForHandle,
@@ -779,6 +1007,12 @@
       return toTowerProfile(profileForId(id));
     },
     setActiveProfile: setActiveProfile,
+    /* Pro job title (profiles.job_title). False until the column is confirmed. */
+    JOB_TITLE_MAX: JOB_TITLE_MAX,
+    normalizeJobTitle: normalizeJobTitle,
+    jobTitleSupported: function () {
+      return state.jobTitleColumn === true;
+    },
   };
 
   if (document.readyState === "loading") {

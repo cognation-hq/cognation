@@ -1,6 +1,8 @@
 /**
  * COMMUNE — paced public swipe deck (Personal featured mix).
  * Featured families rotate 1:1 — Classroom / ad / chat room / dating / content.
+ * Classroom (and Professional Webinar) cards exist only while a Professional page is
+ * live; with none live that family is skipped and the next family fills the slot.
  * Content lane holds fact, wellness, friend-share, public event, people-you-may-know,
  * and Tower live seller / garage-sale listings. Dating stays opt-in + local + age-gated.
  * Ads stay in the 1:1 mix and play at most 3 seconds. Under-13 sees G/PG only.
@@ -31,6 +33,7 @@
   var INBOUND_KEY = "cognation.commune.dating.inbound.v1";
   var NOTICES_KEY = "cognation.commune.notices.v1";
   var SHARES_KEY = "cognation.commune.friend-shares.v1";
+  var BIDS_KEY = "cognation.commune.market.bids.v1";
   var FADE_LEFT_THRESHOLD = 3;
   var OFF_INTEREST_FRIEND_RATIO = 6;
   var ROOMS_KEY = "cognation.commune.site-rooms.v1";
@@ -48,11 +51,14 @@
     KNOW: "know",
     DATING: "dating",
     CONTENT: "content",
+    MARKET: "marketplace",
+    GROUP: "group",
   };
 
-  /* Alexa lock 2026-10-02: Personal featured mix is 1:1 across five families. */
+  /* Alexa lock 2026-10-02: Personal featured mix is 1:1 across five families.
+     Marketplace rides the content slot. It is not a sixth family. */
   var FEATURED_ORDER = [TYPE.CLASSROOM, TYPE.AD, TYPE.CHAT, TYPE.DATING, TYPE.CONTENT];
-  var CONTENT_SUBTYPES = [TYPE.FACT, TYPE.WELLNESS, TYPE.FRIEND, TYPE.EVENT, TYPE.KNOW, TYPE.CONTENT];
+  var CONTENT_SUBTYPES = [TYPE.MARKET, TYPE.GROUP, TYPE.FACT, TYPE.WELLNESS, TYPE.FRIEND, TYPE.EVENT, TYPE.KNOW, TYPE.CONTENT];
   var AD_MAX_MS = 3000;
   var REPEATABLE = {};
   /* Featured families stay repeatable so a long Personal deck holds true 1:1 rotation. */
@@ -88,34 +94,12 @@
     { id: "room-site-insurance", sqlId: "a1000000-0000-4000-8000-000000000010", slug: "insurance", title: "Insurance", topic: "insurance", gate: "interest", interests: ["insurance"] },
   ];
 
-  /* Honest-thin Classroom / webinar cards — life skills for ~18+ (insurance, voting, business). */
-  var CLASSROOM_BODY = "Cognation Classroom — life skills at a human pace.";
-  var CLASSROOM_SESSIONS = [
-    {
-      id: "class-insurance",
-      sqlId: "a2000000-0000-4000-8000-000000000001",
-      title: "Insurance basics",
-      topic: "insurance",
-      body: "What coverage is for, how premiums work, and questions worth asking before you buy.",
-      minAge: 18,
-    },
-    {
-      id: "class-voting",
-      sqlId: "a2000000-0000-4000-8000-000000000002",
-      title: "Voting & civic basics",
-      topic: "voting",
-      body: "How elections reach the ballot, registering where you live, and finding nonpartisan guides.",
-      minAge: 18,
-    },
-    {
-      id: "class-business",
-      sqlId: "a2000000-0000-4000-8000-000000000003",
-      title: "Starting a small business",
-      topic: "business",
-      body: "Sole prop vs LLC in plain language, basic bookkeeping, and when to ask a professional.",
-      minAge: 18,
-    },
-  ];
+  /* Classroom / Webinar cards come ONLY from a Professional Tower page that is live
+     right now (Alexa 2026-10-20 8:20 PM CT). The live signal is
+     window.CognationProLive.livePages(), a server-backed list of live Professional
+     pages. Nothing provides it yet, so nothing is live and these cards do not render.
+     Go live (live-stubs.js) is a browser-only stub and is NOT a live signal. */
+  var CLASSROOM_BODY = "A live classroom on a Professional page.";
 
   var FACTS = [
     { id: "fact-hearts", title: "A public fact", body: "Octopuses have three hearts. Two pump blood through the gills, and one pumps it through the rest of the body. Source: Smithsonian Ocean." },
@@ -133,8 +117,9 @@
     { id: "well-light", title: "A wellness note", body: "Morning daylight helps set the body clock. Many wellness classes start with a few minutes outside." },
   ];
 
-  /* Professional deck (Alexa GO 2026-10-07). Placeholder cards carry a visible Demo label
-   * until real feeds exist — no invented live data, names, prices, or counts. */
+  /* Professional deck (Alexa GO 2026-10-07). Real cards only (Alexa 2026-10-22: "we don need
+   * demo only crds in echo"): a lane with no real data has no cards and drops out of the 1:1 mix.
+   * No invented live data, names, prices, or counts. */
   var MODE_KEY = "cognation.commune.mode";
   var MODE = { PERSONAL: "personal", PROFESSIONAL: "professional" };
   var PRO = {
@@ -155,21 +140,17 @@
   PRO_MARK[PRO.PODCAST] = "Podcast";
   PRO_MARK[PRO.FIELD] = "Field";
   PRO_MARK[PRO.POP] = "Pop-culture";
-  var DEMO_LABEL = "Demo · placeholder";
-  /* The legacy classroom panel. Not the deck's classroom CARD (it also carries
-     data-classroom="card"): hiding that card on Back left a blank deck. */
-  var CLASSROOM_PANEL_SEL = "[data-classroom]:not([data-commune-card]), #panel-classroom, [data-commune-classroom]";
-  var PRO_WEBINARS = [
-    { id: "pro-webinar-ethics", title: "Ethical collaboration in practice", body: "Credit, consent, and clear roles when people build together." },
-    { id: "pro-webinar-async", title: "Async work that respects time", body: "Written decisions, clean handoffs, and calm response windows." },
-    { id: "pro-webinar-ce", title: "Planning continuing education", body: "Mapping a year of learning to what your field asks you to renew." },
-  ];
+  /* Podcast cards stay, with no Demo badge (Alexa 2026-10-22 11:46 AM CT, via SeedOps:
+     "this will also be a card when cognation goes live but doesnt need to be a demo"). */
   var PRO_PODCASTS = [
     { id: "pro-podcast-leaders", title: "Top industry performers", body: "Talks with leading people across industries, not only Cognation experts." },
     { id: "pro-podcast-ethics", title: "Ethical collaboration", body: "How strong teams share credit and work through disagreement." },
     { id: "pro-podcast-async", title: "Async by default", body: "Episodes on remote and async craft. Listen on your own schedule." },
     { id: "pro-podcast-ce", title: "Continuing education", body: "Episodes that pair with continuing-education goals." },
   ];
+  /* The legacy classroom panel. Not the deck's classroom CARD (it also carries
+     data-classroom="card"): hiding that card on Back left a blank deck. */
+  var CLASSROOM_PANEL_SEL = "[data-classroom]:not([data-commune-card]), #panel-classroom, [data-commune-classroom]";
 
   function readJson(store, key, fallback) {
     try {
@@ -323,7 +304,10 @@
           }
           var card = takeFromList(sub, list, null);
           if (!card) continue;
-          cursors._contentRot = (CONTENT_SUBTYPES.indexOf(sub) + 1) % CONTENT_SUBTYPES.length;
+          /* Each #group post is one card; keep this slot until those posts are placed. */
+          if (!(sub === TYPE.GROUP && (cursors[sub] || 0) < list.length)) {
+            cursors._contentRot = (CONTENT_SUBTYPES.indexOf(sub) + 1) % CONTENT_SUBTYPES.length;
+          }
           return card;
         }
         return null;
@@ -926,28 +910,80 @@
     return age != null && age >= 18;
   }
 
-  function classroomCard(session) {
+  /** Live Professional pages from the server-backed live signal. Empty when no signal. */
+  function liveProPages() {
+    var api = window.CognationProLive;
+    if (!api || typeof api.livePages !== "function") return [];
+    var rows;
+    try { rows = api.livePages(); } catch (eLive) { return []; }
+    if (!Array.isArray(rows)) return [];
+    return rows.filter(function (row) {
+      return row && row.profileId && row.live === true &&
+        (!row.kind || row.kind === "professional");
+    });
+  }
+
+  function liveTitle(page, fallback) {
+    return String(page.sessionTitle || page.title || "").trim() || fallback;
+  }
+
+  function classroomCard(page) {
+    var name = String(page.displayName || page.handle || "").trim();
     return {
-      id: session.id,
+      id: "class-live-" + page.profileId,
       type: TYPE.CLASSROOM,
-      title: session.title,
-      body: session.body || CLASSROOM_BODY,
-      topic: session.topic,
-      host: "Cognation",
+      title: liveTitle(page, name ? name + " is teaching live" : "Live classroom"),
+      body: String(page.body || "").trim() || CLASSROOM_BODY,
+      topic: String(page.topic || "").trim(),
+      host: name,
+      handle: String(page.handle || "").replace(/^@/, ""),
+      profileId: page.profileId,
       classroom: true,
-      sqlId: session.sqlId || "",
-      minAge: session.minAge || 18,
+      live: true,
+      sqlId: page.roomSqlId || "",
+      minAge: page.minAge || 18,
+      sessionId: page.sessionId || "",
+      startsAt: page.startsAt || 0,
+      endsAt: page.endsAt || 0,
+      photoUrl: page.photoUrl || "",
+      record: page.accountKind ? { accountKind: page.accountKind, displayName: name } : null,
     };
   }
 
+  /* A live session is a Classroom (Personal deck) or a Webinar (Professional deck).
+     A live page with no session kind fills both, as #193 did. */
   function classroomCatalog() {
-    return CLASSROOM_SESSIONS.map(classroomCard);
+    return liveProPages().filter(function (page) { return page.sessionKind !== "webinar"; }).map(classroomCard);
   }
 
   function visibleClassroomSessions() {
     /* No birth month yet: keep the card so Join can offer Add birth month. */
     if (!classroomAllowed() && !liveBirthMissing()) return [];
     return classroomCatalog();
+  }
+
+  function liveWebinarCards() {
+    return liveProPages().filter(function (page) { return page.sessionKind !== "classroom"; }).map(function (page) {
+      var name = String(page.displayName || page.handle || "").trim();
+      return {
+        id: "pro-webinar-live-" + page.profileId,
+        type: PRO.WEBINAR,
+        title: liveTitle(page, name ? name + " is live" : "Live webinar"),
+        body: String(page.body || "").trim() || "A live webinar on a Professional page.",
+        why: "This Professional page is live right now.",
+        profileId: page.profileId,
+        handle: String(page.handle || "").replace(/^@/, ""),
+        live: true,
+        rating: page.rating || "G",
+        minAge: page.minAge || 0,
+        host: name,
+        sessionId: page.sessionId || "",
+        startsAt: page.startsAt || 0,
+        endsAt: page.endsAt || 0,
+        photoUrl: page.photoUrl || "",
+        record: page.accountKind ? { accountKind: page.accountKind, displayName: name } : null,
+      };
+    });
   }
 
   function youtubeId(url) {
@@ -1289,6 +1325,119 @@
     return out;
   }
 
+  /* A feed post tagged #market becomes a Marketplace card in the 1:1 content slot. */
+  function marketTagged(text) {
+    return /(^|[^a-z0-9])#market(?![a-z0-9])/i.test(String(text || ""));
+  }
+  function marketCanBid() {
+    var age = getMemberAge();
+    return typeof age === "number" && age >= 16;
+  }
+  function marketPictures(post) {
+    var out = [];
+    (post && Array.isArray(post.attachments) ? post.attachments : []).forEach(function (a) {
+      var url = String((a && (a.dataUrl || a.url || a.src || a.imageUrl)) || "");
+      if (url.indexOf("data:image/") === 0 || /^https?:\/\//.test(url)) out.push(url);
+    });
+    return out;
+  }
+  /* Tower posts for Marketplace. Goes through the tower module's list() so it gets the
+     same filters as the TOWER Feed (#199: local SeedOps template posts never show
+     signed in). Raw store read only if the tower module isn't loaded. */
+  /* Age line a #market post asks for: 18 or 21 from minAge, audience / roomKind,
+     an "18+" / "21+" in the text, or an R / MA rating. 0 = none. */
+  function marketPostMinAge(post) {
+    var need = Number(post && post.minAge) || 0;
+    var marks = [post && post.audience, post && post.roomKind];
+    marks.forEach(function (m) {
+      if (m === "21+") need = Math.max(need, 21);
+      else if (m === "18+") need = Math.max(need, 18);
+    });
+    var text = String((post && post.title) || "") + " " + String((post && post.body) || "");
+    if (typeof text.normalize === "function") text = text.normalize("NFKC");
+    if (/(^|\W)21\s?\+(?!\w)/.test(text)) need = Math.max(need, 21);
+    else if (/(^|\W)18\s?\+(?!\w)/.test(text)) need = Math.max(need, 18);
+    var rating = String((post && post.rating) || "").toUpperCase();
+    if (rating === "MA") need = Math.max(need, 21);
+    else if (rating === "R") need = Math.max(need, 18);
+    return need;
+  }
+  /* Same Tower rule as the feed and ECHO groups (echo-group.js posts():
+     CognationTowerPostVisibleToViewer, i.e. rating + the under-13 / unknown-age
+     floor), plus the post's own age line, so an 18-20 viewer never gets a 21+
+     sale. Unknown age counts as 0 (fail closed). */
+  function marketVisibleToViewer(post) {
+    var visible = window.CognationTowerPostVisibleToViewer;
+    if (typeof visible === "function" && !visible(post)) return false;
+    var need = marketPostMinAge(post);
+    if (!need) return true;
+    var floor = window.CognationAgeFloor;
+    var age = floor && typeof floor.viewerAge === "function" ? Number(floor.viewerAge()) || 0 : 0;
+    return age >= need;
+  }
+  function marketSourcePosts() {
+    var store = window.CognationTowerStore;
+    var list;
+    if (store && typeof store.list === "function") {
+      list = store.list();
+    } else {
+      var doc = readJson(localStorage, "cognation.tower.posts.v3", null);
+      list = doc && Array.isArray(doc.posts) ? doc.posts : [];
+    }
+    return (Array.isArray(list) ? list : []).filter(function (post) {
+      return !!post && marketVisibleToViewer(post);
+    });
+  }
+  function marketplaceCards() {
+    var posts = marketSourcePosts();
+    var out = [];
+    posts.forEach(function (post) {
+      if (!post || !marketTagged((post.body || "") + " " + (post.title || ""))) return;
+      var body = String(post.body || "").replace(/(^|[^a-z0-9])#market(?![a-z0-9])/ig, "$1").replace(/\s+/g, " ").trim();
+      out.push({
+        id: "market-" + (post.id || out.length),
+        type: TYPE.MARKET,
+        title: body.split(/[.!\n]/)[0].slice(0, 80) || "For sale",
+        body: body,
+        fromName: post.authorName || "",
+        handle: String(post.handle || "").replace(/^@/, ""),
+        profileId: post.authorProfileId || "",
+        pictures: marketPictures(post),
+      });
+    });
+    return out;
+  }
+  function marketOptedIn(cardId) {
+    var doc = readJson(localStorage, BIDS_KEY, {});
+    var row = doc[currentProfileId()];
+    return !!(row && row[cardId]);
+  }
+  function optInToBid(cardId) {
+    if (!marketCanBid()) return false;
+    var doc = readJson(localStorage, BIDS_KEY, {});
+    var mine = currentProfileId();
+    if (!doc[mine] || typeof doc[mine] !== "object") doc[mine] = {};
+    doc[mine][cardId] = Date.now();
+    writeJson(localStorage, BIDS_KEY, doc);
+    return true;
+  }
+  function marketCardHtml(card) {
+    var html = "";
+    (card.pictures || []).forEach(function (src) {
+      html += '<img class="commune-market-photo" alt="' + escapeHtml(card.title || "Item") + '" src="' + escapeHtml(src) + '">';
+    });
+    if (html) html = '<div class="commune-market-photos" data-market-photos>' + html + "</div>";
+    if (!marketCanBid()) {
+      return html + '<p class="commune-card-meta" data-market-bid-note>Bidding is for ages 16 and up.</p>';
+    }
+    var opted = marketOptedIn(card.id);
+    return html +
+      '<button type="button" class="btn btn-primary" data-market-bid aria-pressed="' + (opted ? "true" : "false") + '">' +
+      (opted ? "Opted in" : "Bid") + "</button>" +
+      '<p class="commune-card-meta" data-market-bid-note>' +
+      (opted ? "You're opted in to bid. Nothing is charged." : "Opt in only. Nothing is charged.") + "</p>";
+  }
+
   function ageSafeFeaturedCard(card) {
     if (!card) return false;
     if (!isUnder13()) return true;
@@ -1422,6 +1571,12 @@
     return SITE_ROOMS.filter(roomVisible).map(roomCard);
   }
 
+  function groupLane() {
+    var api = window.CognationEchoGroups;
+    var list = api && typeof api.cards === "function" ? api.cards() : [];
+    return Array.isArray(list) ? list : [];
+  }
+
   function buildLanes() {
     var lanes = {};
     lanes[TYPE.CLASSROOM] = visibleClassroomSessions();
@@ -1433,6 +1588,8 @@
     lanes[TYPE.EVENT] = publicEvents();
     lanes[TYPE.KNOW] = peopleYouMayKnow();
     lanes[TYPE.CONTENT] = towerLiveContentCards();
+    lanes[TYPE.MARKET] = marketplaceCards();
+    lanes[TYPE.GROUP] = groupLane();
     Object.keys(lanes).forEach(function (type) {
       lanes[type] = omitPassed((lanes[type] || []).filter(ageSafeFeaturedCard).filter(function (card) {
         /* Repeated lefts fade a topic out of the deck (friend shares handled separately). */
@@ -1472,10 +1629,6 @@
     var p = getMemberProfile();
     return norm(p.field || p.profession || p.industry) || viewerInterestPhrases()[0] || "";
   }
-  function slug(t) { return norm(t).replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
-  function proPlaceholder(type, id, title, body, why, minAge) {
-    return { id: id, type: type, title: title, body: body, why: why, demo: true, rating: "G", minAge: minAge || 0 };
-  }
 
   /** Professional pages only — never personal friends-you-may-know. Ranked by shared interest count. */
   function professionalsYouMightKnow() {
@@ -1488,10 +1641,30 @@
         (accounts.getProfilesForUsername(session.username) || []).forEach(function (p) { if (p && p.id) mine[String(p.id)] = true; });
       } catch (eOwn) {}
     }
+    /* The viewer's own server pages, by id and by owner. */
+    var social0 = window.CognationSupabaseSocial;
+    var myUserIds = {};
+    if (social0 && typeof social0.getMyProfiles === "function") {
+      try {
+        (social0.getMyProfiles() || []).forEach(function (p) {
+          if (!p) return;
+          if (p.id) mine[String(p.id)] = true;
+          if (p.user_id) myUserIds[String(p.user_id)] = true;
+        });
+      } catch (eMine) {}
+    }
+    try {
+      var authS = window.CognationAuth && typeof window.CognationAuth.getSession === "function" ? window.CognationAuth.getSession() : null;
+      if (authS && authS.supabaseUserId) myUserIds[String(authS.supabaseUserId)] = true;
+    } catch (eAuthS) {}
+    /* Seed sandbox: only a viewer the server confirms as seed/ops gets seed pages (and only
+       those). Real and unknown viewers get real pages only, so a real member is never
+       suggested a seed account. A page of unknown kind counts as seed (fail closed). */
+    var wantSeed = resolveViewerSeedStatus() === true;
     var interests = viewerInterestPhrases();
     var field = viewerField();
     if (field && interests.indexOf(field) < 0) interests.unshift(field);
-    var out = [];
+    var people = [];
     /* Live site: only real professional pages from the server (supabase-social).
        The local registry (cognation.profiles.v1) holds demo records such as
        prof-alexa-professional whose handle has no server page, so Open their page
@@ -1503,43 +1676,91 @@
         var rows = social && typeof social.listProfiles === "function" ? social.listProfiles() || [] : [];
         rows.forEach(function (row) {
           if (!row) return;
-          fn({ id: row.id, kind: row.kind, handle: row.handle, displayName: row.display_name, bio: row.bio || "", userId: row.user_id });
+          /* accountKind / seedFleetId: the card's Demo badge reads them (not the handle). */
+          /* #231: same owner check as Tower (effectiveAccountKind). A 'seed-' Pro page
+             saved before seed-pulse-sql/02 reads 'real'; its seed/ops owner decides. */
+          var rawKind = String(row.account_kind || "").toLowerCase();
+          var kind = rawKind;
+          var fleetId = String(row.seed_fleet_id || "");
+          if (social && typeof social.effectiveAccountKind === "function") {
+            try { kind = String(social.effectiveAccountKind(row) || rawKind).toLowerCase(); } catch (eKind) {}
+          }
+          var ownerFleet = (kind === "seed" || kind === "ops") && kind !== rawKind;
+          if (ownerFleet && !fleetId && typeof social.effectiveFleetId === "function") {
+            try { fleetId = String(social.effectiveFleetId(row) || ""); } catch (eFleet) {}
+          }
+          fn({ id: row.id, kind: row.kind, handle: row.handle, displayName: row.display_name, bio: row.bio || "", userId: row.user_id,
+            accountKind: kind, seedFleetId: fleetId, ownerFleet: ownerFleet, jobTitle: row.job_title || "" });
         });
       };
     }
     each(function (rec) {
       if (!rec || rec.kind !== "professional" || mine[String(rec.id)] || isFollowing(rec.id)) return;
-      var name = rec.displayName || rec.handle;
+      if (rec.userId && myUserIds[String(rec.userId)]) return;
+      /* ownerFleet: seed/ops by owner even if the per-id cache read the raw 'real'. */
+      if ((rec.ownerFleet === true || profileLooksSeed(rec)) !== wantSeed) return;
+      var name = String(rec.displayName || rec.handle || "").trim();
       if (!name) return;
       var tags = terms([rec.field, rec.industry, rec.headline, rec.bio, rec.interests].join(" "));
       var shared = interests.filter(function (phrase) {
         var words = terms(phrase);
         return words.length && words.every(function (t) { return tags.indexOf(t) >= 0; });
       });
-      out.push({
-        id: "pro-know-" + rec.id,
-        type: PRO.KNOW,
+      people.push({
         profileId: rec.id,
         record: rec,
         handle: String(rec.handle || "").replace(/^@/, ""),
-        title: name,
-        body: rec.headline || rec.bio || "A professional page on Cognation.",
-        why: shared.length ? "Shares your interest: " + shared[0] : "A professional page you don't follow yet.",
-        rating: "G",
-        minAge: 13,
+        name: name,
+        jobTitle: proJobTitle(rec),
+        shared: shared[0] || "",
         score: shared.length,
       });
     });
-    out.sort(function (a, b) { return b.score - a.score; });
-    /* Live site: zero real professional pages means no "you might know" card at
-       all (never the fallback). The fallback stays only for the signed-out local
-       preview, unchanged from main. */
-    if (!out.length && !liveSignedIn()) {
-      out.push(proPlaceholder(PRO.KNOW, "pro-know-placeholder", "Professionals you might know",
-        "Professional pages that match your field show here once real pages connect.",
-        "Matched by shared field and interests only.", 13));
+    people.sort(function (a, b) { return b.score - a.score; });
+    /* Zero real professional pages: no "you might know" card at all (no placeholder). */
+    if (!people.length) return [];
+    /* One card, up to 3 people (Alexa 2026-10-22 11:49 AM CT: "maybe 3 people you might
+       know on one card"). Fewer real matches: fewer rows. Never padded. */
+    var rows = people.slice(0, PRO_KNOW_MAX);
+    return [{
+      id: "pro-know-" + rows.map(function (r) { return r.profileId; }).join("-"),
+      type: PRO.KNOW,
+      title: "Professionals you might know",
+      people: rows,
+      /* Designer v2 (2026-10-22): one fixed why-line; the heading stays the type mark. */
+      why: "Matched to your field and interests.",
+      rating: "G",
+      minAge: 13,
+      keepOnly: true,
+    }];
+  }
+
+  var PRO_KNOW_MAX = 3;
+
+  /* Job title from the Pro page (Alexa 2026-10-22 11:49 AM CT: "this persons name - job
+     title software eng"). public.profiles has no job title column today
+     (id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id), so live rows
+     show the name only. Only an explicit job title field counts; bio is never used. */
+  function proJobTitle(rec) {
+    var t = rec ? rec.jobTitle || rec.job_title || "" : "";
+    return String(t).replace(/\s+/g, " ").trim().slice(0, 80);
+  }
+
+  function proKnowRowLabel(row) {
+    return row.jobTitle ? row.name + " \u00b7 " + row.jobTitle : row.name;
+  }
+
+  /* Designer v2: the name on its own line, then the job title (only when the row has
+     one, from profiles.job_title, #236) on a second line, one line max with an ellipsis.
+     Rows without a title stay one line. The full "Name · Title" is the accessible name. */
+  function proKnowRowInnerHtml(row) {
+    var html = '<span class="commune-pro-know-text">' +
+      '<span class="commune-pro-know-person">' + escapeHtml(row.name) + "</span>";
+    if (row.jobTitle) {
+      html += '<span class="commune-pro-know-title" data-pro-know-title title="' + escapeHtml(row.jobTitle) + '">' +
+        escapeHtml(row.jobTitle) + "</span>";
     }
-    return out;
+    return html + "</span>";
   }
 
   function professionalCardAllowed(card) {
@@ -1552,53 +1773,63 @@
     return true;
   }
 
+  /* Auction cards appear only when a real auction is scheduled on the Cognation
+     Professional Tower page (Alexa 2026-10-22). No server source holds an auction
+     schedule yet (classroom_sessions.kind allows only classroom / webinar), so the
+     lane is empty and no Auction card renders. */
+  function scheduledAuctionCards() {
+    return [];
+  }
+
+  function researchRoomCards() {
+    var api = window.CognationResearchRoom;
+    if (!api || typeof api.cards !== "function" || !hasInterest(["research"])) return [];
+    return api.cards();
+  }
+
   function buildProfessionalLanes() {
-    var field = viewerField();
-    var fieldName = field || "your field";
-    var fieldWhy = field ? "Matches the field on your profile: " + field : "Add your field to your profile to tune this.";
-    var interests = viewerInterestPhrases();
     var lanes = {};
-    lanes[PRO.WEBINAR] = PRO_WEBINARS.map(function (w) {
-      return proPlaceholder(PRO.WEBINAR, w.id, w.title, w.body, "Cognation-hosted. Every Professional deck sees it.");
-    });
+    /* Webinar cards only while a Professional page is live. None live: lane empty. */
+    lanes[PRO.WEBINAR] = liveWebinarCards();
     lanes[PRO.KNOW] = professionalsYouMightKnow();
-    lanes[PRO.RESEARCH] = (interests.length ? interests : [""]).map(function (t) {
-      return proPlaceholder(PRO.RESEARCH, "pro-research-" + (slug(t) || "general"),
-        t ? "Research papers: " + t : "Research papers by interest",
-        "Papers matched to " + (t ? "\u201c" + t + "\u201d" : "the interests on your profile") + " show here once a research feed connects.",
-        t ? "Matches your interest: " + t : "Add interests to your profile to tune this.");
-    });
-    lanes[PRO.AUCTION] = [proPlaceholder(PRO.AUCTION, "pro-auction-weekly", "Weekly Cognation webinar + bot auction",
-      "Each week Cognation hosts a webinar, then a bot auction on starter projects for sale.",
-      "Weekly Cognation event. Same card for everyone 18+.", 18)];
+    lanes[PRO.AUCTION] = scheduledAuctionCards();
     lanes[PRO.PODCAST] = PRO_PODCASTS.map(function (w) {
-      return proPlaceholder(PRO.PODCAST, w.id, w.title, w.body, "Picked by topic: ethics, async work, continuing education.");
+      return { id: w.id, type: PRO.PODCAST, title: w.title, body: w.body,
+        why: "Picked by topic: ethics, async work, continuing education.", rating: "G", minAge: 0, keepOnly: true };
     });
-    lanes[PRO.FIELD] = [proPlaceholder(PRO.FIELD, "pro-field-" + (slug(field) || "general"), "Field update: " + fieldName,
-      "News and changes in " + fieldName + " show here once a field feed connects.", fieldWhy)];
-    lanes[PRO.POP] = [proPlaceholder(PRO.POP, "pro-popculture-" + (slug(field) || "general"), "Pop culture \u00d7 " + fieldName,
-      "Pop-culture moments that touch " + fieldName + " show here once a feed connects.", fieldWhy)];
+    /* Research chat only if this person lists research. Field and Pop culture stay empty. */
+    lanes[PRO.RESEARCH] = researchRoomCards();
+    lanes[PRO.FIELD] = [];
+    lanes[PRO.POP] = [];
     Object.keys(lanes).forEach(function (type) {
       lanes[type] = omitPassed(lanes[type].filter(professionalCardAllowed));
     });
     return lanes;
   }
 
-  /** Strict 1:1 round-robin across Professional types that have cards. */
+  /** Strict 1:1 round-robin across Professional types that have cards. Real cards
+      only, each once: an empty lane is skipped, and a lane that runs out drops out
+      of the rotation, so the deck never repeats or spins on missing data. */
   function paceProfessional(lanes, count) {
     var out = [];
     var cursors = {};
     var live = PRO_ORDER.filter(function (t) { return lanes && lanes[t] && lanes[t].length; });
     var target = count || 18;
-    for (var n = 0; live.length && out.length < target; n++) {
-      var type = live[n % live.length];
+    var at = 0; /* position in `live`; an exhausted lane is removed and the next lane takes its turn */
+    while (live.length && out.length < target) {
+      if (at >= live.length) at = 0;
+      var type = live[at];
       var list = lanes[type];
       var i = cursors[type] || 0;
+      if (i >= list.length) {
+        live.splice(at, 1);
+        continue;
+      }
       cursors[type] = i + 1;
-      var card = clone(list[i % list.length]);
+      var card = clone(list[i]);
       card.type = type;
-      if (i >= list.length) card.id = String(card.id) + "-r" + i;
       out.push(card);
+      at += 1;
     }
     return out;
   }
@@ -1648,6 +1879,8 @@
       case TYPE.KNOW: return "People you may know";
       case TYPE.DATING: return "Dating";
       case TYPE.CONTENT: return "Content";
+      case TYPE.MARKET: return "Marketplace";
+      case TYPE.GROUP: return "Group";
       default: return "Echo";
     }
   }
@@ -1873,22 +2106,48 @@
       el.setAttribute("data-professional-handle", card.handle);
     }
     el.setAttribute("tabindex", "0");
+    if (card.live && (card.type === TYPE.CLASSROOM || card.type === PRO.WEBINAR)) {
+      el.innerHTML = liveSessionCardHtml(card);
+      el.classList.add("commune-card--live-session");
+      el.setAttribute("data-live-session-card", "");
+      if (PRO_MARK[card.type]) el.setAttribute("data-professional-card", "");
+      return el;
+    }
     var html = '<p class="commune-card-kicker">' + escapeHtml(typeLabel(card.type)) + "</p>";
     if (PRO_MARK[card.type]) {
       el.setAttribute("data-professional-card", "");
       var badge = "";
-      if (card.demo) {
-        badge = '<span class="seedops-demo-badge" data-account-kind="placeholder" title="Placeholder card until a real feed connects.">' + DEMO_LABEL + "</span>";
-      } else if (card.record && window.CognationSeedOpsBadge && window.CognationSeedOpsBadge.badgeHtml) {
+      if (card.record && window.CognationSeedOpsBadge && window.CognationSeedOpsBadge.badgeHtml) {
         try { badge = window.CognationSeedOpsBadge.badgeHtml(card.record) || ""; } catch (eB) { badge = ""; }
       }
       html = '<div class="commune-card-kicker commune-pro-kicker"><span class="commune-type-mark" data-type-mark="' +
         escapeHtml(card.type.replace(/^pro-/, "")) + '">' + escapeHtml(PRO_MARK[card.type]) + "</span>" + badge + "</div>";
-      html += '<h4 class="commune-card-title">' + escapeHtml(card.title || "") + "</h4>";
+      /* The people card's type mark already reads "Professionals you might know". */
+      if (!card.people) html += '<h4 class="commune-card-title">' + escapeHtml(card.title || "") + "</h4>";
       if (card.body) html += '<p class="commune-card-body">' + escapeHtml(card.body) + "</p>";
+      if (card.type === PRO.KNOW && card.people && card.people.length) {
+        html += '<ul class="commune-pro-know-list" data-pro-know-list>';
+        card.people.forEach(function (row, i) {
+          var badgeRow = "";
+          if (row.record && window.CognationSeedOpsBadge && window.CognationSeedOpsBadge.badgeHtml) {
+            try { badgeRow = window.CognationSeedOpsBadge.badgeHtml(row.record) || ""; } catch (eBR) { badgeRow = ""; }
+          }
+          html += '<li class="commune-pro-know-row">';
+          if (row.handle) {
+            html += '<button type="button" class="commune-pro-know-open" data-pro-know-open="' + i + '" data-pro-know-handle="' +
+              escapeHtml(row.handle) + '" aria-label="' + escapeHtml(proKnowRowLabel(row)) + '">' + proKnowRowInnerHtml(row) +
+              '<span class="commune-pro-know-chevron" aria-hidden="true">\u203a</span></button>';
+          } else {
+            html += '<span class="commune-pro-know-name">' + proKnowRowInnerHtml(row) + "</span>";
+          }
+          html += badgeRow + "</li>";
+        });
+        html += "</ul>";
+      }
       if (card.why) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
-      if (card.type === PRO.KNOW && card.handle) {
-        html += '<button type="button" class="btn btn-secondary" data-commune-open-profile>Open their page</button>';
+      if (card.type === PRO.RESEARCH) {
+        html += '<button type="button" class="btn btn-primary" data-research-enter>Enter Research</button>';
+        if (card.full) html += '<p class="commune-card-meta">Full — another Research card is open.</p>';
       }
       el.innerHTML = html;
       return el;
@@ -1911,6 +2170,7 @@
       if (card.fromName) html += '<p class="commune-card-meta">' + escapeHtml(card.fromName) + "</p>";
       if (card.videoUrl) html += videoHtml(card.videoUrl);
       if (card.body) html += '<p class="commune-card-body">' + escapeHtml(card.body) + "</p>";
+      if (card.type === TYPE.MARKET) html += marketCardHtml(card);
       if (card.type === TYPE.AD && card.handle) {
         html += '<button type="button" class="btn btn-secondary" data-commune-open-profile>Open their page</button>';
         html += '<p class="commune-card-meta">Book on the calendar, or follow this professional page.</p>';
@@ -1926,8 +2186,14 @@
         }
       }
       if (card.type === TYPE.CLASSROOM) {
-        html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
-        html += '<p class="commune-card-meta">Life skills · ~18+</p>';
+        var cast = window.CognationLive && window.CognationLive.professionalBroadcast && window.CognationLive.professionalBroadcast();
+        if (cast) {
+          html += '<p class="commune-card-meta">' + escapeHtml(cast.name) + " is live</p>";
+          html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Join live</button>';
+        } else {
+          html += '<button type="button" class="btn btn-primary" data-commune-enter-classroom>Open session</button>';
+          html += '<p class="commune-card-meta">Life skills · ~18+</p>';
+        }
       }
       if (card.type === TYPE.CONTENT) html += '<span class="commune-card-badge">Live</span>';
       if (card.type === TYPE.AD) html += '<span class="commune-card-badge commune-card-badge--ad">Ad</span>';
@@ -1936,7 +2202,76 @@
     return el;
   }
 
+  function clockLabel(ms) {
+    if (!ms) return "";
+    try { return new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; }
+  }
+
+  /* Live Classroom / Webinar card (Designer comp classroom-live): LIVE pill, host link
+     to their Tower, silent join (camera and mic off). Same card size as the deck. */
+  function liveSessionCardHtml(card) {
+    var webinar = card.type === PRO.WEBINAR;
+    var kindLabel = webinar ? "Webinar" : "Classroom";
+    var host = String(card.host || card.handle || "").trim();
+    var badge = "";
+    if (card.record && window.CognationSeedOpsBadge && window.CognationSeedOpsBadge.badgeHtml) {
+      try { badge = window.CognationSeedOpsBadge.badgeHtml(card.record) || ""; } catch (eB) { badge = ""; }
+    }
+    var started = clockLabel(card.startsAt);
+    var ends = clockLabel(card.endsAt);
+    var avatar = card.photoUrl
+      ? '<img class="commune-live-avatar" src="' + escapeHtml(card.photoUrl) + '" alt="" width="44" height="44" loading="lazy">'
+      : '<span class="commune-live-avatar commune-live-avatar--blank" aria-hidden="true">' + escapeHtml((host || "?").charAt(0).toUpperCase()) + "</span>";
+    var html = '<div class="commune-live-head">' +
+      '<span class="cgn-live-pill"><i class="cgn-live-dot" aria-hidden="true"></i>LIVE</span>' +
+      '<span class="commune-live-kind" data-live-kind="' + (webinar ? "webinar" : "classroom") + '">' + kindLabel + "</span>" +
+      badge +
+      (started ? '<span class="commune-live-started">Started ' + escapeHtml(started) + "</span>" : "") +
+      "</div>";
+    html += '<h4 class="commune-card-title commune-live-title">' + escapeHtml(card.title || "") + "</h4>";
+    if (card.handle) {
+      html += '<a class="commune-live-host" href="#tower-profile-' + escapeHtml(card.handle) + '" data-live-host-link>' + avatar +
+        '<span class="commune-live-host-text"><span class="commune-live-host-name">' + escapeHtml(host || card.handle) + "</span>" +
+        '<span class="commune-live-host-sub">Professional · <span class="commune-live-host-cta">View Tower ›</span></span></span></a>';
+    }
+    html += '<p class="commune-live-meta"><span>Open seats · no cap</span>' +
+      (ends ? '<span aria-hidden="true">|</span><span>Ends about ' + escapeHtml(ends) + "</span>" : "") + "</p>";
+    html += '<button type="button" class="btn btn-primary commune-live-join" data-live-session-join>Join ' + kindLabel.toLowerCase() + "</button>";
+    html += '<p class="commune-live-quiet">Join quietly · camera and mic off</p>';
+    html += '<p class="commune-live-foot">Leaves ECHO when the session ends</p>';
+    return html;
+  }
+
+  /* Join = the silent classroom room (no camera, no mic). Real video waits on spend approval. */
+  function joinLiveSession(card) {
+    if (!card) return false;
+    if (card.type === TYPE.CLASSROOM) return openClassroom(card.id, true);
+    if (!state.shell) return false;
+    closeRoom();
+    paintClassroom({ id: card.id, title: card.title, body: card.body, topic: "" });
+    return true;
+  }
+
+  function openLiveSession(profileId, kind) {
+    var cards = kind === "webinar" ? liveWebinarCards() : classroomCatalog();
+    var card = cards.filter(function (c) { return c.profileId === String(profileId || ""); })[0];
+    if (!card) return false;
+    if (kind === "webinar") card.type = PRO.WEBINAR;
+    return joinLiveSession(card);
+  }
+
   function bindCard(el, card) {
+    var liveJoin = el.querySelector("[data-live-session-join]");
+    if (liveJoin) liveJoin.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      joinLiveSession(card);
+    });
+    var hostLink = el.querySelector("[data-live-host-link]");
+    if (hostLink) hostLink.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      openProfessionalPage(card);
+    });
     var range = el.querySelector("input[data-dating-rate]");
     var out = el.querySelector("[data-dating-rate-output]");
     if (range) {
@@ -1956,6 +2291,16 @@
       range.addEventListener("input", commit);
       range.addEventListener("change", commit);
     }
+    var bidBtn = el.querySelector("[data-market-bid]");
+    if (bidBtn) bidBtn.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!optInToBid(card.id)) return;
+      bidBtn.textContent = "Opted in";
+      bidBtn.setAttribute("aria-pressed", "true");
+      var note = el.querySelector("[data-market-bid-note]");
+      if (note) note.textContent = "You're opted in to bid. Nothing is charged.";
+    });
     var sim = el.querySelector("[data-commune-enter-sim]");
     if (sim) sim.addEventListener("click", function (ev) { ev.stopPropagation(); openRoom(card.id, true); });
     var enterClass = el.querySelector("[data-commune-enter-classroom]");
@@ -1965,6 +2310,11 @@
     });
     var open = el.querySelector("[data-commune-open-profile]");
     if (open) open.addEventListener("click", function (ev) { ev.stopPropagation(); openProfessionalPage(card); });
+    Array.prototype.forEach.call(el.querySelectorAll("[data-pro-know-open]"), function (btn) {
+      var row = card.people && card.people[Number(btn.getAttribute("data-pro-know-open"))];
+      if (!row) return;
+      btn.addEventListener("click", function (ev) { ev.stopPropagation(); openProfessionalPage(row); });
+    });
     if (card.type === TYPE.CLASSROOM) {
       wireClassroomCardClick(el, card, openClassroom);
     } else if (card.type === PRO.AUCTION) {
@@ -1973,6 +2323,15 @@
     /* Alexa's rule: an ECHO card opens its own full-screen window or a Tower profile, nothing else. */
     if (card.type === TYPE.CHAT) {
       wireClassroomCardClick(el, card, function () { openRoom(card.id, true); });
+    }
+    if (card.type === PRO.RESEARCH) {
+      var openResearch = function () {
+        var api = window.CognationResearchRoom;
+        if (api && api.open) api.open(card.id);
+      };
+      var researchBtn = el.querySelector("[data-research-enter]");
+      if (researchBtn) researchBtn.addEventListener("click", function (ev) { ev.stopPropagation(); openResearch(); });
+      wireClassroomCardClick(el, card, openResearch);
     }
     if ((card.type === TYPE.KNOW || card.type === TYPE.FRIEND) && (card.profileId || card.handle)) {
       el.setAttribute("data-commune-opens-profile", "");
@@ -1983,6 +2342,8 @@
       el.setAttribute("data-commune-opens-profile", "");
       wireClassroomCardClick(el, card, function () { openProfessionalPage(card); });
     }
+    var groups = window.CognationEchoGroups;
+    if (groups && typeof groups.bind === "function") groups.bind(el, card);
     if (card.type === TYPE.AD && card.handle) {
       el.addEventListener("click", function (ev) {
         if (ev.target.closest("button, a, input, video, iframe")) return;
@@ -2291,8 +2652,8 @@
         escapeHtml(uid) +
         '">Report</button>';
     var blockBtn =
-      '<button type="button" class="news-report-option" data-commune-room-block data-author-user-id="' +
-      escapeHtml(uid) +
+      '<button type="button" class="news-report-option" data-commune-room-block data-message-id="' +
+      escapeHtml(mid) +
       '">Block</button>';
     return (
       '<button type="button" class="commune-room-more" data-commune-room-more aria-haspopup="true" aria-expanded="false" aria-label="More for this message">⋯</button>' +
@@ -2830,6 +3191,7 @@
     closeClassroom();
     releaseRoomSurface();
     if (!paintCardView("auction", card, card.why || "")) return false;
+    if (window.CognationAuctionRoom) window.CognationAuctionRoom.mount(roomEl(), card, getMemberAge());
     state.auctionId = card.id;
     friction("begin", "auction", "auction:" + card.id);
     if (scroll && state.shell.scrollIntoView) state.shell.scrollIntoView({ block: "center" });
@@ -2845,7 +3207,7 @@
 
   function paintClassroom(session) {
     var notesText =
-      "Honest thin session: Cognation hosts short life-skills webinars here (insurance, voting, business). Full curriculum arrives later — this seat is real.";
+      "Live session on this Professional page.";
     if (paintCardView("classroom", {
       title: session && session.title || "Classroom",
       body: (session && session.topic ? "Topic · " + session.topic + " — " : "") + (session && session.body || CLASSROOM_BODY),
@@ -2864,7 +3226,7 @@
     if (body) body.textContent = session.body || CLASSROOM_BODY;
     if (notes) {
       notes.textContent =
-        "Honest thin session: Cognation hosts short life-skills webinars here (insurance, voting, business). Full curriculum arrives later — this seat is real.";
+        "Live session on this Professional page.";
     }
     showClassroom(true);
     state.classroomId = session.id;
@@ -2902,10 +3264,18 @@
       setStatus("Classroom is for members 18+. Update your age in your profile to join.");
       return false;
     }
+    var cast = window.CognationLive && window.CognationLive.professionalBroadcast && window.CognationLive.professionalBroadcast();
+    if (cast && cast.handle) {
+      var tab = document.getElementById("tab-tower");
+      if (tab) tab.click();
+      if (window.CognationTowerOpenProfile) window.CognationTowerOpenProfile(cast.handle);
+      if (window.CognationLive.open) window.CognationLive.open();
+      return true;
+    }
     var sessions = classroomCatalog();
     var session = null;
     sessions.forEach(function (item) { if (item.id === sessionId) session = item; });
-    if (!session && sessions.length) session = sessions[0];
+    /* Only the live page that was tapped. A page that went offline opens nothing. */
     if (!session) return false;
     /* Signed in + 18+: a real live classroom (join_chat_room, messages, members). */
     if (state.shell && liveChatEligible() && session.sqlId) {
@@ -2950,20 +3320,28 @@
     }
     if (!card) {
       var roomsOpen = ensureSiteRooms().length;
+      /* Designer v2: deck end is a centered two-line note; Pass / Keep and the status
+         line ("Passed …") hide until a card is back (is-deck-end on the shell). */
+      if (state.shell) state.shell.classList.add("is-deck-end");
+      setStatus("");
       var empty =
-        '<p class="commune-swipe-empty">You\'re caught up.</p>' +
+        '<div class="commune-swipe-end" data-commune-deck-end>' +
+        '<p class="commune-swipe-empty commune-swipe-end-title">You\'re caught up.</p>' +
+        '<p class="commune-swipe-end-sub">New cards show up as people share.</p>' +
         (liveBirthMissing()
           ? '<p class="commune-swipe-empty commune-swipe-empty--rooms" data-commune-birth-needed>Chat rooms (13+) and classrooms (18+) need your birth year and month. Only the month and year are saved.</p>' +
             '<p class="commune-swipe-empty"><button type="button" class="btn btn-primary" data-commune-add-birth>Add birth month</button></p>'
           : roomsOpen
             ? ''
-            : '<p class="commune-swipe-empty commune-swipe-empty--rooms">No chat rooms match your age and interests yet. Update age or interests in your profile, then come back.</p>');
+            : '<p class="commune-swipe-empty commune-swipe-empty--rooms">No chat rooms match your age and interests yet. Update age or interests in your profile, then come back.</p>') +
+        "</div>";
       state.deck.innerHTML = empty;
       var addBirth = state.deck.querySelector("[data-commune-add-birth]");
       if (addBirth) addBirth.addEventListener("click", openBirthPrompt);
       syncActionLabels();
       return;
     }
+    if (state.shell) state.shell.classList.remove("is-deck-end");
     var el = renderCard(card);
     state.deck.appendChild(el);
     bindCard(el, card);
@@ -2971,6 +3349,8 @@
   }
 
   function refill() {
+    /* The browser-only "X is live" card from live-stubs.js is gone; live Classroom /
+       Webinar cards come only from real live sessions, inside the 1:1 mix. */
     state.cards = sampleDeck(12);
     state.index = 0;
   }
@@ -3229,15 +3609,16 @@
     }
     if (PRO_MARK[card.type]) {
       like(card);
-      if (card.type === PRO.KNOW && card.profileId && !card.demo) {
+      if (card.type === PRO.KNOW && card.profileId && !card.people) {
         if (!isFollowing(card.profileId)) toggleFollow(card.profileId);
         setStatus("Following this professional page.");
       } else {
-        if (!card.demo) {
+        /* Podcast cards have no episode to share yet: Keep only keeps (as on main). */
+        if (!card.keepOnly) {
           confirmInterestTags(card);
           recordShare(card);
         }
-        setStatus(card.demo ? "Kept." : "Shared with friends · interest confirmed.");
+        setStatus(card.keepOnly ? "Kept." : "Shared with friends · interest confirmed.");
       }
       friction("complete", pathway);
       return;
@@ -3441,13 +3822,9 @@
       if (blockBtn && roomPanel.contains(blockBtn)) {
         ev.preventDefault();
         ev.stopPropagation();
-        var blockUid = blockBtn.getAttribute("data-author-user-id");
-        if (!blockUid) return;
-        blockBtn.disabled = true;
-        blockLiveRoomAuthor(blockUid).then(function (res) {
-          if (!res || !res.ok) blockBtn.disabled = false;
-          else blockBtn.textContent = "Blocked";
-        });
+        var blockMid = blockBtn.getAttribute("data-message-id");
+        if (!blockMid) return;
+        hideLiveMessageLocally(blockMid);
         return;
       }
       var reportBtn = ev.target && ev.target.closest("[data-commune-room-report]");
@@ -3549,6 +3926,7 @@
     state.deck = shell.querySelector("[data-commune-deck]");
     state.statusEl = shell.querySelector("[data-commune-swipe-status]");
     bindInteractions(shell);
+    liveSignature = liveSessionsSignature();
     rebuildDeck();
     document.addEventListener("cognation:session-started", function () {
       refreshSeedGates().then(function () { rebuildDeck(); });
@@ -3557,7 +3935,24 @@
       syncDatingVisibility();
       rebuildDeck();
     });
+    document.addEventListener("cognation:tower-updated", function () { rebuildDeck(); });
+    document.addEventListener("cognation:echo-group-notice", function () { renderNotices(); });
+    document.addEventListener("cognation:classroom-sessions-updated", onLiveSessionsUpdated);
     refreshSeedGates();
+  }
+
+  /* A session going live or ending rebuilds the deck, so its card shows only while
+     live. Waits while a room or classroom is open; the next update catches up. */
+  var liveSignature = "";
+  function liveSessionsSignature() {
+    return liveProPages().map(function (p) { return p.profileId + ":" + (p.sessionId || "") + ":" + (p.sessionKind || ""); }).sort().join("|");
+  }
+  function onLiveSessionsUpdated() {
+    var sig = liveSessionsSignature();
+    if (sig === liveSignature) return;
+    if (state.roomId || state.classroomId) return;
+    liveSignature = sig;
+    rebuildDeck();
   }
 
   window.CognationCommuneSwipe = {
@@ -3570,6 +3965,10 @@
     wireClassroomCardClick: wireClassroomCardClick,
     closeClassroom: closeClassroom,
     classroomCatalog: classroomCatalog,
+    liveWebinarCards: liveWebinarCards,
+    liveSessionCardHtml: liveSessionCardHtml,
+    openLiveSession: openLiveSession,
+    liveProPages: liveProPages,
     visibleClassroomSessions: visibleClassroomSessions,
     classroomAllowed: classroomAllowed,
     getFollows: getFollows,
@@ -3619,10 +4018,15 @@
     paceDeck: paceDeck,
     sampleDeck: sampleDeck,
     settleSwipe: settleSwipe,
+    renderCard: renderCard,
+    bindCard: bindCard,
     omitPassed: omitPassed,
     sendPersonalFriendRequest: sendPersonalFriendRequest,
     publicEvents: publicEvents,
     towerLiveContentCards: towerLiveContentCards,
+    marketplaceCards: marketplaceCards,
+    marketCanBid: marketCanBid,
+    optInToBid: optInToBid,
     featuredFamily: featuredFamily,
     getMode: getMode,
     setMode: setMode,

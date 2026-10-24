@@ -143,8 +143,8 @@ Do **not** script a loop that auto-fills to 1000. Stop at 250 unless Alexa unloc
 `seedops-bind-auth.mjs` then:
 
 1. Looks up each deterministic UUID via Auth Admin API.
-2. **Updates** password + `email_confirm` + seedops `app_metadata` / `user_metadata` (or **creates** the user if the stub is missing and `--no-create` was not set).
-3. Best-effort stamps `profiles.account_kind` / `seed_fleet_id` / handle / display_name via service-role REST.
+2. **Updates** password + `email_confirm` + seedops `app_metadata` / `user_metadata` (or **creates** the user if the stub is missing and `--no-create` was not set). A **created** user gets a neutral `user_metadata.handle` (`fleet_<12 hex of the user id>`), never a `seed-`/`seed_`/`ops-`/`ops_` handle, because the signup trigger copies it into the new profile and those prefixes are reserved (`20261020_reserved_handle_prefix.sql`).
+3. Stamps `profiles.account_kind` / `seed_fleet_id` / handle / display_name via service-role REST. This is where the `seed-…` / `ops-…` handle is set. A failed stamp is reported as a failure, so a re-run fixes it.
 
 Signup trigger `create_profile_for_new_user` may create the personal profile on first auth insert; wave provision / bind script then stamps SeedOps fields.
 

@@ -19,6 +19,13 @@ assert.ok(/revoke select \(email\) on public\.profiles from anon, authenticated;
 var listMatch = code.match(/allowed text\[\] := array\[([\s\S]*?)\];/);
 assert.ok(listMatch, "explicit grant list present");
 var granted = listMatch[1].match(/'([a-z_]+)'/g).map(function (s) { return s.slice(1, -1); });
+/* Columns added later with their own public read grant (e.g. 20261016 photo_url). */
+var grantedLater = [];
+fs.readdirSync(path.join(root, "supabase/migrations")).forEach(function (f) {
+  var later = src("supabase/migrations/" + f).replace(/--[^\n]*/g, "");
+  var g, re = /grant select \(([a-z_]+)\) on public\.profiles to anon, authenticated;/g;
+  while ((g = re.exec(later))) if (g[1] !== "email") grantedLater.push(g[1]);
+});
 assert.strictEqual(granted.indexOf("email"), -1, "email is never granted");
 assert.ok(/grant select \(%I\) on public\.profiles to anon, authenticated/.test(code), "grants per column");
 assert.ok(!/grant select on public\.profiles to/.test(code), "no table-level re-grant outside rollback notes");
@@ -43,16 +50,17 @@ clientFiles.forEach(function (rel) {
   assert.ok(selected[c], "fixture sanity: code selects " + c);
 });
 Object.keys(selected).forEach(function (c) {
-  assert.ok(granted.indexOf(c) !== -1, "column " + c + " selected in " + selected[c] + " is granted");
+  assert.ok(granted.indexOf(c) !== -1 || grantedLater.indexOf(c) !== -1, "column " + c + " selected in " + selected[c] + " is granted");
 });
 assert.ok(!selected.email, "no client select of profiles.email");
 
 /* PATCH/POST with return=representation must not fall back to select=*. */
 var social = src("js/supabase-social.js");
-assert.ok(/var PROFILE_RETURN_COLUMNS = "id,user_id,kind,handle,display_name,bio";/.test(social));
+/* account_kind / seed_fleet_id added for seed/ops badges by account field (both granted). */
+assert.ok(/var PROFILE_RETURN_COLUMNS = "id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id";/.test(social));
 assert.ok(/method: "PATCH",[\s\S]{0,260}"&select=" \+ PROFILE_RETURN_COLUMNS/.test(social), "profile PATCH selects explicit columns");
 assert.ok(/rest\("profiles", \{\s*method: "POST",\s*query: "select=" \+ PROFILE_RETURN_COLUMNS/.test(social), "profile POST selects explicit columns");
-"id,user_id,kind,handle,display_name,bio".split(",").forEach(function (c) {
+"id,user_id,kind,handle,display_name,bio,account_kind,seed_fleet_id".split(",").forEach(function (c) {
   assert.ok(granted.indexOf(c) !== -1, "return column " + c + " granted");
 });
 

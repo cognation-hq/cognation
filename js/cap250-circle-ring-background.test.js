@@ -43,7 +43,7 @@ assert.ok(/list\.classList\.add\("is-empty"\)/.test(relations), "empty list flag
 assert.ok(/\.circle-relations\.is-empty[\s\S]*?display:\s*none/.test(css), "empty list hidden so ring is the empty state");
 
 /* Hydrate still fills spots when lines exist */
-assert.ok(/peopleForSpots/.test(relations) && /fillRingSpots\(peopleForSpots\(lines\)\)/.test(relations), "hydrate fills spots from lines");
+assert.ok(/peopleForSpots/.test(relations) && !/fillRingSpots\(peopleForSpots\(lines\)\)/.test(relations), "saved lines do not fill ring spots");
 assert.ok(typeof relApi.peopleForSpots === "function", "peopleForSpots exported");
 
 var sample = relApi.peopleForSpots([
@@ -71,6 +71,11 @@ var shellBlock = tower.match(/Cap 250 — Circle ring as page background[\s\S]*?
 assert.ok(shellBlock, "Cap 250 early shell path present");
 assert.ok(/shellOnly:\s*true/.test(shellBlock[0]), "shellOnly — no portrait physics");
 assert.ok(!/applyCircleTopics/.test(shellBlock[0]), "no 15-minute demo topics on shell path");
+
+/* The masthead line meets the tab bar. Section padding must not open a dark band above it. */
+var circleTabs = css.match(/body\.is-circle-open #main \.tabs-section\s*\{[\s\S]*?\n\}/);
+assert.ok(circleTabs, "circle tabs-section rule present");
+assert.ok(/margin-top:\s*0\s*;/.test(circleTabs[0]) && /padding-top:\s*0\s*;/.test(circleTabs[0]), "no empty gap above the PULSE bar");
 
 /* Full-page ring — not shrunk blank panel */
 var hasRel = css.match(/\.circle-fall:has\(\[data-circle-relations\]\)\s*\{[\s\S]*?\n\}/);

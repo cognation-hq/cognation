@@ -9806,8 +9806,8 @@
     var entry = {
       id: id,
       text: text,
-      x: layout && typeof layout.x === "number" ? layout.x : 36 + Math.random() * 20,
-      y: layout && typeof layout.y === "number" ? layout.y : 30 + Math.random() * 25,
+      x: layout && typeof layout.x === "number" ? layout.x : 4,
+      y: layout && typeof layout.y === "number" ? layout.y : 2,
       z: layout && typeof layout.z === "number" ? layout.z : 10,
       tilt: layout && typeof layout.tilt === "number" ? layout.tilt : 0,
     };
@@ -9824,6 +9824,42 @@
     p.quoteStickers = quotes;
     TowerProfileStore.save(p);
     renderQuoteStickers(root, p);
+    /* A new quote used to land on a random percent of the tall canvas and sat
+       on the profile card. Seat it in a clear spot and bring that spot on screen. */
+    if (!layout && typeof keepQuoteClear === "function" && root && typeof root.querySelector === "function") {
+      var stage = root.querySelector("[data-tower-scrapbook]");
+      var el = stage && stage.querySelector('[data-tower-quote-id="' + id + '"]');
+      if (stage && el && (typeof isPhoneStage !== "function" || !isPhoneStage(stage))) {
+        el.style.setProperty("--sticker-x", "4%");
+        el.style.setProperty("--sticker-y", "8px");
+        el.setAttribute("data-sticker-x", "4");
+        el.setAttribute("data-sticker-y", "1");
+        if (keepQuoteClear(stage, el)) {
+          entry.x = parseFloat(el.getAttribute("data-sticker-x")) || entry.x;
+          entry.y = parseFloat(el.getAttribute("data-sticker-y")) || entry.y;
+          var qPx = parseFloat(el.getAttribute("data-sticker-y-px") || "");
+          if (isFinite(qPx)) entry.yPx = qPx;
+        } else {
+          entry.x = 4;
+          entry.y = 1;
+          entry.yPx = 8;
+        }
+        p.quoteStickers = getQuoteStickers(p).map(function (q) {
+          return q && q.id === id ? entry : q;
+        });
+        TowerProfileStore.save(p);
+        el.__cognationQuoteSpot = {
+          x: entry.x,
+          yCss: typeof entry.yPx === "number" ? entry.yPx + "px" : entry.y + "%",
+          yPct: entry.y,
+        };
+        el.style.setProperty("--sticker-x", entry.x + "%");
+        el.style.setProperty("--sticker-y", el.__cognationQuoteSpot.yCss);
+        if (el.scrollIntoView) {
+          try { el.scrollIntoView({ block: "center", inline: "nearest" }); } catch (eSee) {}
+        }
+      }
+    }
     return entry;
   }
 
@@ -10207,60 +10243,54 @@
     }
     if (!dlg || dlg.__cognationBound) return;
     dlg.__cognationBound = true;
+    /* Enter, or closing the box with words in it, places the quote. A blocked
+       quote stays open. Cancel and the backdrop close an empty box. */
+    function commitAddQuote() {
+      if (!isTowerOwner(TowerProfileStore.get())) return false;
+      var ta = dlg.querySelector("[data-tower-add-quote-text]");
+      var text = ta ? ta.value : "";
+      if (!String(text || "").trim()) {
+        closeAddWidgetDialog();
+        return true;
+      }
+      var added = addQuoteSticker(root, text);
+      var qStatus = dlg.querySelector("[data-tower-add-quote-status]");
+      if (added && added.blocked) {
+        /* Keep the dialog open with the words so the owner can change them. */
+        if (!qStatus && ta && ta.parentNode) {
+          qStatus = document.createElement("p");
+          qStatus.className = "commune-status is-error tower-add-quote-status";
+          qStatus.setAttribute("data-tower-add-quote-status", "");
+          qStatus.setAttribute("role", "status");
+          qStatus.setAttribute("aria-live", "polite");
+          ta.insertAdjacentElement("afterend", qStatus);
+        }
+        if (qStatus) { qStatus.hidden = false; qStatus.textContent = QUOTE_BLOCKED_MESSAGE; }
+        setProfileStatusOn(root, QUOTE_BLOCKED_MESSAGE, true);
+        return false;
+      }
+      if (qStatus) { qStatus.hidden = true; qStatus.textContent = ""; }
+      setProfileStatusOn(root, "Quote sticker added.", false);
+      closeAddWidgetDialog();
+      return true;
+    }
     dlg.addEventListener("click", function (ev) {
-      if (ev.target === dlg) closeAddWidgetDialog();
+      if (ev.target === dlg) commitAddQuote();
+    });
+    dlg.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        closeAddWidgetDialog();
+        return;
+      }
+      var box = ev.target && ev.target.closest ? ev.target.closest("[data-tower-add-quote-text]") : null;
+      if (!box || ev.key !== "Enter" || ev.shiftKey) return;
+      ev.preventDefault();
+      commitAddQuote();
     });
     var cancel = dlg.querySelector("[data-tower-add-widget-cancel]");
-    if (cancel) cancel.addEventListener("click", closeAddWidgetDialog);
-    var confirm = dlg.querySelector("[data-tower-add-quote-confirm]");
-    if (confirm) {
-      confirm.addEventListener("click", function () {
-        if (!isTowerOwner(TowerProfileStore.get())) return;
-        var ta = dlg.querySelector("[data-tower-add-quote-text]");
-        var text = ta ? ta.value : "";
-        var choice = dlg.getAttribute("data-add-choice") || "quote";
-        if (choice === "slogan") {
-          var p = TowerProfileStore.get();
-          p.slogan = String(text || "").trim().slice(0, 400);
-          p.publicWidgets = normalizePublicWidgets(p.publicWidgets);
-          p.publicWidgets.slogan = !!p.slogan;
-          TowerProfileStore.save(p);
-          applyPublicWidgets(root, p);
-          var sloganDisplay = root.querySelector("[data-tower-slogan-display]");
-          if (sloganDisplay) sloganDisplay.textContent = p.slogan;
-          var sloganInput = root.querySelector("[data-tower-slogan]");
-          if (sloganInput) sloganInput.value = p.slogan;
-          setProfileStatusOn(root, "Slogan updated.", false);
-        } else {
-          var added = addQuoteSticker(root, text);
-          var qStatus = dlg.querySelector("[data-tower-add-quote-status]");
-          if (added && added.blocked) {
-            /* Keep the dialog open with the words so the owner can change them. */
-            if (!qStatus && ta && ta.parentNode) {
-              qStatus = document.createElement("p");
-              qStatus.className = "commune-status is-error tower-add-quote-status";
-              qStatus.setAttribute("data-tower-add-quote-status", "");
-              qStatus.setAttribute("role", "status");
-              qStatus.setAttribute("aria-live", "polite");
-              ta.insertAdjacentElement("afterend", qStatus);
-            }
-            if (qStatus) { qStatus.hidden = false; qStatus.textContent = QUOTE_BLOCKED_MESSAGE; }
-            setProfileStatusOn(root, QUOTE_BLOCKED_MESSAGE, true);
-            return;
-          }
-          if (qStatus) { qStatus.hidden = true; qStatus.textContent = ""; }
-          setProfileStatusOn(root, "Quote sticker added.", false);
-        }
-        closeAddWidgetDialog();
-      });
-    }
-    dlg.querySelectorAll("[data-tower-add-choice]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        dlg.setAttribute("data-add-choice", btn.getAttribute("data-tower-add-choice") || "quote");
-        dlg.querySelectorAll("[data-tower-add-choice]").forEach(function (b) {
-          b.classList.toggle("is-selected", b === btn);
-        });
-      });
+    if (cancel) cancel.addEventListener("click", function () {
+      closeAddWidgetDialog();
     });
 
     /* Empty canvas click on personal public page → offer add */

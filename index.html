@@ -1393,18 +1393,9 @@
 
   <div class="tower-add-widget-dialog" data-tower-add-widget-dialog hidden role="dialog" aria-modal="true" aria-labelledby="tower-add-widget-title">
     <div class="tower-add-widget-dialog-card">
-      <h3 id="tower-add-widget-title" class="tower-add-widget-title">Add to scrapbook</h3>
-      <p class="form-hint">Add a quote or text sticker you can drag and resize.</p>
-      <div class="tower-add-widget-choices">
-        <button type="button" class="btn btn-primary" data-tower-add-choice="quote">Quote / text</button>
-        <button type="button" class="btn btn-secondary" data-tower-add-choice="slogan">Slogan card</button>
-      </div>
-      <label class="tower-add-widget-label" for="tower-add-quote-text">Quote text</label>
-      <textarea id="tower-add-quote-text" data-tower-add-quote-text rows="3" maxlength="400" placeholder="Type a quote or note…"></textarea>
-      <div class="form-actions">
-        <button type="button" class="btn btn-primary" data-tower-add-quote-confirm>Add sticker</button>
-        <button type="button" class="btn btn-secondary" data-tower-add-widget-cancel>Cancel</button>
-      </div>
+      <label id="tower-add-widget-title" class="tower-add-widget-title" for="tower-add-quote-text">Add to page</label>
+      <textarea id="tower-add-quote-text" data-tower-add-quote-text rows="2" maxlength="400" placeholder="Type a quote or note…"></textarea>
+      <button type="button" class="tower-add-widget-cancel" data-tower-add-widget-cancel>Cancel</button>
     </div>
   </div>
 

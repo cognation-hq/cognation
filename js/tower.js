@@ -13125,20 +13125,6 @@
       return { id: "", name: "", handle: "" };
     }
     if (form) {
-      var audienceBar = form.querySelector("[data-tower-compose-audience]");
-      if (audienceBar) {
-        audienceBar.addEventListener("click", function (ev) {
-          var btn = ev.target && ev.target.closest ? ev.target.closest("[data-tower-compose-kind]") : null;
-          if (!btn || !audienceBar.contains(btn)) return;
-          ev.preventDefault();
-          audienceBar.querySelectorAll("[data-tower-compose-kind]").forEach(function (b) {
-            var on = b === btn;
-            b.setAttribute("aria-selected", on ? "true" : "false");
-            b.classList.toggle("is-selected", on);
-            b.classList.toggle("is-active", on);
-          });
-        });
-      }
       form.addEventListener("submit", function (e) {
         e.preventDefault();
         var files = fileInput && fileInput.files ? Array.prototype.slice.call(fileInput.files) : [];

@@ -87,7 +87,9 @@ function spotsFor(people) {
   api.paint(layer, people);
   var ring = layer.children[0];
   var spin = ring.children.filter(function (c) { return c.className === "circle-ring-spin"; })[0];
-  return spin.children;
+  var kids = spin.children;
+  if (kids[0] && kids[0].className === "circle-ring-people") kids = kids[0].children;
+  return kids;
 }
 
 var two = spotsFor([{ name: "Sam", userId: "u-sam", handle: "sam" }, { name: "Jo", userId: "u-jo", handle: "jo" }]);

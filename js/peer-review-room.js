@@ -18,9 +18,9 @@
   }
   function ideas(name) {
     return [
-      { id: "a", authorId: "mina", name: "Mina", body: "In " + name + ", which handoff should stay written down?" },
-      { id: "b", authorId: "leo", name: "Leo", body: "Keep the decision in one paragraph. Drop the meeting that repeats it." },
-      { id: "c", authorId: "priya", name: "Priya", body: "Name the constraint, then try the next small change." }];
+      { id: "a", authorId: "mina", name: "Mina", body: "What is one " + name + " practice you would keep?" },
+      { id: "b", authorId: "leo", name: "Leo", body: "I would write the choice down so the next person can pick it up." },
+      { id: "c", authorId: "priya", name: "Priya", body: "A short note is enough. People in " + name + " can use that." }];
   }
   function make(key, n, name) {
     return { id: key + "-" + n, n: n, kicked: {}, camera: [], members: n === 1 ? ["mina", "leo", "priya"] : [], log: n === 1 ? ideas(name) : [] };

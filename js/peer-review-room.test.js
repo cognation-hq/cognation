@@ -22,13 +22,13 @@ function boot(field, interests, age) {
   return { api: load(local, session).CognationCommuneSwipe, local: local };
 }
 var src = fs.readFileSync(path.join(root, "js/peer-review-room.js"), "utf8");
-assert.ok(!/getUserMedia|RTCPeerConnection/.test(src) && /no presenter/.test(src) && /no calendar/.test(src) && /data-peer-report/.test(src));
-var miss = boot("Law", ["nursing"], 30);
+assert.ok(!/getUserMedia|RTCPeerConnection|software engineering/i.test(src) && /no presenter/.test(src) && /no calendar/.test(src) && /data-peer-report/.test(src));
+var miss = boot("Law", [], 30);
 assert.ok(miss.api.sampleDeck(8).every(function (c) { return c.type !== "pro-peer-review"; }), "hidden without the interest");
 miss.api.settleSwipe({ id: "peer-stray", type: "pro-peer-review", peerReview: true, field: "Law", interest: "law" }, "left");
 assert.ok(JSON.parse(miss.local.getItem("cognation.commune.swipe.dismissed.v1")).ada.indexOf("peer-stray") >= 0, "left swipe passes it");
-var hit = boot("Software engineering", ["software engineering"], 30), deck = hit.api.sampleDeck(8);
-assert.strictEqual(deck[0].type, "pro-peer-review");
+var hit = boot("Nursing", ["nursing"], 30), deck = hit.api.sampleDeck(8);
+assert.strictEqual(deck[0].type + ":" + deck[0].field, "pro-peer-review:Nursing");
 hit.api.settleSwipe(deck[0], "left");
 assert.ok(hit.api.sampleDeck(8).every(function (c) { return c.id !== deck[0].id; }));
 var local = mem(), api = load(local, mem()).CognationPeerReview, i;

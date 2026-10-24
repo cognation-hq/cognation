@@ -1832,7 +1832,7 @@
     if ((mode || getMode()) === MODE.PROFESSIONAL) {
       var deck = paceProfessional(buildProfessionalLanes(), count || 18);
       var peer = window.CognationPeerReview, interests = viewerInterestPhrases();
-      var extra = peer && peer.cards ? omitPassed((peer.cards({ field: viewerField(), interests: interests, age: getMemberProfile().age }) || []).filter(function (c) {
+      var extra = peer && peer.cards ? omitPassed((peer.cards({ field: interests[0] || "", interests: interests, age: getMemberProfile().age }) || []).filter(function (c) {
         return !peer.forInterest || peer.forInterest(c, interests);
       })) : [];
       return extra.length ? extra.concat(deck).slice(0, count || 18) : deck;

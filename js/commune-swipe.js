@@ -158,6 +158,7 @@
   PRO_MARK[PRO.EXECUTIVES] = "Executives";
   PRO_MARK[PRO.MOGUL] = "Mogul";
   PRO_MARK[PRO.CREATOR] = "Content Creator";
+  PRO_MARK["pro-college"] = "College programs";
   /* Podcast cards stay, with no Demo badge (Alexa 2026-10-22 11:46 AM CT, via SeedOps:
      "this will also be a card when cognation goes live but doesnt need to be a demo"). */
   var PRO_PODCASTS = [
@@ -2115,6 +2116,17 @@
           deck.push(card);
         });
       }
+      var college = window.CognationCollegePrograms;
+      /* No College programs interest: the card is not in the algorithm. */
+      if (college && hasInterest(college.INTERESTS)) {
+        omitPassed(college.cards()).forEach(function (card) {
+          if (deck.length >= limit) return;
+          if (!professionalCardAllowed(card)) return;
+          if (deck.some(function (c) { return stableCardId(c.id) === stableCardId(card.id); })) return;
+          card.why = "You listed College programs.";
+          deck.push(card);
+        });
+      }
       var extra = omitPassed(proInterestCards()).filter(professionalCardAllowed);
       for (var xi = extra.length - 1; xi >= 0; xi--) {
         var add = extra[xi];
@@ -2459,13 +2471,17 @@
       var licensureOff = card.type === "pro-licensure" && !hasInterest((window.CognationLicensure || {}).INTERESTS || []);
       var mogulOff = card.type === PRO.MOGUL && !hasInterest(["mogul", "moguls"]);
       var creatorOff = card.roomKind === "content-creator" && !hasInterest((window.CognationContentCreator || {}).INTERESTS);
-      if (card.why && !executivesOff && !industryOff && !doctoralOff && !ethicsOff && !businessOff && !licensureOff && !mogulOff && !creatorOff) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
+      var collegeOff = card.type === "pro-college" && !hasInterest((window.CognationCollegePrograms || {}).INTERESTS || []);
+      if (card.why && !executivesOff && !industryOff && !doctoralOff && !ethicsOff && !businessOff && !licensureOff && !mogulOff && !creatorOff && !collegeOff) html += '<p class="commune-card-meta commune-card-why" data-card-why>Why you see this: ' + escapeHtml(card.why) + "</p>";
       if (card.type === PRO.RESEARCH) {
         html += '<button type="button" class="btn btn-primary" data-research-enter>Enter Research</button>';
         if (card.full) html += '<p class="commune-card-meta">Full — another Research card is open.</p>';
       }
       if (card.type === "pro-licensure") {
         html += '<button type="button" class="btn btn-primary" data-licensure-open>Enter room</button>';
+      }
+      if (card.type === "pro-college") {
+        html += '<button type="button" class="btn btn-primary" data-college-open>Enter room</button>';
       }
       el.innerHTML = html;
       return el;
@@ -2711,6 +2727,11 @@
       var openLic = el.querySelector("[data-licensure-open]");
       if (openLic) openLic.addEventListener("click", function (ev) { ev.stopPropagation(); openLicensure(card.id); });
       wireClassroomCardClick(el, card, openLicensure);
+    }
+    if (card.type === "pro-college") {
+      var openCollegeBtn = el.querySelector("[data-college-open]");
+      if (openCollegeBtn) openCollegeBtn.addEventListener("click", function (ev) { ev.stopPropagation(); openCollege(card.id); });
+      wireClassroomCardClick(el, card, openCollege);
     }
     if ((card.type === TYPE.KNOW || card.type === TYPE.FRIEND) && (card.profileId || card.handle)) {
       el.setAttribute("data-commune-opens-profile", "");
@@ -3471,6 +3492,24 @@
     });
   }
 
+  function openCollege(cardOrId) {
+    var api = window.CognationCollegePrograms;
+    var panel = roomEl();
+    var id = cardOrId && cardOrId.id ? cardOrId.id : String(cardOrId || "");
+    if (!api || !panel || !id || !state.shell) return false;
+    var me = currentProfileId();
+    var joined = api.join(id, me);
+    if (joined && joined.kicked) { setStatus("You were removed from this chatroom."); return false; }
+    closeClassroom();
+    ensureRoomHeader(panel);
+    api.paint(panel, id, me);
+    showRoom(true);
+    state.roomId = id;
+    state.collegeRoom = true;
+    state.liveRoom = false;
+    return true;
+  }
+
   function openIndustry(cardOrId) {
     var api = window.CognationIndustry;
     var panel = roomEl();
@@ -3699,6 +3738,7 @@
     state.industryRoom = false;
     state.aiAtWorkRoom = false;
     state.licensureRoom = false;
+    state.collegeRoom = false;
     state.roomSqlId = "";
     state.liveMessages = [];
     if (roomEl()) roomEl().removeAttribute("data-creator-room");
@@ -4381,6 +4421,9 @@
       if (state.licensureRoom && window.CognationLicensure && window.CognationLicensure.onClick(ev, {
         panel: roomPanel, roomId: state.roomId, me: currentProfileId(), status: setStatus
       })) return;
+      if (state.collegeRoom && window.CognationCollegePrograms && window.CognationCollegePrograms.onClick(ev, {
+        panel: roomPanel, roomId: state.roomId, me: currentProfileId(), status: setStatus
+      })) return;
       var moreBtn = ev.target && ev.target.closest("[data-commune-room-more]");
       if (moreBtn && roomPanel.contains(moreBtn)) {
         ev.preventDefault();
@@ -4528,6 +4571,14 @@
           if (input) input.value = "";
           licApi.paint(roomEl(), state.roomId, currentProfileId());
           setStatus(licRes && licRes.kicked ? "You were removed from this chatroom." : "Sent.");
+          return;
+        }
+        if (state.collegeRoom && window.CognationCollegePrograms) {
+          var collegeApi = window.CognationCollegePrograms;
+          var collegeRes = collegeApi.comment(state.roomId, currentProfileId(), viewerDisplayName(), body);
+          if (input) input.value = "";
+          collegeApi.paint(roomEl(), state.roomId, currentProfileId());
+          setStatus(collegeRes && collegeRes.kicked ? "You were removed from this chatroom." : "Sent.");
           return;
         }
         if (state.liveRoom && state.roomSqlId) {

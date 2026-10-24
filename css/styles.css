@@ -12944,6 +12944,9 @@ a.site-switch-side:focus-visible {
 .commune-type-mark[data-type-mark="podcast"] { --mark: #ffb8d9; }
 .commune-type-mark[data-type-mark="field"] { --mark: #c9d4ff; }
 .commune-type-mark[data-type-mark="popculture"] { --mark: #fff3a8; }
+.commune-type-mark[data-type-mark="college"] { --mark: #9ad7ff; }
+.commune-room-line:has([data-college-report]) { display: flex; gap: 0.4rem; align-items: center; justify-content: space-between; }
+.commune-room-line [data-college-report] { width: auto; flex: none; }
 .commune-type-mark[data-type-mark="creator"] { --mark: #f0c8ff; }
 .commune-type-mark[data-type-mark="peer-review"] { --mark: #9ee7c4; }
 .commune-room[data-peer-review] .commune-room-line { display: flex; flex-wrap: wrap; gap: 0.35rem 0.6rem; align-items: baseline; }

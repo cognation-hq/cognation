@@ -11587,7 +11587,8 @@
     if (mutual) {
       var cognationFriend = mutual.parentNode && mutual.parentNode.querySelector("[data-cognation-friend]");
       if (profileIsProfessional(p)) {
-        mutual.hidden = true;
+        mutual.hidden = !houseProfessional(p);
+        if (houseProfessional(p)) mutual.textContent = "Following";
         if (cognationFriend) cognationFriend.hidden = true;
       } else {
         mutual.hidden = false;

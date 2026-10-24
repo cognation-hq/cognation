@@ -71,60 +71,6 @@
     pendingAuth = null;
   }
 
-  function showPickerStep(username, profiles) {
-    pendingUsername = username;
-    pendingProfiles = profiles || [];
-    if (credentialsStep) credentialsStep.hidden = true;
-    if (pickerEl) pickerEl.hidden = false;
-    gate.classList.add("login-gate--picker");
-    renderPicker(pendingProfiles);
-    setStatus("");
-    window.setTimeout(function () {
-      var first =
-        (pickerList && pickerList.querySelector('input[name="loginProfile"]')) ||
-        pickerContinue;
-      if (first && typeof first.focus === "function") first.focus();
-    }, 10);
-  }
-
-  function renderPicker(profiles) {
-    if (!pickerList) return;
-    pickerList.innerHTML = "";
-    profiles.forEach(function (p, idx) {
-      var id = "login-profile-" + (p.id || idx);
-      var label = document.createElement("label");
-      label.className = "login-profile-card";
-      label.setAttribute("for", id);
-
-      var input = document.createElement("input");
-      input.type = "radio";
-      input.name = "loginProfile";
-      input.id = id;
-      input.value = p.id;
-      if (idx === 0) input.checked = true;
-
-      var kind = p.kind === "professional" ? "Professional" : "Personal";
-      var title = document.createElement("span");
-      title.className = "login-profile-card-kind";
-      title.textContent = kind + " page";
-
-      var name = document.createElement("span");
-      name.className = "login-profile-card-name";
-      name.textContent = p.displayName || kind;
-
-      var handle = document.createElement("span");
-      handle.className = "login-profile-card-handle";
-      var h = String(p.handle || "").replace(/^@/, "");
-      handle.textContent = h ? "@" + h : "No handle yet";
-
-      label.appendChild(input);
-      label.appendChild(title);
-      label.appendChild(name);
-      label.appendChild(handle);
-      pickerList.appendChild(label);
-    });
-  }
-
   function openGate(opts) {
     opts = opts || {};
     lastFocus = document.activeElement;
@@ -411,34 +357,6 @@
       }
     );
   });
-
-  if (pickerContinue) {
-    pickerContinue.addEventListener("click", function () {
-      if (!pendingUsername || !pendingProfiles || !pendingProfiles.length) return;
-      var chosen = null;
-      var selected = pickerList && pickerList.querySelector('input[name="loginProfile"]:checked');
-      if (selected) {
-        for (var i = 0; i < pendingProfiles.length; i++) {
-          if (pendingProfiles[i].id === selected.value) {
-            chosen = pendingProfiles[i];
-            break;
-          }
-        }
-      }
-      if (!chosen) chosen = pendingProfiles[0];
-      establishSession(pendingUsername, chosen, pendingAuth || null);
-      pendingAuth = null;
-    });
-  }
-
-  if (pickerBack) {
-    pickerBack.addEventListener("click", function () {
-      showCredentialsStep();
-      setStatus("");
-      var first = form.querySelector('input[name="username"]');
-      if (first) first.focus();
-    });
-  }
 
   if (openBtn) {
     openBtn.addEventListener("click", function () {

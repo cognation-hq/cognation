@@ -8193,11 +8193,17 @@ body { padding-top: 0 !important; }
   background: transparent !important;
   box-shadow: none !important;
   border-radius: 0 !important;
+  padding: 0 !important;
+  font-size: 7px;
+}
+.tower-react-face,
+.tower-private-side .tower-react-face,
+.tower-private-side .tower-react-face.is-mine,
+.tower-private-side .tower-react-face:hover,
+.tower-private-side .tower-react-face:focus-visible {
   width: 7px;
   height: 7px;
   min-width: 0;
-  padding: 0 !important;
-  font-size: 7px;
 }
 .tower-private-side .commune-react-picker {
   background: rgba(255, 245, 249, 0.45) !important;
@@ -10268,6 +10274,17 @@ body.tower-messages-page [data-tower-follow-row],
 .news-comment-react-chip:hover,
 .news-comment-react-chip:focus-visible { border: 0 !important; background: transparent !important; box-shadow: none !important; outline: none; }
 .news-comment-react-count { font-size: 0.62rem; font-weight: 600; color: #9a6b7d; }
+/* The 7px glyph stays put. The count sits beside it, on the same line. */
+.news-comment-react-chip {
+  width: auto;
+  height: auto;
+  min-width: min-content;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  flex-flow: row nowrap;
+  align-items: center;
+  gap: 1px;
+}
 .news-comment-composer { display: flex; gap: 0.35rem; margin-top: 0.4rem; align-items: center; }
 .news-comment-composer input { flex: 1; min-width: 0; font: inherit; font-size: 0.8rem; padding: 0.25rem 0.45rem; border-radius: 6px; border: 1px solid rgba(74, 44, 58, 0.18); }
 .news-comment-submit { font-size: 0.72rem !important; padding: 0.18rem 0.5rem !important; }

@@ -1782,6 +1782,10 @@
     var nextEmoji = Array.isArray(p.emojiStickers)
       ? p.emojiStickers
       : (Array.isArray(prev.emojiStickers) ? prev.emojiStickers : []);
+    /* Empty array is intentional (owner deleted every image). Do not revive prev. */
+    var nextImages = Array.isArray(p.imageStickers)
+      ? p.imageStickers
+      : (Array.isArray(prev.imageStickers) ? prev.imageStickers : []);
     /* An empty pin map must not replace positions already saved for this profile. */
     var nextPins = p.friendPinLayout && typeof p.friendPinLayout === "object" && Object.keys(p.friendPinLayout).length
       ? p.friendPinLayout
@@ -1803,6 +1807,7 @@
       widgetLayout: nextLayout,
       quoteStickers: nextQuotes,
       emojiStickers: nextEmoji,
+      imageStickers: nextImages,
       friendPinLayout: nextPins,
       avatarDataUrl: nextAvatar || "",
       musicUrl: nextMusic || "",
@@ -1873,6 +1878,9 @@
     }
     if (Array.isArray(saved.emojiStickers) && saved.emojiStickers.length && (!Array.isArray(p.emojiStickers) || !p.emojiStickers.length)) {
       p.emojiStickers = saved.emojiStickers;
+    }
+    if (Array.isArray(saved.imageStickers) && saved.imageStickers.length && (!Array.isArray(p.imageStickers) || !p.imageStickers.length)) {
+      p.imageStickers = saved.imageStickers;
     }
     if (saved.friendPinLayout && typeof saved.friendPinLayout === "object") {
       if (!p.friendPinLayout || typeof p.friendPinLayout !== "object") p.friendPinLayout = {};
@@ -9635,11 +9643,134 @@
     syncRotateToolbar(root);
   }
 
+  var MAX_IMAGE_STICKERS = 8;
+
+  function imageStickerList(p) {
+    var out = [];
+    (Array.isArray(p && p.imageStickers) ? p.imageStickers : []).forEach(function (item) {
+      if (!item || out.length >= MAX_IMAGE_STICKERS) return;
+      var id = String(item.id || "");
+      var url = String(item.url || "");
+      if (!id || url.indexOf("data:image/") !== 0 || url.indexOf("data:image/svg") === 0) return;
+      out.push({ id: id, url: url });
+    });
+    return out;
+  }
+
+  function defaultImagePos(index) {
+    return { x: 6 + (index % 3) * 22, y: 16 + (index % 4) * 10, z: 28 + index, tilt: 0 };
+  }
+
+  function renderImageStickers(root, p) {
+    var stage = root && root.querySelector("[data-tower-scrapbook]");
+    if (!stage) return;
+    var placed = imageStickerList(p);
+    var ids = {};
+    placed.forEach(function (item) { ids[item.id] = item; });
+    stage.querySelectorAll("[data-tower-image]").forEach(function (el) {
+      var id = el.getAttribute("data-tower-widget");
+      if (!ids[id] && !el.classList.contains("is-dragging")) el.remove();
+    });
+    var layout = (p && p.widgetLayout) || {};
+    placed.forEach(function (item, index) {
+      var el = stage.querySelector('[data-tower-widget="' + item.id + '"]');
+      if (!el) {
+        el = document.createElement("div");
+        el.className = "tower-sticker tower-sticker--image";
+        el.setAttribute("data-tower-widget", item.id);
+        el.setAttribute("data-tower-image", item.id);
+        el.setAttribute("data-sticker-label", "Image");
+        el.setAttribute("aria-label", "Image");
+        var img = document.createElement("img");
+        img.className = "tower-image-widget";
+        img.alt = "";
+        el.appendChild(img);
+        stage.appendChild(el);
+      }
+      var imgEl = el.querySelector(".tower-image-widget");
+      if (imgEl && imgEl.getAttribute("src") !== item.url) imgEl.src = item.url;
+      if (el.classList.contains("is-dragging")) return;
+      var pos = layout[item.id] || defaultImagePos(index);
+      var fallback = defaultImagePos(index);
+      var x = layoutCoord(pos.x, fallback.x);
+      var y = layoutCoord(pos.y, fallback.y);
+      var z = layoutCoord(pos.z, fallback.z);
+      var tilt = layoutCoord(pos.tilt, 0);
+      el.style.setProperty("--sticker-x", x + "%");
+      el.style.setProperty("--sticker-y", y + "%");
+      el.style.setProperty("--sticker-z", String(z));
+      el.style.setProperty("--sticker-tilt", tilt + "deg");
+      el.setAttribute("data-sticker-x", String(x));
+      el.setAttribute("data-sticker-y", String(y));
+      el.setAttribute("data-sticker-z", String(z));
+      el.hidden = false;
+      el.classList.remove("is-widget-off");
+    });
+  }
+
+  function placeImageWidget(root, url) {
+    url = String(url || "");
+    if (url.indexOf("data:image/") !== 0 || url.indexOf("data:image/svg") === 0) return false;
+    var p = TowerProfileStore.get();
+    if (!isTowerOwner(p) || !isProTower(p)) return false;
+    var list = imageStickerList(p);
+    if (list.length >= MAX_IMAGE_STICKERS) return false;
+    var id = "img-" + Date.now().toString(36) + "-" + Math.floor(Math.random() * 1e4).toString(36);
+    list.push({ id: id, url: url });
+    if (!p.widgetLayout || typeof p.widgetLayout !== "object") p.widgetLayout = {};
+    p.widgetLayout[id] = defaultImagePos(list.length - 1);
+    p.imageStickers = list;
+    var savedOk = false;
+    try { savedOk = !!TowerProfileStore.save(p); } catch (eImgSave) { savedOk = false; }
+    var stored = TowerProfileStore.get();
+    var kept = imageStickerList(stored).some(function (item) { return item.id === id; });
+    if (!savedOk || !kept) return false;
+    renderImageStickers(root, stored);
+    var stage = root.querySelector("[data-tower-scrapbook]");
+    var el = stage && stage.querySelector('[data-tower-widget="' + id + '"]');
+    if (stage && el) {
+      stage.querySelectorAll(".is-widget-selected").forEach(function (node) {
+        node.classList.remove("is-widget-selected");
+      });
+      el.classList.add("is-widget-selected");
+      syncRotateToolbar(root);
+    }
+    return true;
+  }
+
+  function readWidgetImage(file, done) {
+    if (!file || (file.type && file.type.indexOf("image/") !== 0)) { done(""); return; }
+    var reader = new FileReader();
+    reader.onerror = function () { done(""); };
+    reader.onload = function () {
+      var raw = String(reader.result || "");
+      var img = new Image();
+      img.onload = function () {
+        var edge = 360;
+        var scale = Math.min(1, edge / Math.max(img.width || 1, img.height || 1));
+        var canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round((img.width || 1) * scale));
+        canvas.height = Math.max(1, Math.round((img.height || 1) * scale));
+        var ctx = canvas.getContext("2d");
+        var url = "";
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          try { url = canvas.toDataURL("image/jpeg", 0.72); } catch (eUrl) { url = ""; }
+        }
+        done(url.indexOf("data:image/") === 0 ? url : "");
+      };
+      img.onerror = function () { done(""); };
+      img.src = raw;
+    };
+    reader.readAsDataURL(file);
+  }
+
   function initEmojiWidgets(root) {
     if (!root || root.__cognationEmojiWidgetsBound) return;
     root.__cognationEmojiWidgetsBound = true;
-    var bar = root.querySelector("[data-tower-emoji-bar]");
-    if (bar) {
+    var bar = document.querySelector("[data-tower-add-widget-dialog] [data-tower-emoji-bar]");
+    if (bar && !bar.__cognationBound) {
+      bar.__cognationBound = true;
       EMOJI_WIDGETS.forEach(function (item) {
         var btn = document.createElement("button");
         btn.type = "button";
@@ -9647,7 +9778,6 @@
         btn.setAttribute("data-tower-emoji-add", item.id);
         btn.setAttribute("aria-label", "Add " + item.label);
         btn.title = item.label;
-        btn.textContent = item.glyph;
         bar.appendChild(btn);
       });
       bar.addEventListener("click", function (ev) {
@@ -9655,6 +9785,7 @@
         if (!btn || !bar.contains(btn)) return;
         ev.preventDefault();
         placeEmojiWidget(root, btn.getAttribute("data-tower-emoji-add"));
+        closeAddWidgetDialog();
       });
     }
     var stage = root.querySelector("[data-tower-scrapbook]");
@@ -9753,6 +9884,7 @@
     if (p) mergeScrapbookLayout(p);
     if (p) settleArrivalTilts(p);
     renderEmojiStickers(root, p);
+    renderImageStickers(root, p);
     var layout = getWidgetLayout(p) || DEFAULT_WIDGET_LAYOUT;
     var zBase = 2;
     Object.keys(DEFAULT_WIDGET_LAYOUT).forEach(function (id) {
@@ -10366,6 +10498,8 @@
     var dlg = document.querySelector("[data-tower-add-widget-dialog]");
     if (!dlg) return;
     dlg.hidden = false;
+    var imageBtn = dlg.querySelector("[data-tower-add-image]");
+    if (imageBtn) imageBtn.hidden = !isProTower(TowerProfileStore.get());
     var ta = dlg.querySelector("[data-tower-add-quote-text]");
     if (ta) {
       ta.value = "";
@@ -10444,6 +10578,32 @@
     if (cancel) cancel.addEventListener("click", function () {
       closeAddWidgetDialog();
     });
+    var imageBtn = dlg.querySelector("[data-tower-add-image]");
+    var imageFile = dlg.querySelector("[data-tower-add-image-file]");
+    if (imageBtn && imageFile && !imageBtn.__cognationBound) {
+      imageBtn.__cognationBound = true;
+      imageBtn.addEventListener("click", function () {
+        if (!isTowerOwner(TowerProfileStore.get()) || !isProTower(TowerProfileStore.get())) return;
+        imageFile.click();
+      });
+      imageFile.addEventListener("change", function () {
+        var file = imageFile.files && imageFile.files[0];
+        imageFile.value = "";
+        if (!file) return;
+        if (!isProTower(TowerProfileStore.get())) return;
+        readWidgetImage(file, function (url) {
+          if (!url) {
+            setProfileStatusOn(root, "Choose an image file.", true);
+            return;
+          }
+          if (!placeImageWidget(root, url)) {
+            setProfileStatusOn(root, "Could not add that image.", true);
+            return;
+          }
+          closeAddWidgetDialog();
+        });
+      });
+    }
 
     /* Empty canvas click on personal public page → offer add */
     var stage = root.querySelector("[data-tower-scrapbook]");
@@ -11370,6 +11530,22 @@
           TowerProfileStore.save(pEmoji);
           renderEmojiStickers(root, TowerProfileStore.get());
           setProfileStatusSafe("Emoji removed.", false, true);
+          return;
+        }
+
+        var imageId = selected.getAttribute("data-tower-image");
+        if (imageId) {
+          clearWidgetSelection(stage);
+          syncRotateToolbar(root);
+          var pImg = TowerProfileStore.get();
+          if (!isTowerOwner(pImg)) return;
+          pImg.imageStickers = imageStickerList(pImg).filter(function (item) {
+            return item.id !== imageId;
+          });
+          if (pImg.widgetLayout && pImg.widgetLayout[imageId]) delete pImg.widgetLayout[imageId];
+          TowerProfileStore.save(pImg);
+          renderImageStickers(root, TowerProfileStore.get());
+          setProfileStatusSafe("Image removed.", false, true);
           return;
         }
 

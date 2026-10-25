@@ -78,6 +78,7 @@ assert.ok(tower.indexOf("normalized.length > 6") === -1 && tower.indexOf("normal
 var applyInstax = tower.slice(tower.indexOf("function applyInstaxFile"), tower.indexOf("function applyInstaxFiles"));
 assert.ok(applyInstax.indexOf("polaroidRemoved") === -1, "camera upload does not restore the empty Polaroid");
 assert.ok(!/if \(!personal \|\| \(p && p\.polaroidRemoved\)\)/.test(tower), "a removed shell does not hide photo widgets");
-assert.ok(/shellOff = !owner \|\| !!\(p && p\.polaroidRemoved\)/.test(tower), "empty shell stays off after it is removed");
+assert.ok(tower.indexOf("shellOff") === -1 && tower.indexOf("The empty frame stays off the page") !== -1, "empty polaroid stays off the page");
+assert.ok(tower.indexOf("seatPolaroidPrints") !== -1 && tower.indexOf("data-tower-polaroid-band") !== -1, "photos sit with the camera");
 
 console.log("polaroid-print-scale.test.js: ok");

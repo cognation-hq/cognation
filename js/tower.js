@@ -409,11 +409,46 @@
     env.classList.remove("is-placed");
   }
 
+  /* Photos sit in one row with the camera. The empty frame is not part of that row. */
+  function seatPolaroidPrints(stage) {
+    if (!stage) return;
+    var prints = [];
+    stage.querySelectorAll("[data-tower-polaroid-extra]").forEach(function (el) {
+      if (!el.hidden && !el.classList.contains("is-widget-off")) prints.push(el);
+    });
+    var cam = stage.querySelector('[data-tower-widget="instax"]');
+    var band = stage.querySelector("[data-tower-polaroid-band]");
+    var camOn = cam && !cam.hidden && !cam.classList.contains("is-widget-off");
+    if (!prints.length) {
+      if (band) {
+        while (band.firstChild) stage.insertBefore(band.firstChild, band);
+        if (band.parentNode) band.parentNode.removeChild(band);
+      }
+      return;
+    }
+    if (!band) {
+      band = document.createElement("div");
+      band.className = "tower-polaroid-band tower-sticker";
+      band.setAttribute("data-tower-polaroid-band", "");
+      stage.appendChild(band);
+    }
+    if (camOn) {
+      if (cam.parentNode !== band) band.appendChild(cam);
+    } else if (cam && cam.parentNode === band) {
+      stage.insertBefore(cam, band);
+    }
+    prints.forEach(function (el) {
+      if (el.parentNode !== band) band.appendChild(el);
+    });
+    if (band.parentNode !== stage) stage.appendChild(band);
+  }
+
   function spawnUnplacedWidgets(root, p) {
     var stage = root && root.querySelector("[data-tower-scrapbook]");
     if (!stage || !stage.classList.contains("is-sticker-stage")) return;
     var stageW = stage.clientWidth || 0;
     if (!stageW) return;
+    seatPolaroidPrints(stage);
     var phone = isPhoneStage(stage);
     stage.classList.toggle("is-phone-stack", phone);
     /* Phone ignores saved x/y entirely (it is the website's layout). */
@@ -423,7 +458,7 @@
     rows.forEach(function (r) { r.forEach(function (id) { printListed[id] = true; }); });
     stage.querySelectorAll("[data-tower-polaroid-extra]").forEach(function (el) {
       var wid = el.getAttribute("data-tower-widget");
-      if (!wid || printListed[wid] || el.hidden || el.classList.contains("is-widget-off")) return;
+      if (!wid || printListed[wid] || el.hidden || el.classList.contains("is-widget-off") || el.parentNode !== stage) return;
       printListed[wid] = true;
       rows.push([wid]);
     });
@@ -458,6 +493,10 @@
       rows.forEach(function (row) {
         row.forEach(function (id) {
           var el = stage.querySelector('[data-tower-widget="' + id + '"]');
+          if (id === "instax") {
+            var bandEl = stage.querySelector("[data-tower-polaroid-band]");
+            if (bandEl && bandEl.parentNode === stage && (!el || el.hidden || el.classList.contains("is-widget-off") || bandEl.contains(el))) el = bandEl;
+          }
           if (!el || el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
           if (el.classList.contains("is-dragging")) return;
           if (id === VISITOR_CALENDAR_ID) el.style.removeProperty("--visitor-cal-w");
@@ -9466,23 +9505,12 @@
       if (dup && dup.parentNode) dup.parentNode.removeChild(dup);
     }
     var el = nodes[0];
-    /* The empty frame is the original shell. Camera upload must not create another one,
-       and must not put this one back after the owner removed it. */
-    var shellOff = !owner || !!(p && p.polaroidRemoved);
-    if (!el && !shellOff) {
-      el = document.createElement("div");
-      el.className = "tower-sticker tower-sticker--polaroid";
-      el.setAttribute("data-tower-widget", "polaroid");
-      el.setAttribute("data-sticker-label", "Polaroid");
-      el.innerHTML = polaroidMarkup();
-      stage.appendChild(el);
-    }
+    /* The empty frame stays off the page. A photo is its own polaroid, beside the camera. */
     if (el) {
-      el.hidden = shellOff;
-      el.classList.toggle("is-widget-off", shellOff);
+      el.hidden = true;
+      el.classList.add("is-widget-off");
       el.removeAttribute("title");
       paintPolaroidPhoto(el.querySelector("[data-tower-polaroid-photo]"), "");
-      applyPolaroidPrintScale(el, 1);
     }
     showCam();
     var needed = prints.length;
@@ -9508,6 +9536,7 @@
       paintPolaroidPhoto(printEl.querySelector("[data-tower-polaroid-photo]"), prints[i].url);
       applyPolaroidPrintScale(printEl, prints[i].scale);
     }
+    try { spawnUnplacedWidgets(root, p); } catch (eBand) {}
   }
 
   var EMOJI_WIDGETS = [

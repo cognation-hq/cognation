@@ -13239,6 +13239,37 @@ a.site-switch-side:focus-visible {
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker.is-spawned.is-spawn-half {
   grid-column: auto;
 }
+/* Photo polaroids share the camera's row. No empty frame, no wide empty slot. */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-polaroid-band.is-spawned {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.85rem;
+  grid-column: 1 / -1;
+  width: 100%;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-polaroid-band > .tower-sticker {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  width: max-content;
+  max-width: none;
+  margin: 0;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0;
+}
 /* LOOK lock v3.2 — hamburger strips + split links (Alexa). Profile ~72–88px;
    YouTube thumb band ~96–112px; each link its own widget (social-split PR).
    Quote under handle, no divider. SPAWN_ROWS order unchanged. */

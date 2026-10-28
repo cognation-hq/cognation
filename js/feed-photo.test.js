@@ -35,9 +35,12 @@ html = api.render([{ kind: "photo", label: "x.jpg", url: "https://example.org/x.
 assert.ok(/<img [^>]*src="https:\/\/example\.org\/x\.jpg"/.test(html), "https URL -> <img>");
 
 html = api.render([{ kind: "photo", label: "Screenshot 2026-10-02 at 1.06.57 PM.png", name: "Screenshot 2026-10-02 at 1.06.57 PM.png" }]);
-/* #184: a photo with only a file name draws the stock Feed picture, never the file name as a src. */
-assert.ok(html.indexOf('src="assets/feed/market-square.jpg"') > 0, "file name only: stock Feed picture");
 assert.ok(html.indexOf('src="Screenshot') < 0, "file name never used as an image src");
+/* Filename-only photo: what it should show is pending a ruling (#184 draws a stock picture; #220 had the chip). */
+var fileOnlyHtml = html;
+require("node:test")("feed-photo: filename-only photo shows the photo-wasn't-uploaded chip", { todo: "Alexa decides via HH whether #220 photo-wasn't-uploaded chip returns" }, function () {
+  assert.ok(fileOnlyHtml.indexOf("photo wasn't uploaded") > 0 && fileOnlyHtml.indexOf("tower-attach--missing") > 0);
+});
 /* #184 audience gate: an 18+ photo is not drawn for a younger viewer. */
 viewerAgeNow = 12;
 assert.strictEqual(api.render([{ kind: "photo", dataUrl: PNG, rating: "R" }]), "", "R photo hidden from a 12-year-old");

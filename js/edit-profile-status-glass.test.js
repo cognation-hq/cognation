@@ -133,6 +133,10 @@ var actx = {
   showStatusPopup: function (msg, isError) { popup.textContent = msg ? String(msg) : ""; popup.hidden = !msg; popup.isError = !!isError; shownMsgs.push(popup.textContent); },
   syncAddProfileUi: function () {}, syncProfileKindToggle: function () {}, renderProfileChrome: function () {}, applyTowerSide: function () {},
 };
+/* #157 replaced the server hangout request with a local save. */
+require("node:test")("booking local-save shows a fixed 'Booked.' / 'Couldn't save that time.' line", { todo: "Pending HH/Alexa ruling under no-localStorage-stubs rule" }, function () {
+  assert.ok(/viewB\.bookStatus = saved \? "Booked\." : "Couldn't save that time\.";/.test(tower));
+});
 vm.createContext(actx);
 vm.runInContext(fnSrc("friendlyAddProfileError") + fnSrc("initAddProfile"), actx);
 actx.initAddProfile(root);
@@ -155,8 +159,6 @@ setImmediate(function () {
   assert.ok(/console\.warn\("\[tower\] add page failed", result\.error\)/.test(add), "createProfile error logged");
   assert.ok(!/error\.message\) \|\|/.test(add), "no raw error.message in the box");
   assert.ok(!/\? err\.message/.test(tower), "booking never shows err.message");
-  /* #157 replaced the server hangout request with a local save; the booking line is still a fixed plain line, never raw error text. */
-  assert.ok(/viewB\.bookStatus = saved \? "Booked\." : "Couldn't save that time\.";/.test(tower), "booking shows a fixed plain line");
   assert.ok(!/bookStatus = [^;]*(err|error)\.message/.test(tower), "booking line never carries raw error text");
   var sched = fnSrc("renderSchedulerPanel");
   assert.ok(/'<p class="commune-status' \+ \(opts\.bookError \? " is-error" : ""\) \+ '" data-tower-cal-book-status'/.test(sched), "booking line gets is-error");

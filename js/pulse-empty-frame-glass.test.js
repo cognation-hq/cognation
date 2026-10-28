@@ -78,9 +78,9 @@ function el(tag) {
   });
   return node;
 }
-var paint = new Function("document", "window", "paintCircleLightning", "placeCircleSpots", "paintFriendPicture", "openCircleProfile",
+var paint = new Function("document", "window", "paintCircleLightning", "placeCircleSpots", "paintFriendPicture", "openCircleProfile", "paintRingFace", "fallBackIfPhotoFails",
   spotsSrc[0] + "\n" + sliceFn("paintCircleRingShell") + "\nreturn { paint: paintCircleRingShell, spots: CIRCLE_SPOTS };");
-var api = paint({ createElement: el }, {}, function () {}, function () {}, function () {}, function () { return function () {}; });
+var api = paint({ createElement: el }, {}, function () {}, function () {}, function () {}, function () { return function () {}; }, function () {}, function () {});
 
 function spotsFor(people) {
   var layer = el("div");

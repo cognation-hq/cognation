@@ -14101,6 +14101,29 @@
     layer.appendChild(ring);
   }
 
+  /* Designer nit on #298: a frame whose photo_url fails to load showed a plain black
+     circle. Probe the URL; on error drop the photo and paint the same no-photo look
+     (phones: #298 solid palette fill + crisp white initial; 1280: the existing letter
+     style). Any caption already on the spot is kept. */
+  function fallBackIfPhotoFails(spot, person, index) {
+    var Img = window.Image;
+    if (!spot || typeof Img !== "function") return;
+    var url = spot.style && spot.style.backgroundImage;
+    var m = /^url\("?(.*?)"?\)$/.exec(String(url || ""));
+    if (!m) return;
+    var probe = new Img();
+    probe.onerror = function () {
+      if (!spot.hasAttribute || !spot.hasAttribute("data-pulse-photo")) return;
+      var caption = spot.querySelector ? spot.querySelector("[data-circle-caption]") : null;
+      spot.removeAttribute("data-pulse-photo");
+      spot.style.backgroundImage = "";
+      paintFriendPicture(spot, { id: person.handle || person.userId, name: person.name }, index);
+      if (caption) spot.appendChild(caption);
+      spot.setAttribute("data-pulse-photo-failed", "");
+    };
+    probe.src = m[1];
+  }
+
   /* Cap 250 — ring shell as Circle page background: lightning + five spots. */
   function paintCircleRingShell(layer, people) {
     if (!layer) return;
@@ -14135,7 +14158,9 @@
         if (person.userId) spot.setAttribute("data-circle-person", person.userId);
         /* Tower picture: server photo_url, else that profile's Tower avatar. */
         var photoApi = window.CognationProfilePhoto;
-        if (person.photoUrl && photoApi && typeof photoApi.applyPhoto === "function") photoApi.applyPhoto(spot, person.photoUrl);
+        if (person.photoUrl && photoApi && typeof photoApi.applyPhoto === "function") {
+          if (photoApi.applyPhoto(spot, person.photoUrl)) fallBackIfPhotoFails(spot, person, i);
+        }
         else paintFriendPicture(spot, { id: person.handle || person.userId, name: person.name }, i);
         if (person.handle) {
           var handle = String(person.handle);

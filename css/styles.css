@@ -15279,15 +15279,27 @@ textarea::placeholder {
     -webkit-mask-image: radial-gradient(ellipse 86% 70% at 51% 47%, transparent 48%, #000 68%, #000 90%, transparent 100%), radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
     mask-image: radial-gradient(ellipse 86% 70% at 51% 47%, transparent 48%, #000 68%, #000 90%, transparent 100%), radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
   }
-  .circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]) {
-    color: #ffffff !important; text-shadow: none; filter: none;
-    background-image: none !important; background-color: #3e7a98 !important;
-  }
-  .circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]):nth-child(5n+1) { background-color: #983e7a !important; }
-  .circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]):nth-child(5n+2) { background-color: #3e9898 !important; }
-  .circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]):nth-child(5n+3) { background-color: #3e7a98 !important; }
-  .circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]):nth-child(5n+4) { background-color: #986b3e !important; }
-  .circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]):nth-child(5n) { background-color: #5c3e98 !important; }
+}
+/* engineer/pulse-photo-onerror (Designer LOOK NO at 1280 on #299): the photo-less
+   frame look above is no longer phone-only. Every width, PULSE ring frames only
+   (.circle-spot inside .circle-fall[data-pulse-bg]; falling circles are
+   a.pulse-fall-circle and are not matched): solid palette fill, crisp white
+   initial, no text-shadow, no transparent text. Covers frames with no photo_url
+   and frames whose photo failed to load (data-pulse-photo dropped by
+   fallBackIfPhotoFails). Loaded photos ([data-pulse-photo]) are untouched. */
+.circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]) {
+  color: #ffffff !important; text-shadow: none; filter: none;
+  background-image: none !important; background-color: #3e7a98 !important;
+}
+.circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]):nth-child(5n+1) { background-color: #983e7a !important; }
+.circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]):nth-child(5n+2) { background-color: #3e9898 !important; }
+.circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]):nth-child(5n+3) { background-color: #3e7a98 !important; }
+.circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]):nth-child(5n+4) { background-color: #986b3e !important; }
+.circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]):nth-child(5n) { background-color: #5c3e98 !important; }
+/* 1280 (>=768px): frames are 5.6rem, so the initial is 38% of that diameter.
+   Phones keep the 1rem initial Designer approved on #298 (44-56px frames). */
+@media (min-width: 768px) {
+  .circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]) { font-size: 2.128rem; }
 }
 .pulse-side-toggle {
   position: absolute; z-index: 6; top: 8px; left: 50%; transform: translateX(-50%);

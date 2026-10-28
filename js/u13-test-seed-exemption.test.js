@@ -155,14 +155,14 @@ function testSageNoAdultDefaultsNoPut() {
 }
 
 function testSeedWithoutTestRoleStillGetsDefaults() {
-  /* Same fleet id, but no test_role: not the test viewer -> normal seed defaults + one PUT. */
+  /* Same fleet id, but no test_role: not the test viewer -> normal seed defaults, kept local (no PUT). */
   var w = sageWorld({ user: { id: "u-sage", app_metadata: {}, user_metadata: {} } });
   w.load("js/seedops-dating-hydrate.js");
   setTimeout(function () { w.doc.dispatchEvent(new CustomEvent("cognation:session-started")); }, 5);
   rerenders(w, 6);
   return settle(700).then(function () {
     assert.strictEqual(w.win.CognationCommuneSwipe.getMemberAge(), 22, "non-test seed still gets age 22");
-    assert.strictEqual(w.calls.puts.length, 1, "non-test seed still saves defaults once");
+    assert.strictEqual(w.calls.puts.length, 0, "seed defaults are never written to the account");
   });
 }
 

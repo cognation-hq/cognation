@@ -385,11 +385,20 @@
             .then(function (result) {
               delete profile.birthYearMonth; /* not kept on the device either */
               writeProfile(profile);
+              /* Profile Save (user action): the only member-pref write besides the
+                 See dating toggle. Runs once signed in; never sends member_age. */
+              var persistSaved = function (out) {
+                var hyd = window.CognationSeedOpsDatingHydrate;
+                if (hyd && typeof hyd.persistPrefs === "function") {
+                  try { hyd.persistPrefs({ byUser: true }); } catch (ePersist) {}
+                }
+                return out;
+              };
               if (window.CognationAccounts && window.CognationAccounts.ensureCognationFriend) {
                 try { window.CognationAccounts.ensureCognationFriend(profile.username); } catch (eFriend) {}
               }
               if (result && result.session && window.CognationAuth) {
-                return window.CognationAuth.login(profile.email, password);
+                return window.CognationAuth.login(profile.email, password).then(persistSaved);
               }
               setMode("signin");
               setStatus(

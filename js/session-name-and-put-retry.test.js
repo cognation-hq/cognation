@@ -2,8 +2,9 @@
  * (a) After a reload, a signed-in session takes its name from the server
  *     profile row, not from a local CognationAccounts record. A local record
  *     is only a placeholder before the row loads, and only for the same user id.
- * (b) A failing PUT /auth/v1/user is retried at most once per changed value per
- *     page load (with backoff, never queued twice); a real change still writes once.
+ * (b) A failing PUT /auth/v1/user (from a user action) is retried at most once
+ *     per changed value per page load (with backoff, never queued twice); a
+ *     profile Save still writes once, without member_age.
  * Run: node js/session-name-and-put-retry.test.js
  */
 "use strict";
@@ -168,10 +169,10 @@ function pageLoad(server, session, local, script) {
       return p;
     },
     getSeeDating: function () { return see; },
-    setSeeDating: function (on) {
+    setSeeDating: function (on, opts) {
       var prev = see; see = !!on;
       ls.setItem("cognation.commune.seeDating.v1", see ? "1" : "0");
-      if (prev !== see) doc.dispatchEvent(new CustomEvent("cognation:see-dating-changed", { detail: { seeDating: see } }));
+      if (prev !== see) doc.dispatchEvent(new CustomEvent("cognation:see-dating-changed", { detail: { seeDating: see, byUser: !!(opts && opts.byUser) } }));
     },
     getMemberAge: function () { return parseInt(this.getMemberProfile().age, 10) || null; },
     rebuild: function () {},
@@ -186,7 +187,7 @@ function pageLoad(server, session, local, script) {
   var swipe = win.CognationCommuneSwipe;
   function rerender() { swipe.setMemberProfile(swipe.getMemberProfile()); }
   setTimeout(function () { doc.dispatchEvent(new CustomEvent("cognation:session-started")); }, 5);
-  (script || []).forEach(function (step) { setTimeout(function () { step(swipe, doc, rerender); }, step.at); });
+  (script || []).forEach(function (step) { setTimeout(function () { step(swipe, doc, rerender, win); }, step.at); });
   return new Promise(function (resolve) { setTimeout(function () { resolve(puts); }, 1500); });
 }
 
@@ -195,8 +196,12 @@ var SEED = { username: "seed-0003", seedFleetId: "seed-0003", activeProfileId: "
 var REAL = { username: "member-login", activeProfileId: "p-real", source: "supabase", supabaseUserId: "u-real" };
 
 function testFailingPutCapped() {
-  /* Writes blocked server-side; many sync events across the page load. */
-  var script = [];
+  /* Writes blocked server-side; many sync events across the page load. The
+     member flips See dating off and back on (the only write on this load). */
+  var script = [
+    at(100, function (swipe) { swipe.setSeeDating(false, { byUser: true }); }),
+    at(150, function (swipe) { swipe.setSeeDating(true, { byUser: true }); }),
+  ];
   for (var i = 1; i <= 25; i++) {
     script.push(at(i * 40, function (swipe, doc, rerender) {
       rerender();
@@ -208,7 +213,7 @@ function testFailingPutCapped() {
     assert.ok(puts.length <= 2, "failing PUT: at most 2 per load (got " + puts.length + ")");
     assert.strictEqual(puts.length, 2, "one retry after the first failure");
     assert.strictEqual(JSON.stringify(puts[0].data), JSON.stringify(puts[1].data), "retry is the same value");
-    assert.strictEqual(puts[0].data.member_age, 22, "seedDefaults age 22 is the value that was written");
+    assert.deepStrictEqual(puts[0].data, { see_dating: true }, "the toggle value is what was written, see_dating only");
     assert.ok(puts[1].at - puts[0].at >= 2000 / SCALE - 20, "retry waits for the backoff");
   });
 }
@@ -220,12 +225,14 @@ function testRealChangeWritesOnce() {
     "cognation.commune.seeDating.v1": "0",
   };
   var script = [
-    at(150, function (swipe) { var p = swipe.getMemberProfile(); p.age = 41; swipe.setMemberProfile(p); }),
+    at(150, function (swipe) { var p = swipe.getMemberProfile(); p.age = 41; p.city = "Peoria"; p.locality = "Peoria"; swipe.setMemberProfile(p); }),
+    at(160, function (swipe, doc, rerender, win) { win.CognationSeedOpsDatingHydrate.persistPrefs({ byUser: true }); }),
   ];
   for (var i = 4; i <= 25; i++) script.push(at(i * 40, function (s, d, rerender) { rerender(); }));
   return pageLoad({ meta: meta }, REAL, local, script).then(function (puts) {
-    assert.strictEqual(puts.length, 1, "a real change writes exactly once (got " + puts.length + ")");
-    assert.strictEqual(puts[0].data.member_age, 41);
+    assert.strictEqual(puts.length, 1, "profile Save writes exactly once (got " + puts.length + ")");
+    assert.strictEqual(puts[0].data.member_city, "Peoria");
+    assert.ok(!("member_age" in puts[0].data), "member_age is never written");
   });
 }
 

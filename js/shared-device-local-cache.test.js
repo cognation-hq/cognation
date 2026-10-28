@@ -115,10 +115,10 @@ function pageLoad(server, session, local, script) {
       return p;
     },
     getSeeDating: function () { return see; },
-    setSeeDating: function (on) {
+    setSeeDating: function (on, opts) {
       var prev = see; see = !!on;
       ls.setItem("cognation.commune.seeDating.v1", see ? "1" : "0");
-      if (prev !== see) doc.dispatchEvent(new CustomEvent("cognation:see-dating-changed", { detail: { seeDating: see } }));
+      if (prev !== see) doc.dispatchEvent(new CustomEvent("cognation:see-dating-changed", { detail: { seeDating: see, byUser: !!(opts && opts.byUser) } }));
     },
     getMemberAge: function () { return parseInt(this.getMemberProfile().age, 10) || null; },
     rebuild: function () {},
@@ -186,10 +186,10 @@ function testRealChangeStillWrites() {
   var local = {
     [MEMBER]: JSON.stringify({ age: 34, city: "Springfield", locality: "Springfield", state: "IL", country: "United States", interests: ["jobs"], ownerUserId: "u-alex" }),
   };
-  var script = [at(200, function (swipe) { swipe.setSeeDating(true); var p = swipe.getMemberProfile(); swipe.setMemberProfile(p); })];
+  var script = [at(200, function (swipe) { swipe.setSeeDating(true, { byUser: true }); var p = swipe.getMemberProfile(); swipe.setMemberProfile(p); })];
   return pageLoad({ meta: Object.assign({}, ALEX_META) }, ALEX, local, script).then(function (r) {
     assert.strictEqual(r.puts.length, 1, "turning See dating on writes once (got " + r.puts.length + ")");
-    assert.strictEqual(r.puts[0].see_dating, true);
+    assert.deepStrictEqual(r.puts[0], { see_dating: true }, "the toggle writes see_dating only");
   });
 }
 

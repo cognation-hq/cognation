@@ -508,12 +508,13 @@
   function getSeeDating() {
     try { return localStorage.getItem(SEE_DATING_KEY) === "1"; } catch (e) { return false; }
   }
-  function setSeeDating(on) {
+  /* opts.byUser: the member flipped the toggle (only that persists to the account). */
+  function setSeeDating(on, opts) {
     var next = !!on && datingSwitchOn();
     var prev = getSeeDating();
     try { localStorage.setItem(SEE_DATING_KEY, next ? "1" : "0"); } catch (e) {}
     if (prev === next) return;
-    emit("cognation:see-dating-changed", { seeDating: next });
+    emit("cognation:see-dating-changed", { seeDating: next, byUser: !!(opts && opts.byUser) });
   }
   /* P0 kill switch: js/dating-flag.js. Missing flag = off (fail closed). */
   function datingSwitchOn() {
@@ -4406,14 +4407,14 @@
       var age = getMemberAge();
       if (age != null && age <= 18) {
         toggle.checked = false;
-        setSeeDating(false);
+        setSeeDating(false, { byUser: true });
         setStatus("Dating cards stay off under 19.");
         syncDatingVisibility();
         rebuildDeck();
         return;
       }
       var on = !!toggle.checked;
-      setSeeDating(on);
+      setSeeDating(on, { byUser: true });
       syncDatingVisibility();
       if (on) {
         /* Hydrate bios before paint so dating Card 1 is not blank after toggle. */

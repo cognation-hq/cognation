@@ -2993,7 +2993,13 @@
     if (/(^|\W)21\s?\+(?!\w)/i.test(blob)) use(21);
     else if (/(^|\W)18\s?\+(?!\w)/i.test(blob)) use(18);
     if (/\bPG-?13\b/i.test(blob)) use(13);
-    if (/\b(nsfw|explicit)\b/i.test(blob)) use(18);
+    /* Whole-word adult markers via the shared under-13 keyword helper (#184
+       regression). The age tokens (13+ ... 21+, PG-13) are handled above with
+       their own floors, so they are blanked first: only the helper's remaining
+       word markers map to 18 here, exactly as before. */
+    var ageFloor = window.CognationAgeFloor;
+    var wordsOnly = blob.replace(/(^|\W)(13|16|17|18|21)\s?\+(?!\w)|\bPG-?13\b/gi, "$1 ");
+    if (ageFloor && typeof ageFloor.isAdultKeyword === "function" && ageFloor.isAdultKeyword(wordsOnly)) use(18);
     if (!String(a.rating || "").trim() && a.minAge == null && a.min_age == null && !a.audience) {
       var ar = window.CognationAutoRate;
       var named = String(a.label || a.name || "");

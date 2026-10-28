@@ -14101,6 +14101,34 @@
     layer.appendChild(ring);
   }
 
+  /* SeedOps FAIL on live e412c2b (#298): on phones, photo-less PULSE ring frames
+     showed blank coloured discs. paintFriendPicture paints a local avatarDataUrl
+     when the Accounts record has one; seed profiles get an SVG *letter* avatar
+     there (js/seedops-commune-alive.js / seedops-dating-hydrate.js svgAvatar), so
+     the frame's initial lived inside a background-image and textContent was "".
+     The #298 photo-less rule (background-image: none on :not([data-pulse-photo]))
+     then removed the only initial. Ring frames only: a default letter picture
+     (SVG data URL) or no picture becomes text initials on the CSS palette fill;
+     a real local raster picture is marked data-pulse-photo and kept untouched. */
+  function pulseRingInitials(name) {
+    var parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "?";
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  }
+
+  function paintRingFace(spot, person, index) {
+    paintFriendPicture(spot, { id: person.handle || person.userId, name: person.name }, index);
+    var bg = String((spot.style && spot.style.backgroundImage) || "");
+    if (/^url\("?data:image\/(?!svg)/i.test(bg)) {
+      spot.setAttribute("data-pulse-photo", "");
+      return;
+    }
+    spot.style.backgroundImage = "";
+    spot.removeAttribute("data-pulse-photo");
+    spot.textContent = pulseRingInitials(person.name);
+  }
+
   /* Designer nit on #298: a frame whose photo_url fails to load showed a plain black
      circle. Probe the URL; on error drop the photo and paint the same no-photo look
      (phones: #298 solid palette fill + crisp white initial; 1280: the existing letter
@@ -14117,7 +14145,7 @@
       var caption = spot.querySelector ? spot.querySelector("[data-circle-caption]") : null;
       spot.removeAttribute("data-pulse-photo");
       spot.style.backgroundImage = "";
-      paintFriendPicture(spot, { id: person.handle || person.userId, name: person.name }, index);
+      paintRingFace(spot, person, index);
       if (caption) spot.appendChild(caption);
       spot.setAttribute("data-pulse-photo-failed", "");
     };
@@ -14161,7 +14189,7 @@
         if (person.photoUrl && photoApi && typeof photoApi.applyPhoto === "function") {
           if (photoApi.applyPhoto(spot, person.photoUrl)) fallBackIfPhotoFails(spot, person, i);
         }
-        else paintFriendPicture(spot, { id: person.handle || person.userId, name: person.name }, i);
+        else paintRingFace(spot, person, i);
         if (person.handle) {
           var handle = String(person.handle);
           spot.setAttribute("data-circle-handle", handle);

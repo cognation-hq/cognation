@@ -35,7 +35,7 @@ function load(probes) {
   const ctx = {
     window: { Image: function () { probes.push(this); } },
     painted: [],
-    paintFriendPicture(node, friend, index) {
+    paintRingFace(node, friend, index) {
       ctx.painted.push({ friend, index });
       node.textContent = "S"; node.kids.length = 0;
       node.style.background = "linear-gradient(145deg, #c7a, #fff5f9 70%)";
@@ -77,9 +77,11 @@ test("a photo that loads is left alone (no onload repaint)", () => {
   assert.strictEqual(ctx.painted.length, 0);
 });
 
-test("ring shell wires the fallback after applyPhoto; no-photo path unchanged", () => {
+test("ring shell wires the fallback after applyPhoto; no-photo path goes through paintRingFace", () => {
   assert.match(src, /if \(photoApi\.applyPhoto\(spot, person\.photoUrl\)\) fallBackIfPhotoFails\(spot, person, i\);/);
-  assert.match(src, /else paintFriendPicture\(spot, \{ id: person\.handle \|\| person\.userId, name: person\.name \}, i\);/);
+  /* no-photo path: paintRingFace -> paintFriendPicture + text initials (SeedOps e412c2b fix) */
+  assert.match(src, /else paintRingFace\(spot, person, i\);/);
+  assert.match(src, /function paintRingFace\(spot, person, index\) \{\n    paintFriendPicture\(spot, /);
 });
 
 test("falling circles keep their letter when the photo fails (existing probe)", () => {

@@ -352,6 +352,67 @@
     });
   }
 
+
+  /* ---------- Phones (<768px): the #265 3D orbit fitted to the ring box ---------- */
+  /* Designer 2026-10-27 (SeedOps 390 FAIL on 4900038): #265 drew the orbit at a fixed
+     320px radius with ~84px frames, so at 390 four of five friends sat off the panel.
+     On phones the same 3D path is scaled to the ring box (panel width - 32px) and
+     shrunk further only if a frame would come within 8px of a panel edge. Back frames
+     are 44px, the front frame 56px, sizes in between follow depth. Desktop untouched. */
+  var PHONE_MAX_W = 767;
+  var PHONE_FRAME_BACK = 44;
+  var PHONE_FRAME_FRONT = 56;
+  var PHONE_EDGE = 8;
+  var PHONE_RING_INSET = 32;
+  var PHONE_CAPTION = 22; /* 6px gap + 12px name at line-height 1.2, rounded up */
+  function orbitPoint(angleDeg, g) {
+    var t = angleDeg * Math.PI / 180;
+    var x = Math.cos(t) * g.r;
+    var y = Math.sin(t) * g.r;
+    var d = g.persp / (g.persp - y * Math.sin(g.tilt));
+    return { x: x * d, y: y * Math.cos(g.tilt) * d, d: d };
+  }
+  function phoneOrbit(panelW, g) {
+    if (!(panelW > 0) || !g) return null;
+    var dFront = orbitPoint(90, g).d;
+    function sizeAt(d) {
+      var t = (d - 1) / ((dFront - 1) || 1);
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      return PHONE_FRAME_BACK + (PHONE_FRAME_FRONT - PHONE_FRAME_BACK) * t;
+    }
+    var ringW = Math.max(0, panelW - PHONE_RING_INSET);
+    var maxX = 0;
+    var a, p;
+    for (a = 0; a < 360; a += 0.25) { p = orbitPoint(a, g); maxX = Math.max(maxX, Math.abs(p.x)); }
+    var f = maxX ? (ringW / 2) / maxX : 1;
+    for (a = 0; a < 360; a += 0.25) {
+      p = orbitPoint(a, g);
+      if (Math.abs(p.x) < 1e-6) continue;
+      var lim = (panelW / 2 - PHONE_EDGE - sizeAt(p.d) / 2) / Math.abs(p.x);
+      if (lim < f) f = lim;
+    }
+    f *= 0.99; /* sampled every 0.25deg: keep a hair of margin between samples */
+    var top = 0;
+    var bottom = 0;
+    for (a = 0; a < 360; a += 0.25) {
+      p = orbitPoint(a, g);
+      var half = sizeAt(p.d) / 2;
+      top = Math.min(top, p.y * f - half);
+      bottom = Math.max(bottom, p.y * f + half + PHONE_CAPTION);
+    }
+    var bob = g.bob || 0;
+    var lift = g.lift || 0;
+    return {
+      f: f,
+      ringW: ringW,
+      sizeAt: sizeAt,
+      point: function (angleDeg) { var q = orbitPoint(angleDeg, g); return { x: q.x * f, y: q.y * f, d: q.d, size: sizeAt(q.d) }; },
+      /* vertical reach of any frame + caption around the ring centre, motion included */
+      top: top - bob - lift,
+      bottom: bottom + bob
+    };
+  }
+
   /* ---------- Placement: outside the ring and the five frames ---------- */
 
   function num(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
@@ -397,6 +458,14 @@
     if (!k) k = 0.954;
     var top = cy - 230 * k;
     var bottom = cy + 230 * k;
+    /* phones: the orbiting frames' full reach (set by js/tower.js), so falling
+       circles and their Unfriend / Check in chip never sit where a frame passes */
+    var orbit = layer.getAttribute ? String(layer.getAttribute("data-pulse-orbit") || "") : "";
+    var om = /^(-?[\d.]+),(-?[\d.]+)$/.exec(orbit);
+    if (om) {
+      top = Math.min(top, cy + num(om[1]));
+      bottom = Math.max(bottom, cy + num(om[2]));
+    }
     var spots = layer.querySelectorAll ? layer.querySelectorAll("[data-circle-ring] [data-circle-spot]") : [];
     for (var i = 0; i < spots.length; i++) {
       var sp = spots[i];
@@ -691,6 +760,8 @@
     rank: rank,
     haloSpots: haloSpots,
     blockedBand: blockedBand,
+    phoneOrbit: phoneOrbit,
+    PHONE_MAX_W: PHONE_MAX_W,
     centerGroup: centerGroup,
     layoutOutside: layoutOutside,
     render: render,

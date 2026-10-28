@@ -15230,6 +15230,38 @@ textarea::placeholder {
   .circle-fall[data-pulse-bg] .circle-ring-spin::after,
   .circle-fall[data-pulse-bg] .circle-ring-people { animation: none; }
 }
+/* engineer/pulse-390-circle-fit (Designer 2026-10-27, SeedOps 390 FAIL on 4900038).
+   Phones only (<768px); 1280 and every wider rule above are unchanged.
+   - Ring (#265) sized to the panel's ring box (panel width - 32px, set by js/tower.js)
+     instead of 94vw, which ran wider than the panel at 390.
+   - Outer energy band (#285) capped at the panel width so it fades instead of
+     being cut by the panel's edge. Same gradient, blend and motion.
+   - Background image layers: #285's phone masks are intersected with the #150 edge
+     fade, so the glow melts out softly instead of ending in a hard rectangle.
+   - Frame names 12px (frames are no longer scaled on phones, so 12 is true px). */
+@media (max-width: 767px) {
+  .circle-fall[data-pulse-bg] .circle-ring-spin::before {
+    width: var(--pulse-ring-w, min(640px, 94vw)); height: var(--pulse-ring-w, min(640px, 94vw));
+    left: calc(var(--pulse-ring-w, min(640px, 94vw)) / -2); top: calc(var(--pulse-ring-w, min(640px, 94vw)) / -2);
+  }
+  .circle-fall[data-pulse-bg] .circle-ring-spin::after {
+    width: var(--pulse-panel-w, calc(min(640px, 94vw) * 1.75)); height: var(--pulse-panel-w, calc(min(640px, 94vw) * 1.75));
+    left: calc(var(--pulse-panel-w, calc(min(640px, 94vw) * 1.75)) / -2); top: calc(var(--pulse-panel-w, calc(min(640px, 94vw) * 1.75)) / -2);
+  }
+  .circle-fall[data-pulse-bg]::before {
+    -webkit-mask-image: radial-gradient(ellipse 86% 64% at 51% 44%, #000 56%, transparent 74%), radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image: radial-gradient(ellipse 86% 64% at 51% 44%, #000 56%, transparent 74%), radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+    mask-composite: intersect;
+  }
+  .circle-fall[data-pulse-bg]::after {
+    -webkit-mask-image: radial-gradient(ellipse 86% 64% at 51% 44%, transparent 52%, #000 70%, #000 90%, transparent 100%), radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image: radial-gradient(ellipse 86% 64% at 51% 44%, transparent 52%, #000 70%, #000 90%, transparent 100%), radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+    mask-composite: intersect;
+  }
+  .circle-fall[data-pulse-bg] .circle-spot-caption { --pulse-name-px: 12px; }
+}
 .pulse-side-toggle {
   position: absolute; z-index: 6; top: 8px; left: 50%; transform: translateX(-50%);
   display: flex; gap: 6px; pointer-events: auto;

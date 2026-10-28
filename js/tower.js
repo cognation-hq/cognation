@@ -14218,9 +14218,42 @@
     var i;
     var front = 0;
     var frontScale = -1;
+    /* Phones (<768px): same 3D orbit, fitted inside the panel (js/pulse-falling-friends.js phoneOrbit). */
+    var fitLayer = document.querySelector("[data-circle-fall][data-pulse-bg]");
+    var fitApi = window.CognationPulseFall;
+    var fit = null;
+    if (fitLayer && fitApi && typeof fitApi.phoneOrbit === "function" &&
+        window.matchMedia && window.matchMedia("(max-width: " + fitApi.PHONE_MAX_W + "px)").matches) {
+      fit = fitApi.phoneOrbit(fitLayer.clientWidth, {
+        r: CIRCLE_RING_R, tilt: CIRCLE_TILT, persp: CIRCLE_PERSPECTIVE, bob: reduce ? 0 : 18, lift: reduce ? 0 : 32
+      });
+    }
+    if (fitLayer) {
+      if (fit) {
+        fitLayer.style.setProperty("--pulse-ring-w", fit.ringW.toFixed(1) + "px");
+        fitLayer.style.setProperty("--pulse-panel-w", fitLayer.clientWidth + "px");
+        fitLayer.setAttribute("data-pulse-orbit", fit.top.toFixed(1) + "," + fit.bottom.toFixed(1));
+      } else {
+        fitLayer.style.removeProperty("--pulse-ring-w");
+        fitLayer.style.removeProperty("--pulse-panel-w");
+        fitLayer.removeAttribute("data-pulse-orbit");
+      }
+    }
     for (i = 0; i < spots.length; i++) {
       var pos = circleSpotAt(i + shift);
       var depth = pos.s / CIRCLE_SCALE;
+      if (fit) {
+        var px = fit.sizeAt(depth);
+        var pbob = reduce ? 0 : Math.sin(performance.now() / 360 + i * 1.2) * 18;
+        spots[i].style.width = px.toFixed(1) + "px";
+        spots[i].style.height = px.toFixed(1) + "px";
+        spots[i].style.transform =
+          "translate(-50%, -50%) translate(" + (pos.x * fit.f).toFixed(1) + "px," + (pos.y * fit.f + pbob).toFixed(1) + "px) scale(1)";
+        spots[i].style.zIndex = String(Math.round(pos.s * 100));
+        spots[i].style.setProperty("--pulse-spot-s", "1");
+        if (px > frontScale) { frontScale = px; front = i; }
+        continue;
+      }
       var scale = 0.8 + Math.max(0, depth - 0.68) * 0.4;
       var bob = reduce ? 0 : Math.sin(performance.now() / 360 + i * 1.2) * 18;
       var size = 5.6;

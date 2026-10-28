@@ -572,7 +572,14 @@ function testChatroomReplyReleasesSwipe() {
   assert.ok(src.indexOf("function clearPointer") !== -1, "clearPointer helper");
   var submitIdx = src.indexOf('form.addEventListener("submit"');
   assert.ok(submitIdx !== -1, "room compose submit handler");
-  var submitChunk = src.slice(submitIdx, submitIdx + 2200);
+  /* Whole submit handler (balanced braces). #273 added room branches ahead of the live path,
+     so a fixed 2200-char window no longer reaches it. */
+  var bodyStart = src.indexOf("{", submitIdx), depthS = 0, endS = bodyStart;
+  for (; endS < src.length; endS++) {
+    if (src[endS] === "{") depthS++;
+    else if (src[endS] === "}" && --depthS === 0) break;
+  }
+  var submitChunk = src.slice(submitIdx, endS + 1);
   assert.ok(submitChunk.indexOf("state.liveRoom") !== -1, "submit branches on liveRoom");
   assert.ok(submitChunk.indexOf("postLiveMessage") !== -1, "live submit uses RPC");
   assert.ok(submitChunk.indexOf("releaseRoomSurface()") !== -1, "non-live submit releases room surface");

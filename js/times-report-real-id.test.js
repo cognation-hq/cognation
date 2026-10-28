@@ -85,7 +85,7 @@ window.CognationTowerStore = {
 };
 var feedList = new El("div");
 var times = new Function("feedList", "escapeHtml", "formatTime", "env",
-  "var editionId = env.editionId;\n" + fnSource("postsFromTower") + "\n" + fnSource("appendPostEl") +
+  "var editionId = env.editionId;\n" + fnSource("postsFromTower") + "\n" + fnSource("timesHeadline") + "\n" + fnSource("appendPostEl") +
   "\nreturn { postsFromTower: postsFromTower, appendPostEl: appendPostEl };")(
   feedList, function (s) { return String(s == null ? "" : s); }, function () { return "now"; }, { editionId: "local" });
 var stories = times.postsFromTower();

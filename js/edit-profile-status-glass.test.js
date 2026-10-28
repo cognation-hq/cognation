@@ -115,6 +115,7 @@ var root = {
   },
 };
 var logged = [];
+var popup = { textContent: "", hidden: true, isError: false }, shownMsgs = [];
 var RAW = 'duplicate key value violates unique constraint "profiles_pkey" (secret-ish detail)';
 var actx = {
   console: {
@@ -127,18 +128,22 @@ var actx = {
   getSessionObject: function () { return { username: "riley" }; },
   usingRemoteSocial: function () { return true; },
   remoteSocial: function () { return { createProfessionalProfile: function () { return Promise.reject(new Error(RAW)); } }; },
+  /* #157/#167: status lines moved from the inline box to the shared status popup.
+     Record what the popup is asked to show (text + error flag) so the same rules are checked there. */
+  showStatusPopup: function (msg, isError) { popup.textContent = msg ? String(msg) : ""; popup.hidden = !msg; popup.isError = !!isError; shownMsgs.push(popup.textContent); },
   syncAddProfileUi: function () {}, syncProfileKindToggle: function () {}, renderProfileChrome: function () {}, applyTowerSide: function () {},
 };
 vm.createContext(actx);
 vm.runInContext(fnSrc("friendlyAddProfileError") + fnSrc("initAddProfile"), actx);
 actx.initAddProfile(root);
 btn.listeners.click();
-assert.strictEqual(status.textContent, "Creating your professional page…");
+assert.strictEqual(popup.textContent, "Creating your professional page…");
 setImmediate(function () {
-  assert.strictEqual(status.textContent, "Couldn't create your professional page. Try again.", "plain line in the box");
-  assert.strictEqual(status.hidden, false);
-  assert.ok(status.classList.contains("is-error"), "error state");
-  assert.ok(status.textContent.indexOf("duplicate key") < 0, "raw text never in the box");
+  assert.strictEqual(popup.textContent, "Couldn't create your professional page. Try again.", "plain line in the status popup");
+  assert.strictEqual(popup.hidden, false);
+  assert.ok(popup.isError, "error state");
+  assert.ok(shownMsgs.every(function (m) { return m.indexOf("duplicate key") < 0; }), "raw text never shown");
+  assert.ok(/function showStatusPopup\(msg, isError/.test(tower) && /popup\.className = "status-popup" \+ \(isError \? " is-error" : ""\)/.test(tower), "real popup carries the error state");
   assert.ok(logged.some(function (l) { return l[0] === "error" && l[2] && l[2].message === RAW; }), "raw error goes to console.error");
   assert.strictEqual(btn.disabled, false);
 
@@ -150,7 +155,9 @@ setImmediate(function () {
   assert.ok(/console\.warn\("\[tower\] add page failed", result\.error\)/.test(add), "createProfile error logged");
   assert.ok(!/error\.message\) \|\|/.test(add), "no raw error.message in the box");
   assert.ok(!/\? err\.message/.test(tower), "booking never shows err.message");
-  assert.ok(/console\.warn\("\[tower\] hangout request failed", err\); \} catch \(eLog\) \{\}\s*viewB\.bookStatus = friendlyBookingError\(err\);\s*viewB\.bookError = true;/.test(tower), "booking error logged, plain line shown, error state set");
+  /* #157 replaced the server hangout request with a local save; the booking line is still a fixed plain line, never raw error text. */
+  assert.ok(/viewB\.bookStatus = saved \? "Booked\." : "Couldn't save that time\.";/.test(tower), "booking shows a fixed plain line");
+  assert.ok(!/bookStatus = [^;]*(err|error)\.message/.test(tower), "booking line never carries raw error text");
   var sched = fnSrc("renderSchedulerPanel");
   assert.ok(/'<p class="commune-status' \+ \(opts\.bookError \? " is-error" : ""\) \+ '" data-tower-cal-book-status'/.test(sched), "booking line gets is-error");
   assert.ok(/bookError: owner \? false : !!view\.bookError/.test(fnSrc("renderPublicCalendar")), "public calendar passes the error flag");

@@ -17,5 +17,17 @@ var note = msg.slice(msg.indexOf("Hello! You have agreed"));
 assert.ok(/data-auction-amt/.test(note) && /data-auction-seller/.test(note) && /data-auction-date/.test(note));
 assert.ok(!/value=/.test(note.slice(0, note.indexOf("> amount of money"))));
 assert.ok(/data-auction-draft/.test(msg) && /Buyer connected/.test(msg) && /data-auction-send>Send/.test(msg) && /Please keep a copy of this message for your records/.test(msg) && /data-auction-pay>Apple Pay/.test(msg) && /No payment was taken/.test(msg) && !/receipt|purchase completed/i.test(msg));
-assert.ok(!/Apple Pay|apple-pay|ApplePay/.test(swipe) && /CognationAuctionRoom\.mount/.test(swipe) && !/tower-profile/.test(msg.slice(msg.lastIndexOf("function mount"))));
+/* #183 added Apple Pay for the Marketplace high bid (data-market-pay / payHighBid) to commune-swipe.js.
+   The auction's Apple Pay still lives only in the buyer-seller note (commune-messages.js), never in the deck. */
+function fnBody(src0, name) {
+  var st = src0.indexOf("function " + name + "("); if (st < 0) return "";
+  var d = 0, k = src0.indexOf("{", st);
+  for (; k < src0.length; k++) { if (src0[k] === "{") d++; else if (src0[k] === "}" && --d === 0) break; }
+  return src0.slice(st, k + 1);
+}
+var payFn = fnBody(swipe, "payHighBid");
+assert.ok(!/data-auction-pay/.test(swipe), "no auction Apple Pay button in the deck");
+assert.strictEqual((swipe.match(/>Apple Pay<\/button>/g) || []).length, (swipe.match(/data-market-pay>Apple Pay<\/button>/g) || []).length, "the only Apple Pay button in the deck is the Marketplace one");
+assert.ok(payFn && /ApplePaySession/.test(payFn) && !/ApplePaySession|\/apple-pay\//.test(swipe.replace(payFn, "")), "Apple Pay session only in the Marketplace payHighBid");
+assert.ok(/CognationAuctionRoom\.mount/.test(swipe) && !/tower-profile/.test(msg.slice(msg.lastIndexOf("function mount"))));
 console.log("tower-calendar-kind-pills.test.js ok");

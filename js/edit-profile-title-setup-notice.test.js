@@ -49,7 +49,7 @@ function run(opts) {
   var end = js.indexOf("  function initAddProfile(root) {");
   var fnSrc = js.slice(start, end);
   function el() { return { hidden: true, textContent: "", classList: { set: {}, remove: function (c) { delete this.set[c]; }, toggle: function (c, on) { if (on) this.set[c] = 1; else delete this.set[c]; } } }; }
-  var btn = el(), status = el();
+  var btn = el(), status = el(), popups = [];
   var fakeRoot = { querySelector: function (s) { return s === "[data-tower-add-profile]" ? btn : s === "[data-tower-add-profile-status]" ? status : null; } };
   if (opts.flag) fakeRoot.__cognationProSetupJustCreated = true;
   var ctx = {
@@ -58,30 +58,37 @@ function run(opts) {
     remoteSocial: function () { return { getMyProfiles: function () { return opts.profiles; } }; },
     getSessionObject: function () { return { username: "riley", profileKind: opts.kind }; },
     TowerProfileStore: { get: function () { return { _profileKind: opts.kind }; } },
+    /* #167: the setup notice moved from the inline status box to the shared status popup. */
+    showStatusPopup: function (msg, isError, o) { popups.push({ msg: String(msg || ""), isError: !!isError, once: !!(o && o.once) }); },
   };
   vm.runInNewContext(fnSrc + "\nsyncAddProfileUi(__root);", Object.assign(ctx, { __root: fakeRoot }));
-  return { btn: btn, status: status };
+  return { btn: btn, status: status, popups: popups };
 }
 var both = [{ kind: "personal" }, { kind: "professional" }];
 
 test("shows right after the first Pro setup, on the Pro page", function () {
   var r = run({ profiles: both, kind: "professional", flag: true });
-  assert.strictEqual(r.status.hidden, false);
-  assert.strictEqual(r.status.textContent, "Your professional page is set up.");
-  assert.ok(r.status.classList.set["tower-pro-setup-notice"]);
+  assert.strictEqual(r.popups.length, 1, "one notice");
+  assert.strictEqual(r.popups[0].msg, "Your professional page is set up.");
+  assert.strictEqual(r.popups[0].isError, false, "a notice, not an error");
+  assert.ok(r.popups[0].once, "shown once");
   assert.strictEqual(r.btn.hidden, true);
 });
 test("never on a later open (flag spent or new page load)", function () {
   var r = run({ profiles: both, kind: "professional", flag: false });
   assert.strictEqual(r.status.hidden, true);
   assert.strictEqual(r.status.textContent, "");
+  assert.strictEqual(r.popups.length, 0, "no popup notice");
 });
 test("never in Personal Edit profile, even right after setup", function () {
-  assert.strictEqual(run({ profiles: both, kind: "personal", flag: true }).status.hidden, true);
+  var p1 = run({ profiles: both, kind: "personal", flag: true });
+  assert.strictEqual(p1.status.hidden, true);
+  assert.strictEqual(p1.popups.length, 0, "no popup notice in Personal");
   assert.strictEqual(run({ profiles: both, kind: "personal", flag: false }).status.hidden, true);
 });
 test("no Pro page yet: Add button shows, no notice", function () {
   var r = run({ profiles: [{ kind: "personal" }], kind: "personal", flag: false });
   assert.strictEqual(r.btn.hidden, false);
   assert.strictEqual(r.status.hidden, true);
+  assert.strictEqual(r.popups.length, 0, "no popup notice");
 });

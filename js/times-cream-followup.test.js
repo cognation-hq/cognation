@@ -79,14 +79,15 @@ var panel = new El("section"); panel.id = "panel-signal";
 var feedList = panel.appendChild(new El("div"));
 var env = { editionId: "local" };
 var appendPostEl = new Function("feedList", "escapeHtml", "formatTime", "env",
-  "var editionId = env.editionId;\n" + appendSrc + "\nreturn appendPostEl;")(
+  "var editionId = env.editionId;\n" + fnSource("timesHeadline") + "\n" + appendSrc + "\nreturn appendPostEl;")(
   feedList, function (s) { return String(s == null ? "" : s); }, function () { return "now"; }, env);
 
 /* renderFeed's printing block, driven by the real appendPostEl. */
 var printBlock = /var printed = posts\.slice\(0, TIMES_SLOTS\);[\s\S]*?var spare = [^;]*;/.exec(fnSource("renderFeed"))[0];
 function renderFeed(posts) {
   feedList.innerHTML = "";
-  new Function("posts", "TIMES_SLOTS", "appendPostEl", printBlock)(posts, 10, appendPostEl);
+  /* #178: the printing block ranks by postScore(); load the real helper. */
+  new Function("posts", "TIMES_SLOTS", "appendPostEl", fnSource("postScore") + "\n" + printBlock)(posts, 10, appendPostEl);
 }
 var state = { byEdition: {} };
 function applyRefreshedPosts(posts, note) {

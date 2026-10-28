@@ -145,7 +145,7 @@ var times = new Function("window", "document", "feedList", [
   "function natIntlFloor(p) { return p; } function newsViewerUnder13() { return false; } function wireAllowed() { return false; }",
   "function setEndlessUi() {} function bindEndlessObserver() {}",
   "function escapeHtml(s) { return String(s == null ? '' : s); } function formatTime() { return 'now'; }",
-  fnSource("towerPlateKey"), fnSource("syncFeedEmpty"), fnSource("postsFromTower"), fnSource("appendPostEl"), fnSource("renderFeed"),
+  fnSource("towerPlateKey"), fnSource("syncFeedEmpty"), fnSource("postsFromTower"), fnSource("timesHeadline"), fnSource("postScore"), fnSource("appendPostEl"), fnSource("renderFeed"),
   listenerSrc,
   "return { renderFeed: renderFeed };",
 ].join("\n"))(win, pageDoc, feedList);

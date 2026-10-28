@@ -116,7 +116,9 @@ test("switch CSS: Oswald pipe, lit #f7f9ff, dim #d9d2f0 at 60%, pipe at 40%, one
 test("no success notice: a successful post shows nothing (Alexa, Oct 22 11:45 AM CT)", function () {
   assert.ok(tower.indexOf("Posted to Feed") < 0, "no 'Posted to Feed.' text anywhere in tower.js");
   assert.ok(tower.indexOf("Posting to Feed") < 0, "no in-flight notice either");
-  var submit = tower.slice(tower.indexOf(".createTowerPost({"), tower.indexOf('var result = TowerStore.add({'));
+  /* Scope to the Feed composer submit (#283 added a second createTowerPost call for #addevent posts earlier in tower.js). */
+  var composerAt = tower.indexOf("var savedPics = form.__pics");
+  var submit = tower.slice(tower.indexOf(".createTowerPost({", composerAt), tower.indexOf('var result = TowerStore.add({', composerAt));
   var ok = submit.slice(submit.indexOf(".then(function () {"), submit.indexOf(".catch("));
   assert.ok(/setStatus\("", false\);/.test(ok), "success hides the status box");
   assert.ok(!/setStatus\("[^"]/.test(ok), "success sets no message");
@@ -163,6 +165,8 @@ function remoteBranch() {
   var statusFn = "function setStatus(msg, isError)" + balanced(tower, statusAt, "{", "}");
   return new Function("form", "postSubmitBtn", "status", "bodyInput", "fileInput", "attachments", "social0", "window", "console", "renderFeed", "root",
     "function usingRemoteSocial(){return true;} function remoteSocial(){return social0;}\n" +
+    /* #184: the composer resolves its author via audienceAuthor() before this branch; a signed-in member with a page. */
+    'var who = { id: "pro-1", name: "", handle: "" };\n' +
     tower.match(/var EMPTY_POST_LINE = "[^"]*";/)[0] + "\n" +
     statusFn + "\n" + inFlightFn + "\n" + lineFn + "\n" +
     "return function run() " + block + ";");

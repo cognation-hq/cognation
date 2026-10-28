@@ -214,7 +214,7 @@ function testTowerSource() {
 
 function testTowerFollowSelfHidden() {
   var src = read("js/tower-follow.js");
-  assert.ok(/if \(ownProfileOnScreen\(btn\)\) \{\s*if \(row\) row\.hidden = true;\s*btn\.hidden = true;\s*return;/.test(src),
+  assert.ok(/if \(ownProfileOnScreen\(btn\)(?: \|\| isCognationPage\(\))?\) \{\s*if \(row\) row\.hidden = true;\s*btn\.hidden = true;\s*return;/.test(src),
     "Add friend row hidden on your own profile before any async lookup");
 }
 

@@ -83,7 +83,10 @@ photo.saveOwnPhoto(client, me, "https://cdn.example.com/me.jpg").then(function (
     { userId: "b", name: "Leo", handle: "leo", photoUrl: "" },
     { userId: "c", name: "Mia", handle: "mia", photoUrl: "javascript:alert(1)" },
   ], { width: 390, height: 700 });
-  var c = stack.children[0].children;
+  /* #265 adds a per-friend actions box (Unfriend / Check in) next to each frame; check the friend circles themselves. */
+  function circles(st) { return st.children[0].children.filter(function (e) { return "data-circle-fall-portrait" in e.attrs; }); }
+  var c = circles(stack);
+  assert.strictEqual(c.length, 3, "one circle per friend");
   /* Before the photo loads every circle already shows its letter (never blank). */
   assert.deepStrictEqual(c.map(function (e) { return e.textContent; }), ["A", "L", "M"], "letters first");
   pending.forEach(function (p) { if (/broken/.test(p[1])) p[0].onerror(); else p[0].onload(); });
@@ -98,7 +101,7 @@ photo.saveOwnPhoto(client, me, "https://cdn.example.com/me.jpg").then(function (
     { userId: "d", name: "Luna", handle: "luna", photoUrl: null },
     { userId: "e", name: "Omar", handle: "omar", photoUrl: "https://cdn.example.com/broken.jpg" },
   ], { width: 390, height: 700, paint: function (el) { el.textContent = ""; el.style.backgroundImage = 'url("data:image/png;base64,AAAA")'; } });
-  var c2 = s2.children[0].children;
+  var c2 = circles(s2);
   pending.forEach(function (p) { if (/broken/.test(p[1])) p[0].onerror(); else p[0].onload(); });
   assert.strictEqual(c2[0].textContent, "L", "null photo_url → letter");
   assert.ok(!c2[0].style.backgroundImage, "local painter avatar dropped");

@@ -34,8 +34,16 @@ assert.ok(feedRule.index > blackBorder && postRule.index > panelBg && composeRul
 /* Scoped: TOWER Feed list/cards and the Feed panel's composer only; nothing for the Times, badge, buttons or other panels. */
 var start = css.indexOf("/* TOWER Feed contrast (Designer follow-up).");
 assert.ok(start !== -1, "block present");
-var block = css.slice(start).replace(/\/\*[\s\S]*?\*\//g, "");
-var selectors = block.match(/[^{}]+(?=\{)/g).map(function (s) { return s.trim(); });
+/* #268 appended unrelated CSS after this block with no closing comment, so the block is the
+   run of rules right after the header, up to the first rule outside the TOWER Feed scope. */
+var SCOPED = /^(\.tower-feed\[data-tower-feed\]|#panel-signal \.signal-feed-host \.tower-compose\[data-tower-compose\])/;
+var tail = css.slice(start).replace(/\/\*[\s\S]*?\*\//g, "");
+var ruleRe = /([^{}]+)\{[^{}]*\}/g, m2, block = "";
+while ((m2 = ruleRe.exec(tail))) {
+  if (!SCOPED.test(m2[1].trim())) break;
+  block += m2[0];
+}
+var selectors = (block.match(/[^{}]+(?=\{)/g) || []).map(function (s) { return s.trim(); });
 assert.strictEqual(selectors.length, 4, "four rules only");
 selectors.forEach(function (s) {
   assert.ok(/^\.tower-feed\[data-tower-feed\]/.test(s) || /^#panel-signal \.signal-feed-host \.tower-compose\[data-tower-compose\]/.test(s), "scoped to the TOWER Feed panel: " + s);

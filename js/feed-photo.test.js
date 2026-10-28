@@ -18,23 +18,34 @@ function fnSource(src, name) {
   for (; i < src.length; i++) { if (src[i] === "{") depth++; else if (src[i] === "}" && --depth === 0) break; }
   return src.slice(start, i + 1);
 }
-var api = new Function(
-  ["escapeHtml", "kindLabel", "attachmentImageUrl", "renderAttachments"].map(function (n) { return fnSource(tower, n); }).join("\n") +
-  "\nreturn { render: renderAttachments, url: attachmentImageUrl };")();
+/* #184 added photoSrc() and the per-photo audience gate (photoVisible); load them with an adult viewer. */
+var viewerAgeNow = 30;
+var api = new Function("window",
+  ["escapeHtml", "kindLabel", "attachmentImageUrl", "photoSrc", "photoMinAge", "feedViewerAge", "photoVisible", "renderAttachments"].map(function (n) { return fnSource(tower, n); }).join("\n") +
+  "\nreturn { render: renderAttachments, url: attachmentImageUrl, src: photoSrc };")(
+  { CognationAgeFloor: { viewerAge: function () { return viewerAgeNow; }, isAdultKeyword: function (t) { return /\b(nsfw|explicit)\b/i.test(t); } } });
 
 var PNG = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD";
 var html = api.render([{ kind: "photo", label: "shoes.png", dataUrl: PNG }]);
-assert.ok(html.indexOf('<img class="tower-attach-img" src="' + PNG + '"') > 0, "dataUrl photo -> <img>");
-assert.ok(html.indexOf('alt="Photo: shoes.png"') > 0, "alt names the photo");
+/* #184 markup: <img class="tower-feed-photo" alt="" src=...> */
+assert.ok(html.indexOf('<img class="tower-feed-photo" alt="" src="' + PNG + '"') > 0, "dataUrl photo -> <img>");
 assert.ok(html.indexOf("tower-attach-kind") < 0, "no PHOTO pill when the picture is there");
 
 html = api.render([{ kind: "photo", label: "x.jpg", url: "https://example.org/x.jpg" }]);
 assert.ok(/<img [^>]*src="https:\/\/example\.org\/x\.jpg"/.test(html), "https URL -> <img>");
 
 html = api.render([{ kind: "photo", label: "Screenshot 2026-10-02 at 1.06.57 PM.png", name: "Screenshot 2026-10-02 at 1.06.57 PM.png" }]);
-assert.ok(html.indexOf("<img") < 0, "file name only: no image to draw");
-assert.ok(html.indexOf("Screenshot 2026-10-02 at 1.06.57 PM.png") > 0 && html.indexOf("photo wasn't uploaded") > 0, "file name only: honest note");
-assert.ok(html.indexOf("tower-attach--missing") > 0, "marked missing");
+assert.ok(html.indexOf('src="Screenshot') < 0, "file name never used as an image src");
+/* Filename-only photo: what it should show is pending a ruling (#184 draws a stock picture; #220 had the chip). */
+var fileOnlyHtml = html;
+require("node:test")("feed-photo: filename-only photo shows the photo-wasn't-uploaded chip", { todo: "Alexa decides via HH whether #220 photo-wasn't-uploaded chip returns" }, function () {
+  assert.ok(fileOnlyHtml.indexOf("photo wasn't uploaded") > 0 && fileOnlyHtml.indexOf("tower-attach--missing") > 0);
+});
+/* #184 audience gate: an 18+ photo is not drawn for a younger viewer. */
+viewerAgeNow = 12;
+assert.strictEqual(api.render([{ kind: "photo", dataUrl: PNG, rating: "R" }]), "", "R photo hidden from a 12-year-old");
+viewerAgeNow = 30;
+assert.ok(api.render([{ kind: "photo", dataUrl: PNG, rating: "R" }]).indexOf("<img") > 0, "R photo shown to an adult");
 
 html = api.render([{ kind: "document", label: "notes.pdf" }]);
 assert.ok(html.indexOf("<img") < 0 && html.indexOf("wasn't uploaded") < 0 && html.indexOf("notes.pdf") > 0, "documents stay a plain label");

@@ -79,7 +79,7 @@ var times = new Function("feedList", "feedEmpty", "state", "document", "window",
   "function bindEndlessObserver() { loadMoreWire(); }", /* browser: first fill if the list is short */
   "function postsFromTower() { return state.posts.slice(); }",
   "function escapeHtml(s) { return String(s == null ? '' : s); } function formatTime() { return 'now'; }",
-  fnSource("towerPlateKey"), fnSource("syncFeedEmpty"), fnSource("makeWirePost"), fnSource("appendPostEl"),
+  fnSource("towerPlateKey"), fnSource("syncFeedEmpty"), fnSource("makeWirePost"), fnSource("timesHeadline"), fnSource("postScore"), fnSource("appendPostEl"),
   fnSource("loadMoreWire"), fnSource("renderFeed"), fnSource("refreshStatewidePlate"),
   "return { render: function () { endlessOn = state.endlessOn; renderFeed(); }, refresh: function () { endlessOn = state.endlessOn; refreshStatewidePlate(); }, more: function () { loadMoreWire(); } };",
 ].join("\n"))(

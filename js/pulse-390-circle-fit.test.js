@@ -56,3 +56,58 @@ test("phone CSS is scoped below 768px", () => {
   assert.ok(/radial-gradient\(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%\)/.test(block), "#150 edge fade");
   assert.ok(/--pulse-name-px: 12px/.test(block));
 });
+
+/* engineer/pulse-chip-clearance: SeedOps 430 FAIL on 06f5bd8 (chip under a falling
+   circle touched a back frame). On phones circles + chip sit below the orbit. */
+function phoneLayer(vw, ringY) {
+  const o = api.phoneOrbit(vw - 32, G);
+  return {
+    o,
+    layer: {
+      clientHeight: 900,
+      style: { getPropertyValue: (n) => (n === "--pulse-ring-y" ? ringY + "px" : "") },
+      getAttribute: (n) => (n === "data-pulse-orbit" ? o.top.toFixed(1) + "," + o.bottom.toFixed(1) : null),
+      querySelectorAll: () => []
+    }
+  };
+}
+for (const vw of [360, 375, 390, 430]) {
+  test(`${vw}px: falling circles and their chip clear every frame at every orbit angle (bob included)`, () => {
+    const cy = 380;
+    const { o, layer } = phoneLayer(vw, cy);
+    for (const h of [260, 420, 700]) { /* short visible heights put live circles inside the ring */
+      const L = api.phoneBelowRing(layer, { size: 28, slots: [{ x: 10, y: h - 62 }, { x: 60, y: h - 62 }] });
+      for (const s of L.slots) {
+        const chipTop = s.y + L.size + 2;
+        const chipBottom = chipTop + api.PHONE_CHIP;
+        for (let a = 0; a < 360; a += 0.5) {
+          const p = o.point(a);
+          for (const bob of [-18, 0, 18]) {
+            const frameBottom = cy + p.y + bob + p.size / 2 + 22; /* + 12px name */
+            assert.ok(s.y >= frameBottom + 16 - 1, `${vw} angle ${a}: circle top ${s.y} vs frame/name ${frameBottom}`);
+            assert.ok(chipTop > frameBottom && chipBottom > chipTop);
+          }
+        }
+      }
+    }
+  });
+}
+test("blockedBand adds the chip height (+8px gap) above the orbit on phones", () => {
+  const { o, layer } = phoneLayer(430, 384);
+  const band = api.blockedBand(layer);
+  assert.ok(band.top <= 384 + o.top - 48 + 0.1);
+  assert.strictEqual(api.PHONE_CHIP, 48);
+});
+test("desktop (no data-pulse-orbit) placement is untouched", () => {
+  const layer = { clientHeight: 900, style: { getPropertyValue: () => "" }, getAttribute: () => null, querySelectorAll: () => [] };
+  const L = { size: 40, slots: [{ x: 1, y: 100 }] };
+  assert.strictEqual(api.phoneBelowRing(layer, L).slots[0].y, 100);
+});
+test("360 frames without a photo render like 375: solid fill, crisp white initial, no blur (phones only)", () => {
+  const css = fs.readFileSync(path.join(__dirname, "..", "css", "styles.css"), "utf8");
+  const i = css.indexOf("engineer/pulse-chip-clearance");
+  const block = css.slice(css.indexOf("@media (max-width: 767px) {", i), css.indexOf(".pulse-side-toggle {", i));
+  assert.ok(/\.circle-spot\.is-filled:not\(\[data-pulse-photo\]\) \{[^}]*color: #ffffff !important; text-shadow: none; filter: none;[^}]*background-image: none !important/.test(block));
+  assert.ok(!/max-width: 3\d\dpx/.test(block), "no 360-only rule: 360 and 375 share one phone rule");
+  assert.ok(/ellipse 86% 70% at 51% 47%/.test(block), "seam: top edge feathered");
+});

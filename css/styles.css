@@ -15262,6 +15262,33 @@ textarea::placeholder {
   }
   .circle-fall[data-pulse-bg] .circle-spot-caption { --pulse-name-px: 12px; }
 }
+/* engineer/pulse-chip-clearance (phones only, <768px; 1280 unchanged).
+   1) Seam nit (Designer #295): the image masks' top edge is feathered ~24px more
+      (outer ellipse 64% -> 70% tall, centre nudged down 3%) so no darker band
+      shows above the halo at ~y 300-330 on a 390 screen.
+   2) Frames without a photo_url fell back to js/tower.js paintFriendPicture: a pale
+      pink gradient, and .circle-spot's `color: transparent !important` + 10px
+      text-shadow left only a blurred initial (SeedOps 360, seed-0063). Same look as
+      the photo frames instead: solid colour fill, crisp white initial, no blur. */
+@media (max-width: 767px) {
+  .circle-fall[data-pulse-bg]::before {
+    -webkit-mask-image: radial-gradient(ellipse 86% 70% at 51% 47%, #000 50%, transparent 74%), radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+    mask-image: radial-gradient(ellipse 86% 70% at 51% 47%, #000 50%, transparent 74%), radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+  }
+  .circle-fall[data-pulse-bg]::after {
+    -webkit-mask-image: radial-gradient(ellipse 86% 70% at 51% 47%, transparent 48%, #000 68%, #000 90%, transparent 100%), radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+    mask-image: radial-gradient(ellipse 86% 70% at 51% 47%, transparent 48%, #000 68%, #000 90%, transparent 100%), radial-gradient(ellipse 53% 44% at 51% 44%, #000 74%, transparent 100%);
+  }
+  .circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]) {
+    color: #ffffff !important; text-shadow: none; filter: none;
+    background-image: none !important; background-color: #3e7a98 !important;
+  }
+  .circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]):nth-child(5n+1) { background-color: #983e7a !important; }
+  .circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]):nth-child(5n+2) { background-color: #3e9898 !important; }
+  .circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]):nth-child(5n+3) { background-color: #3e7a98 !important; }
+  .circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]):nth-child(5n+4) { background-color: #986b3e !important; }
+  .circle-fall[data-pulse-bg] .circle-spot.is-filled:not([data-pulse-photo]):nth-child(5n) { background-color: #5c3e98 !important; }
+}
 .pulse-side-toggle {
   position: absolute; z-index: 6; top: 8px; left: 50%; transform: translateX(-50%);
   display: flex; gap: 6px; pointer-events: auto;

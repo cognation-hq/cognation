@@ -365,6 +365,10 @@
   var PHONE_EDGE = 8;
   var PHONE_RING_INSET = 32;
   var PHONE_CAPTION = 22; /* 6px gap + 12px name at line-height 1.2, rounded up */
+  /* Unfriend / Check in chip under each falling circle: 2px gap + two 10px/1.2 pills
+     (~38px), plus an 8px clearance gap. SeedOps 430 FAIL on 06f5bd8. */
+  var PHONE_CHIP = 48;
+  var PHONE_BELOW_GAP = 16; /* Designer: circles + chip start 16px below the orbit's lowest reach */
   function orbitPoint(angleDeg, g) {
     var t = angleDeg * Math.PI / 180;
     var x = Math.cos(t) * g.r;
@@ -438,12 +442,31 @@
     var bottom = band.bottom;
     for (var i = 0; i < L.slots.length; i++) {
       if (L.slots[i].y < band.top) return 0; /* circles above the halo: leave as is */
-      bottom = Math.max(bottom, L.slots[i].y + L.size);
+      bottom = Math.max(bottom, L.slots[i].y + L.size + (phoneBand(layer) ? PHONE_CHIP : 0));
     }
     var lift = band.top - (h - (bottom - band.top)) / 2;
     if (!(lift > 1)) return 0;
     layer.style.setProperty("--pulse-ring-y", (h * 0.48 - lift).toFixed(1) + "px");
     return lift;
+  }
+
+  function phoneBand(layer) {
+    return !!(layer && layer.getAttribute && /^-?[\d.]+,-?[\d.]+$/.test(String(layer.getAttribute("data-pulse-orbit") || "")));
+  }
+
+  /* Phones (data-pulse-orbit is only set below 768px): every falling circle and its
+     Unfriend / Check in chip sit BELOW the ring, the top row starting 16px under the
+     lowest reach of the front frame + name (bob included), as on 1280 / the spec. */
+  function phoneBelowRing(layer, L) {
+    if (!phoneBand(layer) || !L || !L.slots.length) return L;
+    var band = blockedBand(layer);
+    if (!band) return L;
+    var floor = band.bottom + PHONE_BELOW_GAP;
+    var minY = Infinity;
+    for (var i = 0; i < L.slots.length; i++) minY = Math.min(minY, L.slots[i].y);
+    var d = floor - minY;
+    if (d > 0) for (var j = 0; j < L.slots.length; j++) L.slots[j].y = Math.round(L.slots[j].y + d);
+    return L;
   }
 
   /* Vertical band (layer px) covered by the ring image and the five frames + captions.
@@ -463,7 +486,9 @@
     var orbit = layer.getAttribute ? String(layer.getAttribute("data-pulse-orbit") || "") : "";
     var om = /^(-?[\d.]+),(-?[\d.]+)$/.exec(orbit);
     if (om) {
-      top = Math.min(top, cy + num(om[1]));
+      /* the chip hangs below its circle, so anything placed above the band needs
+         the chip's height (+8px gap) of extra room above the frames' reach */
+      top = Math.min(top, cy + num(om[1]) - PHONE_CHIP);
       bottom = Math.max(bottom, cy + num(om[2]));
     }
     var spots = layer.querySelectorAll ? layer.querySelectorAll("[data-circle-ring] [data-circle-spot]") : [];
@@ -608,7 +633,7 @@
       if (seen > 160 && seen < h) h = seen;
     }
     if (opts.center) centerGroup(layer, friends.length, w, h, opts);
-    var L = layoutBottom(friends.length, w, h);
+    var L = phoneBelowRing(layer, layoutBottom(friends.length, w, h));
     var inner = document.createElement("div");
     inner.className = "pulse-fall-inner";
     stack.appendChild(inner);
@@ -761,6 +786,8 @@
     haloSpots: haloSpots,
     blockedBand: blockedBand,
     phoneOrbit: phoneOrbit,
+    phoneBelowRing: phoneBelowRing,
+    PHONE_CHIP: PHONE_CHIP,
     PHONE_MAX_W: PHONE_MAX_W,
     centerGroup: centerGroup,
     layoutOutside: layoutOutside,

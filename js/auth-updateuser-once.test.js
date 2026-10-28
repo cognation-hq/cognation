@@ -1,7 +1,9 @@
 /**
  * One page load (session-started + profile load + Tower/Commune renders that
- * fire cognation:member-profile-updated) sends PUT /auth/v1/user at most once,
- * and not at all when the server metadata already matches.
+ * fire cognation:member-profile-updated) sends no PUT /auth/v1/user: seed
+ * defaults stay local, and member-profile-updated never persists. Only a user
+ * action (See dating toggle, profile Save) writes; see
+ * js/seed-signin-no-updateuser.test.js.
  * Run: node js/auth-updateuser-once.test.js
  */
 "use strict";
@@ -92,11 +94,8 @@ var REAL = { username: "member-login", activeProfileId: "prof-real", source: "su
 
 var seedServer = { meta: {} };   /* nothing saved server-side yet */
 pageLoad(seedServer, SEED, null).then(function (puts) {
-  assert.ok(puts.length <= 1, "fresh seed page load: at most one PUT /auth/v1/user (got " + puts.length + ")");
-  assert.strictEqual(puts.length, 1, "seed defaults are written once");
-  assert.strictEqual(puts[0].see_dating, true);
-  assert.strictEqual(puts[0].member_age, 22);
-  /* Reload: server now matches local -> zero PUTs. */
+  assert.strictEqual(puts.length, 0, "fresh seed page load: seed defaults are never written (got " + JSON.stringify(puts) + ")");
+  /* Reload: still zero PUTs. */
   return pageLoad(seedServer, SEED, null);
 }).then(function (puts) {
   assert.strictEqual(puts.length, 0, "reload with unchanged metadata: no PUT (got " + puts.length + ")");
@@ -109,7 +108,7 @@ pageLoad(seedServer, SEED, null).then(function (puts) {
   return pageLoad({ meta: meta }, REAL, local);
 }).then(function (puts) {
   assert.strictEqual(puts.length, 0, "real member, unchanged metadata: no PUT (got " + puts.length + ")");
-  /* A real change (age edited) is written exactly once. */
+  /* Local age differs from metadata: age is never written (user_birth only). */
   var meta = { see_dating: false, member_age: 34, member_city: "Springfield", member_state: "IL", member_country: "United States", member_interests: ["jobs"] };
   var local = {
     "cognation.member.profile.v1": JSON.stringify({ age: 35, city: "Springfield", locality: "Springfield", state: "IL", country: "United States", interests: ["jobs"] }),
@@ -117,8 +116,7 @@ pageLoad(seedServer, SEED, null).then(function (puts) {
   };
   var srv = { meta: meta };
   return pageLoad(srv, REAL, local).then(function (puts) {
-    /* hydrate applies server age (34) over local, so local now matches: no write. */
-    assert.ok(puts.length <= 1, "at most one PUT (got " + puts.length + ")");
+    assert.strictEqual(puts.length, 0, "no PUT without a user action (got " + JSON.stringify(puts) + ")");
     console.log("auth-updateuser-once.test.js: ok");
   });
 }).catch(function (err) { console.error(err); process.exit(1); });

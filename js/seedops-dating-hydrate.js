@@ -216,7 +216,9 @@
     };
   }
 
-  /* Same shape and key order as prefsPayloadFromLocal(), from auth user_metadata. */
+  /* Same shape and key order as prefsPayloadFromLocal(), from auth user_metadata.
+     No member_age: age comes only from user_birth and is never written to auth
+     metadata (an old member_age there is still read by prefsFromMetadata). */
   function prefsPayloadFromMetadata(meta) {
     meta = meta || {};
     var p = prefsFromMetadata(meta);
@@ -225,7 +227,6 @@
     return {
       /* Missing see_dating means the default (off), not a change to write. */
       see_dating: p.seeDating == null ? false : p.seeDating,
-      member_age: p.age,
       member_city: p.city,
       member_state: p.state,
       member_country: p.country,
@@ -251,7 +252,6 @@
     if (Array.isArray(interests)) interests = interests.slice();
     return {
       see_dating: see,
-      member_age: parseInt(member.age, 10) || null,
       member_city: String(member.city || member.locality || ""),
       member_state: String(member.state || ""),
       member_country: String(member.country || ""),
@@ -548,8 +548,23 @@
       });
   }
 
+  /* Only these keys: opts.fields limits a write (the See dating toggle sends
+     see_dating alone). GoTrue merges data keys into user_metadata. */
+  function pickPrefs(obj, fields) {
+    if (!fields) return obj;
+    var out = {};
+    fields.forEach(function (k) {
+      if (obj && Object.prototype.hasOwnProperty.call(obj, k)) out[k] = obj[k];
+    });
+    return out;
+  }
+
+  /* Writes PUT /auth/v1/user. Call only from an explicit user action (the See
+     dating toggle, or the sign-up profile Save); never from sign-in, hydrate,
+     or seed defaults. */
   function persistPrefs(opts) {
     opts = opts || {};
+    var fields = Array.isArray(opts.fields) && opts.fields.length ? opts.fields.slice() : null;
     var sb = client();
     if (!isConfigured() || !sb || typeof sb.updateUser !== "function") {
       return Promise.resolve({ ok: false, skipped: true, error: "no_update_user" });
@@ -584,16 +599,21 @@
         : fetchUserMetadata().then(function (meta) { rememberServerPrefs(meta); return serverPrefsJson; });
       return known.then(function (serverJson) {
         if (serverJson == null) return { ok: false, skipped: true, error: "server_prefs_unknown" };
-        var payload = prefsPayloadFromLocal();
+        var full = prefsPayloadFromLocal();
+        var serverPrefs = JSON.parse(serverJson) || {};
+        var payload = pickPrefs(full, fields);
         var json = JSON.stringify(payload);
-        if (json === serverJson) return { ok: true, skipped: true, unchanged: true };
+        if (json === JSON.stringify(pickPrefs(serverPrefs, fields))) {
+          return { ok: true, skipped: true, unchanged: true };
+        }
         var tries = persistAttempts[json] || 0;
         if (tries >= PERSIST_MAX_ATTEMPTS) return { ok: false, skipped: true, error: "persist_gave_up" };
         /* A retry for this value is already queued: don't queue or send another. */
         if (retryTimer && retryJson === json) return { ok: false, skipped: true, error: "retry_pending" };
         persistAttempts[json] = tries + 1;
         return sb.updateUser(payload).then(function () {
-          serverPrefsJson = json;
+          Object.keys(payload).forEach(function (k) { serverPrefs[k] = payload[k]; });
+          serverPrefsJson = JSON.stringify(pickPrefs(serverPrefs, Object.keys(full)));
           emitLog({ action: "persist", ok: true, payload: payload });
           return { ok: true, payload: payload };
         }, function (err) {
@@ -603,7 +623,7 @@
             retryTimer = setTimeout(function () {
               retryTimer = null;
               retryJson = "";
-              persistPrefs();
+              persistPrefs(opts);
             }, PERSIST_RETRY_MS * persistAttempts[json]);
           }
           return {
@@ -625,12 +645,12 @@
     return persistChain;
   }
 
-  function schedulePersist() {
-    if (hydrating) return;
+  /* User actions only (see the see-dating-changed listener in boot()). */
+  function schedulePersist(opts) {
     if (persistTimer) clearTimeout(persistTimer);
     persistTimer = setTimeout(function () {
       persistTimer = null;
-      persistPrefs();
+      persistPrefs(opts);
     }, 600);
   }
 
@@ -738,9 +758,11 @@
         writeJson(sessionStorage, BOOT_FLAG, out);
         emitLog({ action: "hydrate", ok: out.ok, result: out });
         hydrating = false;
-        /* Do not PUT /auth/v1/user from hydrate/boot. That write on every
-           sign-in was the main suspect for breaking real sessions. Prefs
-           persist only from explicit member-profile / see-dating changes. */
+        /* Do not PUT /auth/v1/user from hydrate/boot. Seed defaults and other
+           setMemberProfile calls at sign-in fire member-profile-updated, and that
+           used to schedule a PUT; it no longer does. Prefs persist only on an
+           explicit user action: the See dating toggle (detail.byUser) or the
+           sign-up profile Save calling persistPrefs(). */
         return out;
       })
       .catch(function (err) {
@@ -794,11 +816,11 @@
       } catch (e3) {}
       run(true);
     });
-    document.addEventListener("cognation:member-profile-updated", function () {
-      schedulePersist();
-    });
+    /* No persist on cognation:member-profile-updated: it fires on every
+       setMemberProfile (seed defaults, renders, sign-in), not only user edits. */
     document.addEventListener("cognation:see-dating-changed", function (ev) {
-      schedulePersist();
+      /* Only the member flipping the toggle writes, and only see_dating. */
+      if (ev && ev.detail && ev.detail.byUser) schedulePersist({ fields: ["see_dating"], byUser: true });
       var on = !!(ev && ev.detail && ev.detail.seeDating);
       if (!on) return;
       /* Toggle into Dating: refresh bios if cache left profiles empty (blank Card 1). */

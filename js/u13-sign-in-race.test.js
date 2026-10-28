@@ -5,7 +5,7 @@
  * state and profile row load, and "not loaded" was treated as "not Sage".
  * Here the login state is ready only after a delay and the profile row loads
  * even later. Expect: Sage 0 PUTs and her age never reads 22; a normal seed
- * still gets age 22 with exactly one write.
+ * still gets age 22 locally and nothing is written at sign-in.
  * Run: node js/u13-sign-in-race.test.js
  */
 "use strict";
@@ -154,9 +154,7 @@ function testNormalSeedOneWrite() {
   var row = { id: "p-seed-0003", user_id: "u-0003", account_kind: "seed", seed_fleet_id: "seed-0003" };
   return signIn({ username: "seed-0003", user: user, row: row, rowDelay: 2500 }).then(function (r) {
     assert.strictEqual(r.win.CognationCommuneSwipe.getMemberAge(), 22, "normal seed still gets age 22");
-    assert.strictEqual(r.puts.length, 1, "normal seed: exactly one write (got " + r.puts.length + ")");
-    assert.strictEqual(r.puts[0].data.member_age, 22);
-    assert.ok(r.puts[0].at >= 2500, "write waits for the profile row (at " + r.puts[0].at + "ms)");
+    assert.strictEqual(r.puts.length, 0, "normal seed: no write at sign-in (got " + JSON.stringify(r.puts) + ")");
   });
 }
 

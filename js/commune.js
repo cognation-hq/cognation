@@ -973,7 +973,9 @@
     var floorUnder13AtRender = null;
     var towerPlateKeyAtRender = null;
     function towerPlateKey(posts) {
-      return posts.slice(0, TIMES_SLOTS).map(function (p) { return p.id || ""; }).join("|");
+      /* Rating is part of the key: when a rated copy replaces an unrated or
+         guessed one (same ids), the Times redraws with the server rating. */
+      return posts.slice(0, TIMES_SLOTS).map(function (p) { return (p.id || "") + ":" + (p.towerRating || ""); }).join("|");
     }
     function natIntlFloor(posts) {
       return newsNatIntlFloor(posts, editionId);
@@ -1289,6 +1291,9 @@
           seeded: true,
           fromTower: true,
           towerPostId: p.id,
+          /* Store rating, for the redraw key only (towerPlateKey); not read by
+             the age floor or comments, so what prints is unchanged. */
+          towerRating: p.rating || "",
           /* Author's profile id: the Times Report spots the reader's own post
              (the server refuses those with cannot_report_own). */
           authorProfileId: p.authorProfileId || "",

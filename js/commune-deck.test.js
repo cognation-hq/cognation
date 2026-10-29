@@ -311,6 +311,9 @@ function testAdsAndNoInventedCafe() {
     },
   }));
   var api2 = loadSwipe(withAd, memoryStorage());
+  /* user_birth pending or no row: age 0, so no marketing ads (#309). */
+  assert.ok(api2.sampleDeck(12).every(function (card) { return card.type !== "ad"; }), "age pending: no ads");
+  api2.setDatingBirthAge(30);
   var shown = api2.sampleDeck(12);
   assert.ok(shown.some(function (card) { return card.type === "ad" && card.handle === "studio" && card.videoUrl; }));
 }
@@ -413,6 +416,7 @@ function testRightSwipeStillKeeps() {
     api.noteProfileSeedStatus("friend", false);
     api.noteProfileSeedStatus("sam", false);
   }
+  api.setDatingBirthAge(30); /* ads need a known age (user_birth); pending = 0 = no ads */
   assert.strictEqual(deckHas(api.sampleDeck(18), "ad-pro-0"), true);
   assert.strictEqual(deckHas(api.sampleDeck(18), "know-sam"), true);
 
@@ -427,7 +431,9 @@ function testRightSwipeStillKeeps() {
   }, "right");
   var shares = JSON.parse(local.getItem("cognation.commune.friend-shares.v1"));
   assert.ok(shares.some(function (share) { return share.adId === "ad-pro-0" && share.swiperId === "ada"; }));
-  assert.strictEqual(deckHas(loadSwipe(local, memoryStorage()).sampleDeck(18), "ad-pro-0"), true);
+  var reloaded = loadSwipe(local, memoryStorage());
+  reloaded.setDatingBirthAge(30);
+  assert.strictEqual(deckHas(reloaded.sampleDeck(18), "ad-pro-0"), true);
 
   api.settleSwipe({ id: "know-sam", type: "know", profileId: "sam", title: "Sam" }, "right");
   assert.strictEqual(deckHas(api.sampleDeck(18), "know-sam"), true);
@@ -435,6 +441,7 @@ function testRightSwipeStillKeeps() {
   api.settleSwipe({ id: "ad-pro-0", type: "ad", title: "Evening class" }, "left");
   api.settleSwipe({ id: "know-sam", type: "know", profileId: "sam" }, "left");
   var after = loadSwipe(local, memoryStorage());
+  after.setDatingBirthAge(30); /* known age, so the ad is gone because of the left swipe, not the age */
   if (after.noteViewerSeedStatus) after.noteViewerSeedStatus(false);
   if (after.noteProfileSeedStatus) {
     after.noteProfileSeedStatus("friend", false);
@@ -448,6 +455,7 @@ function testRightSwipeStillKeeps() {
   local.setItem("cognation.profiles.v1", JSON.stringify(profiles));
   local.setItem("cognation.session.v2", sessionFor("bea"));
   var bea = loadSwipe(local, memoryStorage());
+  bea.setDatingBirthAge(30);
   if (bea.noteViewerSeedStatus) bea.noteViewerSeedStatus(false);
   if (bea.noteProfileSeedStatus) {
     bea.noteProfileSeedStatus("bea", false);

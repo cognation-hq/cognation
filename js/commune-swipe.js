@@ -509,11 +509,10 @@
   function getMemberAge() {
     if (signedOutViewer()) return 0;
     if (datingBirthAge != null) return datingBirthAge;
-    /* Not known yet: the local profile age (a mirror of user_birth, and
-       editable) can only lower the age, never raise it above 13. */
-    var n = parseInt(getMemberProfile().age, 10);
-    var stored = !isNaN(n) && n > 0 ? n : null;
-    return stored != null && stored < ACCESS_AGE_UNKNOWN ? stored : ACCESS_AGE_UNKNOWN;
+    /* Signed in, user_birth pending or no row: 0, like viewerAge() (#309).
+       The local profile age (editable) is never read here. The server's
+       13 default for an unknown age is a separate backstop. */
+    return 0;
   }
   function getSeeDating() {
     try { return localStorage.getItem(SEE_DATING_KEY) === "1"; } catch (e) { return false; }
@@ -1691,9 +1690,7 @@
     });
     if (html) html = '<div class="commune-market-photos" data-market-photos>' + html + "</div>";
     if (!marketCanBid()) {
-      /* Signed out: the age is unknown, not too young; say what opens it. */
-      return html + '<p class="commune-card-meta" data-market-bid-note>' +
-        (signedOutViewer() ? "Sign in to bid." : "Bidding is for ages 16 and up.") + "</p>";
+      return html + '<p class="commune-card-meta" data-market-bid-note>Bidding is for ages 16 and up.</p>';
     }
     var price = marketMoney(card.ask);
     var high = liveHigh(card.id);

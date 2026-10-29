@@ -228,11 +228,16 @@ function closed(w, label) {
     assert.strictEqual(w.newsThread("R"), false, label + ": no R news thread");
   }
   if (w.has("CognationClassroomSessions")) {
-    /* Unknown age reads as 13, as on the server: no R session; PG-13 stays the server's unknown-age floor. */
-    assert.strictEqual(w.agenda(), "G,PG-13", label + ": no R classroom session");
+    /* Unknown age is 0 (PM ruling, #309): G/PG sessions only. The server's 13 default is a separate backstop. */
+    assert.strictEqual(w.agenda(), "G", label + ": G/PG classroom sessions only");
   }
   if (w.swipe) {
-    assert.ok(w.swipe.getMemberAge() < 18, label + ": member age under 18");
+    assert.strictEqual(w.swipe.getMemberAge(), 0, label + ": member age 0, not the own local age 30");
+    ["personal", "professional"].forEach(function (mode) {
+      var deck = w.swipe.sampleDeck(40, mode);
+      assert.ok(deck.every(function (c) { return c.type !== "classroom" && c.type !== "ad"; }), label + ": no classroom or ad cards (" + mode + ")");
+      assert.ok(deck.every(function (c) { return !c.rating || ["G", "PG"].indexOf(String(c.rating)) !== -1; }), label + ": G/PG cards only (" + mode + ")");
+    });
     assert.ok(w.win.CognationLive.memberAge() < 18, label + ": COMMUNE live age under 18");
     assert.strictEqual(w.swipe.datingAllowed(), false, label + ": dating closed");
     assert.strictEqual(w.roomOpen("speed-dating"), false, label + ": speed dating closed");

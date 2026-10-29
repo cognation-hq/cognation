@@ -140,8 +140,9 @@
 
   /**
    * Mirrors the server read policy so the UI never shows a row the server would hide
-   * (the server is the real gate; this is the second lock).
-   * viewer: { userId, isSeed, age }  (age 0 / null = unknown: as 13, no R)
+   * (the server is the real gate; this is the second lock). For an unknown age the
+   * client is stricter (0 = G/PG only) than the server's 13 backstop.
+   * viewer: { userId, isSeed, age }  (age 0 / null = unknown: G/PG only, as under 13)
    */
   function visibleToViewer(s, viewer) {
     if (!s || !s.host) return false;
@@ -152,10 +153,11 @@
     if (s.status === "ended") return false;
     if (s.host.accountKind !== "real" && !viewer.isSeed) return false;
     var age = Number(viewer.age) || 0;
-    if (age > 0 && age < 13 && !ratingIsGPG(s.rating)) return false;
-    /* R (or any rating past PG-13) needs a known 18+ age, as on the server,
-       where an unknown age counts as 13. Unknown (0: signed out, pending, or
-       no user_birth reader on this page) never opens R (#309). */
+    /* Under 13 or unknown (0: signed out, user_birth pending or no row, or no
+       user_birth reader on this page) sees G/PG only (#309). The server's 13
+       default for an unknown age is a separate backstop. */
+    if (age < 13 && !ratingIsGPG(s.rating)) return false;
+    /* R (or any rating past PG-13) needs a known 18+ age. */
     var r = String(s.rating || "").toUpperCase();
     if (!ratingIsGPG(s.rating) && r !== "PG-13" && !(age >= 18)) return false;
     return true;

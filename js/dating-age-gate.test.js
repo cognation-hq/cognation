@@ -78,13 +78,15 @@ assert.ok(/vp\.account_kind = 'seed'/.test(sql) && /p\.account_kind = 'seed'/.te
 assert.ok(/cognation_user_age\(p\.user_id\) is not null\s+and public\.cognation_user_age\(p\.user_id\) >= 18/.test(sql), "pool 18+ known");
 console.log("dating-age-gate ok");
 
-// 6) Missing birth year = access age 13 (not under-13, not 28).
+// 6) Missing birth year = member age 0 (closed until user_birth answers; #309), never stale 28.
+//    The server's 13 default for an unknown age is a separate backstop.
 api.setMemberProfile({ age: 28 });
 api.setDatingBirthAge(null);
-assert.strictEqual(api.getMemberAge(), 13, "missing birth reads 13, never stale 28");
-assert.ok(api.getMemberAge() >= 13, "not treated as under-13");
+assert.strictEqual(api.getMemberAge(), 0, "missing birth reads 0, never stale 28");
+assert.strictEqual(api.datingAllowed(), false, "missing birth: dating closed");
+assert.strictEqual(api.classroomAllowed(), false, "missing birth: classroom closed");
 api.setMemberProfile({ age: 11 });
-assert.strictEqual(api.getMemberAge(), 11, "lower stored age (Sage) still wins");
+assert.strictEqual(api.getMemberAge(), 0, "local age is never read, even a lower one");
 api.setDatingBirthAge(26);
 assert.strictEqual(api.getMemberAge(), 26, "real birth age used");
 assert.ok(/coalesce\(public\.cognation_user_age\(p_user\), 13\)/.test(sql), "server access age 13 when missing");

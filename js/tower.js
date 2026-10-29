@@ -3066,7 +3066,9 @@
     } catch (eFeed) {}
     try {
       var hyd = window.CognationSeedOpsTowerHydrate;
-      if (hyd && typeof hyd.hydrate === "function") hyd.hydrate({ force: true, fillEmpty: false });
+      /* One after-age seed-post read per session (shared with the dating hydrate report). */
+      if (hyd && typeof hyd.readAfterAge === "function") hyd.readAfterAge({ reason: "viewer_age_changed", fillEmpty: false });
+      else if (hyd && typeof hyd.hydrate === "function") hyd.hydrate({ force: true, fillEmpty: false });
     } catch (eHyd) {}
   });
 

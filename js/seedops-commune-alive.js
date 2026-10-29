@@ -288,11 +288,13 @@
 
   /**
    * Run bootstrap. Safe to call repeatedly; skips heavy work if already booted
-   * for this session unless opts.force.
+   * for this session unless opts.force. Seed/ops sessions only, even with force.
    */
   function bootstrap(opts) {
     opts = opts || {};
-    if (!isSeedOrOpsSession() && !opts.force) {
+    /* Fail closed: force only skips the BOOT_FLAG cache, never the seed/ops
+       gate, so no caller can write seed data into a real user's session. */
+    if (!isSeedOrOpsSession()) {
       return { ok: false, error: "not_seed_or_ops", skipped: true };
     }
     var prior = readJson(sessionStorage, BOOT_FLAG, null);

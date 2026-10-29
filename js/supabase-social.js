@@ -876,8 +876,9 @@
             var tower = store.get() || {};
             tower.friendIds = ids.slice();
             /* Friend roster only — never a geometry edit. geometry:true was
-               rewriting tower_widget_layouts on every Save/reload. */
-            store.save(tower);
+               rewriting tower_widget_layouts on every Save/reload. A load-time
+               hydrate, so repair: local copies only, never an upload. */
+            store.save(tower, { repair: true });
           } catch (eHydrate) {}
         }
         try {

@@ -2,7 +2,8 @@
  * Tower widget layout ⇄ Supabase (public.tower_widget_layouts, one row per profile).
  * Read: a saved DB row wins; no row → whatever the page already has (local copy,
  * else the default spawn layout). Write: the owner's next save upserts the layout,
- * which also moves an older localStorage-only layout into the DB.
+ * which also moves an older localStorage-only layout into the DB. Load-time
+ * repairs are staged in memory (stage) and never upload on their own.
  *
  * layout._public (optional): { musicUrl, socialLinks } — Pro YouTube + Venmo /
  * Pay for services / Buy ads / social URLs that must survive a fresh browser.
@@ -307,10 +308,8 @@
     return true;
   }
 
-  /** Called from the owner-only geometry save path. Debounced upsert. */
-  function save(p) {
-    var id = profileId(p);
-    if (!id) return false;
+  /* The row save() would upload for p: positions, _public, _backup, _widgets. */
+  function buildLayout(id, p) {
     /* No built-in positions yet (only an added Quote, say) still uploads. */
     var layout = clean(p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : {});
     delete layout._widgets;
@@ -327,9 +326,33 @@
     if (bk) layout._backup = bk;
     /* Added widgets go up even when no built-in widget has a position yet. */
     layout._widgets = cleanWidgets(p);
-    var ok = upsert(id, layout);
+    return layout;
+  }
+
+  /** Called from the owner-only geometry save path (drag end, resize end, an
+      owner add / remove, Reset). Debounced upsert. */
+  function save(p) {
+    var id = profileId(p);
+    if (!id) return false;
+    var ok = upsert(id, buildLayout(id, p));
     if (ok) widgetsSeen[id] = widgetsSignature(p);
     return ok;
+  }
+
+  /**
+   * Load-time repair (overlap fix, one-time compaction, arrival-tilt cleanup):
+   * keep the repaired layout in this page's memory so the Tower and the owner's
+   * next drag see it, but never upload. The next explicit owner save (drag end,
+   * resize end, add / remove, Save) uploads it with the owner's change.
+   * Only after this profile's row has been read: staging first would hide the row.
+   */
+  function stage(p) {
+    var id = profileId(p);
+    if (!id || !Object.prototype.hasOwnProperty.call(cache, id)) return false;
+    var layout = buildLayout(id, p);
+    cache[id] = layout;
+    if (layout._public) publicCache[id] = layout._public;
+    return true;
   }
 
   /**
@@ -378,6 +401,7 @@
   var api = {
     apply: apply,
     save: save,
+    stage: stage,
     savePublic: savePublic,
     saveWidgetsIfChanged: saveWidgetsIfChanged,
     _cleanWidgets: cleanWidgets,

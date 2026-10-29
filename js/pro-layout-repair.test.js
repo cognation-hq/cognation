@@ -69,7 +69,7 @@ assert.strictEqual(Object.keys(ctx.plan([{ id: "a", x: 0, y: 0, w: 10, h: 10 }, 
 
 /* 4. Wiring: runs after every desktop layout pass and after a drop; saves once, owner only; no deletes. */
 assert.ok(/repairLayoutOverlaps\(stage, p, layout, spawnIds\);\s*\n\s*\}/.test(tower), "called at end of spawnUnplacedWidgets");
-assert.ok(/repairLayoutOverlaps\(stage, pr, getWidgetLayout\(pr\), spawnIdsDrop\)/.test(tower), "called after a drop");
+assert.ok(/repairLayoutOverlaps\(stage, pr, getWidgetLayout\(pr\), spawnIdsDrop(, \{ ownerAction: true \})?\)/.test(tower), "called after a drop");
 var fn = tower.slice(end, tower.indexOf("  /* Saved spot if the owner placed it"));
 assert.ok(/isPhoneStage\(stage\)/.test(fn) && /is-default-grid/.test(fn), "skips phone + grid");
 assert.ok(/repairSavedSig\[pid\] !== sig/.test(fn) && /isTowerOwner\(p\)/.test(fn), "save once, owner only");

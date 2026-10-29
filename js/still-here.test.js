@@ -551,7 +551,7 @@ assert.ok(/a\.target = "_blank";\s*a\.rel = "noopener noreferrer";/.test(tower),
     "refreshFriends stores profile UUIDs, not handles"
   );
   assert.ok(
-    /tower\.friendIds = ids\.slice\(\);\s*\/\* Friend roster only[\s\S]*?store\.save\(tower\);/.test(social) ||
+    /tower\.friendIds = ids\.slice\(\);\s*\/\* Friend roster only[\s\S]*?store\.save\(tower(, \{ repair: true \})?\);/.test(social) ||
       /tower\.friendIds = ids\.slice\(\);\s*store\.save\(tower\);/.test(social),
     "friend hydrate saves without geometry:true"
   );

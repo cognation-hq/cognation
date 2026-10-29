@@ -1132,6 +1132,9 @@
       if (post.towerPostId) article.setAttribute("data-tower-post-id", String(post.towerPostId));
       if (post.authorProfileId) article.setAttribute("data-author-profile-id", String(post.authorProfileId));
       if (post.rating) article.setAttribute("data-news-rating", String(post.rating));
+      /* Tower stories: label only, from the store's postRating() value. Not
+         data-news-rating, so comments and the under-13 floor are unchanged. */
+      if (post.fromTower && post.towerRating) article.setAttribute("data-tower-rating", String(post.towerRating));
       /* Insert before mounting comments: the Times "Comments" line attaches only to
          stories already inside SIGNAL (news-comments.js wireTimesToggle). */
       feedList.appendChild(article);

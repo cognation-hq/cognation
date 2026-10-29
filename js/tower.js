@@ -3362,6 +3362,9 @@
       article.className = "tower-post";
       article.setAttribute("data-tower-post", post.id || "");
       article.setAttribute("data-post-audience", post.profileKind === "professional" ? "professional" : "personal");
+      /* Rating label: the same postRating() value every gate reads (a server
+         post with no rating reads PG-13). Markup only; no gate reads it. */
+      article.setAttribute("data-tower-rating", String(postRating(post)));
       article.innerHTML =
         '<header class="tower-post-meta">' +
         towerPostAuthorHtml(post) +
@@ -14838,6 +14841,8 @@
   window.CognationTowerIsFounderOwner = isFounderOwner;
   window.CognationTowerNewsPostAppropriate = newsPostAppropriate;
   window.CognationTowerPostVisibleToViewer = towerPostVisibleToViewer;
+  /* The rating every Tower/News gate reads (server rating; missing on a server post = PG-13). */
+  window.CognationTowerPostRating = postRating;
   window.CognationTowerApplySide = function (side) {
     document.querySelectorAll("[data-tower-app]").forEach(function (root) {
       applyTowerSide(root, side);

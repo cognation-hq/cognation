@@ -90,6 +90,13 @@
     });
   }
 
+  /* The rating column is missing until 20261015_tower_auto_rate.sql runs
+     (same check as supabase-social). */
+  function isMissingRatingColumn(err) {
+    var text = String((err && (err.message || err.details || err.hint || err.code)) || err || "");
+    return /rating/i.test(text) && /(column|42703|PGRST204|does not exist|schema cache)/i.test(text);
+  }
+
   function fetchTowerPostsForAuthors(profileIds) {
     var sb = client();
     if (!sb || typeof sb.rest !== "function") {
@@ -107,13 +114,20 @@
           return encodeURIComponent(id);
         }).join(",") + ")";
         var q =
-          "select=id,author_profile_id,body,visibility,attachments,created_at" +
+          "select=id,author_profile_id,body,visibility,attachments,created_at,rating" +
           ",author:profiles!tower_posts_author_profile_id_fkey(id,user_id,kind,handle,display_name,account_kind,seed_fleet_id)" +
           "&author_profile_id=in." +
           listed +
           "&order=created_at.desc&limit=100";
         return sb.rest("tower_posts", { query: q }).then(function (rows) {
           return Array.isArray(rows) ? rows : [];
+        }, function (err) {
+          /* Before the rating migration: load without it (rows stay unrated,
+             so the merge keeps any rated copy already in the store). */
+          if (!isMissingRatingColumn(err)) return [];
+          return sb.rest("tower_posts", { query: q.replace(",created_at,rating", ",created_at") }).then(function (rows) {
+            return Array.isArray(rows) ? rows : [];
+          });
         }).catch(function () {
           return [];
         });
@@ -184,7 +198,17 @@
       likes: 0,
       reactions: {},
       visibility: row.visibility || "friends",
+      /* Server auto-rate (tower_posts.rating), same default as supabase-social. */
+      rating: row.rating || "PG-13",
     };
+  }
+
+  /* A copy whose row carried no server rating never replaces a rated copy's
+     rating: the rating already held wins over the PG-13 default. */
+  function keepRating(prev, next, nextServerRated) {
+    if (!prev || !next || !prev.rating) return next;
+    if (!nextServerRated || !next.rating) next.rating = prev.rating;
+    return next;
   }
 
   function mergeSeedProfiles(rows) {
@@ -312,9 +336,12 @@
 
   function applyTowerPosts(rows, byServerId) {
     var posts = [];
+    var serverRated = {};
     (Array.isArray(rows) ? rows : []).forEach(function (row) {
       if (!row) return;
-      posts.push(mapPost(row, byServerId || {}));
+      var mapped = mapPost(row, byServerId || {});
+      if (mapped.id && row.rating) serverRated[mapped.id] = true;
+      posts.push(mapped);
     });
     if (!posts.length) return { applied: 0, posts: [] };
 
@@ -331,7 +358,7 @@
           if (p && p.id) byId[p.id] = p;
         });
         posts.forEach(function (p) {
-          if (p && p.id) byId[p.id] = p;
+          if (p && p.id) byId[p.id] = keepRating(byId[p.id], p, !!serverRated[p.id]);
         });
         var merged = Object.keys(byId).map(function (id) {
           return byId[id];
@@ -353,12 +380,19 @@
       if (!Array.isArray(overlay.posts)) overlay.posts = [];
       var seen = {};
       overlay.posts.forEach(function (p) {
-        if (p && p.id) seen[p.id] = true;
+        if (p && p.id) seen[p.id] = p;
       });
       posts.forEach(function (p) {
-        if (!p || !p.id || seen[p.id]) return;
+        if (!p || !p.id) return;
+        if (seen[p.id]) {
+          /* Already in the overlay: only bring its rating up to date (a server
+             rating wins; an unrated row never clears or downgrades one). */
+          var held = seen[p.id];
+          if (p.rating && (serverRated[p.id] || !held.rating)) held.rating = p.rating;
+          return;
+        }
         overlay.posts.unshift(p);
-        seen[p.id] = true;
+        seen[p.id] = p;
       });
       overlay.posts = overlay.posts.slice(0, HARD_CAP);
       writeJson(localStorage, key, overlay);
@@ -532,6 +566,7 @@
     hydrate: hydrate,
     fetchSeedProfiles: fetchSeedProfiles,
     mergeSeedProfiles: mergeSeedProfiles,
+    applyTowerPosts: applyTowerPosts,
   };
 
   if (document.readyState === "loading") {

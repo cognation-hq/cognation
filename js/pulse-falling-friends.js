@@ -376,14 +376,25 @@
     var d = g.persp / (g.persp - y * Math.sin(g.tilt));
     return { x: x * d, y: y * Math.cos(g.tilt) * d, d: d };
   }
-  function phoneOrbit(panelW, g) {
-    if (!(panelW > 0) || !g) return null;
-    var dFront = orbitPoint(90, g).d;
+  /* engineer/pulse-phone-halo-separation (Designer LOOK): adjacent frames overlapped
+     as they passed each other on phones (about 22px at 390, 27 at 358). Phones now
+     share one bob phase (tower.js placeCircleSpots), and when g.spots (the ring's
+     spot angles, in order) is given, phoneOrbit scales every frame by sizeK <= 1 so
+     adjacent centres stay >= (size_a + size_b) / 2 + PHONE_FRAME_GAP apart at every
+     rotation step. Smaller frames let the orbit widen (edge limit), so sizeK is the
+     largest scale that holds. sizeK is 1 when nothing overlaps (430 today). */
+  var PHONE_FRAME_GAP = 4;
+  var PHONE_GAP_CUSHION = 0.5; /* rotation is sampled: a hair extra between samples */
+  var sepCache = {};
+  function fitScale(g, dFront, k) {
     function sizeAt(d) {
       var t = (d - 1) / ((dFront - 1) || 1);
       t = t < 0 ? 0 : t > 1 ? 1 : t;
-      return PHONE_FRAME_BACK + (PHONE_FRAME_FRONT - PHONE_FRAME_BACK) * t;
+      return k * (PHONE_FRAME_BACK + (PHONE_FRAME_FRONT - PHONE_FRAME_BACK) * t);
     }
+    return sizeAt;
+  }
+  function orbitF(panelW, g, sizeAt) {
     var ringW = Math.max(0, panelW - PHONE_RING_INSET);
     var maxX = 0;
     var a, p;
@@ -395,9 +406,61 @@
       var lim = (panelW / 2 - PHONE_EDGE - sizeAt(p.d) / 2) / Math.abs(p.x);
       if (lim < f) f = lim;
     }
-    f *= 0.99; /* sampled every 0.25deg: keep a hair of margin between samples */
+    return f * 0.99; /* sampled every 0.25deg: keep a hair of margin between samples */
+  }
+  /* Spot i at rotation phase s, the same path tower.js circleSpotAt walks. */
+  function spotAngle(spots, phase) {
+    var n = spots.length;
+    var w = ((phase % n) + n) % n;
+    var i = Math.floor(w);
+    var mix = w - i;
+    var from = spots[i];
+    var to = spots[(i + 1) % n];
+    if (to > from) to -= 360;
+    return from + (to - from) * mix;
+  }
+  /* Smallest (centre distance - gap) / (mean size at k=1) over every adjacent pair
+     and rotation step: the largest k whose frames keep the gap at this f. */
+  function separationRatio(spots, g, f, unit) {
+    var n = spots.length;
+    var worst = Infinity;
+    for (var s = 0; s < n; s += 0.004) {
+      var P = [];
+      for (var i = 0; i < n; i++) { var q = orbitPoint(spotAngle(spots, i + s), g); P.push({ x: q.x * f, y: q.y * f, size: unit(q.d) }); }
+      for (i = 0; i < n; i++) {
+        var a = P[i], b = P[(i + 1) % n];
+        var r = (Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y)) - PHONE_FRAME_GAP - PHONE_GAP_CUSHION) / ((a.size + b.size) / 2);
+        if (r < worst) worst = r;
+      }
+    }
+    return worst;
+  }
+  function separationK(panelW, g, dFront) {
+    var key = [panelW, g.r, g.tilt, g.persp, g.spots.join(",")].join("|");
+    if (Object.prototype.hasOwnProperty.call(sepCache, key)) return sepCache[key];
+    var unit = fitScale(g, dFront, 1);
+    function ok(k) { return separationRatio(g.spots, g, orbitF(panelW, g, fitScale(g, dFront, k)), unit) >= k; }
+    var k = 1;
+    if (!ok(1)) {
+      var lo = Math.max(0, Math.min(1, separationRatio(g.spots, g, orbitF(panelW, g, unit), unit)));
+      var hi = 1;
+      /* lo holds: smaller frames only widen the orbit. Bisect up to the largest k that holds. */
+      for (var it = 0; it < 18; it++) { var mid = (lo + hi) / 2; if (ok(mid)) lo = mid; else hi = mid; }
+      k = lo;
+    }
+    sepCache[key] = k;
+    return k;
+  }
+  function phoneOrbit(panelW, g) {
+    if (!(panelW > 0) || !g) return null;
+    var dFront = orbitPoint(90, g).d;
+    var sizeK = Array.isArray(g.spots) && g.spots.length > 1 ? separationK(panelW, g, dFront) : 1;
+    var sizeAt = fitScale(g, dFront, sizeK);
+    var ringW = Math.max(0, panelW - PHONE_RING_INSET);
+    var f = orbitF(panelW, g, sizeAt);
     var top = 0;
     var bottom = 0;
+    var a, p;
     for (a = 0; a < 360; a += 0.25) {
       p = orbitPoint(a, g);
       var half = sizeAt(p.d) / 2;
@@ -409,6 +472,7 @@
     return {
       f: f,
       ringW: ringW,
+      sizeK: sizeK,
       sizeAt: sizeAt,
       point: function (angleDeg) { var q = orbitPoint(angleDeg, g); return { x: q.x * f, y: q.y * f, d: q.d, size: sizeAt(q.d) }; },
       /* vertical reach of any frame + caption around the ring centre, motion included */
@@ -789,6 +853,7 @@
     phoneBelowRing: phoneBelowRing,
     PHONE_CHIP: PHONE_CHIP,
     PHONE_MAX_W: PHONE_MAX_W,
+    PHONE_FRAME_GAP: PHONE_FRAME_GAP,
     centerGroup: centerGroup,
     layoutOutside: layoutOutside,
     render: render,

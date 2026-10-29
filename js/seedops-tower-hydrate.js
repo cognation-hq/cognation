@@ -6,7 +6,9 @@
  * Does NOT invent new fleet accounts past 250.
  *
  * HH: hydrate-from-existing first; SeedOps content gen (tower-posts) only when
- * shells are still empty after hydrate. No public Demo gate control.
+ * shells are still empty after hydrate, and then only into this browser's
+ * local store / overlay (never a live tower_posts write: live seed posts come
+ * only from an explicit ops-panel run). No public Demo gate control.
  */
 (function () {
   "use strict";
@@ -17,6 +19,13 @@
   var FETCH_LIMIT = 250;
   var TOP_FRIENDS = 8;
   var hydrating = false;
+  /* Flight generation: bumps on session-started, session-ended and
+     auth-changed. A hydrate captures it when it starts; if it changed by the
+     time its reads come back, the flight belongs to the previous viewer
+     (e.g. the signed-out boot read still out when the member signs in) and
+     drops its apply, fillEmpty and BOOT_FLAG write. */
+  var flightGen = 0;
+  var runningGen = -1;
 
   function emitLog(payload) {
     if (window.CognationSeedOpsLog && typeof window.CognationSeedOpsLog.write === "function") {
@@ -413,7 +422,10 @@
     return { applied: posts.length, posts: posts };
   }
 
-  /** Seeds still without any activity after hydrate → SeedOps content gen only then. */
+  /** Seeds still without any activity after hydrate → SeedOps content gen only then.
+      Local only: this browser's Tower store / SeedOps overlay. Hydrate never
+      writes tower_posts (it runs on sign-in, as whoever signed in); live seed
+      posts come only from an explicit ops-panel run (SeedOps trigger). */
   function fillEmptyShells(byServerId, postCountByFleet) {
     var api = window.CognationSeedOpsTowerPosts;
     if (!api || typeof api.postOne !== "function") {
@@ -428,7 +440,7 @@
       var have = postCountByFleet[rec.seedFleetId] || 0;
       if (have > 0) continue;
       try {
-        var result = api.postOne(rec.seedFleetId, { news: false });
+        var result = api.postOne(rec.seedFleetId, { news: false, localOnly: true });
         if (result && result.ok) generated += 1;
       } catch (eGen) {}
     }
@@ -460,12 +472,25 @@
       return Promise.resolve({ ok: true, cached: true, prior: prior });
     }
     if (hydrating) {
+      if (runningGen !== flightGen) {
+        /* The flight that is out is for the previous viewer and will drop its
+           results: run this one right after it instead of skipping it. */
+        afterFlight = opts;
+        return Promise.resolve({ ok: true, queued: true });
+      }
       return Promise.resolve({ ok: false, error: "hydrate_in_flight", skipped: true });
     }
     hydrating = true;
+    var gen = flightGen;
+    runningGen = gen;
+    var STALE = { stale: true };
+    function stale() { return gen !== flightGen; }
 
     return fetchSeedProfiles()
       .then(function (profiles) {
+        /* Viewer changed while the profiles read was out: no merge, and no
+           seed-post read for the previous viewer. */
+        if (stale()) return STALE;
         var merged = mergeSeedProfiles(profiles);
         var serverIds = Object.keys(merged.byServerId || {});
         return Promise.all([
@@ -475,6 +500,12 @@
         ]);
       })
       .then(function (parts) {
+        if (parts === STALE || stale()) {
+          hydrating = false;
+          setTimeout(runAfterFlight, 0);
+          emitLog({ action: "hydrate_dropped", ok: false, error: "session_changed" });
+          return { ok: false, skipped: true, stale: true, error: "session_changed" };
+        }
         var merged = parts[0] || { ok: false, merged: 0, byServerId: {}, byUserId: {} };
         var friendships = parts[1] || [];
         var towerRows = parts[2] || [];
@@ -585,7 +616,7 @@
     var waited = !!ageWait;
     cancelAgeWait();
     /* A read that waited for the age stands in for the session-start read, so
-       it fills empty shells like that one did. */
+       it fills empty shells like that one did (local store / overlay only). */
     var hopts = waited ? { force: true } : { force: true, fillEmpty: opts.fillEmpty };
     if (hydrating) {
       /* An earlier read (e.g. the signed-out one) is still out: go right after it. */
@@ -609,6 +640,7 @@
     }
     function startSession() {
       ageGen += 1;
+      flightGen += 1;
       try {
         sessionStorage.removeItem(BOOT_FLAG);
       } catch (e) {}
@@ -635,6 +667,7 @@
        loads still reuse the flag, so a signed-out page load does not refetch). */
     document.addEventListener("cognation:session-ended", function () {
       ageGen += 1;
+      flightGen += 1;
       cancelAgeWait();
       afterFlight = null;
       ageReadGen = ageGen;

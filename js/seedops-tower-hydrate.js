@@ -509,6 +509,7 @@
         writeJson(sessionStorage, BOOT_FLAG, out);
         emitLog({ action: "hydrate", ok: out.ok, result: out });
         hydrating = false;
+        setTimeout(runAfterFlight, 0);
         try {
           document.dispatchEvent(
             new CustomEvent("cognation:circle-friends-hydrated", {
@@ -520,6 +521,7 @@
       })
       .catch(function (err) {
         hydrating = false;
+        setTimeout(runAfterFlight, 0);
         var fail = {
           ok: false,
           error: (err && err.message) || "hydrate_failed",
@@ -530,36 +532,137 @@
       });
   }
 
+  /* One seed-post read per sign-in, after the age is known.
+     A signed-in viewer's Tower seed posts are read once this session's
+     user_birth age is known: seedops-dating-hydrate reports its hydrate, or
+     tower.js asks (cognation:viewer-age-changed). Before this, session-started
+     read them before the age loaded and the dating report (or the age change)
+     read them all again ~1-3 s later: two identical bursts. */
+  var DATING_FLAG = "cognation.seedops.datingHydrate.v2";
+  var AGE_WAIT_MS = 8000;
+  var ageGen = 0; /* bumps on session-started, session-ended, auth-changed, birth-saved */
+  var ageReadGen = -1; /* ageGen whose after-age read already went out */
+  var ageWait = null; /* { timer } while a read waits for the age */
+
+  function datingModule() {
+    return !!window.CognationSeedOpsDatingHydrate && isConfigured();
+  }
+
+  function signedInLocal() {
+    try {
+      var auth = window.CognationAuth;
+      var s = auth && typeof auth.getSession === "function" ? auth.getSession() : null;
+      return !!(s && s.supabaseUserId);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /* The dating hydrate already ran for this tab and re-applied its age from
+     its cache (it reports nothing on that path). */
+  function datingCacheApplied() {
+    var prior = readJson(sessionStorage, DATING_FLAG, null);
+    return !!(prior && prior.ok);
+  }
+
+  function cancelAgeWait() {
+    if (ageWait && ageWait.timer) clearTimeout(ageWait.timer);
+    ageWait = null;
+  }
+
+  function waitForAge() {
+    cancelAgeWait();
+    var gen = ageGen;
+    ageWait = {
+      timer: setTimeout(function () {
+        /* No age report in time (dating hydrate missing or stuck): read once anyway. */
+        if (gen === ageGen) readAfterAge({ reason: "age_wait_timeout" });
+      }, AGE_WAIT_MS),
+    };
+  }
+
+  /* The one after-age read for this session. Later asks in the same session
+     are skipped; a new session or a saved birth month starts a new one. */
+  function readAfterAge(opts) {
+    opts = opts || {};
+    if (ageReadGen === ageGen) {
+      emitLog({ action: "after_age_read_skipped", reason: opts.reason || "", gen: ageGen });
+      return Promise.resolve({ ok: true, skipped: true, error: "after_age_read_done" });
+    }
+    ageReadGen = ageGen;
+    var waited = !!ageWait;
+    cancelAgeWait();
+    /* A read that waited for the age stands in for the session-start read, so
+       it fills empty shells like that one did. */
+    var hopts = waited ? { force: true } : { force: true, fillEmpty: opts.fillEmpty };
+    if (hydrating) {
+      /* An earlier read (e.g. the signed-out one) is still out: go right after it. */
+      afterFlight = hopts;
+      return Promise.resolve({ ok: true, queued: true });
+    }
+    return hydrate(hopts);
+  }
+
+  var afterFlight = null;
+  function runAfterFlight() {
+    if (!afterFlight || hydrating) return;
+    var next = afterFlight;
+    afterFlight = null;
+    hydrate(next);
+  }
+
   function boot() {
     function run(force) {
       hydrate({ force: !!force }).then(function () {});
     }
-    setTimeout(function () {
-      run(false);
-    }, 350);
-    document.addEventListener("cognation:session-started", function () {
+    function startSession() {
+      ageGen += 1;
       try {
         sessionStorage.removeItem(BOOT_FLAG);
       } catch (e) {}
-      run(true);
-    });
+      afterFlight = null;
+      if (datingModule()) waitForAge();
+      else {
+        ageReadGen = ageGen;
+        run(true);
+      }
+    }
+    setTimeout(function () {
+      if (signedInLocal() && datingModule()) {
+        if (datingCacheApplied()) readAfterAge({ reason: "dating_cache" });
+        else if (!ageWait && ageReadGen !== ageGen) waitForAge();
+        return;
+      }
+      /* Signed out (no age to wait for): this load's one read. */
+      ageReadGen = ageGen;
+      run(false);
+    }, 350);
+    document.addEventListener("cognation:session-started", startSession);
     /* Sign-out in this tab: hydrate again for the signed-out viewer (same-viewer
        loads still reuse the flag, so a signed-out page load does not refetch). */
     document.addEventListener("cognation:session-ended", function () {
+      ageGen += 1;
+      cancelAgeWait();
+      afterFlight = null;
+      ageReadGen = ageGen;
       run(false);
     });
-    document.addEventListener("cognation:auth-changed", function () {
-      try {
-        sessionStorage.removeItem(BOOT_FLAG);
-      } catch (e2) {}
-      run(true);
+    document.addEventListener("cognation:auth-changed", startSession);
+    /* A saved birth month re-reads the age: allow one more after-age read. */
+    document.addEventListener("cognation:birth-saved", function () {
+      ageGen += 1;
     });
     document.addEventListener("cognation:seedops-dating-hydrate", function (ev) {
-      var detail = ev && ev.detail;
-      if (detail && detail.action === "hydrate" && detail.ok) {
-        /* Dating hydrate may have refreshed bios — refresh Tower shells once. */
-        run(true);
+      var detail = (ev && ev.detail) || {};
+      if (detail.action !== "hydrate") return;
+      /* Started under an earlier session: not this session's age. */
+      if (detail.error === "session_changed") return;
+      if (ageWait) {
+        readAfterAge({ reason: "dating_hydrate" });
+        return;
       }
+      /* Dating hydrate may have refreshed bios: refresh Tower shells, once per session. */
+      if (detail.ok) readAfterAge({ reason: "dating_hydrate" });
     });
   }
 
@@ -568,6 +671,7 @@
     BOOT_FLAG: BOOT_FLAG,
     firstNameOnly: firstNameOnly,
     hydrate: hydrate,
+    readAfterAge: readAfterAge,
     fetchSeedProfiles: fetchSeedProfiles,
     mergeSeedProfiles: mergeSeedProfiles,
     applyTowerPosts: applyTowerPosts,

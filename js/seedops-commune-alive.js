@@ -129,6 +129,23 @@
     }
   }
 
+  /* Seed and ops accounts sign in with an internal address on the seed auth
+     domain or the ops auth domain (scripts/seedops-bind-auth.mjs). A bare
+     "seed-" / "ops-" username prefix is not a marker: after Supabase sign-in
+     session.username is the member's own email. Returns the fleet id or "". */
+  var SEED_AUTH_DOMAIN = "seed.cognation.internal";
+  var OPS_AUTH_DOMAIN = "ops.cognation.internal";
+  function fleetFromAuthEmail(value) {
+    var s = String(value || "").trim().toLowerCase();
+    var at = s.lastIndexOf("@");
+    if (at <= 0) return "";
+    var local = s.slice(0, at);
+    var domain = s.slice(at + 1);
+    if (domain === SEED_AUTH_DOMAIN && /^seed-\d{4}$/.test(local)) return local;
+    if (domain === OPS_AUTH_DOMAIN && /^ops-[a-z0-9-]+$/.test(local)) return local;
+    return "";
+  }
+
   function isSeedOrOpsSession() {
     try {
       if (window.CognationSeedOpsTrigger && typeof window.CognationSeedOpsTrigger.isArmed === "function") {
@@ -145,6 +162,7 @@
         if (kind === "seed" || kind === "ops") return true;
         if (/^seed-\d{4}$/.test(fleet) || /^ops-/.test(fleet)) return true;
         if (app.seedops === true || um.seedops === true) return true;
+        if (fleetFromAuthEmail(user.email)) return true;
       }
     } catch (e2) {}
     try {
@@ -153,8 +171,9 @@
           ? window.CognationAuth.getSession()
           : readJson(localStorage, "cognation.session.v2", null);
       if (!session) return false;
-      var uname = String(session.username || session.profileHandle || "");
-      if (/^seed-\d{4}$/.test(uname) || /^ops-/.test(uname) || /^seed-/.test(uname)) return true;
+      /* Removed: bare /^seed-/, /^seed-\d{4}$/, /^ops-/ match on session.username /
+         profileHandle. Only the seed or ops auth domain counts. */
+      if (fleetFromAuthEmail(session.username)) return true;
     } catch (e3) {}
     return false;
   }

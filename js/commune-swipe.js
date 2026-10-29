@@ -1253,6 +1253,23 @@
     if (/^ops-/.test(fleet)) return "ops";
     return "real";
   }
+  /* Seed and ops accounts sign in with an internal address on the seed auth
+     domain or the ops auth domain (scripts/seedops-bind-auth.mjs). A bare
+     "seed-" / "ops-" username prefix is not a marker: after Supabase sign-in
+     session.username is the member's own email. Returns the fleet id or "". */
+  var SEED_AUTH_DOMAIN = "seed.cognation.internal";
+  var OPS_AUTH_DOMAIN = "ops.cognation.internal";
+  function fleetFromAuthEmail(value) {
+    var s = String(value || "").trim().toLowerCase();
+    var at = s.lastIndexOf("@");
+    if (at <= 0) return "";
+    var local = s.slice(0, at);
+    var domain = s.slice(at + 1);
+    if (domain === SEED_AUTH_DOMAIN && /^seed-\d{4}$/.test(local)) return local;
+    if (domain === OPS_AUTH_DOMAIN && /^ops-[a-z0-9-]+$/.test(local)) return local;
+    return "";
+  }
+
   function viewerAccountKind() {
     try {
       var auth = window.CognationAuth && typeof window.CognationAuth.getSession === "function"
@@ -1263,8 +1280,11 @@
         if (ak === "seed" || ak === "ops") return ak;
         if (auth.isSeed) return "seed";
         var fleet = String(auth.seedFleetId || auth.seed_fleet_id || "");
-        if (/^seed-/.test(fleet) || /^seed-/.test(String(auth.username || ""))) return "seed";
+        if (/^seed-/.test(fleet)) return "seed";
         if (/^ops-/.test(fleet)) return "ops";
+        /* Removed: bare /^seed-/ match on auth.username (a member's email). */
+        var fromEmail = fleetFromAuthEmail(auth.username);
+        if (fromEmail) return /^ops-/.test(fromEmail) ? "ops" : "seed";
       }
     } catch (eKind) {}
     return accountKindOf(viewerPersonal());

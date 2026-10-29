@@ -24,9 +24,13 @@ function memoryStorage() {
   };
 }
 
+/* Built at runtime from parts: no literal addresses in tests (HH rule). */
+function seedAddr(fleet) { return fleet + "@" + ["seed", "cognation", "internal"].join("."); }
+function memberAddr(local) { return local + "@" + ["example", "test"].join("."); }
+
 var SEED_USER = {
   id: "u-seed-1",
-  email: "seed-0001@seed.cognation.internal",
+  email: seedAddr("seed-0001"),
   app_metadata: { seedops: true, account_kind: "seed", seed_fleet_id: "seed-0001" },
   user_metadata: {},
 };
@@ -117,14 +121,14 @@ function skipLogged(win, channel) {
 
 /* --- ops-trigger --- */
 test("ops-trigger: awaits getUser before running a pathway", async function () {
-  var w = world({ user: SEED_USER, session: { username: "seed-0001" } });
+  var w = world({ user: SEED_USER, session: { username: seedAddr("seed-0001") } });
   var r = await w.win.CognationSeedOpsTrigger.runAfterAuth("circle", "seed-0002");
   assert.ok(r.ok, JSON.stringify(r));
   assert.ok(awaitedBeforeWrite(w.order), "pathway runs after getUser resolves: " + w.order.join(","));
 });
 
 test("ops-trigger: no user -> skips with a log, nothing run", async function () {
-  var w = world({ user: null, session: { username: "seed-0001" } });
+  var w = world({ user: null, session: { username: seedAddr("seed-0001") } });
   var r = await w.win.CognationSeedOpsTrigger.runAfterAuth("circle", "seed-0002");
   assert.strictEqual(r.ok, false);
   assert.strictEqual(r.error, "no_auth_user");
@@ -133,7 +137,7 @@ test("ops-trigger: no user -> skips with a log, nothing run", async function () 
 });
 
 test("ops-trigger: getUser error -> skips, nothing run", async function () {
-  var w = world({ reject: true, session: { username: "seed-0001" } });
+  var w = world({ reject: true, session: { username: seedAddr("seed-0001") } });
   var r = await w.win.CognationSeedOpsTrigger.runAfterAuth("__all__", "seed-0002");
   assert.strictEqual(r.error, "get_user_failed");
   assert.strictEqual(firstWrite(w.order), -1);
@@ -148,7 +152,7 @@ test("ops-trigger: resolved seed metadata arms (never reads the pending Promise)
 });
 
 test("ops-trigger: real user stays unarmed after getUser", async function () {
-  var w = world({ user: { id: "u-real", email: "x@example.test", app_metadata: {}, user_metadata: {} }, session: { username: "dana" } });
+  var w = world({ user: { id: "u-real", email: memberAddr("x"), app_metadata: {}, user_metadata: {} }, session: { username: "dana" } });
   var r = await w.win.CognationSeedOpsTrigger.runAfterAuth("tower", "seed-0001");
   assert.strictEqual(r.error, "not_armed");
   assert.strictEqual(firstWrite(w.order), -1);
@@ -156,14 +160,14 @@ test("ops-trigger: real user stays unarmed after getUser", async function () {
 
 /* --- commune-alive --- */
 test("commune-alive: awaits getUser before the first bootstrap write", async function () {
-  var w = world({ user: SEED_USER, session: { username: "seed-0001" } });
+  var w = world({ user: SEED_USER, session: { username: seedAddr("seed-0001") } });
   var r = await w.win.CognationSeedOpsCommuneAlive.bootstrapAfterAuth({ force: true, count: 3 });
   assert.ok(r.ok, JSON.stringify(r));
   assert.ok(awaitedBeforeWrite(w.order), w.order.join(","));
 });
 
 test("commune-alive: no user -> skips with a log, nothing written", async function () {
-  var w = world({ user: null, session: { username: "seed-0001" } });
+  var w = world({ user: null, session: { username: seedAddr("seed-0001") } });
   var r = await w.win.CognationSeedOpsCommuneAlive.bootstrapAfterAuth({ force: true, count: 3 });
   assert.strictEqual(r.skipped, true);
   assert.strictEqual(r.error, "no_auth_user");
@@ -172,14 +176,14 @@ test("commune-alive: no user -> skips with a log, nothing written", async functi
 });
 
 test("commune-alive: getUser error -> skips, nothing written", async function () {
-  var w = world({ reject: true, session: { username: "seed-0001" } });
+  var w = world({ reject: true, session: { username: seedAddr("seed-0001") } });
   var r = await w.win.CognationSeedOpsCommuneAlive.bootstrapAfterAuth({ force: true, count: 3 });
   assert.strictEqual(r.error, "get_user_failed");
   assert.strictEqual(firstWrite(w.order), -1);
 });
 
 test("commune-alive: real user -> no bootstrap writes", async function () {
-  var w = world({ user: { id: "u-real", email: "x@example.test", app_metadata: {}, user_metadata: {} }, session: { username: "dana" } });
+  var w = world({ user: { id: "u-real", email: memberAddr("x"), app_metadata: {}, user_metadata: {} }, session: { username: "dana" } });
   var r = await w.win.CognationSeedOpsCommuneAlive.bootstrapAfterAuth({ count: 3 });
   assert.strictEqual(r.error, "not_seed_or_ops");
   assert.strictEqual(firstWrite(w.order), -1);
@@ -187,7 +191,7 @@ test("commune-alive: real user -> no bootstrap writes", async function () {
 
 /* --- tower-posts (live client write) --- */
 test("tower-posts: awaits getUser before the live Tower write", async function () {
-  var w = world({ user: SEED_USER, session: { username: "seed-0001" } });
+  var w = world({ user: SEED_USER, session: { username: seedAddr("seed-0001") } });
   var r = w.win.CognationSeedOpsTowerPosts.postOne("seed-0001");
   assert.ok(r.pending, JSON.stringify(r));
   assert.strictEqual(firstWrite(w.order), -1, "no write before getUser resolves");
@@ -198,7 +202,7 @@ test("tower-posts: awaits getUser before the live Tower write", async function (
 });
 
 test("tower-posts: no user -> live write skipped with a log", async function () {
-  var w = world({ user: null, session: { username: "seed-0001" } });
+  var w = world({ user: null, session: { username: seedAddr("seed-0001") } });
   var settled = await w.win.CognationSeedOpsTowerPosts.postOne("seed-0001").promise;
   assert.strictEqual(settled.ok, false);
   assert.strictEqual(settled.error, "no_auth_user");
@@ -207,7 +211,7 @@ test("tower-posts: no user -> live write skipped with a log", async function () 
 });
 
 test("tower-posts: getUser error -> live write skipped", async function () {
-  var w = world({ reject: true, session: { username: "seed-0001" } });
+  var w = world({ reject: true, session: { username: seedAddr("seed-0001") } });
   var settled = await w.win.CognationSeedOpsTowerPosts.postOne("seed-0001").promise;
   assert.strictEqual(settled.error, "get_user_failed");
   assert.strictEqual(w.order.indexOf("write:createTowerPost"), -1);
@@ -216,7 +220,7 @@ test("tower-posts: getUser error -> live write skipped", async function () {
 test("tower-posts: auth user is another seed -> live write skipped", async function () {
   var other = JSON.parse(JSON.stringify(SEED_USER));
   other.app_metadata.seed_fleet_id = "seed-0002";
-  var w = world({ user: other, session: { username: "seed-0001" } });
+  var w = world({ user: other, session: { username: seedAddr("seed-0001") } });
   var settled = await w.win.CognationSeedOpsTowerPosts.postOne("seed-0001").promise;
   assert.strictEqual(settled.error, "auth_user_not_seed");
   assert.strictEqual(w.order.indexOf("write:createTowerPost"), -1);

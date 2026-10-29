@@ -136,6 +136,23 @@
   /* Last fetched user_metadata this session; undefined = not fetched yet. */
   var lastMeta;
 
+  /* Seed and ops accounts sign in with an internal address on the seed auth
+     domain or the ops auth domain (scripts/seedops-bind-auth.mjs). A bare
+     "seed-" / "ops-" username prefix is not a marker: after Supabase sign-in
+     session.username is the member's own email. Returns the fleet id or "". */
+  var SEED_AUTH_DOMAIN = "seed.cognation.internal";
+  var OPS_AUTH_DOMAIN = "ops.cognation.internal";
+  function fleetFromAuthEmail(value) {
+    var s = String(value || "").trim().toLowerCase();
+    var at = s.lastIndexOf("@");
+    if (at <= 0) return "";
+    var local = s.slice(0, at);
+    var domain = s.slice(at + 1);
+    if (domain === SEED_AUTH_DOMAIN && /^seed-\d{4}$/.test(local)) return local;
+    if (domain === OPS_AUTH_DOMAIN && /^ops-[a-z0-9-]+$/.test(local)) return local;
+    return "";
+  }
+
   function isSeedOrOpsSession() {
     try {
       if (window.CognationSeedOpsCommuneAlive && typeof window.CognationSeedOpsCommuneAlive.isSeedOrOpsSession === "function") {
@@ -152,8 +169,8 @@
           ? window.CognationAuth.getSession()
           : readJson(localStorage, "cognation.session.v2", null);
       if (!session) return false;
-      var uname = String(session.username || session.profileHandle || "");
-      if (/^seed-\d{4}$/.test(uname) || /^ops-/.test(uname) || /^seed-/.test(uname)) return true;
+      /* Removed: bare username / profileHandle prefix match. */
+      if (fleetFromAuthEmail(session.username)) return true;
       var kind = String(session.accountKind || session.account_kind || "");
       if (kind === "seed" || kind === "ops") return true;
     } catch (e2) {}
@@ -169,8 +186,8 @@
       if (!session) return "";
       var fleet = String(session.seedFleetId || session.seed_fleet_id || "");
       if (/^seed-\d{4}$/.test(fleet) || /^ops-/.test(fleet)) return fleet;
-      var uname = String(session.username || "");
-      if (/^seed-\d{4}$/.test(uname) || /^ops-/.test(uname)) return uname;
+      var fromEmail = fleetFromAuthEmail(session.username);
+      if (fromEmail) return fromEmail;
     } catch (e) {}
     return "";
   }

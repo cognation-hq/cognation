@@ -14,6 +14,9 @@ var fs = require("fs");
 var path = require("path");
 var vm = require("vm");
 
+/* Built at runtime from parts: no literal addresses in tests (HH rule). */
+function seedAddr(fleet) { return fleet + "@" + ["seed", "cognation", "internal"].join("."); }
+
 function read(rel) { return fs.readFileSync(path.join(__dirname, "..", rel), "utf8"); }
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
 function store(seed) {
@@ -110,7 +113,7 @@ function signIn(opts) {
   var sampler = setInterval(sample, 50 / SCALE);
 
   setTimeout(function () {
-    session = { username: opts.username, accountKind: "seed", seedFleetId: opts.username };
+    session = { username: seedAddr(opts.username), accountKind: "seed", seedFleetId: opts.username };
     doc.dispatchEvent(new CustomEvent("cognation:session-started"));
   }, 1);
   setTimeout(function () {

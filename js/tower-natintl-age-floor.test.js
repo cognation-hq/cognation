@@ -28,11 +28,14 @@ function CustomEvent(type, init) { this.type = type; this.detail = init && init.
 function load(viewer, opts) {
   opts = opts || {};
   var seed = {};
-  /* A known age is a signed-in viewer's own profile (#309: signed out, every gate
-     sees age 0). opts.signedOut keeps the edited local age but no sign-in. */
+  /* A known age is a signed-in viewer's user_birth age (the commune-swipe birth
+     age, #309), mirrored into their own local profile. opts.signedOut keeps the
+     edited local age but no sign-in; opts.localOnly is signed in with only the
+     edited local age (no user_birth age yet). */
   var viewerId = ["u", "viewer"].join("-");
   if (viewer !== "unknown" && !opts.signedOut) seed["cognation.session.v2"] = JSON.stringify({ source: "supabase", supabaseUserId: viewerId });
   if (viewer !== "unknown") seed["cognation.member.profile.v1"] = JSON.stringify({ age: viewer.age, ownerUserId: opts.signedOut ? undefined : viewerId });
+  var birthAge = viewer !== "unknown" && !opts.signedOut && !opts.localOnly ? viewer.age : null;
   var ls = mem(seed);
   var doc = {
     readyState: "complete",
@@ -46,6 +49,7 @@ function load(viewer, opts) {
   };
   var win = { document: doc, localStorage: ls, location: { hash: "", search: "" }, CustomEvent: CustomEvent, addEventListener: function () {} };
   win.window = win;
+  if (birthAge != null) win.CognationCommuneSwipe = { getDatingBirthAge: function () { return birthAge; } };
   var ctx = vm.createContext({
     window: win, document: doc, localStorage: ls, location: win.location, CustomEvent: CustomEvent,
     console: console, Promise: Promise, setTimeout: setTimeout, clearTimeout: clearTimeout,
@@ -100,6 +104,9 @@ var U13_NEWS = "g,pg,gpg,gpg-dash,own";
 });
 /* Signed out with an edited local age of 30: the floor still applies (#309). */
 assert.strictEqual(load({ age: 30 }, { signedOut: true }).towerVisible(TOWER).join(), CLEAN_TOWER, "signed out: local age 30 ignored");
+/* Signed in, no user_birth age yet (or no swipe module on the page): an edited
+   local age of 30 is never read (#309: user_birth only). */
+assert.strictEqual(load({ age: 30 }, { localOnly: true }).towerVisible(TOWER).join(), CLEAN_TOWER, "signed in: local age 30 ignored");
 /* Hidden entirely: the render path filters the list itself, no placeholder text. */
 var towerSrc = read("js/tower.js");
 assert.ok(/var posts = TowerStore\.list\(\)\.filter\(towerPostVisibleToViewer\);/.test(towerSrc), "Tower feed render filters posts");
@@ -157,10 +164,12 @@ function fakeEl(tag) {
    refresh() presses "Refresh hot topics" (offline, so the unrated hot-topic pool loads). */
 function renderEdition(viewer, edition) {
   var seed = { "cognation.commune.edition.v1": JSON.stringify(edition), "cognation.commune.feedEndless.v1": "1" };
-  /* A known age is a signed-in viewer's own profile (#309). */
+  /* A known age is a signed-in viewer's user_birth age (#309), mirrored into
+     their own local profile. */
   var viewerId = ["u", "viewer"].join("-");
   if (viewer !== "unknown") seed["cognation.session.v2"] = JSON.stringify({ source: "supabase", supabaseUserId: viewerId });
   if (viewer !== "unknown") seed["cognation.member.profile.v1"] = JSON.stringify({ age: viewer.age, ownerUserId: viewerId });
+  var birthAge = viewer !== "unknown" ? viewer.age : null;
   var ls = mem(seed);
   var root = fakeEl("section");
   root.__root = true;
@@ -190,6 +199,7 @@ function renderEdition(viewer, edition) {
   };
   var win = { document: doc, localStorage: ls, location: { hash: "", search: "" }, CustomEvent: CustomEvent, addEventListener: function () {}, IntersectionObserver: IO };
   win.window = win;
+  if (birthAge != null) win.CognationCommuneSwipe = { getDatingBirthAge: function () { return birthAge; } };
   var ctx = vm.createContext({
     window: win, document: doc, localStorage: ls, location: win.location, CustomEvent: CustomEvent, IntersectionObserver: IO,
     console: console, Promise: Promise, setTimeout: setTimeout, clearTimeout: clearTimeout,

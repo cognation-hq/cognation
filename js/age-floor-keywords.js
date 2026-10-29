@@ -70,26 +70,20 @@
     }
   }
 
-  /* Signed out (or a demo session): every client gate sees age 0, whatever the
-     device's local profile, localStorage or sessionStorage says (#309 rule). */
+  /* Signed out (or a signed-out demo session): every client gate sees age 0,
+     whatever the device's local profile, localStorage or sessionStorage says.
+     Signed in (a real member or a seed): the age comes ONLY from user_birth
+     (read by seedops-dating-hydrate into commune-swipe). Pending, missing or
+     a page without that reader = 0. The local profile age is never read
+     (#309 rule). */
   function viewerAge() {
     try {
       if (!sessionUserId()) return 0;
-      var store0 = localStore();
-      var own = store0 ? JSON.parse(store0.getItem("cognation.member.profile.v1") || "null") : null;
       var swipe = root.CognationCommuneSwipe;
-      /* Server birth age (user_birth, read by seedops-dating-hydrate) is not
-         device state, so it counts even when this browser has no saved profile. */
-      if (swipe && typeof swipe.getDatingBirthAge === "function" && sessionUserId()) {
-        var b = swipe.getDatingBirthAge();
-        if (b != null && !isNaN(b) && b > 0) return b;
+      if (swipe && typeof swipe.getDatingBirthAge === "function") {
+        var b = parseInt(swipe.getDatingBirthAge(), 10);
+        if (!isNaN(b) && b > 0) return b;
       }
-      if (!memberProfileOwned(own)) return 0;
-      if (swipe && swipe.getMemberAge) {
-        var n = swipe.getMemberAge();
-        if (n != null && !isNaN(n)) return n;
-      }
-      if (own && own.age != null) return parseInt(own.age, 10) || 0;
     } catch (e) {}
     return 0;
   }

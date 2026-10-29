@@ -58,9 +58,15 @@ assert.strictEqual(load({ profile: { country: "United States" } }).isThreadVisib
 
 /* Known ages unchanged. */
 assert.strictEqual(load({ swipeAge: 28, signedIn: true }).isThreadVisible("PG-13"), true, "adult via swipe profile");
-assert.strictEqual(load({ profile: { age: 16 }, signedIn: true }).isThreadVisible("R"), true, "teen via saved profile");
-assert.strictEqual(load({ profile: { age: 11 }, signedIn: true }).isThreadVisible("PG-13"), false, "known under-13");
-assert.strictEqual(load({ profile: { age: 11 }, signedIn: true }).isThreadVisible("G-PG"), true);
+assert.strictEqual(load({ swipeAge: 16, signedIn: true }).isThreadVisible("R"), true, "teen via user_birth");
+assert.strictEqual(load({ swipeAge: 11, signedIn: true }).isThreadVisible("PG-13"), false, "known under-13");
+assert.strictEqual(load({ swipeAge: 11, signedIn: true }).isThreadVisible("G-PG"), true);
+
+/* Signed in: the age comes only from user_birth (#309). An edited local age
+   (no swipe module yet, or user_birth pending) opens nothing. */
+assert.strictEqual(load({ profile: { age: 30 }, signedIn: true }).viewerAge(), 0, "signed in, local age 30 ignored");
+assert.strictEqual(load({ profile: { age: 30 }, signedIn: true }).isThreadVisible("PG-13"), false, "signed in, local age opens no PG-13 thread");
+assert.strictEqual(load({ profile: { age: 30 }, signedIn: true, swipeAge: null }).isThreadVisible("R"), false, "signed in, birth age pending: local age ignored");
 
 /* Signed out: an edited local or swipe age opens nothing (#309). */
 assert.strictEqual(load({ swipeAge: 28 }).isThreadVisible("PG-13"), false, "signed out: swipe age ignored");

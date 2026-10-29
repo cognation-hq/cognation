@@ -18,13 +18,12 @@ function load(age) {
     setItem: function (k, v) { d[k] = String(v); },
     removeItem: function (k) { delete d[k]; },
   };
-  /* Signed in (#309: a signed-out viewer's gates see age 0): a Supabase session
-     and this user's own member profile. */
+  /* Signed in (#309: a signed-out viewer's gates see age 0) with this age from
+     user_birth (the commune-swipe birth age); the local profile age is never read. */
   var viewerId = ["u", "viewer"].join("-");
   local.setItem("cognation.session.v2", JSON.stringify({ username: "ada", activeProfileId: "ada", source: "supabase", supabaseUserId: viewerId }));
-  local.setItem("cognation.member.profile.v1", JSON.stringify({ age: age, ownerUserId: viewerId }));
   var documentStub = { readyState: "loading", addEventListener: function () {}, querySelector: function () { return null; }, querySelectorAll: function () { return []; }, dispatchEvent: function () {} };
-  var windowStub = { localStorage: local, document: documentStub };
+  var windowStub = { localStorage: local, document: documentStub, CognationCommuneSwipe: { getDatingBirthAge: function () { return age; } } };
   windowStub.window = windowStub;
   var ctx = vm.createContext({ window: windowStub, document: documentStub, localStorage: local, location: { hash: "", search: "", pathname: "/" }, console: console, CustomEvent: function (t, i) { this.type = t; this.detail = i && i.detail; } });
   ["js/age-floor-keywords.js", "js/auto-rate.js", "js/tower.js"].forEach(function (f) {

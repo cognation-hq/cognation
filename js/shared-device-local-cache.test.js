@@ -63,8 +63,8 @@ function testViewerAgeSameUserOnly() {
   h = helperFor(ALEX, { [MEMBER]: JSON.stringify({ age: 34 }) });
   assert.strictEqual(h.viewerAge(), 0, "an ownerless blob does not count for a signed-in user");
   h = helperFor(LUNA, { [MEMBER]: lunaBlob });
-  assert.strictEqual(h.viewerAge(), 34, "the same user's own age still counts");
-  assert.strictEqual(h.viewerIsUnder13(), false);
+  assert.strictEqual(h.viewerAge(), 0, "even the same user's own local age does not count: user_birth only (#309)");
+  assert.strictEqual(h.viewerIsUnder13(), true);
   h = helperFor({ username: "demo" }, { [MEMBER]: JSON.stringify({ age: 34 }) });
   assert.strictEqual(h.viewerAge(), 0, "signed-out / demo sessions see age 0 (#309), whatever the local profile says");
 }

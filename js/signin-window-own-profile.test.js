@@ -143,7 +143,7 @@ function testSharedDeviceAdaToAlex() {
   mine[MEMBER] = JSON.stringify({ age: 34, ownerUserId: "u-alex" });
   var own = towerPage(mine, { session: ALEX });
   assert.strictEqual(own.tower.get().displayName, "Alex", "your own stamped copy still shows");
-  assert.strictEqual(own.floor.viewerAge(), 34);
+  assert.strictEqual(own.floor.viewerAge(), 0, "your own local age 34 does not count either: user_birth only (#309)");
 }
 
 /* ---------- 2. Logout clears both local profile copies ---------- */

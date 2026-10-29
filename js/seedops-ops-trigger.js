@@ -125,12 +125,13 @@
     try {
       var user = knownAuthUser();
       if (!user) return null;
+      /* Server-set app_metadata only. Removed: user_metadata seedops,
+         account_kind and seed_fleet_id (member-writable). */
       var app = user.app_metadata || user.appMetadata || {};
-      var um = user.user_metadata || user.userMetadata || {};
       return {
-        seedops: !!(app.seedops || um.seedops),
-        accountKind: String(app.account_kind || app.accountKind || um.account_kind || um.accountKind || ""),
-        seedFleetId: String(app.seed_fleet_id || app.seedFleetId || um.seed_fleet_id || um.seedFleetId || ""),
+        seedops: !!app.seedops,
+        accountKind: String(app.account_kind || app.accountKind || ""),
+        seedFleetId: String(app.seed_fleet_id || app.seedFleetId || ""),
         email: String(user.email || ""),
       };
     } catch (e) {

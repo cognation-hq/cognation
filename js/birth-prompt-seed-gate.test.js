@@ -37,7 +37,12 @@ function run(session) {
   };
   var s = Object.assign({ source: "supabase", supabaseUserId: "u-1" }, session);
   ctx.window.CognationAuth = { getSession: function () { return s; } };
-  ctx.window.CognationSupabase = { rest: function (t, o) { calls.push(t); return Promise.resolve([]); } };
+  var liveUser = { id: "u-1", app_metadata: { provider: "email" }, user_metadata: {} };
+  if (s.selfSetUserMetadata) liveUser.user_metadata = { account_kind: "seed", seed_fleet_id: "seed-0005", seedops: true };
+  ctx.window.CognationSupabase = {
+    rest: function (t, o) { calls.push(t); return Promise.resolve([]); },
+    getSession: function () { return { access_token: "t", user: liveUser }; },
+  };
   vm.runInNewContext(src, ctx);
   return new Promise(function (res) {
     setImmediate(function () { setImmediate(function () { res(calls); }); });
@@ -50,6 +55,9 @@ var realCases = [
   { username: addr("seed-fan", MEMBER_DOMAIN) },
   { username: addr("ops-team", MEMBER_DOMAIN) },
   { username: addr("seed-0001", MEMBER_DOMAIN) },
+  /* Member who self-set user_metadata account_kind seed / seed_fleet_id / seedops:
+     the session comes from the profiles row (account_kind real), so still asked. */
+  { username: addr("jordan", MEMBER_DOMAIN), accountKind: "real", selfSetUserMetadata: true },
 ];
 var seedCases = [
   { username: addr("seed-0001", SEED_DOMAIN) },

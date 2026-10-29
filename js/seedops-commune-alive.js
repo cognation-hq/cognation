@@ -155,13 +155,14 @@
     try {
       var user = knownAuthUser();
       if (user) {
+        /* Server-set app_metadata only. Removed: user_metadata account_kind,
+           seed_fleet_id and seedops (any member can write their own user_metadata). */
         var app = user.app_metadata || user.appMetadata || {};
-        var um = user.user_metadata || user.userMetadata || {};
-        var kind = String(app.account_kind || app.accountKind || um.account_kind || um.accountKind || "");
-        var fleet = String(app.seed_fleet_id || app.seedFleetId || um.seed_fleet_id || um.seedFleetId || "");
+        var kind = String(app.account_kind || app.accountKind || "");
+        var fleet = String(app.seed_fleet_id || app.seedFleetId || "");
         if (kind === "seed" || kind === "ops") return true;
         if (/^seed-\d{4}$/.test(fleet) || /^ops-/.test(fleet)) return true;
-        if (app.seedops === true || um.seedops === true) return true;
+        if (app.seedops === true) return true;
         if (fleetFromAuthEmail(user.email)) return true;
       }
     } catch (e2) {}

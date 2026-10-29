@@ -301,9 +301,9 @@
 
   function authUserFleetId(user) {
     if (!user) return "";
+    /* Server-set app_metadata only. Removed: user_metadata seed_fleet_id (member-writable). */
     var app = user.app_metadata || user.appMetadata || {};
-    var um = user.user_metadata || user.userMetadata || {};
-    return String(app.seed_fleet_id || app.seedFleetId || um.seed_fleet_id || um.seedFleetId || "");
+    return String(app.seed_fleet_id || app.seedFleetId || "");
   }
 
   /* Seed and ops accounts sign in with an internal address on the seed auth

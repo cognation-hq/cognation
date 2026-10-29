@@ -280,7 +280,9 @@ function datingWorld(opts) {
     querySelectorAll: function () { return []; },
   };
   var seeDating = false;
-  var member = { age: 31, city: "Chicago" };
+  var member = opts.member || { age: 31, city: "Chicago" };
+  var birthAges = [];
+  var birthRow = opts.birthRow || null;
   var sb = {
     configured: function () { return true; },
     getSession: function () { return { access_token: "t" }; },
@@ -292,6 +294,7 @@ function datingWorld(opts) {
           { id: "srv-7", seed_fleet_id: "seed-0007", display_name: "Bea", bio: "Early runs.", account_kind: "seed" },
         ]);
       }
+      if (table === "user_birth" && birthRow) return Promise.resolve([birthRow]);
       return Promise.resolve([]);
     },
     updateUser: function () { return Promise.resolve({}); },
@@ -319,7 +322,7 @@ function datingWorld(opts) {
       getSeeDating: function () { return seeDating; },
       setSeeDating: function (on) { seeDating = !!on; },
       getMemberAge: function () { return parseInt(member.age, 10) || null; },
-      setDatingBirthAge: function () {},
+      setDatingBirthAge: function (a) { birthAges.push(a); },
       sampleDeck: function () { return []; },
       rebuild: function () {},
     },
@@ -334,7 +337,8 @@ function datingWorld(opts) {
   ["js/seedops-schema.js", "js/seedops-commune-alive.js", "js/seedops-dating-hydrate.js"].forEach(function (rel) {
     vm.runInContext(src(rel), ctx, { filename: rel });
   });
-  return { win: win, writes: writes, calls: calls, saved: saved,
+  return { win: win, writes: writes, calls: calls, saved: saved, birthAges: birthAges,
+    member: function () { return member; }, seeDating: function () { return seeDating; },
     fire: function (name, detail) { doc.dispatchEvent(new win.CustomEvent(name, { detail: detail })); } };
 }
 
@@ -521,4 +525,119 @@ test("trust markers: an ops bot on the ops domain arms the trigger; an unknown o
   var w2 = world({ signedIn: true, user: bare, authSession: { username: opsAddr("ops-team") } });
   await w2.win.CognationSeedOpsCommuneAlive.awaitAuthUser();
   assert.strictEqual(w2.win.CognationSeedOpsTrigger.isArmed(), false, "unknown ops local part does not arm");
+});
+
+/* --- Only server-set markers count: app_metadata (account_kind, seed_fleet_id,
+   seedops), the armed ops trigger, or the seed / ops auth domain. A member can
+   write their own user_metadata, so user_metadata account_kind / seed_fleet_id /
+   seedops never mark a seed or ops session. --- */
+function selfSetMember() {
+  return {
+    id: "u-self-1",
+    email: memberAddr("jordan"),
+    app_metadata: { provider: "email" },
+    user_metadata: { display_name: "Jordan", account_kind: "seed", seed_fleet_id: "seed-0005", seedops: true },
+  };
+}
+var SELF_SET_SESSION = { username: memberAddr("jordan"), profileHandle: "jordan", accountKind: "real" };
+
+test("user_metadata markers: a member self-setting account_kind seed / seed_fleet_id / seedops gets 0 seed writes", async function () {
+  var state = { signedIn: true, user: selfSetMember(), authSession: SELF_SET_SESSION, writes: [], calls: [] };
+  var w = world(state);
+  var alive = w.win.CognationSeedOpsCommuneAlive;
+  var trig = w.win.CognationSeedOpsTrigger;
+  await tick();
+  state.writes.length = 0;
+  state.calls.length = 0;
+  w.order.length = 0;
+
+  w.fire("cognation:session-started");
+  await tick();
+  var r1 = await alive.bootstrapAfterAuth({ force: true });
+  var r2 = alive.bootstrap({ force: true });
+  var mat = alive.materializeDatingSample(12);
+  await tick();
+
+  assert.strictEqual(trig.isArmed(), false, "ops trigger not armed");
+  assert.strictEqual(trig.resolveOperator(), null, "no operator");
+  assert.strictEqual(alive.isSeedOrOpsSession(), false, "not a seed/ops session");
+  assert.strictEqual(r1.skipped, true, JSON.stringify(r1));
+  assert.strictEqual(r2.skipped, true, JSON.stringify(r2));
+  assert.strictEqual(mat.skipped, true, JSON.stringify(mat));
+  assert.deepStrictEqual(state.writes, [], "storage writes");
+  assert.deepStrictEqual(w.order.filter(function (x) { return /^write:/.test(x); }), [], "profile/account writes");
+  assert.deepStrictEqual(state.calls, [], "Supabase calls");
+  assert.deepStrictEqual(w.win.CognationAccounts._p, {}, "no seed profiles materialized");
+  assert.strictEqual(w.win.CognationCommuneSwipe._m.age, undefined, "no demo age 22 on the member");
+});
+
+test("user_metadata markers: a self-set seed_fleet_id makes no live Tower post as that seed", async function () {
+  var state = { signedIn: true, user: selfSetMember(), authSession: SELF_SET_SESSION };
+  var w = world(state);
+  var posts = w.win.CognationSeedOpsTowerPosts;
+  await posts.awaitAuthUser();
+  w.order.length = 0;
+  var r = posts.postOne("seed-0005");
+  await tick();
+  await tick();
+  assert.strictEqual(w.order.indexOf("write:createTowerPost"), -1, "no live createTowerPost: " + JSON.stringify(r));
+});
+
+test("user_metadata markers: a self-set teen keeps teen limits (dating off, real birth age, no demo age)", async function () {
+  var now = new Date();
+  var birthRow = { birth_year: now.getFullYear() - 15, birth_month: 1 };
+  var teenAge = now.getFullYear() - birthRow.birth_year - (now.getMonth() + 1 < 1 ? 1 : 0);
+  var w = datingWorld({ user: selfSetMember(), authSession: SELF_SET_SESSION, member: { city: "Chicago" }, birthRow: birthRow });
+  var hyd = w.win.CognationSeedOpsDatingHydrate;
+  var alive = w.win.CognationSeedOpsCommuneAlive;
+  await alive.awaitAuthUser();
+  assert.strictEqual(alive.isSeedOrOpsSession(), false, "not a seed/ops session");
+  w.saved.length = 0;
+
+  w.fire("cognation:session-started");
+  await settle();
+  await hyd.hydrate({ force: true });
+  await hyd.ensureDatingContent({ minCount: 1, forceBios: true });
+  await settle();
+
+  assert.strictEqual(w.seeDating(), false, "See dating not switched on by seed defaults");
+  assert.ok(!(parseInt(w.member().age, 10) > 0), "no demo age on the member: " + JSON.stringify(w.member()));
+  assert.ok(w.birthAges.length > 0, "dating age set from user_birth");
+  assert.strictEqual(w.birthAges[w.birthAges.length - 1], teenAge, "dating age is the real birth age");
+  assert.ok(teenAge < 18);
+  assert.deepStrictEqual(w.saved, [], "no seed bios merged");
+});
+
+test("user_metadata markers: a seed with app_metadata only (empty user_metadata) still passes every gate", async function () {
+  var metaOnly = {
+    id: "u-seed-8",
+    app_metadata: { seedops: true, account_kind: "seed", seed_fleet_id: "seed-0008" },
+    user_metadata: {},
+  };
+  var w = world({ signedIn: true, user: metaOnly, authSession: { username: "fleet_0a1b2c3d4e5f" } });
+  var alive = w.win.CognationSeedOpsCommuneAlive;
+  await alive.awaitAuthUser();
+  await w.win.CognationSeedOpsTrigger.awaitAuthUser();
+  assert.strictEqual(alive.isSeedOrOpsSession(), true);
+  var op = w.win.CognationSeedOpsTrigger.resolveOperator();
+  assert.ok(op && op.isSeed && op.seedFleetId === "seed-0008", JSON.stringify(op));
+  var boot = alive.bootstrap({ force: true, count: 3 });
+  assert.ok(boot.ok && boot.materialized === 3, JSON.stringify(boot));
+});
+
+test("user_metadata markers: a seed on the seed auth domain only (provider-only app_metadata) still passes", async function () {
+  var stub = {
+    id: "u-seed-9",
+    email: seedAddr("seed-0009"),
+    app_metadata: { provider: "email", providers: ["email"] },
+    user_metadata: { handle: "seed_0009", seed_fleet_id: "seed-0009" },
+  };
+  var w = world({ signedIn: true, user: stub, authSession: { username: seedAddr("seed-0009") } });
+  var alive = w.win.CognationSeedOpsCommuneAlive;
+  await alive.awaitAuthUser();
+  assert.strictEqual(alive.isSeedOrOpsSession(), true);
+  var op = w.win.CognationSeedOpsTrigger.resolveOperator();
+  assert.ok(op && op.isSeed && op.seedFleetId === "seed-0009", JSON.stringify(op));
+  var boot = alive.bootstrap({ force: true, count: 3 });
+  assert.ok(boot.ok && boot.materialized === 3, JSON.stringify(boot));
 });

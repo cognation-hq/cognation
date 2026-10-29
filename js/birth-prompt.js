@@ -10,6 +10,9 @@
   var SHOWN_KEY = "cognation.birthPrompt.shown.v1";
   var panel = null;
   var busy = false;
+  /* Bumped on sign-out: a save or lookup started for the earlier account is
+     dropped instead of closing, marking or announcing for the next one. */
+  var sessionGen = 0;
   var UNKNOWN = { unknown: true };
 
   function session() {
@@ -177,9 +180,11 @@
     }
     busy = true;
     setStatus("Saving…", false);
+    var gen = sessionGen;
     sb
       .rpc("set_my_birth_month", { y: y, m: m })
       .then(function (ok) {
+        if (gen !== sessionGen) return; /* signed out meanwhile */
         busy = false;
         setStatus("", false); /* clear "Saving…" the moment the save resolves */
         if (ok === false) {
@@ -194,6 +199,7 @@
         } catch (eEv) {}
       })
       .catch(function () {
+        if (gen !== sessionGen) return;
         busy = false;
         setStatus("Could not save right now. Try again in a moment.", true);
       });
@@ -208,7 +214,9 @@
     if (alreadyShownFor(id)) return;
     var login = document.querySelector(".login-gate:not(.birth-prompt-gate)");
     if (login && !login.hidden) return;
+    var gen = sessionGen;
     hasBirthRow().then(function (row) {
+      if (gen !== sessionGen) return; /* signed out meanwhile */
       if (row === UNKNOWN) return; /* lookup failed: never block the page on a guess */
       if (row) {
         markShown(id);
@@ -220,7 +228,20 @@
     });
   }
 
+  /* In-page sign-out (shared devices): close the ask without saving and clear
+     what was typed, so the next account never sees or submits it. */
+  function onSessionEnded() {
+    sessionGen += 1;
+    busy = false;
+    if (!panel) return;
+    var form = panel.querySelector("[data-birth-prompt-form]");
+    if (form && typeof form.reset === "function") form.reset();
+    setStatus("", false);
+    closePanel();
+  }
+
   function boot() {
+    document.addEventListener("cognation:session-ended", onSessionEnded);
     document.addEventListener("cognation:session-started", function () {
       setTimeout(maybePrompt, 400);
     });

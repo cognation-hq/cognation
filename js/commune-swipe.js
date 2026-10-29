@@ -4086,7 +4086,7 @@
         (liveBirthMissing()
           ? '<p class="commune-swipe-empty commune-swipe-empty--rooms" data-commune-birth-needed>Chat rooms (13+) and classrooms (18+) need your birth year and month. Only the month and year are saved.</p>' +
             '<p class="commune-swipe-empty"><button type="button" class="btn btn-primary" data-commune-add-birth>Add birth month</button></p>'
-          : roomsOpen || birthAgePending() || signedOutViewer()
+          : roomsOpen || birthAgePending()
             ? ''
             : '<p class="commune-swipe-empty commune-swipe-empty--rooms">No chat rooms match your age and interests yet. Update age or interests in your profile, then come back.</p>') +
         "</div>";

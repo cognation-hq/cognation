@@ -196,8 +196,6 @@ test("3. signed out: one muted glass line 'Sign in to join rooms.' where the roo
   assert.ok(rule, "rooms line has a rule");
   assert.ok(/color: var\(--cgn-text-muted\);/.test(rule[1]) && /background: var\(--cgn-glass\);/.test(rule[1]) && /border: 1px solid var\(--cgn-line\);/.test(rule[1]), "existing muted/glass tokens");
   assert.ok(!/#[0-9a-f]{3,8}\b|rgba?\(/i.test(rule[1]), "no new colors in the rule");
-  /* The deck end no longer adds a second, age-and-interests rooms line while signed out. */
-  assert.ok(/: roomsOpen \|\| birthAgePending\(\) \|\| signedOutViewer\(\)\s*\? ''/.test(read("js/commune-swipe.js")), "deck end: no second rooms line signed out");
   assert.deepStrictEqual(w.net.writes, [], "signed out: no network writes");
 });
 

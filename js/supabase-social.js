@@ -425,13 +425,19 @@
     };
   }
 
+  /* Whose session the in-memory feed was fetched for. */
+  var feedUserId = "";
   function replaceTowerFeed(posts) {
     state.feed = posts;
+    feedUserId = String((identity() && identity().supabaseUserId) || "");
     if (
       window.CognationTowerStore &&
       typeof window.CognationTowerStore.setRemotePosts === "function"
     ) {
-      window.CognationTowerStore.setRemotePosts(posts);
+      /* The store holds only what the viewer may see while their age is not
+         known (G/PG + own posts); the in-memory feed keeps the same set. */
+      var held = window.CognationTowerStore.setRemotePosts(posts);
+      if (Array.isArray(held) && held.length !== posts.length) state.feed = held.slice();
     }
     emit("cognation:remote-feed-loaded", { count: posts.length });
   }
@@ -951,11 +957,19 @@
     if (active()) return;
     state.feed = [];
     state.myProfiles = [];
+    feedUserId = "";
   });
 
   var sawSessionStart = false;
   document.addEventListener("cognation:session-started", function () {
     sawSessionStart = true;
+    /* A different account: forget the previous viewer's in-memory feed before
+       this account's own load lands. */
+    var now = String((identity() && identity().supabaseUserId) || "");
+    if (now !== feedUserId) {
+      state.feed = [];
+      feedUserId = now;
+    }
     refresh();
   });
 
@@ -1006,6 +1020,10 @@
     },
     getMyProfiles: function () {
       return state.myProfiles.slice();
+    },
+    /* Read-only copy of the Feed held in memory (empty after sign-out). */
+    feedSnapshot: function () {
+      return state.feed.slice();
     },
     getViewedProfileId: viewedProfileId,
     getTowerProfile: function (id) {

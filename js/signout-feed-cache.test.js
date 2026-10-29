@@ -3,9 +3,10 @@
  * the last member's server posts in the signed-out SIGNAL Feed, and the signed-out
  * SeedOps content did not come back until a new tab (sessionStorage hydrate flag).
  * Now:
- *   - tower.js: on cognation:session-ended the Tower store drops cached member
- *     posts (server posts that are not seed/ops); signed out, list() never returns
- *     them, even from a store written before this fix (reload).
+ *   - tower.js: on cognation:session-ended the Tower store drops every cached
+ *     server post (member, seed and ops; since the 2026-10-29 session-end clear,
+ *     public seed/ops copies too); signed out, list() never returns member posts,
+ *     even from a store written before this fix (reload).
  *   - seedops-tower-hydrate.js: the hydrate flag is per viewer, so the signed-out
  *     viewer hydrates again in the same tab (immediately and after reload).
  *   - supabase-social.js: the in-memory feed is emptied on sign-out.
@@ -93,7 +94,9 @@ check("sign-out in the same tab clears the member's posts from the store and the
   t.win.CognationTowerStore.setRemotePosts(memberPosts.concat([seedServer]));
   assert.strictEqual(ids(t.win.CognationTowerStore.list()), "tp-dana-1,tp-dana-2,tp-seed-0", "signed in: member Feed shows");
   t.signOut();
-  assert.strictEqual(ids(t.win.CognationTowerStore.list()), "tp-seed-0", "signed out: only SeedOps posts");
+  /* Session-end clear (PM GO, 2026-10-29): every cached server post goes on sign-out, public seed ones too;
+     the signed-out SeedOps hydrate reads public seed posts again (test 8 / sign-out re-hydrate below). */
+  assert.strictEqual(ids(t.win.CognationTowerStore.list()), "", "signed out: no cached server post held");
   var raw = String(t.storage.getItem(TOWER_KEY) || "");
   assert.ok(raw.indexOf("tp-dana-") < 0 && raw.indexOf("clinic") < 0, "member posts gone from localStorage");
   assert.ok(t.events.some(function (e) { return e.type === "cognation:tower-updated" && e.detail && e.detail.remote; }), "Feed / Times redraw event fired");
@@ -149,17 +152,17 @@ async.push(["sign-out in the same tab re-hydrates immediately", function () {
 }]);
 
 /* 6. Seed / ops friends-only posts never linger signed out (same tab, store + overlay). */
-check("sign-out drops seed and ops friends-only posts; public seed/ops posts stay", function () {
+check("sign-out drops seed and ops friends-only posts, and (session-end clear) public seed/ops server copies too", function () {
   var t = boot({ signedIn: true, sessionSeed: {} });
   t.storage.setItem("cognation.seedops.tower.posts.v1", JSON.stringify({ version: 1, posts: [seedServer, seedFriendsOnly, template] }));
   t.win.CognationTowerStore.setRemotePosts(memberPosts.concat([seedServer, seedFriendsOnly, opsFriendsOnly, opsPublic, seedNoVis]));
   assert.ok(ids(t.win.CognationTowerStore.list()).indexOf("tp-seed-fo") >= 0, "signed in: the seed's friends-only post shows to a friend");
   t.signOut();
-  assert.strictEqual(ids(t.win.CognationTowerStore.list()), "tp-ops-pub,tp-seed-0", "signed out: public seed/ops posts only");
+  assert.strictEqual(ids(t.win.CognationTowerStore.list()), "", "signed out: no server copies held (hydrate reads public ones again)");
   var raw = String(t.storage.getItem(TOWER_KEY) || "");
   assert.ok(raw.indexOf("tp-seed-fo") < 0 && raw.indexOf("moving house") < 0 && raw.indexOf("tp-ops-fo") < 0 && raw.indexOf("tp-seed-nv") < 0, "friends-only seed/ops posts gone from localStorage");
   var ov = JSON.parse(t.storage.getItem("cognation.seedops.tower.posts.v1"));
-  assert.strictEqual(ids(ov.posts), "seedops-tower-seed-0003-1,tp-seed-0", "overlay keeps public seed rows + templates only");
+  assert.strictEqual(ids(ov.posts), "seedops-tower-seed-0003-1", "overlay keeps local templates only");
 });
 
 /* 7. Reload with a stale store holding a seed friends-only post: hidden signed out. */
@@ -172,14 +175,14 @@ check("reload: signed-out list() hides seed/ops friends-only posts, keeps public
 });
 
 /* 8. Normal signed-out load unchanged: 40 public seed server posts + templates all show. */
-async.push(["normal signed-out load: all 40 public seed posts kept", function () {
+async.push(["normal signed-out load: all 40 public seed posts show; sign-out clears the copies and the hydrate reads them again", function () {
   var t = boot({ signedIn: false, sessionSeed: {} });
   var rows = [];
   for (var i = 0; i < 40; i++) rows.push({ id: "tp-pub-" + i, _remote: true, seeded: true, isSeed: true, seedFleetId: "seed-" + String(i + 1).padStart(4, "0"), authorName: "S" + i, body: "post " + i, createdAt: "2026-10-21T0" + (i % 10) + ":00:00.000Z", rating: "G", visibility: "public" });
   t.win.CognationTowerStore.setRemotePosts(rows.concat([template]));
   assert.strictEqual(t.win.CognationTowerStore.list().length, 41, "40 seed posts + the local template");
   t.signOut();
-  assert.strictEqual(t.win.CognationTowerStore.list().length, 41, "sign-out drops none of them");
+  assert.strictEqual(t.win.CognationTowerStore.list().length, 1, "sign-out clears the 40 server copies; the local template stays");
   /* sign-out re-hydrates (anon read returns public rows): that seed post lands and shows */
   return flush().then(flush).then(function () {
     assert.ok(ids(t.win.CognationTowerStore.list()).indexOf("tp-seed-1") >= 0, "hydrated public seed post shows signed out");

@@ -2685,7 +2685,8 @@
     return !!pid && slugIsViewerOwn(pid);
   }
   /* Server posts are gated by the server too, but a cached copy can outlive the
-     session that fetched it (sign-out keeps public seed/ops posts), so the
+     session that fetched it (the signed-out SeedOps hydrate re-reads public
+     seed/ops posts), so the
      client rating check applies to every server post the viewer did not write.
      A missing server rating reads PG-13 (postRating); NR and unknown ratings
      fail closed in AutoRate.canSee. The author always sees their own post. */
@@ -2801,6 +2802,35 @@
     } catch (e) { return 0; }
   }
 
+  /* Session end (sign-out, or a switch to a different account): every server
+     post copy goes from the SeedOps overlay, member, seed and ops alike, public
+     ones included. Local SeedOps templates (never _remote) stay. */
+  function clearOverlayRemote() {
+    try {
+      var raw = localStorage.getItem(SEEDOPS_OVERLAY_KEY);
+      if (!raw) return 0;
+      var doc = JSON.parse(raw);
+      if (!doc || !Array.isArray(doc.posts)) return 0;
+      var kept = doc.posts.filter(function (p) { return !(p && p._remote); });
+      var dropped = doc.posts.length - kept.length;
+      if (dropped) { doc.posts = kept; localStorage.setItem(SEEDOPS_OVERLAY_KEY, JSON.stringify(doc)); }
+      return dropped;
+    } catch (e) { return 0; }
+  }
+
+  /* While the viewer's age is not known (signed out, signed in with user_birth
+     not read yet, or no user_birth row: ratingViewer() age 0) the store holds
+     only server posts that viewer may see: G/PG by server rating (a missing
+     rating reads PG-13 and is not held) plus the viewer's own posts. Nothing
+     the viewer could not see is lost: age 0 already renders G/PG only. Once the
+     age is known the held-back posts are read again (see viewer-age-changed). */
+  var heldBackWhileAgeUnknown = false;
+  function holdRemotePost(post) {
+    if (!post || !post._remote) return true;
+    if (ratingViewer().age > 0) return true;
+    return viewerWroteRemotePost(post) || ratingVisible(post);
+  }
+
   var TowerStore = {
     load: function () {
       try {
@@ -2882,13 +2912,43 @@
       );
       return dropped;
     },
+    /* Session end: forget every cached server post (member, seed and ops,
+       public ones included) in the Tower store and the SeedOps overlay, so
+       feedPlate / newsList hold no server post behind the login screen or into
+       the next account. The viewer's own local posts and local SeedOps
+       templates stay. Returns how many went from the Tower store. */
+    clearSessionCache: function () {
+      clearOverlayRemote();
+      heldBackWhileAgeUnknown = false;
+      var data = this.load();
+      if (!data) return 0;
+      var kept = data.posts.filter(function (p) { return !(p && p._remote); });
+      var dropped = data.posts.length - kept.length;
+      if (!dropped && !data.remote) return 0;
+      data.posts = kept;
+      data.remote = false;
+      delete data.viewer;
+      this.save(data);
+      document.dispatchEvent(
+        new CustomEvent("cognation:tower-updated", { detail: { remote: true, signedOut: true } })
+      );
+      return dropped;
+    },
+    /* Same rule as the store (holdRemotePost), for other copies of server posts
+       (SeedOps overlay, supabase-social's in-memory feed). */
+    holdRemotePost: holdRemotePost,
     setRemotePosts: function (posts) {
+      var list = !Array.isArray(posts) ? [] : usingRemoteSocial()
+        ? posts.filter(function (p) { return !isLocalSeedTemplate(p); })
+        : posts.slice();
+      var held = list.filter(holdRemotePost);
+      if (held.length !== list.length) heldBackWhileAgeUnknown = true;
       var data = {
         version: 2,
         remote: true,
-        posts: !Array.isArray(posts) ? [] : usingRemoteSocial()
-          ? posts.filter(function (p) { return !isLocalSeedTemplate(p); })
-          : posts.slice(),
+        /* whose session fetched these ("" signed out): a different account clears them */
+        viewer: signedInUserId(),
+        posts: held,
       };
       this.save(data);
       document.dispatchEvent(
@@ -2976,10 +3036,38 @@
   };
 
   window.CognationTowerStore = TowerStore;
-  /* Signing out in this tab clears the member's Feed cache right away. */
+  /* Signing out in this tab clears every cached server post right away
+     (member, seed and ops, public ones included). The signed-out SeedOps
+     hydrate then brings back the public seed posts a signed-out visitor sees. */
   document.addEventListener("cognation:session-ended", function () {
     if (usingRemoteSocial()) return;
-    try { TowerStore.clearMemberCache(); } catch (eClear) {}
+    try { TowerStore.clearSessionCache(); } catch (eClear) {}
+  });
+  /* Switching to a different account (sign-in or auth change): server posts
+     fetched for another viewer (or signed out) go before the new account's
+     own load lands. Same account: nothing is cleared. */
+  function clearIfOtherViewer() {
+    try {
+      var data = TowerStore.load();
+      var hasRemote = !!(data && (data.remote || data.posts.some(function (p) { return p && p._remote; })));
+      if (hasRemote && String(data.viewer || "") !== signedInUserId()) TowerStore.clearSessionCache();
+    } catch (eSwitch) {}
+  }
+  document.addEventListener("cognation:session-started", clearIfOtherViewer);
+  document.addEventListener("cognation:auth-changed", clearIfOtherViewer);
+  /* The age became known after posts above G/PG were held back: read the Feed
+     and the SeedOps seed posts again (reads only). */
+  document.addEventListener("cognation:viewer-age-changed", function () {
+    if (!heldBackWhileAgeUnknown || !(ratingViewer().age > 0)) return;
+    heldBackWhileAgeUnknown = false;
+    try {
+      var social = remoteSocial();
+      if (social && social.active && social.active() && typeof social.refreshFeed === "function") social.refreshFeed();
+    } catch (eFeed) {}
+    try {
+      var hyd = window.CognationSeedOpsTowerHydrate;
+      if (hyd && typeof hyd.hydrate === "function") hyd.hydrate({ force: true, fillEmpty: false });
+    } catch (eHyd) {}
   });
 
   /* Feed photos: the post row carries the picture itself (attachments[i].dataUrl, a

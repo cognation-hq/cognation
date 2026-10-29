@@ -64,7 +64,8 @@ function signIn(win) {
         return Promise.resolve([{ id: "srv-seed-1", user_id: "u-seed-1", kind: "personal", handle: "sasha-0001", display_name: "Sasha", bio: "", account_kind: "seed", seed_fleet_id: "seed-0001" }]);
       }
       if (table === "tower_posts") {
-        return Promise.resolve([{ id: "srv-post-1", author_profile_id: "srv-seed-1", body: "Server seed post from Sasha.", visibility: "public", attachments: [], created_at: "2026-10-20T20:00:00.000Z",
+        /* rated G: this viewer's age is not known here (no user_birth), so the store holds G/PG server posts only */
+        return Promise.resolve([{ id: "srv-post-1", author_profile_id: "srv-seed-1", body: "Server seed post from Sasha.", visibility: "public", attachments: [], created_at: "2026-10-20T20:00:00.000Z", rating: "G",
           author: { id: "srv-seed-1", user_id: "u-seed-1", kind: "personal", handle: "sasha-0001", display_name: "Sasha", account_kind: "seed", seed_fleet_id: "seed-0001" } }]);
       }
       return Promise.resolve([]);

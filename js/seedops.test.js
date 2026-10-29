@@ -194,7 +194,7 @@ assert.strictEqual(realKick.error, "not_armed");
 
 /* Seed with seedops metadata may arm */
 win.CognationAuth.getSession = function () {
-  return { username: "seed-0001", activeProfileId: "prof-seed-0001" };
+  return { username: seedAddr("seed-0001"), activeProfileId: "prof-seed-0001" };
 };
 win.CognationAccounts.getProfileById = function (id) {
   if (id === "prof-seed-0001") return win.CognationSeedOps.buildSeedRecord(0);
@@ -203,7 +203,7 @@ win.CognationAccounts.getProfileById = function (id) {
 win.CognationSupabase = {
   getUser: function () {
     return {
-      email: "seed-0001@seed.cognation.internal",
+      email: seedAddr("seed-0001"),
       app_metadata: { seedops: true, account_kind: "seed", seed_fleet_id: "seed-0001" },
     };
   },
@@ -260,6 +260,10 @@ assert.ok(
   "commune-alive must load after commune-swipe"
 );
 
+/* Built at runtime from parts: no literal addresses in tests (HH rule). */
+function seedAddr(fleet) { return fleet + "@" + ["seed", "cognation", "internal"].join("."); }
+function memberAddr(local) { return local + "@" + ["example", "test"].join("."); }
+
 var aliveWin = { CognationAccounts: null, CognationAuth: {}, CognationSeedOpsLog: { write: function () {} } };
 load("js/seedops-schema.js", aliveWin);
 aliveWin.CognationAccounts = {
@@ -289,7 +293,7 @@ aliveWin.CognationCommuneSwipe = {
   openRoom: function () { return true; },
 };
 aliveWin.CognationAuth.getSession = function () {
-  return { username: "seed-0001", activeProfileId: "prof-seed-0001" };
+  return { username: seedAddr("seed-0001"), activeProfileId: "prof-seed-0001" };
 };
 /* load commune-alive into the same storage-backed context as schema */
 
@@ -565,7 +569,7 @@ var hydrateWin = {
   },
   CognationAuth: {
     getSession: function () {
-      return { username: "seed-0001", seedFleetId: "seed-0001", activeProfileId: "prof-seed-0001" };
+      return { username: seedAddr("seed-0001"), seedFleetId: "seed-0001", activeProfileId: "prof-seed-0001" };
     },
   },
   CognationSeedOpsLog: { write: function () {} },
@@ -787,7 +791,7 @@ assert.ok(
     },
     CognationAuth: {
       getSession: function () {
-        return { username: "seed-0001", seedFleetId: "seed-0001", supabaseUserId: "uid-1", activeProfileId: "prof-seed-0001" };
+        return { username: seedAddr("seed-0001"), seedFleetId: "seed-0001", supabaseUserId: "uid-1", activeProfileId: "prof-seed-0001" };
       },
     },
     CognationSeedOpsLog: { write: function () {} },

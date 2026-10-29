@@ -168,18 +168,22 @@
     var profile = (active && active.profile) || null;
     var c = classify(profile || {});
     var username = (active && active.username) || "";
-    var fleetFromProfile = String((profile && (profile.seedFleetId || profile.handle)) || "");
+    /* Removed: profile.handle as a fleet source (a member-chosen handle). */
+    var fleetFromProfile = String((profile && profile.seedFleetId) || "");
     var fleetFromMeta = (meta && meta.seedFleetId) || "";
     var fleetFromUser = "";
-    if (/^(ops-curator|ops-mod|ops-wire)$/.test(username)) fleetFromUser = username;
-    else if (/^seed-\d{1,4}$/.test(username)) fleetFromUser = username;
-    else if (/^ops-/.test(username)) fleetFromUser = username;
-    else if (/@ops\.cognation\.internal$/i.test((meta && meta.email) || "")) {
-      var local = String(meta.email).split("@")[0];
-      if (knownOpsId(local)) fleetFromUser = local;
-    } else if (/@seed\.cognation\.internal$/i.test((meta && meta.email) || "")) {
-      var seedLocal = String(meta.email).split("@")[0];
-      if (/^seed-\d{1,4}$/.test(seedLocal)) fleetFromUser = seedLocal;
+    /* Removed: bare /^seed-\d{1,4}$/, /^ops-/ and ops-name match on session.username /
+       profileHandle. Only the auth email or session username on the seed or ops
+       auth domain counts (ops local part must be a known ops fleet id). */
+    var candidates = [(meta && meta.email) || "", username];
+    for (var ci = 0; ci < candidates.length && !fleetFromUser; ci++) {
+      var addr = String(candidates[ci] || "").trim().toLowerCase();
+      var at = addr.lastIndexOf("@");
+      if (at <= 0) continue;
+      var local = addr.slice(0, at);
+      var domain = addr.slice(at + 1);
+      if (domain === "ops.cognation.internal" && knownOpsId(local)) fleetFromUser = local;
+      else if (domain === "seed.cognation.internal" && /^seed-\d{1,4}$/.test(local)) fleetFromUser = local;
     }
 
     var kind =

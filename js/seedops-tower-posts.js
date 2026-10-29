@@ -306,6 +306,23 @@
     return String(app.seed_fleet_id || app.seedFleetId || um.seed_fleet_id || um.seedFleetId || "");
   }
 
+  /* Seed and ops accounts sign in with an internal address on the seed auth
+     domain or the ops auth domain (scripts/seedops-bind-auth.mjs). A bare
+     "seed-" / "ops-" username prefix is not a marker: after Supabase sign-in
+     session.username is the member's own email. Returns the fleet id or "". */
+  var SEED_AUTH_DOMAIN = "seed.cognation.internal";
+  var OPS_AUTH_DOMAIN = "ops.cognation.internal";
+  function fleetFromAuthEmail(value) {
+    var s = String(value || "").trim().toLowerCase();
+    var at = s.lastIndexOf("@");
+    if (at <= 0) return "";
+    var local = s.slice(0, at);
+    var domain = s.slice(at + 1);
+    if (domain === SEED_AUTH_DOMAIN && /^seed-\d{4}$/.test(local)) return local;
+    if (domain === OPS_AUTH_DOMAIN && /^ops-[a-z0-9-]+$/.test(local)) return local;
+    return "";
+  }
+
   function signedInAsSeed(seed) {
     if (!seed) return false;
     try {
@@ -316,8 +333,10 @@
           ? window.CognationAuth.getSession()
           : null;
       if (!session) return false;
-      var uname = String(session.username || session.profileHandle || "");
-      if (uname === seed.seedFleetId || uname === seed.handle) return true;
+      /* Removed: session.username / profileHandle equal to the seed's fleet id or
+         handle. Only the seed's own address on the seed auth domain counts. */
+      var fromEmail = fleetFromAuthEmail(session.username);
+      if (fromEmail && fromEmail === seed.seedFleetId) return true;
       if (session.activeProfileId && seed.id && session.activeProfileId === seed.id) return true;
     } catch (e) {}
     return false;

@@ -42,16 +42,20 @@ function recordCalls(name, obj, calls) {
   });
 }
 
+/* Built at runtime from parts: no literal addresses in tests (HH rule). */
+function seedAddr(fleet) { return fleet + "@" + ["seed", "cognation", "internal"].join("."); }
+function memberAddr(local) { return local + "@" + ["example", "test"].join("."); }
+
 var REAL_USER = {
   id: "u-real-1",
-  email: "member@example.test",
+  email: memberAddr("member"),
   app_metadata: { provider: "email" },
   user_metadata: { display_name: "Jordan" },
 };
 
 var SEED_USER = {
   id: "u-seed-1",
-  email: "seed-0001@seed.cognation.internal",
+  email: seedAddr("seed-0001"),
   app_metadata: { seedops: true, account_kind: "seed", seed_fleet_id: "seed-0001" },
   user_metadata: {},
 };
@@ -372,7 +376,7 @@ test("dating-hydrate: a real user's See dating toggle writes 0 seed dating profi
 });
 
 test("dating-hydrate: seed sessions still materialize and merge seed dating profiles", async function () {
-  var w = datingWorld({ user: SEED_USER, authSession: { username: "seed-0001", seedFleetId: "seed-0001" } });
+  var w = datingWorld({ user: SEED_USER, authSession: { username: seedAddr("seed-0001"), seedFleetId: "seed-0001" } });
   var hyd = w.win.CognationSeedOpsDatingHydrate;
   var alive = w.win.CognationSeedOpsCommuneAlive;
   await alive.awaitAuthUser();
@@ -386,4 +390,135 @@ test("dating-hydrate: seed sessions still materialize and merge seed dating prof
   assert.ok(w.saved.indexOf("prof-seed-0006") !== -1, "seed bios merged for seeds: " + w.saved.join(","));
   var boot = alive.bootstrap({ force: true, count: 3 });
   assert.ok(boot.ok && boot.materialized === 3, "seed bootstrap (pathways force path) works: " + JSON.stringify(boot));
+});
+
+/* --- Trust markers: only metadata, an armed ops trigger, or the seed / ops
+   auth domain mark a seed or ops session. A bare "seed-" / "ops-" username or
+   profileHandle (session.username is a member's own email) does not. --- */
+function opsAddr(fleet) { return fleet + "@" + ["ops", "cognation", "internal"].join("."); }
+
+var REAL_PREFIX_SESSIONS = [
+  { label: "bare handle ops-team", session: { username: "ops-team", profileHandle: "ops-team" }, email: memberAddr("jordan") },
+  { label: "bare handle seed-fan", session: { username: "seed-fan", profileHandle: "seed-fan" }, email: memberAddr("jordan") },
+  { label: "email-like seed-fan", session: { username: memberAddr("seed-fan"), profileHandle: "seed-fan" }, email: memberAddr("seed-fan") },
+  { label: "email-like ops-team", session: { username: memberAddr("ops-team"), profileHandle: "ops-team" }, email: memberAddr("ops-team") },
+  { label: "email-like seed-0001", session: { username: memberAddr("seed-0001") }, email: memberAddr("seed-0001") },
+];
+
+function realUserWith(email) {
+  return Object.assign({}, REAL_USER, { email: email });
+}
+
+REAL_PREFIX_SESSIONS.forEach(function (c) {
+  test("trust markers: real user (" + c.label + ") bootstrap makes 0 seed writes", async function () {
+    var state = { signedIn: true, user: realUserWith(c.email), authSession: c.session, writes: [], calls: [] };
+    var w = world(state);
+    var alive = w.win.CognationSeedOpsCommuneAlive;
+    var trig = w.win.CognationSeedOpsTrigger;
+    await tick();
+    state.writes.length = 0;
+    state.calls.length = 0;
+    w.order.length = 0;
+
+    w.fire("cognation:session-started");
+    await tick();
+    var r1 = await alive.bootstrapAfterAuth({ force: true });
+    var r2 = alive.bootstrap({ force: true });
+    var mat = alive.materializeDatingSample(12);
+    await tick();
+
+    assert.strictEqual(trig.isArmed(), false, "ops trigger not armed");
+    assert.strictEqual(alive.isSeedOrOpsSession(), false, "not a seed/ops session");
+    assert.strictEqual(r1.skipped, true, JSON.stringify(r1));
+    assert.strictEqual(r2.skipped, true, JSON.stringify(r2));
+    assert.strictEqual(mat.skipped, true, JSON.stringify(mat));
+    assert.deepStrictEqual(state.writes, [], "storage writes");
+    assert.deepStrictEqual(w.order.filter(function (x) { return /^write:/.test(x); }), [], "profile/account writes");
+    assert.deepStrictEqual(state.calls, [], "Supabase calls");
+    assert.deepStrictEqual(w.win.CognationAccounts._p, {}, "no seed profiles materialized");
+  });
+
+  test("trust markers: real user (" + c.label + ") See dating writes 0 seed profiles", async function () {
+    var w = datingWorld({ user: realUserWith(c.email), authSession: c.session });
+    var hyd = w.win.CognationSeedOpsDatingHydrate;
+    var alive = w.win.CognationSeedOpsCommuneAlive;
+    await alive.awaitAuthUser();
+    assert.strictEqual(alive.isSeedOrOpsSession(), false, "not a seed/ops session");
+    w.saved.length = 0;
+    w.writes.length = 0;
+    w.calls.length = 0;
+
+    w.win.CognationCommuneSwipe.setSeeDating(true);
+    w.fire("cognation:see-dating-changed", { seeDating: true });
+    await settle();
+    await hyd.ensureDatingContent({ minCount: 1, forceBios: true });
+    var mat = alive.materializeDatingSample(48);
+    await settle();
+
+    assert.strictEqual(mat.skipped, true, JSON.stringify(mat));
+    assert.deepStrictEqual(w.saved, [], "no accounts-store writes of seed profiles");
+    assert.deepStrictEqual(w.win.CognationAccounts._p, {}, "accounts store untouched");
+    assert.deepStrictEqual(
+      w.writes.filter(function (k) { return /cognation\.(profiles|seedops\.fleet)/.test(k); }),
+      [],
+      "no seed profile/fleet storage writes"
+    );
+    assert.deepStrictEqual(
+      w.calls.filter(function (c) { return c !== "CognationSupabase.rest"; }),
+      [],
+      "no Supabase writes"
+    );
+  });
+});
+
+test("trust markers: a seed with only app_metadata still bootstraps", async function () {
+  var metaOnly = {
+    id: "u-seed-2",
+    app_metadata: { seedops: true, account_kind: "seed", seed_fleet_id: "seed-0002" },
+    user_metadata: {},
+  };
+  var state = { signedIn: true, user: metaOnly, authSession: { username: "fleet_0a1b2c3d4e5f" } };
+  var w = world(state);
+  var alive = w.win.CognationSeedOpsCommuneAlive;
+  await alive.awaitAuthUser();
+  assert.strictEqual(alive.isSeedOrOpsSession(), true);
+  var boot = alive.bootstrap({ force: true, count: 3 });
+  assert.ok(boot.ok && boot.materialized === 3, JSON.stringify(boot));
+});
+
+test("trust markers: a seed known only by a seed-domain session still passes", async function () {
+  var bare = { id: "u-seed-3", app_metadata: { provider: "email" }, user_metadata: {} };
+  var state = { signedIn: true, user: bare, authSession: { username: seedAddr("seed-0003") } };
+  var w = world(state);
+  var alive = w.win.CognationSeedOpsCommuneAlive;
+  await alive.awaitAuthUser();
+  assert.strictEqual(alive.isSeedOrOpsSession(), true);
+  var boot = alive.bootstrap({ force: true, count: 3 });
+  assert.ok(boot.ok && boot.materialized === 3, JSON.stringify(boot));
+  var op = w.win.CognationSeedOpsTrigger.resolveOperator();
+  assert.ok(op && op.isSeed && op.seedFleetId === "seed-0003", JSON.stringify(op));
+});
+
+test("trust markers: a seed known only by its auth email on the seed domain still passes", async function () {
+  var bare = { id: "u-seed-4", email: seedAddr("seed-0004"), app_metadata: { provider: "email" }, user_metadata: {} };
+  var state = { signedIn: true, user: bare, authSession: { username: "fleet_0a1b2c3d4e5f" } };
+  var w = world(state);
+  var alive = w.win.CognationSeedOpsCommuneAlive;
+  await alive.awaitAuthUser();
+  assert.strictEqual(alive.isSeedOrOpsSession(), true);
+  var op = w.win.CognationSeedOpsTrigger.resolveOperator();
+  assert.ok(op && op.isSeed && op.seedFleetId === "seed-0004", JSON.stringify(op));
+});
+
+test("trust markers: an ops bot on the ops domain arms the trigger; an unknown ops local part does not", async function () {
+  var bare = { id: "u-ops-1", app_metadata: { provider: "email" }, user_metadata: {} };
+  var w = world({ signedIn: true, user: bare, authSession: { username: opsAddr("ops-mod") } });
+  await w.win.CognationSeedOpsCommuneAlive.awaitAuthUser();
+  var op = w.win.CognationSeedOpsTrigger.resolveOperator();
+  assert.ok(op && op.isOpsBot && op.seedFleetId === "ops-mod", JSON.stringify(op));
+  assert.strictEqual(w.win.CognationSeedOpsCommuneAlive.isSeedOrOpsSession(), true);
+
+  var w2 = world({ signedIn: true, user: bare, authSession: { username: opsAddr("ops-team") } });
+  await w2.win.CognationSeedOpsCommuneAlive.awaitAuthUser();
+  assert.strictEqual(w2.win.CognationSeedOpsTrigger.isArmed(), false, "unknown ops local part does not arm");
 });

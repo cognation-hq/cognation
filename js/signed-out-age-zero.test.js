@@ -242,7 +242,7 @@ function settle(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   var mug = Array.prototype.filter.call(out.swipe.marketplaceCards(), function (c) { return /-g$/.test(c.id); })[0];
   assert.ok(mug, "signed out: the G Marketplace card stays");
   var mugHtml = out.swipe.renderCard(mug).innerHTML;
-  assert.ok(/data-market-bid-note>Sign in to bid\.</.test(mugHtml), "signed out: bid note says Sign in to bid.");
+  assert.ok(/data-market-bid-note>(?:<a [^>]*>)?Sign in to bid\.</.test(mugHtml), "signed out: bid note says Sign in to bid.");
   assert.ok(!/data-market-bid[\s>]/.test(mugHtml), "signed out: no Bid button on the card");
 
   /* 4) No network writes while signed out. */

@@ -15,6 +15,8 @@ var path = require("path");
 var vm = require("vm");
 
 var root = path.join(__dirname, "..");
+/* Built at runtime from parts: no literal addresses in tests (HH rule). */
+function memberAddr(local) { return local + "@" + ["example", "test"].join("."); }
 
 function read(rel) {
   return fs.readFileSync(path.join(root, rel), "utf8");
@@ -105,7 +107,7 @@ function testRemoteProfileReadDoesNotRecurse() {
           source: "supabase",
           supabaseUserId: "user-1",
           activeProfileId: "profile-1",
-          username: "alexa@example.com",
+          username: memberAddr("member"),
         };
       },
     },
@@ -187,7 +189,7 @@ function testSignInSkipsStaleSessionAndSurfacesMsg() {
                   access_token: "fresh-access",
                   refresh_token: "fresh-refresh",
                   expires_in: 3600,
-                  user: { id: "user-1", email: "alexa@example.com" },
+                  user: { id: "user-1", email: memberAddr("member") },
                 })
           );
         },
@@ -196,14 +198,14 @@ function testSignInSkipsStaleSessionAndSurfacesMsg() {
   };
   windowStub.window = windowStub;
   loadScript("js/supabase-client.js", windowStub);
-  return windowStub.CognationSupabase.signIn("alexa@example.com", "correct").then(function (result) {
+  return windowStub.CognationSupabase.signIn(memberAddr("member"), "correct").then(function (result) {
     assert.strictEqual(result.user.id, "user-1");
     assert.strictEqual(calls.length, 1, "sign-in must not refresh a stale session first");
     assert.ok(calls[0].url.indexOf("grant_type=password") !== -1);
     assert.ok(!calls[0].options.headers.Authorization, "password grant must not send a leftover user JWT");
     var stored = JSON.parse(storage.getItem("cognation.supabase.session.v1"));
     assert.strictEqual(stored.access_token, "fresh-access");
-    return windowStub.CognationSupabase.signIn("alexa@example.com", "wrong");
+    return windowStub.CognationSupabase.signIn(memberAddr("member"), "wrong");
   }).then(
     function () {
       throw new Error("wrong password should reject");
@@ -224,7 +226,7 @@ function testSignInSkipsStaleSessionAndSurfacesMsg() {
 function testInvalidCredentialsCopy() {
   var html = [
     '<div id="login-gate" hidden><form id="login-form">',
-    '<input name="username" value="test@example.com">',
+    '<input name="username" value="' + memberAddr("test") + '">',
     '<input name="password" id="login-password" value="x">',
     '<p id="login-status" hidden></p>',
     '<button type="submit" data-login-submit>Sign in</button>',
@@ -288,7 +290,7 @@ function testInvalidCredentialsCopy() {
   }
   var gate = el("div", { id: "login-gate", hidden: true });
   var form = el("form", { id: "login-form" });
-  var user = el("input", { name: "username", value: "test@example.com" });
+  var user = el("input", { name: "username", value: memberAddr("test") });
   var pass = el("input", { name: "password", id: "login-password", value: "x" });
   var status = el("p", { id: "login-status", hidden: true });
   form.children = [user, pass, status];

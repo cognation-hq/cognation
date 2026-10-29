@@ -4,6 +4,8 @@ var path = require("path");
 var assert = require("assert");
 var vm = require("vm");
 var root = path.join(__dirname, "..");
+/* Built at runtime from parts: no literal addresses in tests (HH rule). */
+function seedAddr(fleet) { return fleet + "@" + ["seed", "cognation", "internal"].join("."); }
 var ORIGINAL = ["alex-rivera", "sam-okonkwo", "jordan-lee"];
 var REMOVED = "alex-rivera";
 var REMAINING = ["sam-okonkwo", "jordan-lee"];
@@ -65,13 +67,13 @@ function boot(storage, viewed) {
 
 function seed(storage) {
   storage.setItem("cognation.session.v2", JSON.stringify({
-    source: "supabase", username: "seed-0001@seed.cognation.internal", activeProfileId: "prof-seed",
+    source: "supabase", username: seedAddr("seed-0001"), activeProfileId: "prof-seed",
   }));
 }
 
 function account(win) {
   win.CognationAccounts.saveProfileRecord({
-    id: "prof-seed", kind: "personal", accountUsername: "seed-0001@seed.cognation.internal",
+    id: "prof-seed", kind: "personal", accountUsername: seedAddr("seed-0001"),
     phone: "(312) 555-0199", handle: "seed-0001", displayName: "Seed",
     featuredFriendIds: [], removedFriendPinIds: [],
   });

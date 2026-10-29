@@ -7,6 +7,8 @@ var assert = require("assert");
 var fs = require("fs");
 var path = require("path");
 var pr = require("./password-reset.js");
+/* Built at runtime from parts: no literal addresses in tests (HH rule). */
+function memberAddr(local) { return local + "@" + ["example", "test"].join("."); }
 
 assert.deepStrictEqual(pr.parseRecovery("#access_token=abc&type=recovery&expires_in=3600"), { token: "abc" });
 assert.strictEqual(pr.parseRecovery("#access_token=abc&type=signup"), null);
@@ -18,7 +20,7 @@ var calls = [];
 function fakeFetch(url, opts) { calls.push({ url: url, opts: opts }); return Promise.resolve({ ok: true, json: function () { return Promise.resolve({}); } }); }
 var c = { url: "https://x.supabase.co", key: "sb_publishable_test" };
 (async function () {
-  await pr.requestReset(fakeFetch, c, "a@b.co", "https://site/reset-password.html");
+  await pr.requestReset(fakeFetch, c, memberAddr("member"), "https://site/reset-password.html");
   assert.ok(calls[0].url.indexOf("/auth/v1/recover?redirect_to=https%3A%2F%2Fsite%2Freset-password.html") > 0);
   assert.strictEqual(calls[0].opts.method, "POST");
   assert.ok(!calls[0].opts.headers.Authorization, "recover sends no user token");

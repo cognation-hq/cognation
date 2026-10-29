@@ -37,7 +37,8 @@
   function cards(opts) {
     opts = opts || {};
     var age = parseInt(opts.age, 10), name = label(opts.field), p, field;
-    if ((!isNaN(age) && age > 0 && age < 18) || !forInterest({ field: name, interest: norm(opts.field) || norm(name) }, opts.interests)) return [];
+    /* 18+ only. Unknown, 0 or signed out (age 0) fails closed (#309). */
+    if (isNaN(age) || age < 18 || !forInterest({ field: name, interest: norm(opts.field) || norm(name) }, opts.interests)) return [];
     p = pack(name); spill(p); field = p.pack.field;
     return p.pack.rooms.map(function (r) {
       var full = r.members.length >= MAX;

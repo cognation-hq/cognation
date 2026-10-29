@@ -12924,6 +12924,11 @@ a.site-switch-side:focus-visible {
 .commune-swipe-shell[data-commune-mode="professional"] .commune-dating-toggle-row {
   display: none !important;
 }
+/* Professional hides every toggle row above, so the Algorithm Manager block
+   (label + top rule) would sit empty: hide it whole (#318 LOOK). */
+.commune-swipe-shell[data-commune-mode="professional"] .commune-algo-manager {
+  display: none !important;
+}
 .commune-pro-kicker {
   display: flex;
   flex-wrap: wrap;

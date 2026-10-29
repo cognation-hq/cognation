@@ -497,14 +497,22 @@
       return !!(sess && (sess.user || sess.access_token));
     } catch (eLive) { return false; }
   }
+  /* Signed out: no live Supabase session and no signed-in user id. Every client
+     gate then sees age 0 (#309 rule), whatever the device stores. */
+  function signedOutViewer() {
+    if (liveSignedIn()) return false;
+    var floorU = ageFloorApi();
+    try {
+      return !(floorU && typeof floorU.sessionUserId === "function" && floorU.sessionUserId());
+    } catch (eU) { return true; }
+  }
   function getMemberAge() {
-    var n = parseInt(getMemberProfile().age, 10);
-    var stored = !isNaN(n) && n > 0 ? n : null;
+    if (signedOutViewer()) return 0;
     if (datingBirthAge != null) return datingBirthAge;
-    if (birthMissing || liveSignedIn()) {
-      return stored != null && stored < ACCESS_AGE_UNKNOWN ? stored : ACCESS_AGE_UNKNOWN;
-    }
-    return stored;
+    /* Signed in, user_birth pending or no row: 0, like viewerAge() (#309).
+       The local profile age (editable) is never read here. The server's
+       13 default for an unknown age is a separate backstop. */
+    return 0;
   }
   function getSeeDating() {
     try { return localStorage.getItem(SEE_DATING_KEY) === "1"; } catch (e) { return false; }
@@ -577,7 +585,7 @@
     var a = getMemberAge();
     return typeof a === "number" && a > 0 ? a : ACCESS_AGE_UNKNOWN;
   }
-  function getDatingBirthAge() { return datingBirthAge; }
+  function getDatingBirthAge() { return signedOutViewer() ? null : datingBirthAge; }
   /* Signed in and this session's user_birth age is not known yet (not read, or
      the read is still in flight). Not "missing": a read that found no row sets
      birthMissing. Tower rates a pending viewer G/PG only. */
@@ -601,7 +609,7 @@
   function datingAllowed() {
     if (!datingSwitchOn()) return false;
     if (birthAgePending()) return false;
-    return !!(getSeeDating() && datingAgeOk(datingBirthAge));
+    return !!(getSeeDating() && datingAgeOk(getDatingBirthAge()));
   }
   /* In-page sign-out: forget this account's birth age and See dating so the next
      account on the device never reads them. */
@@ -994,6 +1002,7 @@
     /* Age not read yet for this session: closed until it is. */
     if (birthAgePending()) return false;
     /* Signed in: the saved birth month (user_birth) decides. */
+    if (signedOutViewer()) return false;
     if (liveSignedIn() && datingBirthAge != null) return datingBirthAge >= 18;
     var age = getMemberAge();
     return age != null && age >= 18;
@@ -1681,7 +1690,9 @@
     });
     if (html) html = '<div class="commune-market-photos" data-market-photos>' + html + "</div>";
     if (!marketCanBid()) {
-      return html + '<p class="commune-card-meta" data-market-bid-note>Bidding is for ages 16 and up.</p>';
+      /* Signed out: the age is unknown, not too young; say what opens it. */
+      return html + '<p class="commune-card-meta" data-market-bid-note>' +
+        (signedOutViewer() ? "Sign in to bid." : "Bidding is for ages 16 and up.") + "</p>";
     }
     var price = marketMoney(card.ask);
     var high = liveHigh(card.id);
@@ -2404,6 +2415,7 @@
     if (!y || !m) return;
     var now = new Date();
     var age = now.getFullYear() - y - (now.getMonth() + 1 < m ? 1 : 0);
+    if (signedOutViewer()) return; /* no account to save a birth month for */
     setDatingBirthAge(age);
     if (state.statusEl && state.statusEl.querySelector("[data-commune-add-birth]")) setStatus("");
   });

@@ -30,7 +30,22 @@ function memoryStorage() {
   };
 }
 
-function loadSwipe(localStorage, sessionStorage) {
+/* Signed in (#309: a signed-out or demo viewer's gates see age 0). With an age,
+   the stored session is a Supabase sign-in, the member profile is this user's,
+   and the age comes from user_birth (setDatingBirthAge), not the local profile.
+   No live Supabase session, so the local page registry still feeds the deck. */
+var VIEWER_ID = ["u", "viewer"].join("-");
+function signInAs(localStorage) {
+  var sess = JSON.parse(localStorage.getItem("cognation.session.v2") || "{}");
+  sess.source = "supabase"; sess.supabaseUserId = VIEWER_ID;
+  if (!sess.username) { sess.username = "ada"; sess.activeProfileId = "ada"; }
+  localStorage.setItem("cognation.session.v2", JSON.stringify(sess));
+  var prof = JSON.parse(localStorage.getItem("cognation.member.profile.v1") || "{}");
+  prof.ownerUserId = VIEWER_ID;
+  localStorage.setItem("cognation.member.profile.v1", JSON.stringify(prof));
+}
+function loadSwipe(localStorage, sessionStorage, age) {
+  if (age != null) signInAs(localStorage);
   var windowStub = {};
   var documentStub = {
     readyState: "complete",
@@ -66,7 +81,9 @@ function loadSwipe(localStorage, sessionStorage) {
     Number: Number,
   });
   vm.runInContext(src("js/content-creator-room.js"), context);
+  vm.runInContext(src("js/age-floor-keywords.js"), context);
   vm.runInContext(src("js/commune-swipe.js"), context);
+  if (age != null) windowStub.CognationCommuneSwipe.setDatingBirthAge(age);
   windowStub.CognationCommuneSwipe.contentCreator = windowStub.CognationContentCreator;
   return windowStub.CognationCommuneSwipe;
 }
@@ -129,7 +146,7 @@ function adultStores() {
 }
 
 var stores = adultStores();
-var adult = loadSwipe(stores.local, stores.session);
+var adult = loadSwipe(stores.local, stores.session, 30);
 if (adult.noteViewerSeedStatus) adult.noteViewerSeedStatus(false);
 if (adult.noteProfileSeedStatus) {
   adult.noteProfileSeedStatus("ada", false);
@@ -200,7 +217,7 @@ kidLocal.setItem("cognation.member.profile.v1", JSON.stringify({ age: 12, intere
 kidLocal.setItem("cognation.profiles.v1", stores.local.getItem("cognation.profiles.v1"));
 var kidSession = memoryStorage();
 kidSession.setItem("cognation.commune.mode", "professional");
-var kid = loadSwipe(kidLocal, kidSession);
+var kid = loadSwipe(kidLocal, kidSession, 12);
 assert.strictEqual(kid.getMode(), "professional");
 var kidDeck = kid.sampleDeck(15);
 assert.ok(kidDeck.length > 0 && kidDeck.every(function (c) { return c.type === "pro-podcast"; }), "under-13 gets the G Podcast cards only");
@@ -221,7 +238,7 @@ var makerLocal = memoryStorage();
 makerLocal.setItem("cognation.member.profile.v1", JSON.stringify({ age: 30, interests: ["content creator"] }));
 var makerSession = memoryStorage();
 makerSession.setItem("cognation.commune.mode", "professional");
-var maker = loadSwipe(makerLocal, makerSession);
+var maker = loadSwipe(makerLocal, makerSession, 30);
 var makerCard = maker.sampleDeck(8).filter(function (c) { return c.type === "pro-creator" && c.roomKind === "content-creator"; })[0];
 assert.ok(makerCard, "interest shows the card");
 assert.ok(maker.renderCard(makerCard).innerHTML.indexOf("You listed Content Creator as an interest") >= 0, "interest keeps the why line");

@@ -14,10 +14,13 @@ function memoryStorage() {
     removeItem: function (k) { delete data[k]; },
   };
 }
+/* Signed in (#309: a signed-out viewer's gates see age 0): a live session, and
+   the age comes from user_birth (setDatingBirthAge), not the local profile. */
+var VIEWER_ID = ["u", "viewer"].join("-");
 function load(local, interests) {
   local.setItem("cognation.session.v2", JSON.stringify({ username: "ada", activeProfileId: "ada" }));
   local.setItem("cognation.member.profile.v1", JSON.stringify({ age: 30, interests: interests }));
-  var windowStub = {};
+  var windowStub = { CognationSupabase: { getSession: function () { return { access_token: "t-" + VIEWER_ID, user: { id: VIEWER_ID } }; } } };
   var documentStub = { addEventListener: function () {}, querySelector: function () { return null; }, body: { classList: { add: function () {}, remove: function () {} } } };
   var context = vm.createContext({
     window: windowStub, document: documentStub, localStorage: local, sessionStorage: memoryStorage(),
@@ -27,6 +30,7 @@ function load(local, interests) {
   });
   vm.runInContext(src("js/research-room.js"), context);
   vm.runInContext(src("js/commune-swipe.js"), context);
+  windowStub.CognationCommuneSwipe.setDatingBirthAge(30);
   return { swipe: windowStub.CognationCommuneSwipe, room: windowStub.CognationResearchRoom };
 }
 var roomSrc = src("js/research-room.js");

@@ -29,7 +29,11 @@ var COMMENTS = [
 ];
 function render(age) {
   var seed = { "cognation.news.comments.v1": JSON.stringify({ byStory: { s1: COMMENTS } }) };
-  if (age != null) seed["cognation.member.profile.v1"] = JSON.stringify({ age: age });
+  /* Signed in (#309: a signed-out viewer's gates see age 0): a Supabase session
+     and this user's own member profile. */
+  var viewerId = ["u", "viewer"].join("-");
+  seed["cognation.session.v2"] = JSON.stringify({ source: "supabase", supabaseUserId: viewerId });
+  if (age != null) seed["cognation.member.profile.v1"] = JSON.stringify({ age: age, ownerUserId: viewerId });
   var w = {};
   vm.runInNewContext(code, { window: w, localStorage: mem(seed), Date: Date, Math: Math });
   var article = {

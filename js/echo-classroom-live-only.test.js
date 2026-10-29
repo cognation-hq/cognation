@@ -24,11 +24,15 @@ function memoryStorage() {
   };
 }
 
+/* Signed in (#309: a signed-out viewer's gates see age 0): a live session, and
+   the age comes from user_birth (setDatingBirthAge), not the local profile. */
+var VIEWER_ID = ["u", "viewer"].join("-");
 function loadSwipe(windowStub) {
   var local = memoryStorage();
   local.setItem("cognation.member.profile.v1", JSON.stringify({ age: 30, interests: ["insurance"] }));
   local.setItem("cognation.commune.seeDating.v1", "1");
   windowStub.CognationDatingFlag = { enabled: function () { return true; } };
+  windowStub.CognationSupabase = windowStub.CognationSupabase || { getSession: function () { return { access_token: "t-" + VIEWER_ID, user: { id: VIEWER_ID } }; } };
   var context = vm.createContext({
     window: windowStub,
     document: {

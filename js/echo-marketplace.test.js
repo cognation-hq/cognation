@@ -18,8 +18,12 @@ function memoryStorage() {
   };
 }
 
-function loadSwipe(local) {
-  var windowStub = {};
+/* Signed in (#309: a signed-out or demo viewer's gates see age 0): a live
+   session, and the age comes from user_birth (setDatingBirthAge), not the
+   local profile. */
+var VIEWER_ID = ["u", "viewer"].join("-");
+function loadSwipe(local, age) {
+  var windowStub = { CognationSupabase: { getSession: function () { return { access_token: "t-" + VIEWER_ID, user: { id: VIEWER_ID } }; } } };
   var context = vm.createContext({
     window: windowStub,
     document: { readyState: "complete", querySelector: function () { return null; }, addEventListener: function () {}, dispatchEvent: function () {} },
@@ -40,6 +44,7 @@ function loadSwipe(local) {
     Promise: Promise,
   });
   vm.runInContext(fs.readFileSync(path.join(__dirname, "commune-swipe.js"), "utf8"), context);
+  if (age != null) windowStub.CognationCommuneSwipe.setDatingBirthAge(age);
   return windowStub.CognationCommuneSwipe;
 }
 
@@ -56,7 +61,7 @@ local.setItem("cognation.tower.posts.v3", JSON.stringify({
   ],
 }));
 local.setItem("cognation.member.profile.v1", JSON.stringify({ age: 16, lat: 41.88, lng: -87.63 }));
-var api = loadSwipe(local);
+var api = loadSwipe(local, 16);
 var cards = api.marketplaceCards();
 assert.strictEqual(cards.length, 1, "only a nearby #market post");
 assert.strictEqual(cards[0].id, "market-sale-1");
@@ -79,7 +84,7 @@ assert.strictEqual(api.optInToBid("nope-under"), true);
 var young = memoryStorage();
 young.setItem("cognation.member.profile.v1", JSON.stringify({ age: 15, lat: 41.88, lng: -87.63 }));
 young.setItem("cognation.tower.posts.v3", local.getItem("cognation.tower.posts.v3"));
-var kid = loadSwipe(young);
+var kid = loadSwipe(young, 15);
 assert.strictEqual(kid.marketCanBid(), false);
 assert.strictEqual(kid.optInToBid(kid.marketplaceCards()[0].id), false);
 assert.strictEqual(young.getItem("cognation.commune.market.bids.v1"), null);
@@ -88,11 +93,11 @@ assert.strictEqual(kid.raiseBid(kid.marketplaceCards()[0].id, 8, 5), false);
 var away = memoryStorage();
 away.setItem("cognation.member.profile.v1", JSON.stringify({ age: 30, lat: 34.05, lng: -118.24 }));
 away.setItem("cognation.tower.posts.v3", local.getItem("cognation.tower.posts.v3"));
-assert.strictEqual(loadSwipe(away).marketplaceCards().length, 0, "too far");
+assert.strictEqual(loadSwipe(away, 30).marketplaceCards().length, 0, "too far");
 var blank = memoryStorage();
 blank.setItem("cognation.member.profile.v1", JSON.stringify({ age: 30 }));
 blank.setItem("cognation.tower.posts.v3", local.getItem("cognation.tower.posts.v3"));
-assert.strictEqual(loadSwipe(blank).marketplaceCards().length, 0, "viewer location missing");
+assert.strictEqual(loadSwipe(blank, 30).marketplaceCards().length, 0, "viewer location missing");
 
 var high = JSON.parse(local.getItem("cognation.commune.market.high.v1"));
 high["market-sale-1"].at = Date.now() - 86400001;

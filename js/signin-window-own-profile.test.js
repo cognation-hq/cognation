@@ -126,7 +126,7 @@ function testLocalPreviewUnchanged() {
   var page = towerPage(local, { configured: false });
   assert.strictEqual(page.floor.signInPending(), false);
   assert.strictEqual(page.tower.getActiveProfileId(), "prof-alexa", "demo founder fallback unchanged in local preview");
-  assert.strictEqual(page.floor.viewerAge(), 34, "local preview member copy unchanged");
+  assert.strictEqual(page.floor.viewerAge(), 0, "local preview is signed out: age 0 (#309), the local member copy is not trusted");
   var demo = towerPage(local, { session: { username: "demo", source: "demo" } });
   assert.strictEqual(demo.floor.signInPending(), false, "demo sessions are not 'signing in'");
 }

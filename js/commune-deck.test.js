@@ -26,8 +26,11 @@ function memoryStorage() {
   };
 }
 
+/* Signed in (#309: a signed-out viewer's gates see age 0): a live session, and
+   the age comes from user_birth (setDatingBirthAge), not the local profile. */
+var VIEWER_ID = ["u", "viewer"].join("-");
 function loadSwipe(localStorage, sessionStorage, proLive) {
-  var windowStub = {};
+  var windowStub = { CognationSupabase: { getSession: function () { return { access_token: "t-" + VIEWER_ID, user: { id: VIEWER_ID } }; } } };
   if (proLive) windowStub.CognationProLive = proLive;
   var documentStub = {
     readyState: "complete",

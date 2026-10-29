@@ -66,7 +66,7 @@ function testViewerAgeSameUserOnly() {
   assert.strictEqual(h.viewerAge(), 34, "the same user's own age still counts");
   assert.strictEqual(h.viewerIsUnder13(), false);
   h = helperFor({ username: "demo" }, { [MEMBER]: JSON.stringify({ age: 34 }) });
-  assert.strictEqual(h.viewerAge(), 34, "signed-out / demo sessions unchanged");
+  assert.strictEqual(h.viewerAge(), 0, "signed-out / demo sessions see age 0 (#309), whatever the local profile says");
 }
 
 function testCommuneSwipeGetterIgnoresForeignBlob() {

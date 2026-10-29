@@ -189,7 +189,7 @@ test("adult signs out, teen signs in (no reload): classroom and dating closed un
   assert.strictEqual(h.swipe.getSeeDating(), false, "sign-out turns See dating off");
   assert.notStrictEqual(h.ls.getItem("cognation.commune.seeDating.v1"), "1", "saved See dating cleared");
   assert.strictEqual(h.ss.getItem("cognation.seedops.datingHydrate.v2"), null, "hydrate cache cleared");
-  assert.strictEqual(h.swipe.getMemberAge(), null, "signed out: no access age invented");
+  assert.strictEqual(h.swipe.getMemberAge(), 0, "signed out: every gate sees age 0 (#309), no access age invented");
 
   h.birthDelay[TEEN.user.id] = 120; /* teen's user_birth answers late */
   h.signIn(TEEN);

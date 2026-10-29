@@ -32,7 +32,10 @@ assert.strictEqual(H.seedAgeFromFleetId("seed-0005"), 17, "Ana 17");
 // 2) swipe gate: dating age only from user_birth; member_age 28 is ignored.
 var api = (function () {
   var s2 = {}; var l2 = { getItem: function (k) { return k in s2 ? s2[k] : null; }, setItem: function (k, v) { s2[k] = String(v); }, removeItem: function (k) { delete s2[k]; } };
-  var w = { CognationDatingFlag: { enabled: function () { return true; } } };
+  /* Signed in (#309: a signed-out viewer's gates see age 0): a live session. */
+  var viewerId = ["u", "viewer"].join("-");
+  var w = { CognationDatingFlag: { enabled: function () { return true; } },
+    CognationSupabase: { getSession: function () { return { access_token: "t-" + viewerId, user: { id: viewerId } }; } } };
   var ctx = vm.createContext({
     window: w, localStorage: l2, sessionStorage: l2, console: console, setTimeout: setTimeout, clearTimeout: clearTimeout,
     document: { addEventListener: function () {}, querySelector: function () { return null; }, querySelectorAll: function () { return []; }, readyState: "loading", dispatchEvent: function () {} },

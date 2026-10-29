@@ -70,8 +70,11 @@
     }
   }
 
+  /* Signed out (or a demo session): every client gate sees age 0, whatever the
+     device's local profile, localStorage or sessionStorage says (#309 rule). */
   function viewerAge() {
     try {
+      if (!sessionUserId()) return 0;
       var store0 = localStore();
       var own = store0 ? JSON.parse(store0.getItem("cognation.member.profile.v1") || "null") : null;
       var swipe = root.CognationCommuneSwipe;

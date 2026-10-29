@@ -382,8 +382,12 @@
       overlay.posts.forEach(function (p) {
         if (p && p.id) seen[p.id] = p;
       });
+      /* Same hold rule as the Tower store: while the viewer's age is not known,
+         no server post above G/PG is copied here. */
+      var hold = store && typeof store.holdRemotePost === "function" ? store.holdRemotePost : null;
       posts.forEach(function (p) {
         if (!p || !p.id) return;
+        if (hold && !hold(p)) return;
         if (seen[p.id]) {
           /* Already in the overlay: only bring its rating up to date (a server
              rating wins; an unrated row never clears or downgrades one). */

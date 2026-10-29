@@ -16,7 +16,7 @@
   "use strict";
 
   var LOG_CHANNEL = "dating-hydrate";
-  var BOOT_FLAG = "cognation.seedops.datingHydrate.v2"; /* v2: drops cached ages read from member_age (the stale 28). The cache is never a source of age: only user_birth sets it. */
+  var BOOT_FLAG = "cognation.seedops.datingHydrate.v2"; /* v2: drops cached ages read from member_age (the stale 28). The cache is never a source of age: only this load's user_birth read sets it. Keyed by userId. */
 
   /* Deterministic seed age from fleet id (matches 20261016_seed_birth_backfill.sql).
      Ages 13..26; seed-0248 is the under-13 test viewer (age 11) until removed. */
@@ -535,10 +535,17 @@
     var swipe = window.CognationCommuneSwipe;
     if (swipe && typeof swipe.setDatingBirthAge === "function") swipe.setDatingBirthAge(age);
   }
+  /* One user_birth read in flight per user and session: a forced hydrate that
+     starts while the cached path's read is out shares it. */
+  var birthInFlight = null;
   function fetchBirthAge() {
     var sb = client();
     if (!sb || typeof sb.rest !== "function" || !lastUserId) return Promise.resolve(null);
-    return sb
+    if (birthInFlight && birthInFlight.userId === lastUserId && birthInFlight.gen === sessionGen) {
+      return birthInFlight.promise;
+    }
+    var flight = { userId: lastUserId, gen: sessionGen, promise: null };
+    flight.promise = sb
       .rest("user_birth", {
         query: "select=birth_year,birth_month&user_id=eq." + encodeURIComponent(lastUserId) + "&limit=1",
       })
@@ -548,7 +555,43 @@
       })
       .catch(function () {
         return null;
+      })
+      .then(function (age) {
+        if (birthInFlight === flight) birthInFlight = null;
+        return age;
       });
+    birthInFlight = flight;
+    return flight.promise;
+  }
+
+  /* Signed-in user id from the local session ("" signed out). */
+  function sessionUserId() {
+    try {
+      var s = window.CognationAuth && typeof window.CognationAuth.getSession === "function"
+        ? window.CognationAuth.getSession()
+        : null;
+      return s && s.supabaseUserId ? String(s.supabaseUserId) : "";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  /* This load's own user_birth read for the signed-in user (the cached path):
+     sets the age when it answers, or nothing if the session changed meanwhile. */
+  function freshBirthAge() {
+    var gen = sessionGen;
+    return fetchUserMetadata().then(function () {
+      if (gen !== sessionGen) return { stale: true };
+      if (!lastUserId || lastUserId !== sessionUserId()) {
+        setDatingBirthAge(null);
+        return { age: null };
+      }
+      return fetchBirthAge().then(function (a) {
+        if (gen !== sessionGen) return { stale: true };
+        setDatingBirthAge(a);
+        return { age: a };
+      });
+    });
   }
 
   function fetchUserMetadata() {
@@ -699,6 +742,14 @@
       return Promise.resolve({ ok: false, error: "supabase_not_configured", skipped: true });
     }
     var prior = readJson(sessionStorage, BOOT_FLAG, null);
+    /* The cache belongs to the account that wrote it: another user's (or a
+       signed-out) cache is dropped, never applied. */
+    if (prior && (!prior.userId || String(prior.userId) !== sessionUserId())) {
+      try {
+        sessionStorage.removeItem(BOOT_FLAG);
+      } catch (eOther) {}
+      prior = null;
+    }
     if (prior && prior.ok && !opts.force) {
       var biosOk = datingBiosReady(1);
       /* Cache is only valid when dating bios still live in CognationAccounts.
@@ -709,10 +760,10 @@
         } catch (eStale) {}
         prior = null;
       } else {
-        /* Re-apply the user_birth age + seeDating so Classroom/dating gates match
-           last hydrate. No cached member age is re-applied. */
+        /* Re-apply seeDating only. The cache is never a source of age (it is
+           editable session storage): the viewer stays pending until this
+           load's own user_birth read answers, which then sets the age. */
         var cachedPrefs = {};
-        setDatingBirthAge(prior.birthAge != null ? prior.birthAge : null);
         if (prior.seeDating != null) cachedPrefs.seeDating = !!prior.seeDating;
         if (prior.seeDating != null) {
           applyViewerPrefs(cachedPrefs, { seedDefaults: false });
@@ -721,7 +772,16 @@
           applyViewerPrefs({}, { seedDefaults: true });
           refillDeck();
         }
-        return Promise.resolve({ ok: true, cached: true, prior: prior, biosReady: biosOk });
+        return freshBirthAge().then(function (fresh) {
+          if (fresh.stale) {
+            emitLog({ action: "hydrate", ok: false, error: "session_changed" });
+            return { ok: false, stale: true, error: "session_changed" };
+          }
+          var res = { ok: true, cached: true, birthAge: fresh.age, biosReady: biosOk };
+          /* Tower hydrate waits for this report before its after-age read. */
+          emitLog({ action: "hydrate", ok: true, cached: true, result: res });
+          return res;
+        });
       }
     }
     hydrating = true;
@@ -786,6 +846,8 @@
               ? !!window.CognationCommuneSwipe.getSeeDating()
               : null,
           birthAge: birthAge,
+          /* Whose hydrate this is: a cache for any other user is dropped. */
+          userId: lastUserId,
           at: new Date().toISOString(),
           error: result && result.bios && result.bios.error,
         };
@@ -859,6 +921,7 @@
     });
     document.addEventListener("cognation:auth-changed", function () {
       lastMeta = undefined;
+      birthInFlight = null;
       try {
         sessionStorage.removeItem(BOOT_FLAG);
       } catch (e2) {}
@@ -867,6 +930,7 @@
     /* Birth month just saved (real accounts): re-read user_birth so rooms and
        classrooms open without a reload. */
     document.addEventListener("cognation:birth-saved", function () {
+      birthInFlight = null; /* a read from before the save must not answer for it */
       try {
         sessionStorage.removeItem(BOOT_FLAG);
       } catch (e3) {}

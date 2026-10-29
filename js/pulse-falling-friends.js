@@ -388,6 +388,8 @@
      bob; past that the bob is 0 and frames shrink just enough to hold the gap. */
   var PHONE_FRAME_GAP = 4;
   var PHONE_GAP_CUSHION = 0.5; /* rotation is sampled: a hair extra between samples */
+  /* engineer/pulse-halo-live-width: rotation is sampled every 0.001 of a spot step
+     (was 0.004), so the gap holds >= 4.5px between samples too (360 dipped to 4.497). */
   var PHONE_MIN_SIZE_K = 0.88;
   var sepCache = {};
   function fitScale(g, dFront, k) {
@@ -434,7 +436,7 @@
     var sizeAt = fitScale(g, dFront, k);
     var f = orbitF(panelW, g, sizeAt);
     var best = maxBob;
-    for (var s = 0; s < n; s += 0.004) {
+    for (var s = 0; s < n; s += 0.001) {
       var P = [];
       for (var i = 0; i < n; i++) { var q = orbitPoint(spotAngle(spots, i + s), g); P.push({ x: q.x * f, y: q.y * f, size: sizeAt(q.d) }); }
       for (i = 0; i < n; i++) {
@@ -450,6 +452,54 @@
       }
     }
     return best;
+  }
+  /* engineer/pulse-halo-live-width: the #313 tap pads (an invisible round pad of
+     max(frame, D) across on each filled frame, 360 to 429) must never overlap a
+     neighbour's pad. Smallest pad-to-pad clearance at frame scale k and bob
+     amplitude A, over every rotation step and bob phase (same sweep as bobRoom). */
+  function padRoom(panelW, g, dFront, k, A, phaseStep, D) {
+    var spots = g.spots;
+    var n = spots.length;
+    var sizeAt = fitScale(g, dFront, k);
+    var f = orbitF(panelW, g, sizeAt);
+    var worst = Infinity;
+    for (var s = 0; s < n; s += 0.001) {
+      var P = [];
+      for (var i = 0; i < n; i++) { var q = orbitPoint(spotAngle(spots, i + s), g); P.push({ x: q.x * f, y: q.y * f, pad: Math.max(sizeAt(q.d), D) }); }
+      for (i = 0; i < n; i++) {
+        var j = (i + 1) % n;
+        var a = P[i], b = P[j];
+        var M = 2 * Math.abs(Math.sin(phaseStep * (i - j) / 2));
+        var dy = Math.max(0, Math.abs(a.y - b.y) - A * M);
+        var room = Math.sqrt((a.x - b.x) * (a.x - b.x) + dy * dy) - (a.pad + b.pad) / 2;
+        if (room < worst) worst = room;
+      }
+    }
+    return worst;
+  }
+  /* Largest pad diameter <= PHONE_TAP_PAD (44px) whose pads keep >= 0 apart at the
+     worst phase (floored to 0.1px). Never below the back frame: the pad is
+     max(frame, D), so a smaller D would change nothing. */
+  var PHONE_TAP_PAD = 44;
+  var padCache = {};
+  function tapPadFit(panelW, g, dFront, k, A) {
+    var phaseStep = typeof g.bobPhase === "number" ? g.bobPhase : 0;
+    var key = [panelW, g.r, g.tilt, g.persp, k, A, phaseStep, g.spots.join(",")].join("|");
+    if (Object.prototype.hasOwnProperty.call(padCache, key)) return padCache[key];
+    var lo = k * PHONE_FRAME_BACK;
+    var out;
+    if (padRoom(panelW, g, dFront, k, A, phaseStep, PHONE_TAP_PAD) >= 0) {
+      out = PHONE_TAP_PAD;
+    } else {
+      var hi = PHONE_TAP_PAD;
+      for (var it = 0; it < 18; it++) {
+        var mid = (lo + hi) / 2;
+        if (padRoom(panelW, g, dFront, k, A, phaseStep, mid) >= 0) lo = mid; else hi = mid;
+      }
+      out = Math.floor(lo * 10) / 10;
+    }
+    padCache[key] = out;
+    return out;
   }
   function separationFit(panelW, g, dFront) {
     var maxBob = g.bob || 0;
@@ -504,11 +554,13 @@
     }
     var bob = sep.bob;
     var lift = g.lift || 0;
+    var tapPad = Array.isArray(g.spots) && g.spots.length > 1 ? tapPadFit(panelW, g, dFront, sizeK, bob) : PHONE_TAP_PAD;
     return {
       f: f,
       ringW: ringW,
       sizeK: sizeK,
       bob: bob, /* phone bob amplitude (px) to use for every frame */
+      tapPad: tapPad, /* #313 tap pad diameter (px, <= 44) that never overlaps a neighbour's */
       sizeAt: sizeAt,
       point: function (angleDeg) { var q = orbitPoint(angleDeg, g); return { x: q.x * f, y: q.y * f, d: q.d, size: sizeAt(q.d) }; },
       /* vertical reach of any frame + caption around the ring centre, motion included */
@@ -891,6 +943,7 @@
     PHONE_MAX_W: PHONE_MAX_W,
     PHONE_FRAME_GAP: PHONE_FRAME_GAP,
     PHONE_MIN_SIZE_K: PHONE_MIN_SIZE_K,
+    PHONE_TAP_PAD: PHONE_TAP_PAD,
     centerGroup: centerGroup,
     layoutOutside: layoutOutside,
     render: render,

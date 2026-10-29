@@ -16475,7 +16475,12 @@ body.cgn-cal-page {
    44px round pads keep at least 1.6px apart and clear the front frame. The frame
    itself (size, ring, ripple, bob, motion) is unchanged; overflow is opened only so
    the pad is not clipped (photos are backgrounds, so nothing else can show past the
-   round frame). 430 and wider (full-size frames) and desktop are untouched. */
+   round frame). 430 and wider (full-size frames) and desktop are untouched.
+   engineer/pulse-halo-live-width: the 44px is now a cap. js/pulse-falling-friends.js
+   phoneOrbit returns tapPad, the largest diameter <= 44 at which neighbouring pads
+   never overlap at any rotation or bob phase, and tower.js sets --pulse-tap-pad.
+   With the full-bleed PULSE panel below that is 44px at 360, 375 and 390; a
+   narrower panel would get a smaller pad (e.g. 42.8px on a 328px panel). */
 @media (min-width: 360px) and (max-width: 429px) {
   .circle-fall[data-pulse-bg] .circle-spot.is-filled { overflow: visible; }
   .circle-fall[data-pulse-bg] .circle-spot.is-filled::after {
@@ -16483,12 +16488,27 @@ body.cgn-cal-page {
     position: absolute;
     left: 50%;
     top: 50%;
-    width: max(100%, 44px);
-    height: max(100%, 44px);
+    width: max(100%, var(--pulse-tap-pad, 44px));
+    height: max(100%, var(--pulse-tap-pad, 44px));
     border-radius: 50%;
     transform: translate(-50%, -50%);
     background: transparent;
     border: 0;
     pointer-events: auto;
+  }
+}
+
+/* engineer/pulse-halo-live-width (PM + HH): phones (<768px) get the accepted #310
+   PULSE look back. #310 was designed and measured with the PULSE panel as wide as
+   the screen; live, the panel sat inside .container (width 100% - 2rem), so it was
+   the screen minus 32px and phoneOrbit fitted the orbit to that narrower panel
+   (smaller frames, no bob at 360 to 390). The PULSE panel now runs edge to edge on
+   phones (the 1rem side gutters are covered by the PULSE background), so
+   phoneOrbit(fitLayer.clientWidth) sees the screen width, exactly as in #310.
+   Tablets (768+) and desktop are unchanged. */
+@media (max-width: 767px) {
+  .circle-fall[data-pulse-bg] {
+    width: calc(100% + 2rem);
+    margin-inline: -1rem;
   }
 }

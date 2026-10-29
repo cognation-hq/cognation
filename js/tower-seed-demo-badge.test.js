@@ -57,6 +57,8 @@ var badgeSrc = fnSource("towerPostSeedBadge") || "function towerPostSeedBadge() 
 var bylineSrc = ["initials", "towerPostAuthorSlug", "towerPostAuthorHtml", "bindTowerAuthorLinks"].map(fnSource).join("\n");
 /* Feed event-invite card (#283) used by renderFeed. */
 var inviteSrc = ["feedInvite", "inviteWhenLabel", "feedInviteHtml", "bindFeedInvites"].map(fnSource).join("\n");
+/* Rating label (data-tower-rating) on each Feed card: the real postRating(). */
+var ratingSrc = fnSource("postRating");
 
 var list = el("div");
 var state = { posts: [] };
@@ -69,7 +71,7 @@ var renderFeed = new Function("window", "document", "list", "state", [
   "function formatTime() { return 'Oct 1, 9:39 AM'; }",
   "function renderAttachments() { return ''; }",
   "function buildTowerPostReactBar() { return document.createElement('div'); }",
-  badgeSrc, bylineSrc, inviteSrc, renderSrc, "return renderFeed;",
+  badgeSrc, bylineSrc, inviteSrc, ratingSrc, renderSrc, "return renderFeed;",
 ].join("\n"))(win, doc, list, state);
 
 /* The posts SeedOps saw signed out: built client-side by seedops-tower-posts.js. */

@@ -165,10 +165,29 @@
     }
     /* One-time compaction done (old layouts). */
     if (layout._compacted) out._compacted = 1;
+    /* Grid drags (layout-drag-keeps-grid): { id: { dx, dy } } px nudges on the default grid. */
+    var nudge = cleanGridNudge(layout._gridNudge);
+    if (Object.keys(nudge).length) out._gridNudge = nudge;
     if (layout._backup && typeof layout._backup === "object") {
       var bk = cleanBackup(layout._backup);
       if (bk) out._backup = bk;
     }
+    return out;
+  }
+
+  function cleanGridNudge(src) {
+    var out = {};
+    if (!src || typeof src !== "object") return out;
+    Object.keys(src).slice(0, 60).forEach(function (id) {
+      var v = src[id];
+      if (!v || typeof v !== "object" || String(id).length > 64 || String(id).charAt(0) === "_") return;
+      var dx = Math.round(Number(v.dx));
+      var dy = Math.round(Number(v.dy));
+      if (!isFinite(dx) || !isFinite(dy)) return;
+      dx = Math.max(-4000, Math.min(4000, dx));
+      dy = Math.max(-20000, Math.min(20000, dy));
+      if (dx || dy) out[id] = { dx: dx, dy: dy };
+    });
     return out;
   }
 
@@ -258,6 +277,7 @@
       var base = p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : {};
       Object.keys(saved).forEach(function (wid) {
         if (wid === "_compacted") { base._compacted = 1; return; }
+        if (wid === "_gridNudge") return;
         if (wid === "_public" || wid === "_backup") return;
         var next = saved[wid];
         var prev = base[wid];
@@ -271,6 +291,9 @@
         }
         base[wid] = next;
       });
+      /* The row's grid nudges replace any local copy (none in the row = none). */
+      if (saved._gridNudge) base._gridNudge = saved._gridNudge;
+      else delete base._gridNudge;
       p.widgetLayout = base;
     }
     if (saved && saved._widgets) applyWidgetsToProfile(p, saved._widgets);

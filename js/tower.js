@@ -136,6 +136,73 @@
     return !!(layout && layout[id] && !isFactorySeedPos(id, layout[id]));
   }
 
+  /* A drag on the default grid keeps the grid (Designer spec, layout-drag-keeps-grid).
+     The dragged widget is only nudged by the drop offset (px, CSS translate) and
+     saved as layout._gridNudge = { id: { dx, dy } }. Every other widget keeps its
+     grid spot and size, so what the owner saw is what is saved and what reloads.
+     The profile card (avatar | name) moves as one: its key is "profile-strip". */
+  var GRID_NUDGE_KEY = "_gridNudge";
+  var GRID_NUDGE_STRIP = "profile-strip";
+  function cleanGridNudge(src) {
+    var out = {};
+    if (!src || typeof src !== "object") return out;
+    Object.keys(src).slice(0, 60).forEach(function (id) {
+      var v = src[id];
+      if (!v || typeof v !== "object" || String(id).length > 64 || String(id).charAt(0) === "_") return;
+      var dx = Math.round(Number(v.dx));
+      var dy = Math.round(Number(v.dy));
+      if (!isFinite(dx) || !isFinite(dy)) return;
+      dx = Math.max(-4000, Math.min(4000, dx));
+      dy = Math.max(-20000, Math.min(20000, dy));
+      if (dx || dy) out[id] = { dx: dx, dy: dy };
+    });
+    return out;
+  }
+  function getGridNudge(p) {
+    var l = p && p.widgetLayout;
+    return cleanGridNudge(l && typeof l === "object" ? l[GRID_NUDGE_KEY] : null);
+  }
+  /* What moves on screen for a widget in the grid: the profile card for its members. */
+  function gridNudgeTarget(stage, el) {
+    var strip = el && el.parentNode;
+    if (strip && strip !== stage && strip.hasAttribute && strip.hasAttribute("data-tower-profile-strip")) {
+      return { el: strip, key: GRID_NUDGE_STRIP };
+    }
+    return { el: el, key: el ? el.getAttribute("data-tower-widget") : "" };
+  }
+  function setGridNudgeStyle(el, dx, dy) {
+    if (!el || !el.style) return;
+    if (dx || dy) {
+      el.style.setProperty("translate", dx + "px " + dy + "px");
+      el.setAttribute("data-grid-nudge", dx + "," + dy);
+    } else {
+      el.style.removeProperty("translate");
+      if (el.removeAttribute) el.removeAttribute("data-grid-nudge");
+    }
+  }
+  function readGridNudgeStyle(el) {
+    var v = el && el.getAttribute ? el.getAttribute("data-grid-nudge") : null;
+    var m = v ? /^(-?\d+),(-?\d+)$/.exec(v) : null;
+    return m ? { dx: parseInt(m[1], 10), dy: parseInt(m[2], 10) } : { dx: 0, dy: 0 };
+  }
+  function clearGridNudge(stage) {
+    if (!stage || typeof stage.querySelectorAll !== "function") return;
+    stage.querySelectorAll("[data-grid-nudge]").forEach(function (el) { setGridNudgeStyle(el, 0, 0); });
+  }
+  function applyGridNudge(stage, p) {
+    clearGridNudge(stage);
+    if (!stage || !stage.classList.contains("is-default-grid") || isPhoneStage(stage)) return;
+    var nudge = getGridNudge(p);
+    Object.keys(nudge).forEach(function (key) {
+      var el = key === GRID_NUDGE_STRIP
+        ? stage.querySelector("[data-tower-profile-strip]")
+        : stage.querySelector('[data-tower-widget="' + key + '"]');
+      if (!el || el.hidden || (el.classList && el.classList.contains("is-widget-off"))) return;
+      if (key !== GRID_NUDGE_STRIP && el.parentNode !== stage) return;
+      setGridNudgeStyle(el, nudge[key].dx, nudge[key].dy);
+    });
+  }
+
   /* One Pro check for spawn rows AND the music gate. The music gate read only
      _profileKind while the spawn rows also read kind, so a Pro page whose
      _profileKind came back "personal" got Pro rows (no music slot) plus a
@@ -450,7 +517,10 @@
     var useGrid = phone || !anyPlaced;
     stage.classList.toggle("is-default-grid", useGrid);
     stage.classList.toggle("is-desktop-grid", useGrid && !phone);
-    if (!useGrid) unwrapProfileStrip(stage);
+    if (!useGrid) {
+      clearGridNudge(stage);
+      unwrapProfileStrip(stage);
+    }
 
     if (useGrid) {
       var ordered = [];
@@ -487,6 +557,7 @@
       }
       if (!tailOk) ordered.forEach(function (el) { stage.appendChild(el); });
       ensureProfileStrip(stage, p);
+      applyGridNudge(stage, p);
       /* Friend pins: in default grid they sit inside the Top Friends card flow via CSS;
          clear absolute spawn marks so they do not float over the grid. */
       stage.querySelectorAll("[data-tower-friend-pin].is-spawned").forEach(function (pin) {
@@ -911,6 +982,8 @@
       });
       unwrapProfileStrip(stage);
     }
+    /* Spots above already include any grid nudge; the lifted stickers carry it. */
+    clearGridNudge(stage);
     stage.classList.remove("is-default-grid", "is-desktop-grid");
     /* Out of the strip the members take their sticker size; lay them in one row
        from the strip's left edge and push everything below down by the extra height. */
@@ -1110,6 +1183,7 @@
     /* Phone positions are a stacked view, never the website layout. */
     if (isPhoneStage(stage)) return layout;
     liftDefaultGrid(stage);
+    if (layout) delete layout[GRID_NUDGE_KEY];
     stage.querySelectorAll("[data-tower-widget].is-spawned").forEach(function (el) {
       var id = el.getAttribute("data-tower-widget");
       if (!id || el.hidden || el.classList.contains("is-widget-off")) return;
@@ -1855,6 +1929,7 @@
       Object.keys(saved.widgetLayout).forEach(function (id) {
         var pos = saved.widgetLayout[id];
         if (!pos || typeof pos !== "object") return;
+        if (id === GRID_NUDGE_KEY) return;
         var cur = base[id] && typeof base[id] === "object" ? base[id] : {};
         base[id] = {
           x: layoutCoord(pos.x, layoutCoord(cur.x, 0)),
@@ -1867,6 +1942,9 @@
         if (pos.dragged === true) base[id].dragged = true;
       });
       if (saved.widgetLayout._compacted) base._compacted = saved.widgetLayout._compacted;
+      var savedNudge = cleanGridNudge(saved.widgetLayout[GRID_NUDGE_KEY]);
+      if (Object.keys(savedNudge).length) base[GRID_NUDGE_KEY] = savedNudge;
+      else delete base[GRID_NUDGE_KEY];
       p.widgetLayout = base;
     }
     if (saved.musicYoutubeWidth != null && !isNaN(parseInt(saved.musicYoutubeWidth, 10))) {
@@ -11201,6 +11279,9 @@
       var startX = parseFloat(sticker.getAttribute("data-sticker-x") || "0");
       var startY = parseFloat(sticker.getAttribute("data-sticker-y") || "0");
       var dragStarted = false;
+      /* Default grid: nudge the widget in place instead of lifting the grid. */
+      var gridDrag = null;
+      var freeStarted = false;
 
       function onMove(e) {
         var cur = pointerPos(e);
@@ -11209,6 +11290,46 @@
         if (!dragStarted) {
           if (Math.abs(dxPx) < 5 && Math.abs(dyPx) < 5) return;
           dragStarted = true;
+          if (wid !== "quote" && stage.classList.contains("is-default-grid") && !isPhoneStage(stage)) {
+            var tgt = gridNudgeTarget(stage, sticker);
+            var n0 = readGridNudgeStyle(tgt.el);
+            var tr = tgt.el.getBoundingClientRect();
+            gridDrag = {
+              el: tgt.el,
+              key: tgt.key,
+              dx0: n0.dx,
+              dy0: n0.dy,
+              /* The widget's grid slot (rect without its nudge), in stage px. */
+              left: tr.left - rect.left - n0.dx,
+              top: tr.top - rect.top - n0.dy,
+              w: tr.width,
+              h: tr.height,
+              dx: n0.dx,
+              dy: n0.dy,
+            };
+            sticker.classList.add("is-dragging");
+            if (e.pointerId != null && sticker.setPointerCapture) {
+              try { sticker.setPointerCapture(e.pointerId); } catch (errCapG) {}
+            }
+          }
+        }
+        if (gridDrag) {
+          if (e.cancelable) e.preventDefault();
+          var g = gridDrag;
+          var gdx = Math.round(g.dx0 + dxPx);
+          var gdy = Math.round(g.dy0 + dyPx);
+          /* Stay on the card: never past its left/right edge or above its top. */
+          var sw = rect.width || stage.clientWidth || 0;
+          if (sw > 0) gdx = Math.max(-g.left, Math.min(Math.max(-g.left, sw - g.left - g.w), gdx));
+          var sh = rect.height || stage.clientHeight || 0;
+          gdy = sh > 0 ? Math.max(-g.top, Math.min(Math.max(-g.top, sh - g.top - g.h), gdy)) : Math.max(-g.top, gdy);
+          g.dx = gdx;
+          g.dy = gdy;
+          setGridNudgeStyle(g.el, gdx, gdy);
+          return;
+        }
+        if (!freeStarted) {
+          freeStarted = true;
           /* A Quote floats over the page: moving it never lifts the other
              widgets out of the default grid. That lift only lived in this
              browser, so the drop spot sat next to different neighbours on the
@@ -11263,6 +11384,22 @@
           return;
         }
         sticker.__cognationDraggedAt = Date.now();
+        if (gridDrag) {
+          /* Grid drop: save only this widget's nudge. Nothing else is frozen,
+             resized or repaired, so the page reloads exactly as it looks now. */
+          var gp = TowerProfileStore.get();
+          var gl = gp.widgetLayout && typeof gp.widgetLayout === "object" ? gp.widgetLayout : {};
+          var gn = cleanGridNudge(gl[GRID_NUDGE_KEY]);
+          if (gridDrag.dx || gridDrag.dy) gn[gridDrag.key] = { dx: gridDrag.dx, dy: gridDrag.dy };
+          else delete gn[gridDrag.key];
+          if (Object.keys(gn).length) gl[GRID_NUDGE_KEY] = gn;
+          else delete gl[GRID_NUDGE_KEY];
+          gp.widgetLayout = gl;
+          sticker.classList.remove("is-dragging");
+          TowerProfileStore.save(gp, { geometry: true });
+          setGridNudgeStyle(gridDrag.el, gridDrag.dx, gridDrag.dy);
+          return;
+        }
         /* Read the drop before get()/save(). A profile refresh inside save
            repaints from the original layout and would otherwise record spawn. */
         var dropX = parseFloat(sticker.getAttribute("data-sticker-x") || "0");

@@ -13282,6 +13282,12 @@ a.site-switch-side:focus-visible {
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker.is-spawned.is-spawn-full {
   grid-column: 1 / -1;
 }
+/* Owner nudged a widget on the grid (layout-drag-keeps-grid): it rides above its
+   neighbours; its slot and every other widget stay where the grid put them. */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-grid-nudge] {
+  position: relative;
+  z-index: 3 !important;
+}
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker.is-spawned.is-spawn-half {
   grid-column: auto;
 }

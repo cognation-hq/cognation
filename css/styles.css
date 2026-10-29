@@ -16466,3 +16466,29 @@ body.cgn-cal-page {
   text-shadow: none !important;
   align-self: center !important;
 }
+
+/* PULSE tap pad (360 to 429): the back halo frames draw under 44px there (44px x
+   the phone shrink, about 38.5px at 360 and 38.7px at 375 and 390). An invisible
+   round pad, 44px across (or the frame's own size if larger), centred on each filled
+   frame, makes the tap target at least 44px. Round, not square: as frames pass each
+   other a 44 x 44 square pad would overlap its neighbour's (by up to about 4.8px);
+   44px round pads keep at least 1.6px apart and clear the front frame. The frame
+   itself (size, ring, ripple, bob, motion) is unchanged; overflow is opened only so
+   the pad is not clipped (photos are backgrounds, so nothing else can show past the
+   round frame). 430 and wider (full-size frames) and desktop are untouched. */
+@media (min-width: 360px) and (max-width: 429px) {
+  .circle-fall[data-pulse-bg] .circle-spot.is-filled { overflow: visible; }
+  .circle-fall[data-pulse-bg] .circle-spot.is-filled::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    background: transparent;
+    border: 0;
+    pointer-events: auto;
+  }
+}

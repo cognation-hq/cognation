@@ -230,6 +230,9 @@
     var n = Math.round(Number(w));
     /* offsetWidth is the grid slot's width: scale does not change it. */
     var slot = el.offsetWidth || 0;
+    /* Never wider than the slot: growing past it overlaps the neighbours
+       (music 520 vs a ~448 column). A stored size over the slot is capped too. */
+    if (slot > 0 && n > slot) n = slot;
     if (n > 0 && slot > 0 && n !== slot) {
       el.style.setProperty("scale", String(Math.round((n / slot) * 10000) / 10000));
       el.setAttribute("data-grid-w", String(n));
@@ -1171,6 +1174,8 @@
       sticker.classList.add("is-resizing");
       function onMove(e) {
         curW = clampResizeWidth(wid, startW + (e.clientX - startX));
+        /* Grid resize: cap at this widget's live slot width (no reflow). */
+        if (gridResize && sticker.offsetWidth > 0) curW = Math.min(curW, sticker.offsetWidth);
         if (gridResize) setGridSizeStyle(sticker, curW);
         else setStickerWidth(sticker, curW);
         if (e.cancelable) e.preventDefault();
@@ -1199,8 +1204,14 @@
           var gl = p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : {};
           var gs = cleanGridSize(gl[GRID_SIZE_KEY]);
           var slotW = sticker.offsetWidth || 0;
+          var prevW = gs[wid] ? gs[wid].w : 0;
           if (curW > 0 && curW !== slotW) gs[wid] = { w: curW };
           else delete gs[wid];
+          /* Nothing changed (e.g. a grow that hit the slot cap): no write. */
+          if ((gs[wid] ? gs[wid].w : 0) === prevW) {
+            setGridSizeStyle(sticker, prevW);
+            return;
+          }
           if (Object.keys(gs).length) gl[GRID_SIZE_KEY] = gs;
           else delete gl[GRID_SIZE_KEY];
           p.widgetLayout = gl;

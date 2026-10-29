@@ -486,6 +486,81 @@ test("Reset renders exactly like a fresh open: same rects, and no friend tiles a
   assert.deepStrictEqual(Object.keys((row._widgets && row._widgets.friendPinLayout) || {}), [], "Reset saves no friend tile positions");
 });
 
+function overlaps(a, b) { return a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3]; }
+/* Grow with the grip, recording the widget's rect after every move. */
+function growSteps(env, dom, id, dx) {
+  var el = dom.stage.querySelector('[data-tower-widget="' + id + '"]');
+  var grip = el.querySelector("[data-tower-widget-resize]");
+  var r = el.getBoundingClientRect();
+  var x0 = r.left + r.width - 8, y0 = r.top + r.height - 8;
+  var ev = function (x, y) { return { target: grip, clientX: x, clientY: y, pointerId: 1, cancelable: true, button: 0, preventDefault: function () {}, stopPropagation: function () {} }; };
+  var seen = [];
+  dom.stage.dispatch("pointerdown", ev(x0, y0));
+  for (var i = 1; i <= 10; i++) {
+    env.doc.dispatchEvent(Object.assign(ev(x0 + dx * i / 10, y0), { type: "pointermove" }));
+    var b = el.getBoundingClientRect();
+    seen.push([b.left, b.top, b.width, b.height].map(Math.round));
+  }
+  env.doc.dispatchEvent(Object.assign(ev(x0 + dx, y0), { type: "pointerup" }));
+  return seen;
+}
+var NEIGHBOURS = ["avatar", "polaroid", "instax"];
+function assertNoOverlap(rs, label) {
+  NEIGHBOURS.forEach(function (id) {
+    assert.ok(!overlaps(rs.music, rs[id]), label + ": music " + JSON.stringify(rs.music) + " overlaps " + id + " " + JSON.stringify(rs[id]));
+  });
+}
+
+test("growing a widget on the default grid stops at its slot width: never past it, no neighbour moves or is overlapped", async function () {
+  var env = boot(null);
+  var p = profile();
+  ownStore(env, p);
+  var dom = await open(env, p);
+  var before = rects(dom.stage);
+  /* The slot is measured from the live grid (offsetWidth), not a constant. */
+  var slot = dom.stage.querySelector('[data-tower-widget="music"]').offsetWidth;
+  assert.strictEqual(slot, GRID.music[2], "music slot is the grid column");
+
+  var seen = growSteps(env, dom, "music", 100);
+  seen.forEach(function (r, i) {
+    assert.ok(r[2] <= slot, "move " + (i + 1) + ": music width " + r[2] + " is past its " + slot + "px slot");
+  });
+  var after = rects(dom.stage);
+  assert.ok(dom.stage.classList.contains("is-default-grid"), "the grow keeps grid mode (no reflow, no lift)");
+  assert.strictEqual(after.music[2], slot, "music stops exactly at its slot width");
+  ["avatar", "identity", "polaroid", "instax"].forEach(function (id) {
+    assert.deepStrictEqual(after[id], before[id], id + ": 0px off after the grow");
+  });
+  assertNoOverlap(after, "after the grow");
+  await wait(700);
+  assert.strictEqual(layoutWrites(env).length, 0, "a grow that only hits the slot cap writes nothing");
+
+  /* Shrink, then grow back past the slot: still capped, shrink still works. */
+  resize(env, dom, "music", -80);
+  assert.strictEqual(rects(dom.stage).music[2], slot - 80, "shrinking still works");
+  seen = growSteps(env, dom, "music", 200);
+  seen.forEach(function (r, i) {
+    assert.ok(r[2] <= slot, "regrow move " + (i + 1) + ": music width " + r[2] + " is past its slot");
+  });
+  assert.strictEqual(rects(dom.stage).music[2], slot, "regrow stops at the slot");
+  assertNoOverlap(rects(dom.stage), "after the regrow");
+});
+
+test("a stored grid size wider than the slot is capped when it is applied on open, with no write", async function () {
+  var fresh = rects((await open(boot(null), profile())).stage);
+  var env = boot({ _full: 1, _gridSize: { music: { w: 520 } } });
+  var p = profile();
+  ownStore(env, p);
+  var dom = await open(env, p);
+  assert.ok(dom.stage.classList.contains("is-default-grid"), "opens on the default grid");
+  var rs = rects(dom.stage);
+  assert.ok(rs.music[2] <= GRID.music[2], "stored 520 is drawn at most at the " + GRID.music[2] + "px slot, got " + rs.music[2]);
+  assert.deepStrictEqual(rs, fresh, "every rect matches a fresh open");
+  assertNoOverlap(rs, "on open");
+  await wait(700);
+  assert.strictEqual(layoutWrites(env).length, 0, "open writes nothing");
+});
+
 test("the row keeps the full-layout marker and grid sizes through clean(), and drops junk", function () {
   var sync = boot(null).win.CognationTowerLayoutSync;
   var c = sync._clean({ _full: 1, _gridSize: { music: { w: 388.4 }, bad: { w: "x" }, _x: { w: 1 } } });

@@ -1691,7 +1691,9 @@
     });
     if (html) html = '<div class="commune-market-photos" data-market-photos>' + html + "</div>";
     if (!marketCanBid()) {
-      return html + '<p class="commune-card-meta" data-market-bid-note>Bidding is for ages 16 and up.</p>';
+      /* Signed out: the age is unknown, not too young; say what opens it. */
+      return html + '<p class="commune-card-meta" data-market-bid-note>' +
+        (signedOutViewer() ? "Sign in to bid." : "Bidding is for ages 16 and up.") + "</p>";
     }
     var price = marketMoney(card.ask);
     var high = liveHigh(card.id);

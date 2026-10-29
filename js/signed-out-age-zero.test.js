@@ -237,6 +237,14 @@ function settle(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   assert.strictEqual(out.auctionBid(), false, "stray birth age: no auction Bid button");
   assert.strictEqual(out.peerCardsAtMemberAge(), 0, "stray birth age: no Peer Review cards");
 
+  /* 3b) LOOK: the signed-out Marketplace card says what opens bidding (not an age
+     line), and no Bid button is left behind. */
+  var mug = Array.prototype.filter.call(out.swipe.marketplaceCards(), function (c) { return /-g$/.test(c.id); })[0];
+  assert.ok(mug, "signed out: the G Marketplace card stays");
+  var mugHtml = out.swipe.renderCard(mug).innerHTML;
+  assert.ok(/data-market-bid-note>Sign in to bid\.</.test(mugHtml), "signed out: bid note says Sign in to bid.");
+  assert.ok(!/data-market-bid[\s>]/.test(mugHtml), "signed out: no Bid button on the card");
+
   /* 4) No network writes while signed out. */
   assert.deepStrictEqual(out.net.writes, [], "signed out: no network writes");
 
@@ -263,6 +271,10 @@ function settle(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   assert.ok(/CognationAuctionRoom\.mount\(roomEl\(\), card, getMemberAge\(\)\)/.test(swipeSrc), "auction bid age is getMemberAge()");
   assert.ok(/function getMemberAge\(\) \{\s+if \(signedOutViewer\(\)\) return 0;/.test(swipeSrc), "getMemberAge fails closed when signed out");
   assert.ok(/function viewerAge\(\) \{\s+try \{\s+if \(!sessionUserId\(\)\) return 0;/.test(read("js/age-floor-keywords.js")), "viewerAge fails closed when signed out");
+
+  /* LOOK: Professional hides every toggle row, so the Algorithm Manager block hides whole (no orphaned label). */
+  assert.ok(/\.commune-swipe-shell\[data-commune-mode="professional"\] \.commune-algo-manager \{\s*display: none !important;/.test(read("css/styles.css")),
+    "Professional: Algorithm Manager hides whole");
 
   console.log("signed-out-age-zero.test.js: ok");
 })().catch(function (e) { console.error(e); process.exit(1); });

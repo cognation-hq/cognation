@@ -32,6 +32,65 @@
     "moms",
   ];
 
+  /* auth.getUser() is async (GET /auth/v1/user) and returns a Promise. Await
+     it before acting; sync readers use only the resolved user, never the
+     pending Promise. undefined = not fetched yet, null = no user / error. */
+  var authUser;
+  var authUserPending = null;
+
+  function awaitAuthUser() {
+    var sb = window.CognationSupabase;
+    if (!sb || typeof sb.getUser !== "function") {
+      authUser = null;
+      return Promise.resolve({ user: null, error: "no_supabase_client" });
+    }
+    try {
+      if (typeof sb.configured === "function" && !sb.configured()) {
+        authUser = null;
+        return Promise.resolve({ user: null, error: "supabase_not_configured" });
+      }
+      if (typeof sb.getSession === "function") {
+        var s = sb.getSession();
+        if (!s || !s.access_token) {
+          authUser = null;
+          return Promise.resolve({ user: null, error: "no_session" });
+        }
+      }
+    } catch (e) {}
+    if (authUserPending) return authUserPending;
+    var pending;
+    try {
+      pending = Promise.resolve(sb.getUser());
+    } catch (e2) {
+      pending = Promise.reject(e2);
+    }
+    authUserPending = pending
+      .then(
+        function (user) {
+          authUser = user && typeof user === "object" && (user.id || user.email || user.app_metadata || user.user_metadata) ? user : null;
+          return authUser ? { user: authUser } : { user: null, error: "no_auth_user" };
+        },
+        function (err) {
+          authUser = null;
+          return { user: null, error: "get_user_failed", reason: String(err && err.message ? err.message : err) };
+        }
+      )
+      .then(function (r) {
+        authUserPending = null;
+        return r;
+      });
+    return authUserPending;
+  }
+
+  function knownAuthUser() {
+    return authUser || null;
+  }
+
+  function resetAuthUser() {
+    authUser = undefined;
+    authUserPending = null;
+  }
+
   function emitLog(payload) {
     if (window.CognationSeedOpsLog && typeof window.CognationSeedOpsLog.write === "function") {
       window.CognationSeedOpsLog.write(LOG_CHANNEL, payload || {});
@@ -69,18 +128,15 @@
       }
     } catch (e) {}
     try {
-      var sb = window.CognationSupabase;
-      if (sb && typeof sb.getUser === "function") {
-        var user = sb.getUser();
-        if (user) {
-          var app = user.app_metadata || user.appMetadata || {};
-          var um = user.user_metadata || user.userMetadata || {};
-          var kind = String(app.account_kind || app.accountKind || um.account_kind || um.accountKind || "");
-          var fleet = String(app.seed_fleet_id || app.seedFleetId || um.seed_fleet_id || um.seedFleetId || "");
-          if (kind === "seed" || kind === "ops") return true;
-          if (/^seed-\d{4}$/.test(fleet) || /^ops-/.test(fleet)) return true;
-          if (app.seedops === true || um.seedops === true) return true;
-        }
+      var user = knownAuthUser();
+      if (user) {
+        var app = user.app_metadata || user.appMetadata || {};
+        var um = user.user_metadata || user.userMetadata || {};
+        var kind = String(app.account_kind || app.accountKind || um.account_kind || um.accountKind || "");
+        var fleet = String(app.seed_fleet_id || app.seedFleetId || um.seed_fleet_id || um.seedFleetId || "");
+        if (kind === "seed" || kind === "ops") return true;
+        if (/^seed-\d{4}$/.test(fleet) || /^ops-/.test(fleet)) return true;
+        if (app.seedops === true || um.seedops === true) return true;
       }
     } catch (e2) {}
     try {
@@ -271,16 +327,39 @@
     return result;
   }
 
+  /**
+   * Await auth.getUser before any bootstrap read/write. No signed-in user or a
+   * getUser error: log and skip (nothing written).
+   */
+  function bootstrapAfterAuth(opts) {
+    return awaitAuthUser().then(function (auth) {
+      if (!auth.user) {
+        emitLog({
+          action: "bootstrap_skipped",
+          ok: false,
+          error: auth.error || "no_auth_user",
+          reason: "No signed-in auth user (auth.getUser); bootstrap skipped.",
+        });
+        return { ok: false, error: auth.error || "no_auth_user", skipped: true };
+      }
+      if (!isSeedOrOpsSession()) {
+        return { ok: false, error: "not_seed_or_ops", skipped: true };
+      }
+      return bootstrap(opts);
+    });
+  }
+
   function boot() {
     /* Delay slightly so commune-swipe + auth settle */
     setTimeout(function () {
-      if (isSeedOrOpsSession()) bootstrap();
+      bootstrapAfterAuth();
     }, 400);
     document.addEventListener("cognation:auth-changed", function () {
       try {
         sessionStorage.removeItem(BOOT_FLAG);
       } catch (e) {}
-      if (isSeedOrOpsSession()) bootstrap({ force: true });
+      resetAuthUser();
+      bootstrapAfterAuth({ force: true });
     });
   }
 
@@ -298,6 +377,8 @@
     ensureMemberProfile: ensureMemberProfile,
     materializeDatingSample: materializeDatingSample,
     bootstrap: bootstrap,
+    bootstrapAfterAuth: bootstrapAfterAuth,
+    awaitAuthUser: awaitAuthUser,
     refillDeck: refillDeck,
   };
 })();

@@ -67,7 +67,8 @@ function setup(srv, session, age, postId) {
     querySelectorAll: function () { return []; }, addEventListener: function () {},
   };
   var ls = mem();
-  if (age != null) ls.setItem("cognation.member.profile.v1", JSON.stringify({ age: age, ownerUserId: "u-alex" }));
+  /* The age comes from user_birth only (the commune-swipe birth age, #309). */
+  if (age != null) w.CognationCommuneSwipe = { getDatingBirthAge: function () { return age; } };
   vm.runInNewContext(code, { window: w, document: doc, localStorage: ls, Date: Date, Math: Math, Promise: Promise, encodeURIComponent: encodeURIComponent });
   var mounted = w.CognationFeedComments.mount(article, { id: postId });
   return { host: host, api: w.CognationFeedComments, news: w.CognationNewsComments, mounted: mounted };

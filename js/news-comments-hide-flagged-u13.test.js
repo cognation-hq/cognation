@@ -29,8 +29,12 @@ var COMMENTS = [
 ];
 function render(age) {
   var seed = { "cognation.news.comments.v1": JSON.stringify({ byStory: { s1: COMMENTS } }) };
-  if (age != null) seed["cognation.member.profile.v1"] = JSON.stringify({ age: age });
+  /* Signed in (#309: a signed-out viewer's gates see age 0) with this age from
+     user_birth (the commune-swipe birth age); the local profile age is never read. */
+  var viewerId = ["u", "viewer"].join("-");
+  seed["cognation.session.v2"] = JSON.stringify({ source: "supabase", supabaseUserId: viewerId });
   var w = {};
+  if (age != null) w.CognationCommuneSwipe = { getDatingBirthAge: function () { return age; } };
   vm.runInNewContext(code, { window: w, localStorage: mem(seed), Date: Date, Math: Math });
   var article = {
     attrs: { "data-post-id": "s1", "data-news-rating": "G-PG" }, kids: [],
@@ -48,6 +52,7 @@ function render(age) {
     addEventListener: function () {},
   };
   var w2 = {};
+  if (age != null) w2.CognationCommuneSwipe = { getDatingBirthAge: function () { return age; } };
   var ctx = vm.createContext({ window: w2, document: ctxDoc, localStorage: mem(seed), Date: Date, Math: Math });
   vm.runInContext(helper, ctx);
   vm.runInContext(code, ctx);

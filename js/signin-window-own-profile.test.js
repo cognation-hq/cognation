@@ -126,7 +126,7 @@ function testLocalPreviewUnchanged() {
   var page = towerPage(local, { configured: false });
   assert.strictEqual(page.floor.signInPending(), false);
   assert.strictEqual(page.tower.getActiveProfileId(), "prof-alexa", "demo founder fallback unchanged in local preview");
-  assert.strictEqual(page.floor.viewerAge(), 34, "local preview member copy unchanged");
+  assert.strictEqual(page.floor.viewerAge(), 0, "local preview is signed out: age 0 (#309), the local member copy is not trusted");
   var demo = towerPage(local, { session: { username: "demo", source: "demo" } });
   assert.strictEqual(demo.floor.signInPending(), false, "demo sessions are not 'signing in'");
 }
@@ -143,7 +143,7 @@ function testSharedDeviceAdaToAlex() {
   mine[MEMBER] = JSON.stringify({ age: 34, ownerUserId: "u-alex" });
   var own = towerPage(mine, { session: ALEX });
   assert.strictEqual(own.tower.get().displayName, "Alex", "your own stamped copy still shows");
-  assert.strictEqual(own.floor.viewerAge(), 34);
+  assert.strictEqual(own.floor.viewerAge(), 0, "your own local age 34 does not count either: user_birth only (#309)");
 }
 
 /* ---------- 2. Logout clears both local profile copies ---------- */

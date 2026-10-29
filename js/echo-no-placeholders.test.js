@@ -31,6 +31,11 @@ function memoryStorage() {
   };
 }
 
+/* Signed in (#309: a signed-out or demo viewer's gates see age 0): the stored
+   session is a Supabase sign-in, the member profile is this user's, and the
+   age comes from user_birth (setDatingBirthAge), not the local profile. No
+   live Supabase session, so the local page registry still feeds the deck. */
+var VIEWER_ID = ["u", "viewer"].join("-");
 function loadSwipe(localStorage, sessionStorage, extra) {
   var windowStub = extra || {};
   var documentStub = {
@@ -60,7 +65,9 @@ function loadSwipe(localStorage, sessionStorage, extra) {
     String: String,
     Number: Number,
   });
+  vm.runInContext(src("js/age-floor-keywords.js"), context);
   vm.runInContext(src("js/commune-swipe.js"), context);
+  windowStub.CognationCommuneSwipe.setDatingBirthAge(30);
   return windowStub.CognationCommuneSwipe;
 }
 
@@ -86,8 +93,8 @@ assert.ok(/lanes\[PRO\.AUCTION\] = scheduledAuctionCards\(\)/.test(swipe), "auct
 
 function adultStores(pages) {
   var local = memoryStorage();
-  local.setItem("cognation.session.v2", JSON.stringify({ username: "ada", activeProfileId: "ada", source: "demo" }));
-  local.setItem("cognation.member.profile.v1", JSON.stringify({ age: 30, field: "Nursing", interests: ["public health"] }));
+  local.setItem("cognation.session.v2", JSON.stringify({ username: "ada", activeProfileId: "ada", source: "supabase", supabaseUserId: VIEWER_ID }));
+  local.setItem("cognation.member.profile.v1", JSON.stringify({ age: 30, field: "Nursing", interests: ["public health"], ownerUserId: VIEWER_ID }));
   var profiles = { ada: { id: "ada", kind: "personal", displayName: "Ada" } };
   (pages || []).forEach(function (p) { profiles[p.id] = p; });
   local.setItem("cognation.profiles.v1", JSON.stringify({ profiles: profiles }));

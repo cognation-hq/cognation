@@ -74,11 +74,11 @@ function hasBox(h) { return !!h && !h.hidden && /data-news-comment-form/.test(h.
   await b.flush(); await b.flush();
   assert.ok(hasBox(b.host()), "fresh browser shows the comment box once the server age arrives");
 
-  /* Same via member-profile-updated (setMemberProfile from hydrate). */
+  /* Same via member-profile-updated (setDatingBirthAge mirrors user_birth into the profile). */
   var c = fresh("R");
   await c.flush();
   c.ls.setItem("cognation.member.profile.v1", JSON.stringify({ age: 25, ownerUserId: "user-b" }));
-  c.setSwipe({ getMemberAge: function () { return 25; } });
+  c.setSwipe({ getDatingBirthAge: function () { return 25; }, getMemberAge: function () { return 25; } });
   c.fire("cognation:member-profile-updated");
   await c.flush(); await c.flush();
   assert.ok(hasBox(c.host()), "box shows after the member profile is written in a fresh browser");
@@ -98,7 +98,7 @@ function hasBox(h) { return !!h && !h.hidden && /data-news-comment-form/.test(h.
 
   /* 4) Server birth age only counts for a signed-in user. */
   var src = fs.readFileSync(path.join(__dirname, "age-floor-keywords.js"), "utf8");
-  assert.ok(/getDatingBirthAge\(\)/.test(src) && /typeof swipe\.getDatingBirthAge === "function" && sessionUserId\(\)/.test(src), "server age gated on signed-in user");
+  assert.ok(/getDatingBirthAge\(\)/.test(src) && /if \(!sessionUserId\(\)\) return 0;\s*var swipe = root\.CognationCommuneSwipe;\s*if \(swipe && typeof swipe\.getDatingBirthAge === "function"\)/.test(src), "server age gated on signed-in user");
 
   console.log("still-here-news-comments.test.js: OK");
 })().catch(function (e) { console.error(e); process.exit(1); });

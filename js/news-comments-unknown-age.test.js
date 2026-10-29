@@ -24,9 +24,17 @@ function load(opts) {
   opts = opts || {};
   var w = {};
   if (opts.swipeAge !== undefined) {
-    w.CognationCommuneSwipe = { getMemberAge: function () { return opts.swipeAge; } };
+    /* Signed in, the swipe module's user_birth age is the source. */
+    w.CognationCommuneSwipe = { getMemberAge: function () { return opts.swipeAge; }, getDatingBirthAge: function () { return opts.swipeAge; } };
   }
-  var ls = mem(opts.profile ? { "cognation.member.profile.v1": JSON.stringify(opts.profile) } : null);
+  var seed = opts.profile ? { "cognation.member.profile.v1": JSON.stringify(opts.profile) } : {};
+  /* Known ages are a signed-in viewer's (#309: signed out, every gate sees age 0). */
+  if (opts.signedIn) {
+    var viewerId = ["u", "viewer"].join("-");
+    seed["cognation.session.v2"] = JSON.stringify({ source: "supabase", supabaseUserId: viewerId });
+    if (opts.profile) seed["cognation.member.profile.v1"] = JSON.stringify(Object.assign({ ownerUserId: viewerId }, opts.profile));
+  }
+  var ls = mem(seed);
   vm.runInNewContext(code, { window: w, localStorage: ls, Date: Date, Math: Math });
   return w.CognationNewsComments;
 }
@@ -49,10 +57,21 @@ assert.strictEqual(load({ swipeAge: null }).isThreadVisible("PG-13"), false);
 assert.strictEqual(load({ profile: { country: "United States" } }).isThreadVisible("PG-13"), false);
 
 /* Known ages unchanged. */
-assert.strictEqual(load({ swipeAge: 28 }).isThreadVisible("PG-13"), true, "adult via swipe profile");
-assert.strictEqual(load({ profile: { age: 16 } }).isThreadVisible("R"), true, "teen via saved profile");
-assert.strictEqual(load({ profile: { age: 11 } }).isThreadVisible("PG-13"), false, "known under-13");
-assert.strictEqual(load({ profile: { age: 11 } }).isThreadVisible("G-PG"), true);
+assert.strictEqual(load({ swipeAge: 28, signedIn: true }).isThreadVisible("PG-13"), true, "adult via swipe profile");
+assert.strictEqual(load({ swipeAge: 16, signedIn: true }).isThreadVisible("R"), true, "teen via user_birth");
+assert.strictEqual(load({ swipeAge: 11, signedIn: true }).isThreadVisible("PG-13"), false, "known under-13");
+assert.strictEqual(load({ swipeAge: 11, signedIn: true }).isThreadVisible("G-PG"), true);
+
+/* Signed in: the age comes only from user_birth (#309). An edited local age
+   (no swipe module yet, or user_birth pending) opens nothing. */
+assert.strictEqual(load({ profile: { age: 30 }, signedIn: true }).viewerAge(), 0, "signed in, local age 30 ignored");
+assert.strictEqual(load({ profile: { age: 30 }, signedIn: true }).isThreadVisible("PG-13"), false, "signed in, local age opens no PG-13 thread");
+assert.strictEqual(load({ profile: { age: 30 }, signedIn: true, swipeAge: null }).isThreadVisible("R"), false, "signed in, birth age pending: local age ignored");
+
+/* Signed out: an edited local or swipe age opens nothing (#309). */
+assert.strictEqual(load({ swipeAge: 28 }).isThreadVisible("PG-13"), false, "signed out: swipe age ignored");
+assert.strictEqual(load({ profile: { age: 30 } }).isThreadVisible("R"), false, "signed out: local age ignored");
+assert.strictEqual(load({ profile: { age: 30 } }).viewerAge(), 0, "signed out: age 0");
 
 /* mount() renders nothing for a non-G/PG story when age is unknown, but keeps the slot. */
 var api = load();

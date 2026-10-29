@@ -755,7 +755,11 @@
     return moves;
   }
   var COMPACT_MIN_GAP = 160;
-  function repairLayoutOverlaps(stage, p, layout, spawnIds) {
+  /* opts.ownerAction: the owner just dropped or resized, so the repair rides
+     along with that upload. Without it (render, resize of the window) the
+     repair stays in memory: TowerProfileStore.save(..., { repair: true }). */
+  function repairLayoutOverlaps(stage, p, layout, spawnIds, opts) {
+    var repairSaveOpts = opts && opts.ownerAction ? { geometry: true } : { geometry: true, repair: true };
     if (!stage || isPhoneStage(stage) || stage.classList.contains("is-default-grid")) return false;
     var stageW = stage.clientWidth || 0;
     if (!stageW) return false;
@@ -793,7 +797,7 @@
     if (!ids.length) {
       if (markNow) {
         p.widgetLayout = layout;
-        setTimeout(function () { try { TowerProfileStore.save(p, { geometry: true }); } catch (eMk) {} }, 0);
+        setTimeout(function () { try { TowerProfileStore.save(p, repairSaveOpts); } catch (eMk) {} }, 0);
       }
       return false;
     }
@@ -840,7 +844,7 @@
         }
         p.widgetLayout = lay;
         setTimeout(function () {
-          try { TowerProfileStore.save(p, { geometry: true }); } catch (eRep) {}
+          try { TowerProfileStore.save(p, repairSaveOpts); } catch (eRep) {}
         }, 0);
       }
     }
@@ -1064,7 +1068,7 @@
         try {
           var spawnIdsR = {};
           spawnRowsFor(p).forEach(function (r) { r.forEach(function (w) { spawnIdsR[w] = true; }); });
-          repairLayoutOverlaps(stage, p, getWidgetLayout(p), spawnIdsR);
+          repairLayoutOverlaps(stage, p, getWidgetLayout(p), spawnIdsR, { ownerAction: true });
         } catch (eRz) {}
       }
       document.addEventListener("pointermove", onMove);
@@ -1185,7 +1189,8 @@
       changed = true;
     }
     if (changed) {
-      try { TowerProfileStore.save(p, { geometry: true }); } catch (eSettle) {}
+      /* Arrival-tilt cleanup runs on render: in memory only, no upload. */
+      try { TowerProfileStore.save(p, { geometry: true, repair: true }); } catch (eSettle) {}
     }
     return changed;
   }
@@ -2421,7 +2426,8 @@
       mergeScrapbookLayout(p);
       if (created || before == null || afterLen > beforeLen || beforeVis == null || visMig.migrated || calSeeded) {
         try {
-          this.save(p);
+          /* Read-time migration: local copies only, never the server. */
+          this.save(p, { repair: true });
         } catch (e) {}
       }
       return p;
@@ -2440,21 +2446,38 @@
       stripProMusic(data);
       this._saving = true;
       try {
+      /* opts.repair: a load-time fix (overlap repair, one-time compaction,
+         arrival-tilt cleanup, friend-pin seat, read-time migration, roster
+         hydrate). It never writes to the server. A signed-in owner's geometry
+         repair is kept in this page's memory only (the layout row cache), and
+         skips the local copies so the next load repairs again from the same
+         saved row (a local _compacted mark over an unrepaired row would skip
+         the one-time pass); the owner's next drag / resize / add / remove /
+         Save uploads it. Before the row has loaded nothing is kept: the
+         re-render on load repairs again. Signed out it keeps today's
+         local-only copies. */
+      if (opts.repair && opts.geometry && liveSignedInForTower()) {
+        var sync = window.CognationTowerLayoutSync;
+        if (sync && typeof sync.stage === "function") sync.stage(data);
+        return true;
+      }
       writeScrapbookLayout(data, { keepLayout: !opts.geometry });
       /* Account layout row is written only on a real geometry edit (drag end,
          rotate, resize). Opening the Tower must never POST a layout. */
       /* Signed-in owner only (this save already returned for anyone else):
          drag end uploads positions + added widgets; an add / remove / switch
          uploads the added widgets when they changed. localStorage is a cache. */
+      if (!opts.repair) {
       if (window.CognationTowerLayoutSync && liveSignedInForTower()) {
         if (opts.geometry) window.CognationTowerLayoutSync.save(data);
         else if (window.CognationTowerLayoutSync.saveWidgetsIfChanged) window.CognationTowerLayoutSync.saveWidgetsIfChanged(data);
+      }
       }
       var id = data._profileId || resolveActiveProfileId();
       /* A drop only changes x/y. Never PATCH the profile: that reload paints
          the remote row, which has no sticker coordinates, and the widget
          jumps back to its spawn point the moment the pointer goes up. */
-      if (!opts.geometry && usingRemoteSocial() && id) {
+      if (!opts.geometry && !opts.repair && usingRemoteSocial() && id) {
         var social = remoteSocial();
         var activeSession = getSessionObject();
         var remoteRow = social && social.getProfile ? social.getProfile(id) : null;
@@ -6256,7 +6279,8 @@
     if (p) settleArrivalTilts(p);
     var selected = resolveTopFriendIds(p);
     if (ensureFriendPinPositions(p, selected)) {
-      TowerProfileStore.save(p);
+      /* Seating new pins on render is a repair: local copies only. */
+      TowerProfileStore.save(p, { repair: true });
     }
     var pinLayout = getFriendPinLayout(p);
 
@@ -11322,7 +11346,7 @@
             var pr = TowerProfileStore.get();
             var spawnIdsDrop = {};
             spawnRowsFor(pr).forEach(function (r) { r.forEach(function (w) { spawnIdsDrop[w] = true; }); });
-            repairLayoutOverlaps(stage, pr, getWidgetLayout(pr), spawnIdsDrop);
+            repairLayoutOverlaps(stage, pr, getWidgetLayout(pr), spawnIdsDrop, { ownerAction: true });
           } catch (eRepair) {}
         }
       }

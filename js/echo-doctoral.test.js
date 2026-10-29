@@ -7,8 +7,11 @@ function mem() {
   var d = {};
   return { getItem: function (k) { return Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null; }, setItem: function (k, v) { d[k] = String(v); }, removeItem: function (k) { delete d[k]; } };
 }
+/* Signed in (#309: a signed-out viewer's gates see age 0): a live session, and
+   the age comes from user_birth (setDatingBirthAge), not the local profile. */
+var VIEWER_ID = ["u", "viewer"].join("-");
 function load(local, session) {
-  var w = {};
+  var w = { CognationSupabase: { getSession: function () { return { access_token: "t-" + VIEWER_ID, user: { id: VIEWER_ID } }; } } };
   vm.runInContext(src("js/echo-doctoral.js") + "\n" + src("js/commune-swipe.js"), vm.createContext({
     window: w, localStorage: local, sessionStorage: session, console: console,
     document: { readyState: "complete", querySelector: function () { return null; }, addEventListener: function () {}, dispatchEvent: function () {}, createElement: function () { return { setAttribute: function () {}, classList: { add: function () {} } }; } },
@@ -18,7 +21,7 @@ function load(local, session) {
   return w;
 }
 function who(local, id) { local.setItem("cognation.session.v2", JSON.stringify({ username: id, activeProfileId: id, profileDisplayName: id })); }
-function profile(local, interests, age) { local.setItem("cognation.member.profile.v1", JSON.stringify({ age: age == null ? 30 : age, field: "Nursing", interests: interests })); }
+function profile(local, interests, age) { local.setItem("cognation.member.profile.v1", JSON.stringify({ age: age == null ? 30 : age, field: "Nursing", interests: interests })); if (win) win.CognationCommuneSwipe.setDatingBirthAge(age == null ? 30 : age); }
 assert.ok(!/getUserMedia|RTCPeerConnection|software engineering/i.test(src("js/echo-doctoral.js")));
 assert.ok(src("index.html").indexOf("js/echo-doctoral.js") < src("index.html").indexOf("js/commune-swipe.js"));
 var local = mem(), session = mem();

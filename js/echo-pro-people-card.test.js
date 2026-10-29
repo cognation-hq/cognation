@@ -16,6 +16,7 @@ var vm = require("vm");
 
 var root = path.join(__dirname, "..");
 var swipeSrc = fs.readFileSync(path.join(root, "js/commune-swipe.js"), "utf8");
+var floorSrc = fs.readFileSync(path.join(root, "js/age-floor-keywords.js"), "utf8");
 
 function memoryStorage() {
   var data = {};
@@ -44,10 +45,15 @@ function fakeEl() {
   };
 }
 
+/* Signed in (#309: a signed-out or demo viewer's gates see age 0): the stored
+   session is a Supabase sign-in, the member profile is this user's, and the
+   age comes from user_birth (setDatingBirthAge), not the local profile. No
+   live Supabase session, so the local page registry still feeds the deck. */
+var VIEWER_ID = ["u", "viewer"].join("-");
 function load(pages, extra) {
   var local = memoryStorage();
-  local.setItem("cognation.session.v2", JSON.stringify({ username: "ada", activeProfileId: "ada", source: "demo" }));
-  local.setItem("cognation.member.profile.v1", JSON.stringify({ age: 30, field: "Software", interests: ["software engineering"] }));
+  local.setItem("cognation.session.v2", JSON.stringify({ username: "ada", activeProfileId: "ada", source: "supabase", supabaseUserId: VIEWER_ID }));
+  local.setItem("cognation.member.profile.v1", JSON.stringify({ age: 30, field: "Software", interests: ["software engineering"], ownerUserId: VIEWER_ID }));
   var profiles = {
     ada: { id: "ada", kind: "personal", displayName: "Ada", friendIds: ["friend"] },
     friend: { id: "friend", kind: "personal", displayName: "Friend", friendIds: ["ada", "sam"], accountKind: "real" },
@@ -72,9 +78,11 @@ function load(pages, extra) {
     setTimeout: setTimeout, isFinite: isFinite, parseInt: parseInt,
     Date: Date, Math: Math, JSON: JSON, Object: Object, Array: Array, String: String, Number: Number,
   });
+  vm.runInContext(floorSrc, ctx);
   vm.runInContext(swipeSrc, ctx);
   var api = win.CognationCommuneSwipe;
   api.noteViewerSeedStatus(false);
+  api.setDatingBirthAge(30);
   return { api: api, win: win };
 }
 function pro(id, name, extra) {

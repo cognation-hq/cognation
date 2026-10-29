@@ -2654,16 +2654,18 @@
   function ratingViewer() {
     /* CognationAgeFloor.viewerAge(): the user_birth age, never the raw local
        profile or auth metadata. A pending age (signed in, user_birth not read
-       yet), a signed-out demo and an unknown age (helper missing) see G/PG only:
+       yet), a signed-in account with no user_birth row, a signed-out demo and
+       an unknown age (helper missing) see G/PG only:
        age 0 fails PG-13, R and MA in AutoRate.canSee. MA opt-in lives
        server-side only. */
     var age = 0;
     try {
       var swipe = window.CognationCommuneSwipe;
       var pending = !!(swipe && typeof swipe.viewerAgePending === "function" && swipe.viewerAgePending());
+      var noBirth = !!(swipe && typeof swipe.getDatingBirthAge === "function" && !(swipe.getDatingBirthAge() > 0));
       var floor = window.CognationAgeFloor;
       var signedIn = !!(floor && typeof floor.sessionUserId === "function" && floor.sessionUserId());
-      if (!pending && signedIn && typeof floor.viewerAge === "function") age = parseInt(floor.viewerAge(), 10) || 0;
+      if (!pending && !noBirth && signedIn && typeof floor.viewerAge === "function") age = parseInt(floor.viewerAge(), 10) || 0;
     } catch (e) {}
     return { age: age > 0 ? age : 0, matureOptIn: false };
   }
@@ -2975,9 +2977,10 @@
   /* Minimum age for one photo. No rating (and a name that rates G/PG) stays open
      to whoever can already see the post. 21+ / MA never shows under 21. */
   function feedViewerAge() {
-    /* Same rule as ratingViewer(): pending or unknown = 0 (G/PG photos only). */
+    /* Same rule as ratingViewer(): pending, no birth row or unknown = 0 (G/PG photos only). */
     var swipe = window.CognationCommuneSwipe;
     if (swipe && typeof swipe.viewerAgePending === "function" && swipe.viewerAgePending()) return 0;
+    if (swipe && typeof swipe.getDatingBirthAge === "function" && !(swipe.getDatingBirthAge() > 0)) return 0;
     var floor = window.CognationAgeFloor;
     var n = floor && typeof floor.viewerAge === "function" ? floor.viewerAge() : 0;
     return typeof n === "number" && n > 0 ? n : 0;

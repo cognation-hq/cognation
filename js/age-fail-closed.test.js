@@ -5,6 +5,7 @@
  *     Tower (no PG-13, R or MA), and reads 13 in the COMMUNE 18+ live gates
  *     and Peer Review;
  *   - the signed-out demo sees G/PG only in Tower;
+ *   - a signed-in account with no user_birth row sees G/PG only in Tower;
  *   - a 14-year-old with a self-set member_age 99 stays 14 everywhere;
  *   - a real adult gets 18+ once the user_birth age loads;
  *   - nothing here sends a network write.
@@ -178,6 +179,25 @@ function testSignedOutDemoGPG() {
   });
 }
 
+/* 1c) Signed in, user_birth read found no row, self-set member_age 99 (also on
+   the device): Tower G/PG only; the 18+ gates stay closed. */
+function testNoBirthRowGPG() {
+  var w = world({ id: "u-nob", meta: { member_age: 99, see_dating: true }, birth: [] },
+    owned("u-nob", { age: 99, interests: ["nursing"] }));
+  w.doc.dispatchEvent(new CustomEvent("cognation:session-started"));
+  return settle(60).then(function () {
+    assert.ok(!(w.rViewer().age >= 13), "Tower ratingViewer: no birth row is below 13 (got " + w.rViewer().age + ")");
+    assert.strictEqual(w.sees("G"), true, "no birth row sees G");
+    assert.strictEqual(w.sees("PG"), true, "no birth row sees PG");
+    assert.strictEqual(w.sees("PG-13"), false, "no birth row sees no PG-13");
+    assert.strictEqual(w.seesR(), false, "no birth row sees no R");
+    assert.strictEqual(w.sees("MA"), false, "no birth row sees no MA");
+    assert.ok(w.liveAge() < 18, "COMMUNE 18+ live stays closed with no birth row");
+    assert.strictEqual(w.peerCards().length, 0, "no 18+ Peer Review with no birth row");
+    assert.strictEqual(w.net.writes.length, 0, "no network writes: " + JSON.stringify(w.net.writes));
+  });
+}
+
 /* 2) A 14-year-old who set member_age 99 in her metadata stays 14. */
 function testFourteenStaysFourteen() {
   var w = world({ id: "u-14", meta: { member_age: 99, see_dating: true }, birth: birthRow(14) },
@@ -252,7 +272,7 @@ function testSources() {
 }
 
 var failures = [];
-[testPendingTowerR, testPendingCommuneLive, testPendingPeerReview, testSignedOutDemoGPG, testFourteenStaysFourteen, testAdultAfterBirthLoads, testBirthAgeReRenders, testSources]
+[testPendingTowerR, testPendingCommuneLive, testPendingPeerReview, testSignedOutDemoGPG, testNoBirthRowGPG, testFourteenStaysFourteen, testAdultAfterBirthLoads, testBirthAgeReRenders, testSources]
   .reduce(function (chain, t) {
     return chain.then(function () { return t(); }).then(function () {
       console.log("ok - " + t.name);

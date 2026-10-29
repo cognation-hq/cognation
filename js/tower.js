@@ -2647,6 +2647,10 @@
      rated here. Posters never choose it. Fail closed if the rater is missing. */
   function postRating(post) {
     if (post && post.rating) return post.rating;
+    /* A server post copy that arrived without its rating takes the server
+       default (PG-13, as supabase-social maps it), never a client guess: a
+       guessed G must not be stamped over the server rating in NEWS. */
+    if (post && post._remote) return "PG-13";
     var ar = window.CognationAutoRate;
     if (!ar || !post) return "NR";
     return ar.rate(post.body || post.title || "", post.attachments || []).rating;

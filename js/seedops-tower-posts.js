@@ -49,6 +49,65 @@
     "After a long day, {name} chose rest over one more task. That is enough.",
   ];
 
+  /* auth.getUser() is async (GET /auth/v1/user) and returns a Promise. Await
+     it before acting; sync readers use only the resolved user, never the
+     pending Promise. undefined = not fetched yet, null = no user / error. */
+  var authUser;
+  var authUserPending = null;
+
+  function awaitAuthUser() {
+    var sb = window.CognationSupabase;
+    if (!sb || typeof sb.getUser !== "function") {
+      authUser = null;
+      return Promise.resolve({ user: null, error: "no_supabase_client" });
+    }
+    try {
+      if (typeof sb.configured === "function" && !sb.configured()) {
+        authUser = null;
+        return Promise.resolve({ user: null, error: "supabase_not_configured" });
+      }
+      if (typeof sb.getSession === "function") {
+        var s = sb.getSession();
+        if (!s || !s.access_token) {
+          authUser = null;
+          return Promise.resolve({ user: null, error: "no_session" });
+        }
+      }
+    } catch (e) {}
+    if (authUserPending) return authUserPending;
+    var pending;
+    try {
+      pending = Promise.resolve(sb.getUser());
+    } catch (e2) {
+      pending = Promise.reject(e2);
+    }
+    authUserPending = pending
+      .then(
+        function (user) {
+          authUser = user && typeof user === "object" && (user.id || user.email || user.app_metadata || user.user_metadata) ? user : null;
+          return authUser ? { user: authUser } : { user: null, error: "no_auth_user" };
+        },
+        function (err) {
+          authUser = null;
+          return { user: null, error: "get_user_failed", reason: String(err && err.message ? err.message : err) };
+        }
+      )
+      .then(function (r) {
+        authUserPending = null;
+        return r;
+      });
+    return authUserPending;
+  }
+
+  function knownAuthUser() {
+    return authUser || null;
+  }
+
+  function resetAuthUser() {
+    authUser = undefined;
+    authUserPending = null;
+  }
+
   function emitLog(payload) {
     if (window.CognationSeedOpsLog && typeof window.CognationSeedOpsLog.write === "function") {
       window.CognationSeedOpsLog.write(LOG_CHANNEL, payload || {});
@@ -231,19 +290,17 @@
     return { ok: true, path: "seedops_overlay", post: post };
   }
 
+  function authUserFleetId(user) {
+    if (!user) return "";
+    var app = user.app_metadata || user.appMetadata || {};
+    var um = user.user_metadata || user.userMetadata || {};
+    return String(app.seed_fleet_id || app.seedFleetId || um.seed_fleet_id || um.seedFleetId || "");
+  }
+
   function signedInAsSeed(seed) {
     if (!seed) return false;
     try {
-      var meta = null;
-      var sb = window.CognationSupabase;
-      if (sb && typeof sb.getUser === "function") {
-        var user = sb.getUser();
-        if (user) {
-          var app = user.app_metadata || user.appMetadata || {};
-          var um = user.user_metadata || user.userMetadata || {};
-          meta = String(app.seed_fleet_id || app.seedFleetId || um.seed_fleet_id || um.seedFleetId || "");
-        }
-      }
+      var meta = authUserFleetId(knownAuthUser());
       if (meta && meta === seed.seedFleetId) return true;
       var session =
         window.CognationAuth && typeof window.CognationAuth.getSession === "function"
@@ -307,20 +364,44 @@
         seedFleetId: seed.seedFleetId,
       };
     }
+    /* Await auth.getUser before the live write; bail when there is no user,
+       getUser fails, or the auth user is a different seed. */
     return {
-      promise: social.createTowerPost({ body: post.body, attachments: [] }).then(
-        function () {
-          return { ok: true, path: "supabase_client", post: post, seedFleetId: seed.seedFleetId };
-        },
-        function (err) {
-          return {
+      promise: awaitAuthUser().then(function (auth) {
+        if (!auth.user) {
+          emitLog({
+            action: "post_one_skipped",
             ok: false,
-            error: "supabase_client_failed",
-            reason: String(err && err.message ? err.message : err),
+            error: auth.error || "no_auth_user",
+            reason: "No signed-in auth user (auth.getUser); live Tower write skipped.",
             seedFleetId: seed.seedFleetId,
-          };
+          });
+          return { ok: false, error: auth.error || "no_auth_user", seedFleetId: seed.seedFleetId };
         }
-      ),
+        var authFleet = authUserFleetId(auth.user);
+        if (authFleet && authFleet !== seed.seedFleetId) {
+          emitLog({
+            action: "post_one_skipped",
+            ok: false,
+            error: "auth_user_not_seed",
+            seedFleetId: seed.seedFleetId,
+          });
+          return { ok: false, error: "auth_user_not_seed", seedFleetId: seed.seedFleetId };
+        }
+        return social.createTowerPost({ body: post.body, attachments: [] }).then(
+          function () {
+            return { ok: true, path: "supabase_client", post: post, seedFleetId: seed.seedFleetId };
+          },
+          function (err) {
+            return {
+              ok: false,
+              error: "supabase_client_failed",
+              reason: String(err && err.message ? err.message : err),
+              seedFleetId: seed.seedFleetId,
+            };
+          }
+        );
+      }),
     };
   }
 
@@ -501,5 +582,6 @@
     listOverlay: listOverlay,
     clearOverlay: clearOverlay,
     considerForNews: considerForNews,
+    awaitAuthUser: awaitAuthUser,
   };
 })();

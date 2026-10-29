@@ -19,6 +19,65 @@
   var WAVE1_MAX = 100;
   var DEMO_CAP = 250;
 
+  /* auth.getUser() is async (GET /auth/v1/user) and returns a Promise. Await
+     it before acting; sync readers use only the resolved user, never the
+     pending Promise. undefined = not fetched yet, null = no user / error. */
+  var authUser;
+  var authUserPending = null;
+
+  function awaitAuthUser() {
+    var sb = window.CognationSupabase;
+    if (!sb || typeof sb.getUser !== "function") {
+      authUser = null;
+      return Promise.resolve({ user: null, error: "no_supabase_client" });
+    }
+    try {
+      if (typeof sb.configured === "function" && !sb.configured()) {
+        authUser = null;
+        return Promise.resolve({ user: null, error: "supabase_not_configured" });
+      }
+      if (typeof sb.getSession === "function") {
+        var s = sb.getSession();
+        if (!s || !s.access_token) {
+          authUser = null;
+          return Promise.resolve({ user: null, error: "no_session" });
+        }
+      }
+    } catch (e) {}
+    if (authUserPending) return authUserPending;
+    var pending;
+    try {
+      pending = Promise.resolve(sb.getUser());
+    } catch (e2) {
+      pending = Promise.reject(e2);
+    }
+    authUserPending = pending
+      .then(
+        function (user) {
+          authUser = user && typeof user === "object" && (user.id || user.email || user.app_metadata || user.user_metadata) ? user : null;
+          return authUser ? { user: authUser } : { user: null, error: "no_auth_user" };
+        },
+        function (err) {
+          authUser = null;
+          return { user: null, error: "get_user_failed", reason: String(err && err.message ? err.message : err) };
+        }
+      )
+      .then(function (r) {
+        authUserPending = null;
+        return r;
+      });
+    return authUserPending;
+  }
+
+  function knownAuthUser() {
+    return authUser || null;
+  }
+
+  function resetAuthUser() {
+    authUser = undefined;
+    authUserPending = null;
+  }
+
   function emitLog(payload) {
     if (window.CognationSeedOpsLog && typeof window.CognationSeedOpsLog.write === "function") {
       window.CognationSeedOpsLog.write("ops-trigger", payload || {});
@@ -56,9 +115,7 @@
 
   function readSupabaseMeta() {
     try {
-      var sb = window.CognationSupabase;
-      if (!sb || typeof sb.getUser !== "function") return null;
-      var user = sb.getUser();
+      var user = knownAuthUser();
       if (!user) return null;
       var app = user.app_metadata || user.appMetadata || {};
       var um = user.user_metadata || user.userMetadata || {};
@@ -354,13 +411,13 @@
       var pathway = panel.querySelector("[data-seedops-ops-pathway]").value;
       var target = String(panel.querySelector("[data-seedops-ops-target]").value || "").trim();
       var status = panel.querySelector("[data-seedops-ops-status]");
-      var result =
-        pathway === "__all__" ? triggerAll(target || undefined) : triggerPathway(pathway, target || undefined);
-      try {
-        status.textContent = JSON.stringify(result, null, 2);
-      } catch (e) {
-        status.textContent = String(result && result.error ? result.error : "done");
-      }
+      runAfterAuth(pathway, target || undefined).then(function (result) {
+        try {
+          status.textContent = JSON.stringify(result, null, 2);
+        } catch (e) {
+          status.textContent = String(result && result.error ? result.error : "done");
+        }
+      });
     });
     return panel;
   }
@@ -389,11 +446,45 @@
     return { ok: true, armed: true, operator: op };
   }
 
+  /**
+   * Await auth.getUser, then run a pathway (or "__all__"). Bails with a log
+   * and no pathway run when there is no signed-in user or getUser fails.
+   */
+  function runAfterAuth(pathway, targetFleetId) {
+    return awaitAuthUser().then(function (auth) {
+      if (!auth.user) {
+        emitLog({
+          action: "run_skipped",
+          ok: false,
+          error: auth.error || "no_auth_user",
+          reason: "No signed-in auth user (auth.getUser); nothing run.",
+          pathway: pathway,
+        });
+        return { ok: false, error: auth.error || "no_auth_user", pathway: pathway };
+      }
+      return pathway === "__all__" ? triggerAll(targetFleetId) : triggerPathway(pathway, targetFleetId);
+    });
+  }
+
+  function syncAfterAuth() {
+    return awaitAuthUser().then(function (auth) {
+      if (!auth.user && gateOpen()) {
+        emitLog({ action: "auth_user_missing", ok: false, error: auth.error || "no_auth_user" });
+      }
+      return syncPanel();
+    });
+  }
+
   function boot() {
     syncPanel();
+    syncAfterAuth();
     window.addEventListener("hashchange", syncPanel);
     window.addEventListener("popstate", syncPanel);
-    document.addEventListener("cognation:auth-changed", syncPanel);
+    document.addEventListener("cognation:auth-changed", function () {
+      resetAuthUser();
+      syncPanel();
+      syncAfterAuth();
+    });
   }
 
   if (document.readyState === "loading") {
@@ -449,5 +540,7 @@
     postOne: postOne,
     syncPanel: syncPanel,
     gateOpen: gateOpen,
+    awaitAuthUser: awaitAuthUser,
+    runAfterAuth: runAfterAuth,
   };
 })();

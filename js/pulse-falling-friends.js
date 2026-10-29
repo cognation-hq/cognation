@@ -376,14 +376,29 @@
     var d = g.persp / (g.persp - y * Math.sin(g.tilt));
     return { x: x * d, y: y * Math.cos(g.tilt) * d, d: d };
   }
-  function phoneOrbit(panelW, g) {
-    if (!(panelW > 0) || !g) return null;
-    var dFront = orbitPoint(90, g).d;
+  /* engineer/pulse-phone-halo-separation (Designer LOOK; HH: keep the ripple):
+     adjacent frames overlapped as they passed each other on phones (about 22px at
+     390, 27 at 358). Phones keep the desktop ripple (frame i bobs on
+     sin(t/360 + bobPhase*i)); when g.spots (the ring's spot angles, in order) is
+     given, phoneOrbit returns the largest bob amplitude (<= g.bob) at which every
+     adjacent pair keeps (size_a + size_b) / 2 + PHONE_FRAME_GAP between centres at
+     every rotation step and every bob phase. Full-size frames (sizeK 1) are kept
+     whenever any bob >= 0 holds the gap at full size (430 today). Otherwise frames
+     shrink by up to PHONE_MIN_SIZE_K (12%), since smaller frames leave more room to
+     bob; past that the bob is 0 and frames shrink just enough to hold the gap. */
+  var PHONE_FRAME_GAP = 4;
+  var PHONE_GAP_CUSHION = 0.5; /* rotation is sampled: a hair extra between samples */
+  var PHONE_MIN_SIZE_K = 0.88;
+  var sepCache = {};
+  function fitScale(g, dFront, k) {
     function sizeAt(d) {
       var t = (d - 1) / ((dFront - 1) || 1);
       t = t < 0 ? 0 : t > 1 ? 1 : t;
-      return PHONE_FRAME_BACK + (PHONE_FRAME_FRONT - PHONE_FRAME_BACK) * t;
+      return k * (PHONE_FRAME_BACK + (PHONE_FRAME_FRONT - PHONE_FRAME_BACK) * t);
     }
+    return sizeAt;
+  }
+  function orbitF(panelW, g, sizeAt) {
     var ringW = Math.max(0, panelW - PHONE_RING_INSET);
     var maxX = 0;
     var a, p;
@@ -395,20 +410,105 @@
       var lim = (panelW / 2 - PHONE_EDGE - sizeAt(p.d) / 2) / Math.abs(p.x);
       if (lim < f) f = lim;
     }
-    f *= 0.99; /* sampled every 0.25deg: keep a hair of margin between samples */
+    return f * 0.99; /* sampled every 0.25deg: keep a hair of margin between samples */
+  }
+  /* Spot i at rotation phase s, the same path tower.js circleSpotAt walks. */
+  function spotAngle(spots, phase) {
+    var n = spots.length;
+    var w = ((phase % n) + n) % n;
+    var i = Math.floor(w);
+    var mix = w - i;
+    var from = spots[i];
+    var to = spots[(i + 1) % n];
+    if (to > from) to -= 360;
+    return from + (to - from) * mix;
+  }
+  /* Largest bob amplitude (capped at maxBob) that keeps every adjacent pair the
+     gap apart at frame scale k, over every rotation step and bob phase. Frames i and
+     j bob by A*sin(T + p*i) and A*sin(T + p*j): their vertical offset sweeps the
+     whole range [-A*M, A*M], M = 2|sin(p*(i - j)/2)|, so the closest pass is
+     hypot(dx, max(0, |dy| - A*M)). Negative: overlaps even with no bob. */
+  function bobRoom(panelW, g, dFront, k, maxBob, phaseStep) {
+    var spots = g.spots;
+    var n = spots.length;
+    var sizeAt = fitScale(g, dFront, k);
+    var f = orbitF(panelW, g, sizeAt);
+    var best = maxBob;
+    for (var s = 0; s < n; s += 0.004) {
+      var P = [];
+      for (var i = 0; i < n; i++) { var q = orbitPoint(spotAngle(spots, i + s), g); P.push({ x: q.x * f, y: q.y * f, size: sizeAt(q.d) }); }
+      for (i = 0; i < n; i++) {
+        var j = (i + 1) % n;
+        var a = P[i], b = P[j];
+        var need = (a.size + b.size) / 2 + PHONE_FRAME_GAP + PHONE_GAP_CUSHION;
+        var dx = Math.abs(a.x - b.x);
+        if (dx >= need) continue;
+        var dy = Math.abs(a.y - b.y) - Math.sqrt(need * need - dx * dx);
+        var M = 2 * Math.abs(Math.sin(phaseStep * (i - j) / 2));
+        var room = M > 1e-9 ? dy / M : (dy >= 0 ? Infinity : -Infinity);
+        if (room < best) best = room;
+      }
+    }
+    return best;
+  }
+  function separationFit(panelW, g, dFront) {
+    var maxBob = g.bob || 0;
+    var phaseStep = typeof g.bobPhase === "number" ? g.bobPhase : 0;
+    var key = [panelW, g.r, g.tilt, g.persp, maxBob, phaseStep, g.spots.join(",")].join("|");
+    if (Object.prototype.hasOwnProperty.call(sepCache, key)) return sepCache[key];
+    function room(k) { return bobRoom(panelW, g, dFront, k, maxBob, phaseStep); }
+    function bisect(lo, hi, holds) {
+      for (var it = 0; it < 18; it++) { var mid = (lo + hi) / 2; if (holds(mid)) lo = mid; else hi = mid; }
+      return lo;
+    }
+    var out;
+    var atOne = room(1);
+    if (atOne >= maxBob) {
+      out = { k: 1, bob: maxBob };
+    } else if (atOne >= 0) {
+      /* PM: if frames hold the gap at full size with some bob (430 today), keep
+         them full size and use the largest bob that holds; never shrink to bob more */
+      out = { k: 1, bob: Math.floor(atOne * 10) / 10 };
+    } else {
+      var atMin = room(PHONE_MIN_SIZE_K);
+      if (atMin >= maxBob) {
+        /* the full bob fits somewhere in [0.88, 1]: keep the frames as large as possible */
+        out = { k: bisect(PHONE_MIN_SIZE_K, 1, function (k) { return room(k) >= maxBob; }), bob: maxBob };
+      } else if (atMin >= 0) {
+        /* shrink the full 12%, then the largest bob that keeps the gap */
+        out = { k: PHONE_MIN_SIZE_K, bob: Math.floor(atMin * 10) / 10 };
+      } else {
+        /* overlaps even standing still at 0.88: no bob, shrink further until it holds */
+        out = { k: bisect(0, PHONE_MIN_SIZE_K, function (k) { return room(k) >= 0; }), bob: 0 };
+      }
+    }
+    sepCache[key] = out;
+    return out;
+  }
+  function phoneOrbit(panelW, g) {
+    if (!(panelW > 0) || !g) return null;
+    var dFront = orbitPoint(90, g).d;
+    var sep = Array.isArray(g.spots) && g.spots.length > 1 ? separationFit(panelW, g, dFront) : { k: 1, bob: g.bob || 0 };
+    var sizeK = sep.k;
+    var sizeAt = fitScale(g, dFront, sizeK);
+    var ringW = Math.max(0, panelW - PHONE_RING_INSET);
+    var f = orbitF(panelW, g, sizeAt);
     var top = 0;
     var bottom = 0;
+    var a, p;
     for (a = 0; a < 360; a += 0.25) {
       p = orbitPoint(a, g);
       var half = sizeAt(p.d) / 2;
       top = Math.min(top, p.y * f - half);
       bottom = Math.max(bottom, p.y * f + half + PHONE_CAPTION);
     }
-    var bob = g.bob || 0;
+    var bob = sep.bob;
     var lift = g.lift || 0;
     return {
       f: f,
       ringW: ringW,
+      sizeK: sizeK,
+      bob: bob, /* phone bob amplitude (px) to use for every frame */
       sizeAt: sizeAt,
       point: function (angleDeg) { var q = orbitPoint(angleDeg, g); return { x: q.x * f, y: q.y * f, d: q.d, size: sizeAt(q.d) }; },
       /* vertical reach of any frame + caption around the ring centre, motion included */
@@ -789,6 +889,8 @@
     phoneBelowRing: phoneBelowRing,
     PHONE_CHIP: PHONE_CHIP,
     PHONE_MAX_W: PHONE_MAX_W,
+    PHONE_FRAME_GAP: PHONE_FRAME_GAP,
+    PHONE_MIN_SIZE_K: PHONE_MIN_SIZE_K,
     centerGroup: centerGroup,
     layoutOutside: layoutOutside,
     render: render,

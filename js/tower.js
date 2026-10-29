@@ -14322,7 +14322,10 @@
     if (fitLayer && fitApi && typeof fitApi.phoneOrbit === "function" &&
         window.matchMedia && window.matchMedia("(max-width: " + fitApi.PHONE_MAX_W + "px)").matches) {
       fit = fitApi.phoneOrbit(fitLayer.clientWidth, {
-        r: CIRCLE_RING_R, tilt: CIRCLE_TILT, persp: CIRCLE_PERSPECTIVE, bob: reduce ? 0 : 18, lift: reduce ? 0 : 32
+        r: CIRCLE_RING_R, tilt: CIRCLE_TILT, persp: CIRCLE_PERSPECTIVE, bob: reduce ? 0 : 18, lift: reduce ? 0 : 32,
+        /* spot angles in ring order + the ripple's per-frame phase step: phoneOrbit
+           picks the bob amplitude (fit.bob) that keeps adjacent frames apart */
+        spots: CIRCLE_SPOTS.map(function (sp) { return sp.angle; }), bobPhase: 1.2
       });
     }
     if (fitLayer) {
@@ -14341,7 +14344,9 @@
       var depth = pos.s / CIRCLE_SCALE;
       if (fit) {
         var px = fit.sizeAt(depth);
-        var pbob = reduce ? 0 : Math.sin(performance.now() / 360 + i * 1.2) * 18;
+        /* Same per-frame ripple as desktop; phones use a smaller amplitude (fit.bob,
+           engineer/pulse-phone-halo-separation) so passing neighbours keep 4px apart. */
+        var pbob = reduce ? 0 : Math.sin(performance.now() / 360 + i * 1.2) * fit.bob;
         spots[i].style.width = px.toFixed(1) + "px";
         spots[i].style.height = px.toFixed(1) + "px";
         spots[i].style.transform =

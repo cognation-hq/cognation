@@ -1685,6 +1685,13 @@
       try { session.begin(); } catch (eBegin) { finish(notSet); }
     });
   }
+  /* A Marketplace post's first line is its title, so a one-line post would show
+     the same words twice. Skip the body when its trimmed text equals the title
+     (case-insensitive). */
+  function marketBodyRepeatsTitle(card) {
+    var body = String((card && card.body) || "").trim().toLowerCase();
+    return !!body && body === String((card && card.title) || "").trim().toLowerCase();
+  }
   function marketCardHtml(card) {
     var html = "";
     (card.pictures || []).forEach(function (src) {
@@ -1693,8 +1700,12 @@
     if (html) html = '<div class="commune-market-photos" data-market-photos>' + html + "</div>";
     if (!marketCanBid()) {
       /* Signed out: the age is unknown, not too young; say what opens it. */
+      /* Signed out: "Sign in to bid." is a link to the sign-in page (/), the same
+         route as "Back to sign in" on reset-password. */
       return html + '<p class="commune-card-meta" data-market-bid-note>' +
-        (signedOutViewer() ? "Sign in to bid." : "Bidding is for ages 16 and up.") + "</p>";
+        (signedOutViewer()
+          ? '<a class="commune-market-signin" href="/" data-market-signin>Sign in to bid.</a>'
+          : "Bidding is for ages 16 and up.") + "</p>";
     }
     var price = marketMoney(card.ask);
     var high = liveHigh(card.id);
@@ -2619,7 +2630,7 @@
       html += '<h4 class="commune-card-title">' + escapeHtml(card.title || "") + "</h4>";
       if (card.fromName) html += '<p class="commune-card-meta">' + escapeHtml(card.fromName) + "</p>";
       if (card.videoUrl) html += videoHtml(card.videoUrl);
-      if (card.body) html += '<p class="commune-card-body">' + escapeHtml(card.body) + "</p>";
+      if (card.body && !(card.type === TYPE.MARKET && marketBodyRepeatsTitle(card))) html += '<p class="commune-card-body">' + escapeHtml(card.body) + "</p>";
       if (card.type === TYPE.MARKET) html += marketCardHtml(card);
       if (card.type === TYPE.AD && card.handle) {
         html += '<button type="button" class="btn btn-secondary" data-commune-open-profile>Open their page</button>';
@@ -4045,8 +4056,15 @@
     showClassroom(false);
   }
 
+  /* Signed out: one muted glass line where the rooms would be. Rooms need a
+     signed-in age, so no room card or rooms line shows until then. */
+  function syncSignedOutRooms() {
+    var line = state.shell && state.shell.querySelector("[data-commune-signed-out-rooms]");
+    if (line) line.hidden = !signedOutViewer();
+  }
   function paintDeck() {
     if (!state.deck) return;
+    syncSignedOutRooms();
     closeClassroom();
     closeRoom();
     state.deck.innerHTML = "";

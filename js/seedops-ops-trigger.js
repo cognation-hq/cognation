@@ -24,6 +24,9 @@
      pending Promise. undefined = not fetched yet, null = no user / error. */
   var authUser;
   var authUserPending = null;
+  /* Bumped on reset so a getUser that resolves after sign-out cannot
+     repopulate the cache with the previous user. */
+  var authUserGen = 0;
 
   function awaitAuthUser() {
     var sb = window.CognationSupabase;
@@ -45,6 +48,7 @@
       }
     } catch (e) {}
     if (authUserPending) return authUserPending;
+    var gen = authUserGen;
     var pending;
     try {
       pending = Promise.resolve(sb.getUser());
@@ -54,16 +58,19 @@
     authUserPending = pending
       .then(
         function (user) {
-          authUser = user && typeof user === "object" && (user.id || user.email || user.app_metadata || user.user_metadata) ? user : null;
-          return authUser ? { user: authUser } : { user: null, error: "no_auth_user" };
+          var u = user && typeof user === "object" && (user.id || user.email || user.app_metadata || user.user_metadata) ? user : null;
+          if (gen !== authUserGen) return { user: null, error: "auth_reset" };
+          authUser = u;
+          return u ? { user: u } : { user: null, error: "no_auth_user" };
         },
         function (err) {
+          if (gen !== authUserGen) return { user: null, error: "auth_reset" };
           authUser = null;
           return { user: null, error: "get_user_failed", reason: String(err && err.message ? err.message : err) };
         }
       )
       .then(function (r) {
-        authUserPending = null;
+        if (gen === authUserGen) authUserPending = null;
         return r;
       });
     return authUserPending;
@@ -76,6 +83,7 @@
   function resetAuthUser() {
     authUser = undefined;
     authUserPending = null;
+    authUserGen += 1;
   }
 
   function emitLog(payload) {
@@ -484,6 +492,14 @@
       resetAuthUser();
       syncPanel();
       syncAfterAuth();
+    });
+    /* login.js fires these on in-page sign-in / sign-out (auth-changed never fires). */
+    ["cognation:session-started", "cognation:session-ended"].forEach(function (name) {
+      document.addEventListener(name, function () {
+        resetAuthUser();
+        syncPanel();
+        syncAfterAuth();
+      });
     });
   }
 

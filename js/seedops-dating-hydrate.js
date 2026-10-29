@@ -444,6 +444,9 @@
   }
 
   function mergeServerBios(rows) {
+    if (!isSeedOrOpsSession()) {
+      return { ok: false, error: "not_seed_or_ops", skipped: true, merged: 0, dating: 0 };
+    }
     var api = window.CognationSeedOps;
     var accounts = window.CognationAccounts;
     if (!api || typeof api.getByFleetId !== "function") {
@@ -730,7 +733,9 @@
            (Sage always has it), so the age never reads the adult default for her. */
         var defaultsOk = seedish && !!meta && !metaHasTestRole(meta) && !isU13TestViewer();
         applyViewerPrefs(prefs, { seedDefaults: defaultsOk });
-        if (!seedish && !opts.forceBios) {
+        /* Fail closed: forceBios never pulls seed bios into a real user's
+           accounts store (See dating toggle -> ensureDatingContent). */
+        if (!seedish) {
           return { ok: true, bios: { ok: true, merged: 0, dating: 0 }, prefs: prefs, seedish: false };
         }
         return fetchSeedBios()

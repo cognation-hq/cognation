@@ -54,6 +54,9 @@
      pending Promise. undefined = not fetched yet, null = no user / error. */
   var authUser;
   var authUserPending = null;
+  /* Bumped on reset so a getUser that resolves after sign-out cannot
+     repopulate the cache with the previous user. */
+  var authUserGen = 0;
 
   function awaitAuthUser() {
     var sb = window.CognationSupabase;
@@ -75,6 +78,7 @@
       }
     } catch (e) {}
     if (authUserPending) return authUserPending;
+    var gen = authUserGen;
     var pending;
     try {
       pending = Promise.resolve(sb.getUser());
@@ -84,16 +88,19 @@
     authUserPending = pending
       .then(
         function (user) {
-          authUser = user && typeof user === "object" && (user.id || user.email || user.app_metadata || user.user_metadata) ? user : null;
-          return authUser ? { user: authUser } : { user: null, error: "no_auth_user" };
+          var u = user && typeof user === "object" && (user.id || user.email || user.app_metadata || user.user_metadata) ? user : null;
+          if (gen !== authUserGen) return { user: null, error: "auth_reset" };
+          authUser = u;
+          return u ? { user: u } : { user: null, error: "no_auth_user" };
         },
         function (err) {
+          if (gen !== authUserGen) return { user: null, error: "auth_reset" };
           authUser = null;
           return { user: null, error: "get_user_failed", reason: String(err && err.message ? err.message : err) };
         }
       )
       .then(function (r) {
-        authUserPending = null;
+        if (gen === authUserGen) authUserPending = null;
         return r;
       });
     return authUserPending;
@@ -106,6 +113,8 @@
   function resetAuthUser() {
     authUser = undefined;
     authUserPending = null;
+    authUserGen += 1;
+    skipLogged = {};
   }
 
   function emitLog(payload) {
@@ -346,9 +355,35 @@
     return ranked;
   }
 
+  /* Log a skipped live write when awaitAuthUser gives no user (e.g. signed
+     out). Once per auth cycle per error, so a 100-seed local wave does not
+     flood the 200-row SeedOps log ring. */
+  var skipLogged = {};
+  function logNoAuthSkip(seed) {
+    return awaitAuthUser().then(function (auth) {
+      if (auth.user) return auth;
+      var err = auth.error || "no_auth_user";
+      if (!skipLogged[err]) {
+        skipLogged[err] = true;
+        emitLog({
+          action: "post_one_skipped",
+          ok: false,
+          error: err,
+          reason: "No signed-in auth user (auth.getUser); live Tower write skipped, local/demo store used.",
+          seedFleetId: (seed && seed.seedFleetId) || "",
+        });
+      }
+      return auth;
+    });
+  }
+
   function tryClientWrite(seed, post) {
     var social = window.CognationSupabaseSocial;
     if (!social || typeof social.active !== "function" || !social.active()) {
+      /* Signed out: remote is inactive, so this returned before any
+         awaitAuthUser / post_one_skipped log. Log the skip (local path
+         below is unchanged). */
+      logNoAuthSkip(seed);
       return null;
     }
     if (typeof social.createTowerPost !== "function") {
@@ -569,6 +604,15 @@
     return { ok: true };
   }
 
+  /* login.js fires these on in-page sign-in / sign-out: drop the cached user. */
+  try {
+    if (typeof document !== "undefined" && document && typeof document.addEventListener === "function") {
+      ["cognation:session-started", "cognation:session-ended"].forEach(function (name) {
+        document.addEventListener(name, resetAuthUser);
+      });
+    }
+  } catch (eListen) {}
+
   window.CognationSeedOpsTowerPosts = {
     WAVE1_MAX: WAVE1_MAX,
     DEMO_CAP: DEMO_CAP,
@@ -583,5 +627,6 @@
     clearOverlay: clearOverlay,
     considerForNews: considerForNews,
     awaitAuthUser: awaitAuthUser,
+    knownAuthUser: knownAuthUser,
   };
 })();

@@ -37,6 +37,9 @@
      pending Promise. undefined = not fetched yet, null = no user / error. */
   var authUser;
   var authUserPending = null;
+  /* Bumped on reset so a getUser that resolves after sign-out cannot
+     repopulate the cache with the previous user. */
+  var authUserGen = 0;
 
   function awaitAuthUser() {
     var sb = window.CognationSupabase;
@@ -58,6 +61,7 @@
       }
     } catch (e) {}
     if (authUserPending) return authUserPending;
+    var gen = authUserGen;
     var pending;
     try {
       pending = Promise.resolve(sb.getUser());
@@ -67,16 +71,19 @@
     authUserPending = pending
       .then(
         function (user) {
-          authUser = user && typeof user === "object" && (user.id || user.email || user.app_metadata || user.user_metadata) ? user : null;
-          return authUser ? { user: authUser } : { user: null, error: "no_auth_user" };
+          var u = user && typeof user === "object" && (user.id || user.email || user.app_metadata || user.user_metadata) ? user : null;
+          if (gen !== authUserGen) return { user: null, error: "auth_reset" };
+          authUser = u;
+          return u ? { user: u } : { user: null, error: "no_auth_user" };
         },
         function (err) {
+          if (gen !== authUserGen) return { user: null, error: "auth_reset" };
           authUser = null;
           return { user: null, error: "get_user_failed", reason: String(err && err.message ? err.message : err) };
         }
       )
       .then(function (r) {
-        authUserPending = null;
+        if (gen === authUserGen) authUserPending = null;
         return r;
       });
     return authUserPending;
@@ -89,6 +96,7 @@
   function resetAuthUser() {
     authUser = undefined;
     authUserPending = null;
+    authUserGen += 1;
   }
 
   function emitLog(payload) {
@@ -220,6 +228,11 @@
   }
 
   function materializeDatingSample(count) {
+    /* Fail closed: seed dating profiles are only written for seed/ops sessions
+       (callers include the See dating toggle via dating-hydrate / commune-swipe). */
+    if (!isSeedOrOpsSession()) {
+      return { ok: false, error: "not_seed_or_ops", skipped: true, count: 0 };
+    }
     count = Math.max(0, Math.min(250, Number(count) || MATERIALIZE_COUNT));
     var api = window.CognationSeedOps;
     var accounts = window.CognationAccounts;
@@ -280,11 +293,13 @@
 
   /**
    * Run bootstrap. Safe to call repeatedly; skips heavy work if already booted
-   * for this session unless opts.force.
+   * for this session unless opts.force. Seed/ops sessions only, even with force.
    */
   function bootstrap(opts) {
     opts = opts || {};
-    if (!isSeedOrOpsSession() && !opts.force) {
+    /* Fail closed: force only skips the BOOT_FLAG cache, never the seed/ops
+       gate, so no caller can write seed data into a real user's session. */
+    if (!isSeedOrOpsSession()) {
       return { ok: false, error: "not_seed_or_ops", skipped: true };
     }
     var prior = readJson(sessionStorage, BOOT_FLAG, null);
@@ -361,6 +376,17 @@
       resetAuthUser();
       bootstrapAfterAuth({ force: true });
     });
+    /* login.js fires these on in-page sign-in / sign-out (auth-changed never fires). */
+    document.addEventListener("cognation:session-started", function () {
+      try {
+        sessionStorage.removeItem(BOOT_FLAG);
+      } catch (e) {}
+      resetAuthUser();
+      bootstrapAfterAuth({ force: true });
+    });
+    document.addEventListener("cognation:session-ended", function () {
+      resetAuthUser();
+    });
   }
 
   if (document.readyState === "loading") {
@@ -379,6 +405,7 @@
     bootstrap: bootstrap,
     bootstrapAfterAuth: bootstrapAfterAuth,
     awaitAuthUser: awaitAuthUser,
+    knownAuthUser: knownAuthUser,
     refillDeck: refillDeck,
   };
 })();

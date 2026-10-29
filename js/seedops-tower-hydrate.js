@@ -538,7 +538,6 @@
      tower.js asks (cognation:viewer-age-changed). Before this, session-started
      read them before the age loaded and the dating report (or the age change)
      read them all again ~1-3 s later: two identical bursts. */
-  var DATING_FLAG = "cognation.seedops.datingHydrate.v2";
   var AGE_WAIT_MS = 8000;
   var ageGen = 0; /* bumps on session-started, session-ended, auth-changed, birth-saved */
   var ageReadGen = -1; /* ageGen whose after-age read already went out */
@@ -556,13 +555,6 @@
     } catch (e) {
       return false;
     }
-  }
-
-  /* The dating hydrate already ran for this tab and re-applied its age from
-     its cache (it reports nothing on that path). */
-  function datingCacheApplied() {
-    var prior = readJson(sessionStorage, DATING_FLAG, null);
-    return !!(prior && prior.ok);
   }
 
   function cancelAgeWait() {
@@ -629,8 +621,9 @@
     }
     setTimeout(function () {
       if (signedInLocal() && datingModule()) {
-        if (datingCacheApplied()) readAfterAge({ reason: "dating_cache" });
-        else if (!ageWait && ageReadGen !== ageGen) waitForAge();
+        /* Wait for the age even with a dating cache: the cache holds no age,
+           and the dating hydrate reports once this load's user_birth answers. */
+        if (!ageWait && ageReadGen !== ageGen) waitForAge();
         return;
       }
       /* Signed out (no age to wait for): this load's one read. */

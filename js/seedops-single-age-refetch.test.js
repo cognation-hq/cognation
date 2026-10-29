@@ -196,6 +196,24 @@ Object.keys(PROFILES).forEach(function (w) {
   });
 });
 
+/* The dating cache holds no age (dating-cache-age-scope): a signed-in reload
+   with it still waits for this load's user_birth answer and the report. */
+Object.keys(PROFILES).forEach(function (w) {
+  var p = PROFILES[w];
+  test(w + ": signed-in reload with a dating cache reads once, after the age loads", async function () {
+    var x = world(p, { signedIn: true, datingCached: true });
+    var bootAge = 200 + p.ageAfter;
+    await x.clock.advance(bootAge);
+    var ageAt = x.clock.now();
+    x.ageLoads();
+    await x.clock.advance(9000);
+    var b = postBursts(x.log, 0);
+    assert.equal(b.length, 1, "one burst, got " + JSON.stringify(b));
+    assert.ok(b[0].start >= ageAt, "the read waits for the age, not the cache");
+    assert.deepEqual(writes(x.log), []);
+  });
+});
+
 test("a later dating hydrate in the same session does not re-read; a saved birth month does once", async function () {
   var p = PROFILES["1280"];
   var x = world(p, { signedIn: false });

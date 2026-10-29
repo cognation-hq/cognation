@@ -392,7 +392,9 @@
       "</div>" +
       '<p style="margin:0 0 8px;color:#9ca3af;font-size:11px;">Internal pathway kick for ops/seed sessions. Real users never see this panel.</p>' +
       '<label style="display:block;margin-bottom:6px;">Pathway' +
-      '<select data-seedops-ops-pathway style="display:block;width:100%;margin-top:2px;background:#1f2937;color:#f9fafb;border:1px solid #4b5563;border-radius:6px;padding:4px 6px;">' +
+      '<select data-seedops-ops-pathway autocomplete="off" style="display:block;width:100%;margin-top:2px;background:#1f2937;color:#f9fafb;border:1px solid #4b5563;border-radius:6px;padding:4px 6px;">' +
+      /* No default pathway: a disabled placeholder is selected (was: tower). */
+      '<option value="" disabled selected>Pick a pathway</option>' +
       '<option value="tower">tower</option>' +
       '<option value="commune">commune</option>' +
       '<option value="news">news</option>' +
@@ -407,7 +409,7 @@
       '<input data-seedops-ops-target type="text" placeholder="seed-0001 or self" ' +
       'style="display:block;width:100%;margin-top:2px;box-sizing:border-box;background:#1f2937;color:#f9fafb;border:1px solid #4b5563;border-radius:6px;padding:4px 6px;" />' +
       "</label>" +
-      '<button type="button" data-seedops-ops-run ' +
+      '<button type="button" data-seedops-ops-run disabled ' +
       'style="width:100%;padding:6px 8px;background:#2563eb;color:#fff;border:0;border-radius:6px;cursor:pointer;font-weight:600;">Run pathway</button>' +
       '<pre data-seedops-ops-status style="margin:8px 0 0;max-height:120px;overflow:auto;font-size:10px;color:#a7f3d0;white-space:pre-wrap;"></pre>';
     document.body.appendChild(panel);
@@ -420,10 +422,24 @@
       } catch (e) {}
       syncPanel();
     });
-    panel.querySelector("[data-seedops-ops-run]").addEventListener("click", function () {
-      var pathway = panel.querySelector("[data-seedops-ops-pathway]").value;
+    var pathwaySelect = panel.querySelector("[data-seedops-ops-pathway]");
+    var runButton = panel.querySelector("[data-seedops-ops-run]");
+    /* Run stays disabled until a real pathway is picked. */
+    function syncRunEnabled() {
+      runButton.disabled = !String(pathwaySelect.value || "").trim();
+    }
+    pathwaySelect.value = "";
+    syncRunEnabled();
+    pathwaySelect.addEventListener("change", syncRunEnabled);
+    runButton.addEventListener("click", function () {
+      var pathway = String(pathwaySelect.value || "").trim();
       var target = String(panel.querySelector("[data-seedops-ops-target]").value || "").trim();
       var status = panel.querySelector("[data-seedops-ops-status]");
+      if (!pathway) {
+        status.textContent = "Pick a pathway first.";
+        syncRunEnabled();
+        return;
+      }
       runAfterAuth(pathway, target || undefined).then(function (result) {
         try {
           status.textContent = JSON.stringify(result, null, 2);
@@ -464,6 +480,11 @@
    * and no pathway run when there is no signed-in user or getUser fails.
    */
   function runAfterAuth(pathway, targetFleetId) {
+    /* Backstop: an empty pathway never runs (no default pathway). */
+    if (!String(pathway || "").trim()) {
+      emitLog({ action: "run_skipped", ok: false, error: "no_pathway", reason: "No pathway picked; nothing run." });
+      return Promise.resolve({ ok: false, error: "no_pathway" });
+    }
     return awaitAuthUser().then(function (auth) {
       if (!auth.user) {
         emitLog({

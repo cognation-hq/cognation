@@ -60,10 +60,14 @@ function padAt(width) {
   const hits = mediaRules().filter((b) => width >= b.minW && width <= b.maxW && b.rules[PAD_SEL]);
   return hits.length ? { pad: hits[hits.length - 1].rules[PAD_SEL], spot: hits[hits.length - 1].rules[SPOT_SEL] || {}, maxW: hits[hits.length - 1].maxW } : null;
 }
-/* Evaluates max(100%, Npx) / Npx / 100% against the frame size. */
-function cssLen(v, frame) {
+/* Evaluates max(100%, Npx) / max(100%, var(--pulse-tap-pad, Npx)) / Npx / 100%
+   against the frame size. tapPad: the --pulse-tap-pad tower.js sets (fit.tapPad,
+   engineer/pulse-halo-live-width); without it the var falls back to Npx. */
+function cssLen(v, frame, tapPad) {
   const m = /^max\(100%,\s*([\d.]+)px\)$/.exec(v);
   if (m) return Math.max(frame, Number(m[1]));
+  const mv = /^max\(100%,\s*var\(--pulse-tap-pad,\s*([\d.]+)px\)\)$/.exec(v);
+  if (mv) return Math.max(frame, typeof tapPad === "number" ? tapPad : Number(mv[1]));
   if (v === "100%") return frame;
   const px = /^([\d.]+)px$/.exec(v);
   assert.ok(px, "unsupported length " + v);
@@ -79,8 +83,8 @@ function cssLen(v, frame) {
     const p = padAt(w);
     assert.ok(p, "a tap pad rule applies at " + w);
     for (const size of [back, (back + front) / 2, front]) {
-      assert.ok(cssLen(p.pad.width, size) >= 44, "pad width >= 44 for a " + size.toFixed(1) + "px frame");
-      assert.ok(cssLen(p.pad.height, size) >= 44, "pad height >= 44 for a " + size.toFixed(1) + "px frame");
+      assert.ok(cssLen(p.pad.width, size, o.tapPad) >= 44, "pad width >= 44 for a " + size.toFixed(1) + "px frame");
+      assert.ok(cssLen(p.pad.height, size, o.tapPad) >= 44, "pad height >= 44 for a " + size.toFixed(1) + "px frame");
     }
     assert.strictEqual(p.pad.content, '""');
     assert.strictEqual(p.pad.position, "absolute");
@@ -138,13 +142,15 @@ function* layouts(o, padW) {
     const base = [];
     for (let i = 0; i < n; i++) { const p = spotAt(i + s); base.push({ x: p.x * o.f, y: p.y * o.f, size: o.sizeAt(p.d) }); }
     for (let t = 0; t < PERIOD; t += PERIOD / 48) {
-      yield base.map((b, i) => ({ x: b.x, y: b.y + phoneBob(i, t, o), size: b.size, pad: cssLen(padW, b.size) }));
+      yield base.map((b, i) => ({ x: b.x, y: b.y + phoneBob(i, t, o), size: b.size, pad: cssLen(padW, b.size, o.tapPad) }));
     }
   }
 }
 
-/* The PULSE fit layer spans the viewport on phones (--pulse-panel-w measured headless
-   = 360/375/390px at those widths), so phoneOrbit gets the viewport width. */
+/* The PULSE fit layer spans the viewport on phones: since
+   engineer/pulse-halo-live-width it runs edge to edge (live it used to be the
+   viewport minus .container's 2rem), so phoneOrbit gets the viewport width.
+   js/pulse-halo-live-width.test.js models that layout. */
 for (const vw of [360, 375, 390]) {
   for (const panelW of [vw]) {
     test(`${vw}px: round pads never overlap each other or the front frame, and every pad answers 8/8 taps on its 44px ring`, () => {

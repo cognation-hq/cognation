@@ -14450,9 +14450,12 @@
         fitLayer.style.setProperty("--pulse-ring-w", fit.ringW.toFixed(1) + "px");
         fitLayer.style.setProperty("--pulse-panel-w", fitLayer.clientWidth + "px");
         fitLayer.setAttribute("data-pulse-orbit", fit.top.toFixed(1) + "," + fit.bottom.toFixed(1));
+        /* #313 tap pad diameter capped so neighbouring pads never overlap (css/styles.css) */
+        fitLayer.style.setProperty("--pulse-tap-pad", fit.tapPad.toFixed(1) + "px");
       } else {
         fitLayer.style.removeProperty("--pulse-ring-w");
         fitLayer.style.removeProperty("--pulse-panel-w");
+        fitLayer.style.removeProperty("--pulse-tap-pad");
         fitLayer.removeAttribute("data-pulse-orbit");
       }
     }
@@ -14464,10 +14467,11 @@
         /* Same per-frame ripple as desktop; phones use a smaller amplitude (fit.bob,
            engineer/pulse-phone-halo-separation) so passing neighbours keep 4px apart. */
         var pbob = reduce ? 0 : Math.sin(performance.now() / 360 + i * 1.2) * fit.bob;
-        spots[i].style.width = px.toFixed(1) + "px";
-        spots[i].style.height = px.toFixed(1) + "px";
+        /* 2 decimals (was 1): 0.1px rounding could eat into the 4.5px gap */
+        spots[i].style.width = px.toFixed(2) + "px";
+        spots[i].style.height = px.toFixed(2) + "px";
         spots[i].style.transform =
-          "translate(-50%, -50%) translate(" + (pos.x * fit.f).toFixed(1) + "px," + (pos.y * fit.f + pbob).toFixed(1) + "px) scale(1)";
+          "translate(-50%, -50%) translate(" + (pos.x * fit.f).toFixed(2) + "px," + (pos.y * fit.f + pbob).toFixed(2) + "px) scale(1)";
         spots[i].style.zIndex = String(Math.round(pos.s * 100));
         spots[i].style.setProperty("--pulse-spot-s", "1");
         if (px > frontScale) { frontScale = px; front = i; }

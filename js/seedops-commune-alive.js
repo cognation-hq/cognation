@@ -228,6 +228,11 @@
   }
 
   function materializeDatingSample(count) {
+    /* Fail closed: seed dating profiles are only written for seed/ops sessions
+       (callers include the See dating toggle via dating-hydrate / commune-swipe). */
+    if (!isSeedOrOpsSession()) {
+      return { ok: false, error: "not_seed_or_ops", skipped: true, count: 0 };
+    }
     count = Math.max(0, Math.min(250, Number(count) || MATERIALIZE_COUNT));
     var api = window.CognationSeedOps;
     var accounts = window.CognationAccounts;

@@ -257,3 +257,133 @@ test("commune-alive: a real user's session-started makes 0 writes, even with for
   assert.deepStrictEqual(state.calls, [], "Supabase calls");
   assert.deepStrictEqual(w.win.CognationAccounts._p, {}, "no seed profiles materialized");
 });
+
+/* Real user (non-seed, non-ops) turns on See dating: ensureDatingContent in
+   seedops-dating-hydrate.js must not write seed dating profiles anywhere. */
+function datingWorld(opts) {
+  opts = opts || {};
+  var user = opts.user || REAL_USER;
+  var authSession = opts.authSession || { username: "jordan", profileHandle: "jordan" };
+  var writes = [];
+  var calls = [];
+  var saved = [];
+  var listeners = {};
+  var doc = {
+    readyState: "complete",
+    addEventListener: function (t, fn) { (listeners[t] = listeners[t] || []).push(fn); },
+    dispatchEvent: function (ev) { (listeners[ev.type] || []).slice().forEach(function (fn) { fn(ev); }); return true; },
+    querySelector: function () { return null; },
+    querySelectorAll: function () { return []; },
+  };
+  var seeDating = false;
+  var member = { age: 31, city: "Chicago" };
+  var sb = {
+    configured: function () { return true; },
+    getSession: function () { return { access_token: "t" }; },
+    getUser: function () { return Promise.resolve(JSON.parse(JSON.stringify(user))); },
+    rest: function (table, opts) {
+      if (table === "profiles") {
+        return Promise.resolve([
+          { id: "srv-6", seed_fleet_id: "seed-0006", display_name: "Andre", bio: "Farmer-market regular.", account_kind: "seed" },
+          { id: "srv-7", seed_fleet_id: "seed-0007", display_name: "Bea", bio: "Early runs.", account_kind: "seed" },
+        ]);
+      }
+      return Promise.resolve([]);
+    },
+    updateUser: function () { return Promise.resolve({}); },
+  };
+  var win = {
+    document: doc,
+    localStorage: memoryStorage("localStorage", writes),
+    sessionStorage: memoryStorage("sessionStorage", writes),
+    location: { hash: "", search: "", pathname: "/", href: "https://cognation.test/" },
+    history: { replaceState: function () {} },
+    addEventListener: function () {},
+    CustomEvent: function (t, i) { this.type = t; this.detail = (i && i.detail) || {}; },
+    CognationAuth: { getSession: function () { return authSession; } },
+    CognationDatingFlag: { enabled: function () { return true; } },
+    CognationSeedOpsLog: { rows: [], write: function (ch, p) { this.rows.push({ channel: ch, payload: p }); } },
+    CognationSupabase: recordCalls("CognationSupabase", sb, calls),
+    CognationAccounts: {
+      _p: {},
+      saveProfileRecord: function (r) { saved.push(r && r.id); this._p[r.id] = r; return true; },
+      getProfileById: function (id) { return this._p[id] || null; },
+    },
+    CognationCommuneSwipe: {
+      getMemberProfile: function () { return member; },
+      setMemberProfile: function (p) { member = p || {}; return member; },
+      getSeeDating: function () { return seeDating; },
+      setSeeDating: function (on) { seeDating = !!on; },
+      getMemberAge: function () { return parseInt(member.age, 10) || null; },
+      setDatingBirthAge: function () {},
+      sampleDeck: function () { return []; },
+      rebuild: function () {},
+    },
+  };
+  win.window = win;
+  var ctx = vm.createContext({
+    window: win, document: doc, localStorage: win.localStorage, sessionStorage: win.sessionStorage,
+    location: win.location, history: win.history, console: console, CustomEvent: win.CustomEvent,
+    Promise: Promise, setTimeout: function () { return 0; }, clearTimeout: function () {},
+    encodeURIComponent: encodeURIComponent, JSON: JSON,
+  });
+  ["js/seedops-schema.js", "js/seedops-commune-alive.js", "js/seedops-dating-hydrate.js"].forEach(function (rel) {
+    vm.runInContext(src(rel), ctx, { filename: rel });
+  });
+  return { win: win, writes: writes, calls: calls, saved: saved,
+    fire: function (name, detail) { doc.dispatchEvent(new win.CustomEvent(name, { detail: detail })); } };
+}
+
+function settle() { return tick().then(tick).then(tick).then(tick); }
+
+test("dating-hydrate: a real user's See dating toggle writes 0 seed dating profiles", async function () {
+  var w = datingWorld();
+  var hyd = w.win.CognationSeedOpsDatingHydrate;
+  var alive = w.win.CognationSeedOpsCommuneAlive;
+  await alive.awaitAuthUser();
+  assert.strictEqual(alive.isSeedOrOpsSession(), false, "real user, not seed/ops");
+  w.saved.length = 0;
+  w.writes.length = 0;
+  w.calls.length = 0;
+
+  /* Toggle path: commune-swipe fires see-dating-changed; listener calls ensureDatingContent. */
+  w.win.CognationCommuneSwipe.setSeeDating(true);
+  w.fire("cognation:see-dating-changed", { seeDating: true });
+  await settle();
+  /* And directly, plus the materialize call it makes. */
+  var out = await hyd.ensureDatingContent({ minCount: 1 });
+  var mat = alive.materializeDatingSample(48);
+  await settle();
+
+  assert.strictEqual(mat.skipped, true, "materializeDatingSample fails closed: " + JSON.stringify(mat));
+  assert.deepStrictEqual(w.saved, [], "no accounts-store writes of seed profiles");
+  assert.deepStrictEqual(w.win.CognationAccounts._p, {}, "accounts store untouched");
+  assert.deepStrictEqual(
+    w.writes.filter(function (k) { return /cognation\.(profiles|seedops\.fleet)/.test(k); }),
+    [],
+    "no seed profile/fleet storage writes"
+  );
+  assert.deepStrictEqual(
+    w.calls.filter(function (c) { return c !== "CognationSupabase.rest"; }),
+    [],
+    "no Supabase writes"
+  );
+  assert.ok(out, "ensureDatingContent resolved");
+});
+
+test("dating-hydrate: seed sessions still materialize and merge seed dating profiles", async function () {
+  var w = datingWorld({ user: SEED_USER, authSession: { username: "seed-0001", seedFleetId: "seed-0001" } });
+  var hyd = w.win.CognationSeedOpsDatingHydrate;
+  var alive = w.win.CognationSeedOpsCommuneAlive;
+  await alive.awaitAuthUser();
+  assert.strictEqual(alive.isSeedOrOpsSession(), true);
+  var mat = alive.materializeDatingSample(6);
+  assert.ok(mat.ok && mat.count === 6, JSON.stringify(mat));
+  w.win.CognationAccounts._p = {};
+  w.saved.length = 0;
+  await hyd.ensureDatingContent({ minCount: 1 });
+  await settle();
+  assert.ok(w.saved.indexOf("prof-seed-0006") !== -1, "seed bios merged for seeds: " + w.saved.join(","));
+  var boot = alive.bootstrap({ force: true, count: 3 });
+  assert.ok(boot.ok && boot.materialized === 3, "seed bootstrap (pathways force path) works: " + JSON.stringify(boot));
+});

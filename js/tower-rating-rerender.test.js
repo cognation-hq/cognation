@@ -76,6 +76,8 @@ function boot() {
     CustomEvent: function (t, i) { this.type = t; this.detail = i && i.detail; },
     CognationAuth: { getSession: function () { return { source: "supabase", supabaseUserId: "user-viewer", activeProfileId: "p-viewer" }; } },
     CognationSupabaseSocial: { active: function () { return true; } },
+    /* An adult viewer with a birth row: remote posts are rating-gated, and an unknown age sees G/PG only. */
+    CognationCommuneSwipe: { viewerAgePending: function () { return false; }, getDatingBirthAge: function () { return 30; } },
     CognationSupabase: { configured: function () { return true; }, rpc: function () { return Promise.resolve([]); }, rest: function (table, o) {
       var q = String((o && o.query) || "");
       if (table === "profiles") return Promise.resolve([{ id: "p-seed-15", user_id: "u-seed-15", handle: "teen15", display_name: "Rowan", bio: "", account_kind: "seed", seed_fleet_id: "seed-0015", kind: "personal" }]);

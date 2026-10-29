@@ -2678,8 +2678,23 @@
     return !!(ar && ar.canSee(postRating(post), ratingViewer()));
   }
 
+  /* The signed-in viewer wrote this server post (one of their own pages). */
+  function viewerWroteRemotePost(post) {
+    if (!post || !post._remote || !signedInUserId()) return false;
+    var pid = String(post.authorProfileId || "");
+    return !!pid && slugIsViewerOwn(pid);
+  }
+  /* Server posts are gated by the server too, but a cached copy can outlive the
+     session that fetched it (sign-out keeps public seed/ops posts), so the
+     client rating check applies to every server post the viewer did not write.
+     A missing server rating reads PG-13 (postRating); NR and unknown ratings
+     fail closed in AutoRate.canSee. The author always sees their own post. */
+  function remoteRatingVisible(post) {
+    return viewerWroteRemotePost(post) || ratingVisible(post);
+  }
+
   function towerPostVisibleToViewer(post) {
-    if (post && post._remote) return (!viewerUnder13() || newsPostAppropriate(post)); /* server already gated by rating */
+    if (post && post._remote) return remoteRatingVisible(post) && (!viewerUnder13() || newsPostAppropriate(post));
     return ratingVisible(post) && (!viewerUnder13() || newsPostAppropriate(post));
   }
 
@@ -2842,7 +2857,7 @@
         post.rating = postRating(post); /* rating carries unchanged into SIGNAL and ECHO */
         return post;
       }).filter(function (post) {
-        return newsPostAppropriate(post) && (post._remote || ratingVisible(post));
+        return newsPostAppropriate(post) && (post._remote ? remoteRatingVisible(post) : ratingVisible(post));
       }).sort(function (a, b) {
         var delta = newsReactionScore(b) - newsReactionScore(a);
         if (delta) return delta;
@@ -3004,7 +3019,10 @@
     else if (code === "R" || code === "18+") use(18);
     else if (code === "MA" || code === "21+" || code === "NC-17") use(21);
     else if (code === "NR") use(999);
-    else if (/^\d{1,3}$/.test(code)) use(code);
+    else if (/^\d{1,3}\+?$/.test(code)) use(parseInt(code, 10));
+    /* A rating string this gate does not know fails closed (hidden for everyone). */
+    var rcode = String(a.rating || "").toUpperCase().replace(/\s+/g, "").replace(/[\u2010-\u2015\/]/g, "-");
+    if (rcode && !/^(G|PG|G-PG|GPG|PG-?13|R|MA|NC-17|NR|\d{1,3}\+?)$/.test(rcode)) use(999);
     var blob = [a.rating, a.audience, a.label, a.name].join(" ");
     if (/(^|\W)21\s?\+(?!\w)/i.test(blob)) use(21);
     else if (/(^|\W)18\s?\+(?!\w)/i.test(blob)) use(18);

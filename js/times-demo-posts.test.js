@@ -54,6 +54,7 @@ var ctx = vm.createContext({
 });
 vm.runInContext(src("js/age-floor-keywords.js"), ctx);
 vm.runInContext(src("js/accounts.js"), ctx);
+vm.runInContext(src("js/auto-rate.js"), ctx); /* production loads auto-rate.js before tower.js; remote posts are rating-gated */
 vm.runInContext(towerSrc, ctx);
 var Tower = win.CognationTowerStore;
 var TOWER_KEY = "cognation.tower.posts.v3";

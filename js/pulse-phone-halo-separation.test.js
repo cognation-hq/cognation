@@ -102,7 +102,8 @@ for (const vw of [360, 375, 390, 430]) {
         const p = o.point(a);
         assert.ok(Math.abs(p.x) + p.size / 2 <= panelW / 2 - 8 + 1e-6, `angle ${a}`);
       }
-      if (panelW === vw) assert.ok(o.sizeK >= 0.87 && o.sizeK <= 1, `sizeK ${o.sizeK} (frame shrink capped near 12%)`);
+      if (panelW === 430) assert.strictEqual(o.sizeK, 1, "430 keeps full-size frames");
+      else if (panelW === vw) assert.ok(o.sizeK >= 0.87 && o.sizeK <= 0.88, `sizeK ${o.sizeK} (frame shrink capped near 12%)`);
       else assert.ok(o.sizeK > 0.7 && o.sizeK <= 1, `sizeK ${o.sizeK}`);
       assert.ok(o.point(90).size > o.point(-90).size);
     });
@@ -111,6 +112,21 @@ for (const vw of [360, 375, 390, 430]) {
 
 test("phones still bob where there is room: 375, 390 and 430 keep a ripple", () => {
   for (const w of [375, 390, 430]) assert.ok(api.phoneOrbit(w, G).bob > 0, `${w}`);
+});
+
+test("430: full-size frames (sizeK 1, 44px back / 56px front) with the largest ripple bob that holds 4px", () => {
+  const o = api.phoneOrbit(430, G);
+  assert.strictEqual(o.sizeK, 1);
+  assert.ok(o.bob > 2 && o.bob < 18, `bob ${o.bob}`);
+  assert.strictEqual(Math.round(o.point(90).size), 56);
+  assert.strictEqual(Math.round(o.point(-90).size), 44);
+});
+
+test("390, 375 and 360 keep their shrink: sizeK 0.88, 0.88, about 0.874", () => {
+  assert.strictEqual(api.phoneOrbit(390, G).sizeK, 0.88);
+  assert.strictEqual(api.phoneOrbit(375, G).sizeK, 0.88);
+  const k360 = api.phoneOrbit(360, G).sizeK;
+  assert.ok(k360 > 0.873 && k360 < 0.875, `sizeK ${k360}`);
 });
 
 test("reduced motion (no bob): 430 keeps 44px back / 56px front", () => {

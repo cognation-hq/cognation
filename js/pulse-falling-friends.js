@@ -382,9 +382,10 @@
      sin(t/360 + bobPhase*i)); when g.spots (the ring's spot angles, in order) is
      given, phoneOrbit returns the largest bob amplitude (<= g.bob) at which every
      adjacent pair keeps (size_a + size_b) / 2 + PHONE_FRAME_GAP between centres at
-     every rotation step and every bob phase. Frames may shrink by up to
-     PHONE_MIN_SIZE_K (12%) first, since smaller frames leave more room to bob; the
-     largest sizeK that still allows the full bob is kept. 430 today: no change. */
+     every rotation step and every bob phase. Full-size frames (sizeK 1) are kept
+     whenever any bob >= 0 holds the gap at full size (430 today). Otherwise frames
+     shrink by up to PHONE_MIN_SIZE_K (12%), since smaller frames leave more room to
+     bob; past that the bob is 0 and frames shrink just enough to hold the gap. */
   var PHONE_FRAME_GAP = 4;
   var PHONE_GAP_CUSHION = 0.5; /* rotation is sampled: a hair extra between samples */
   var PHONE_MIN_SIZE_K = 0.88;
@@ -461,8 +462,13 @@
       return lo;
     }
     var out;
-    if (room(1) >= maxBob) {
+    var atOne = room(1);
+    if (atOne >= maxBob) {
       out = { k: 1, bob: maxBob };
+    } else if (atOne >= 0) {
+      /* PM: if frames hold the gap at full size with some bob (430 today), keep
+         them full size and use the largest bob that holds; never shrink to bob more */
+      out = { k: 1, bob: Math.floor(atOne * 10) / 10 };
     } else {
       var atMin = room(PHONE_MIN_SIZE_K);
       if (atMin >= maxBob) {

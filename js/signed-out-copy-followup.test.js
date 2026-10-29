@@ -180,22 +180,23 @@ test("2. Marketplace card: body equal to the title (trimmed, any case) is not re
   assert.strictEqual(bodies(fact).length, 1, "other card types are unchanged");
 });
 
-test("3. signed out: one muted glass line 'Sign in to join rooms.' where the rooms would be", async function () {
+test("3. signed out: one line with a 'Sign in to join rooms.' link where the rooms would be", async function () {
   var w = world(false);
   await settle(10);
   w.swipe.rebuild();
   assert.strictEqual(w.roomsLine.hidden, false, "signed out: the rooms line shows");
   assert.strictEqual(w.swipe.visibleSiteRooms().length, 0, "signed out: no rooms open (no gate change)");
   var html = read("index.html");
-  var lines = html.match(/<p class="commune-signed-out-rooms" data-commune-signed-out-rooms hidden>Sign in to join rooms\.<\/p>/g) || [];
+  var lines = html.match(/<p class="commune-signed-out-rooms" data-commune-signed-out-rooms hidden><a class="commune-rooms-signin" href="\/" data-rooms-signin>Sign in to join rooms\.<\/a><\/p>/g) || [];
   assert.strictEqual(lines.length, 1, "exactly one line in index.html");
   assert.ok(html.indexOf("data-commune-signed-out-rooms") < html.indexOf('<div class="commune-swipe-stage">') &&
     html.indexOf('<div class="commune-swipe-stage">') - html.indexOf("data-commune-signed-out-rooms") < 200, "the line sits right above the deck");
   var css = read("css/styles.css");
   var rule = /\.commune-signed-out-rooms \{([^}]*)\}/.exec(css);
   assert.ok(rule, "rooms line has a rule");
-  assert.ok(/color: var\(--cgn-text-muted\);/.test(rule[1]) && /background: var\(--cgn-glass\);/.test(rule[1]) && /border: 1px solid var\(--cgn-line\);/.test(rule[1]), "existing muted/glass tokens");
-  assert.ok(!/#[0-9a-f]{3,8}\b|rgba?\(/i.test(rule[1]), "no new colors in the rule");
+  assert.ok(!/background|border:/.test(rule[1]), "no glass pill: no background or border");
+  assert.ok(/#panel-commune \.commune-signed-out-rooms \.commune-rooms-signin,[^{]*\{\s*color: #ED9300 !important;\s*text-decoration: underline;/.test(css), "link is #ED9300, underlined");
+  assert.ok(/\.commune-signed-out-rooms \.commune-rooms-signin:focus-visible \{\s*outline: 2px solid #ED9300;/.test(css), "visible focus ring");
   assert.deepStrictEqual(w.net.writes, [], "signed out: no network writes");
 });
 

@@ -9171,20 +9171,27 @@ body.tower-messages-page [data-tower-follow-row],
   border-radius: 4px;
   box-shadow: none;
 }
-/* Signed-out ECHO: one muted glass line where the rooms would be (existing
-   --cgn-glass / --cgn-line / --cgn-text-muted tokens, the same muted text as the
-   panel's other lines; no new colors). */
+/* Signed-out ECHO: one plain line where the rooms would be, holding a
+   "Sign in to join rooms." link styled like "Sign in to bid." (no pill). */
 .commune-signed-out-rooms {
   margin: 0 0 1rem;
-  padding: 0.6rem 1rem;
   text-align: center;
   font-size: 0.85rem;
-  color: var(--cgn-text-muted);
-  background: var(--cgn-glass);
-  border: 1px solid var(--cgn-line);
-  border-radius: 1.15rem;
-  backdrop-filter: blur(16px) saturate(122%);
-  -webkit-backdrop-filter: blur(16px) saturate(122%);
+}
+#panel-commune .commune-signed-out-rooms .commune-rooms-signin,
+#panel-commune .commune-signed-out-rooms .commune-rooms-signin:hover,
+.commune-signed-out-rooms .commune-rooms-signin,
+.commune-signed-out-rooms .commune-rooms-signin:hover {
+  color: #ED9300 !important;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+#panel-commune .commune-signed-out-rooms .commune-rooms-signin:focus-visible,
+.commune-signed-out-rooms .commune-rooms-signin:focus-visible {
+  outline: 2px solid #ED9300;
+  outline-offset: 2px;
+  border-radius: 4px;
+  box-shadow: none;
 }
 .commune-signed-out-rooms[hidden] { display: none; }
 .commune-market-photos { display: flex; gap: .4rem; overflow: hidden; }

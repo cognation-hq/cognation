@@ -251,7 +251,12 @@ assert.strictEqual(tr.getWidgetLayout({ widgetLayout: { avatar: { x: 0, y: 0 }, 
 
 /* Wiring in the real handler / store (static, so a refactor that drops it fails). */
 var down = grab("      /* Drag from anywhere on the sticker", "    stage.addEventListener(\"pointerdown\", onPointerDown);");
-assert.ok(/dragStarted = true;\s*\n(?:\s*\/\*[\s\S]*?\*\/)?\s*if \(wid !== "quote" && liftDefaultGrid\(stage\)\)/.test(down), "drag start lifts the default grid (built-in widgets; a Quote floats and never lifts it, #223)");
+/* layout-drag-keeps-grid: a drag on the default grid stays in the grid and
+   only nudges the dragged widget; the old lift (every widget re-sized to its
+   free-sticker size) runs only for drags that are not grid drags. */
+assert.ok(/dragStarted = true;\s*\n\s*if \(wid !== "quote" && stage\.classList\.contains\("is-default-grid"\) && !isPhoneStage\(stage\)\) \{[\s\S]*?gridDrag = \{/.test(down), "drag on the default grid nudges in place (built-in widgets; a Quote floats, #223)");
+assert.ok(/if \(gridDrag\) \{[\s\S]*?setGridNudgeStyle\(g\.el, gdx, gdy\);\s*return;/.test(down), "grid drag moves only the dragged widget");
+assert.ok(/if \(!freeStarted\) \{[\s\S]*?if \(wid !== "quote" && liftDefaultGrid\(stage\)\)/.test(down), "free drags still lift (a Quote floats and never lifts it, #223)");
 assert.ok(/if \(!dragStarted\) \{[^}]*return;/.test(down), "no save when the pointer never dragged");
 assert.ok(/freezeSpawnedWidgets\(root, layout\)/.test(down) && /TowerProfileStore\.save\(p, \{ geometry: true \}\)/.test(down), "drop freezes others and saves geometry");
 assert.ok(/stage\.querySelectorAll\("\[data-tower-widget\]\.is-spawned"\)/.test(grab("  function freezeSpawnedWidgets", "  /* Old scrapbook")) && /liftDefaultGrid\(stage\);/.test(grab("  function freezeSpawnedWidgets", "  /* Old scrapbook")), "freeze pins from on-screen spots");

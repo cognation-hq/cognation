@@ -535,18 +535,19 @@
      and members can edit it). Unknown age fails closed. */
   var datingBirthAge = null;
   var birthMissing = false;
-  /* Shared devices: after an in-page sign-out the next account's birth age is
-     not known until seedops-dating-hydrate reads its user_birth row. Until then
-     the age is pending: dating and classrooms stay closed, and the sign-in deck
-     rebuild waits for the age. */
-  var awaitingBirthAge = false;
+  /* Until seedops-dating-hydrate's user_birth read answers for the signed-in
+     account (a fresh load or a sign-in, with or without an earlier sign-out on
+     this page), the age is pending: dating and classrooms stay closed, the
+     birth-month ask stays hidden, and the sign-in deck rebuild waits. */
   var rebuildWhenAgeKnown = false;
   function setDatingBirthAge(age) {
     var n = parseInt(age, 10);
     var prevBirthAge = datingBirthAge;
+    var wasPending = birthAgePending();
     datingBirthAge = !isNaN(n) && n > 0 ? n : null;
-    birthMissing = datingBirthAge == null;
-    awaitingBirthAge = false;
+    /* "No row" only counts for a signed-in account: a signed-out answer must
+       not mark the next sign-in as missing before its own read answers. */
+    birthMissing = datingBirthAge == null && liveSignedIn();
     var waited = rebuildWhenAgeKnown;
     rebuildWhenAgeKnown = false;
     /* The local profile age mirrors user_birth only: set when the birth age
@@ -554,7 +555,7 @@
        Writing it emits cognation:member-profile-updated, which re-renders the
        Tower feed, the Times and this deck (Peer Review, rooms, classrooms). */
     var mirrored = syncLocalAgeToBirth();
-    if (!mirrored && (waited || prevBirthAge !== datingBirthAge) && state.deck) {
+    if (!mirrored && (waited || wasPending || prevBirthAge !== datingBirthAge) && state.deck) {
       setTimeout(function () { rebuildDeck(); }, 0);
     }
     emit("cognation:viewer-age-changed", { age: datingBirthAge });
@@ -587,14 +588,14 @@
   }
   function getDatingBirthAge() { return signedOutViewer() ? null : datingBirthAge; }
   /* Signed in and this session's user_birth age is not known yet (not read, or
-     the read is still in flight). Not "missing": a read that found no row sets
-     birthMissing. Tower rates a pending viewer G/PG only. */
-  function viewerAgePending() {
+     the read is still in flight), including a fresh signed-in page load. Not
+     "missing": a read that found no row sets birthMissing. False signed out.
+     Tower rates a pending viewer G/PG only. */
+  function birthAgePending() {
     return liveSignedIn() && datingBirthAge == null && !birthMissing;
   }
-  /* Signed in, and this session's birth age has not been read yet. */
-  function birthAgePending() {
-    return awaitingBirthAge && liveSignedIn();
+  function viewerAgePending() {
+    return birthAgePending();
   }
   /* Signed-in account with no user_birth row yet (real accounts made before the
      birth month step; seeds were backfilled). Server treats null age as not
@@ -615,8 +616,7 @@
      account on the device never reads them. */
   function resetViewerAgeForSessionEnd() {
     setDatingBirthAge(null);
-    birthMissing = false;
-    awaitingBirthAge = true;
+    birthMissing = false; /* the next account is pending until its own read */
     setSeeDating(false);
   }
   document.addEventListener("cognation:session-ended", resetViewerAgeForSessionEnd);
@@ -1061,6 +1061,8 @@
   }
 
   function visibleClassroomSessions() {
+    /* Age not read yet: no classroom cards (or titles) for anyone. */
+    if (birthAgePending()) return [];
     /* No birth month yet: keep the card so Join can offer Add birth month. */
     if (!classroomAllowed() && !liveBirthMissing()) return [];
     return classroomCatalog();
@@ -3987,6 +3989,10 @@
 
   function openClassroom(sessionId, scroll) {
     sessionId = String(sessionId || "");
+    if (birthAgePending()) {
+      setStatus("Checking your birth month. Try again in a moment.");
+      return false;
+    }
     if (liveBirthMissing()) {
       setBirthNeededStatus("Add your birth year and month in your profile to join classrooms.");
       return false;
@@ -4062,7 +4068,7 @@
         (liveBirthMissing()
           ? '<p class="commune-swipe-empty commune-swipe-empty--rooms" data-commune-birth-needed>Chat rooms (13+) and classrooms (18+) need your birth year and month. Only the month and year are saved.</p>' +
             '<p class="commune-swipe-empty"><button type="button" class="btn btn-primary" data-commune-add-birth>Add birth month</button></p>'
-          : roomsOpen
+          : roomsOpen || birthAgePending()
             ? ''
             : '<p class="commune-swipe-empty commune-swipe-empty--rooms">No chat rooms match your age and interests yet. Update age or interests in your profile, then come back.</p>') +
         "</div>";

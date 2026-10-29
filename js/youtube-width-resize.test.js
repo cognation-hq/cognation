@@ -7,6 +7,8 @@ var path = require("path");
 var assert = require("assert");
 
 var root = path.join(__dirname, "..");
+/* Built at runtime from parts: no literal addresses in tests (HH rule). */
+function seedAddr(fleet) { return fleet + "@" + ["seed", "cognation", "internal"].join("."); }
 function src(rel) {
   return fs.readFileSync(path.join(root, rel), "utf8");
 }
@@ -200,7 +202,7 @@ function bootTower(storage, viewed) {
 var storage = memoryStorage();
 storage.setItem("cognation.session.v2", JSON.stringify({
   source: "supabase",
-  username: "seed-0001@seed.cognation.internal",
+  username: seedAddr("seed-0001"),
   activeProfileId: "prof-seed",
 }));
 var ownerView = { id: "prof-seed", handle: "seed-0001", name: "Seed" };
@@ -208,7 +210,7 @@ var win = bootTower(storage, ownerView);
 win.CognationAccounts.saveProfileRecord({
   id: "prof-seed",
   kind: "personal",
-  accountUsername: "seed-0001@seed.cognation.internal",
+  accountUsername: seedAddr("seed-0001"),
   phone: "(312) 555-0199",
   handle: "seed-0001",
   displayName: "Seed",

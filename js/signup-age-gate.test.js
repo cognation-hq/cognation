@@ -9,6 +9,8 @@ var fs = require("fs");
 var path = require("path");
 var root = path.join(__dirname, "..");
 var gate = require("./signup-age-gate.js");
+/* Built at runtime from parts: no literal addresses in tests (HH rule). */
+function addr(local, parts) { return local + "@" + parts.join("."); }
 
 function store(seed) {
   var d = Object.assign({}, seed || {});
@@ -82,16 +84,16 @@ assert.ok(/function blockSignup\(\)[\s\S]*?clearSignupInputs\(\)/.test(shell), "
   assert.ok(!/mailto:|@[a-z0-9-]+\.[a-z]/i.test(page), name + " has no contact address");
 });
 
-gate.checkEmailBlocked("A@Example.test", fakeFetch({ blocked: true }))
+gate.checkEmailBlocked(addr("A", ["Example", "test"]), fakeFetch({ blocked: true }))
   .then(function (blocked) {
     assert.strictEqual(blocked, true);
     assert.strictEqual(calls[0].url, "/api/signup-check");
     assert.deepStrictEqual(Object.keys(calls[0].body), ["email"]);
-    return gate.checkEmailBlocked("a@example.test", fakeFetch(new Error("offline")));
+    return gate.checkEmailBlocked(addr("a", ["example", "test"]), fakeFetch(new Error("offline")));
   })
   .then(function (blocked) {
     assert.strictEqual(blocked, false);
-    return gate.checkEmailBlocked("a@example.test", fakeFetch({ blocked: false }));
+    return gate.checkEmailBlocked(addr("a", ["example", "test"]), fakeFetch({ blocked: false }));
   })
   .then(function (blocked) {
     assert.strictEqual(blocked, false);

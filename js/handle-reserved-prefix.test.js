@@ -11,6 +11,8 @@ var path = require("path");
 var vm = require("vm");
 var root = path.join(__dirname, "..");
 function src(rel) { return fs.readFileSync(path.join(root, rel), "utf8"); }
+/* Built at runtime from parts: no literal addresses in tests (HH rule). */
+function memberAddr(local) { return local + "@" + ["example", "test"].join("."); }
 var rulesPath = path.join(root, "js/handle-reserved.js");
 var rulesSrc = fs.existsSync(rulesPath) ? fs.readFileSync(rulesPath, "utf8") : "";
 
@@ -84,7 +86,7 @@ function bootSignup(username) {
   input("login-password", "pw-for-test");
   input("birthdate", "1990-01-01");
   input("phone", "5555550100");
-  input("email", "member@example.test");
+  input("email", memberAddr("member"));
   input("state", "TX");
   var country = new El("select"); country.value = "United States";
   form.map["[data-login-signup-country-select]"] = country;

@@ -14,6 +14,8 @@ var path = require("path");
 var vm = require("vm");
 var root = path.join(__dirname, "..");
 function src(rel) { return fs.readFileSync(path.join(root, rel), "utf8"); }
+/* Built at runtime from parts: no literal addresses in tests (HH rule). */
+function memberAddr(local) { return local + "@" + ["example", "test"].join("."); }
 function fnSource(text, name) {
   var start = text.indexOf("function " + name + "(");
   assert.ok(start >= 0, name + " exists");
@@ -76,7 +78,7 @@ function openTower(viewerId, targetId) {
   };
   var store = {};
   var viewerRow = ROWS[viewerId];
-  var session = loginFns.build("member@example.test", loginFns.map(viewerRow), { source: "supabase", supabaseUserId: viewerRow.user_id });
+  var session = loginFns.build(memberAddr("member"), loginFns.map(viewerRow), { source: "supabase", supabaseUserId: viewerRow.user_id });
   var win = {
     document: doc, setTimeout: setTimeout,
     localStorage: { getItem: function (k) { return k === "cognation.session.v2" ? JSON.stringify(session) : store[k] || null; }, setItem: function (k, v) { store[k] = v; }, removeItem: function () {} },

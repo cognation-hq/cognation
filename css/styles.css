@@ -9153,6 +9153,40 @@ body.tower-messages-page [data-tower-follow-row],
   object-fit: cover;
 }
 
+/* Signed-out Marketplace card: "Sign in to bid." is a link (#ED9300, existing
+   --color-accent) with a visible keyboard focus ring. Scoped under #panel-commune
+   to beat the panel's `a { color: var(--cgn-accent) !important }`. */
+#panel-commune .commune-card .commune-market-signin,
+#panel-commune .commune-card .commune-market-signin:hover,
+.commune-card .commune-market-signin,
+.commune-card .commune-market-signin:hover {
+  color: #ED9300 !important;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+#panel-commune .commune-card .commune-market-signin:focus-visible,
+.commune-card .commune-market-signin:focus-visible {
+  outline: 2px solid #ED9300;
+  outline-offset: 2px;
+  border-radius: 4px;
+  box-shadow: none;
+}
+/* Signed-out ECHO: one muted glass line where the rooms would be (existing
+   --cgn-glass / --cgn-line / --cgn-text-muted tokens, the same muted text as the
+   panel's other lines; no new colors). */
+.commune-signed-out-rooms {
+  margin: 0 0 1rem;
+  padding: 0.6rem 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--cgn-text-muted);
+  background: var(--cgn-glass);
+  border: 1px solid var(--cgn-line);
+  border-radius: 1.15rem;
+  backdrop-filter: blur(16px) saturate(122%);
+  -webkit-backdrop-filter: blur(16px) saturate(122%);
+}
+.commune-signed-out-rooms[hidden] { display: none; }
 .commune-market-photos { display: flex; gap: .4rem; overflow: hidden; }
 .commune-market-photo {
   width: 7.5rem; height: 7.5rem; object-fit: cover; border-radius: 12px;

@@ -552,7 +552,8 @@ function testClassroomAgeGateToast() {
     src.indexOf("Classroom is for members 18+") !== -1,
     "openClassroom must toast age-gate copy"
   );
-  assert.ok(src.indexOf("syncAgeFromAuthMetadata") !== -1, "must try auth member_age sync");
+  assert.ok(src.indexOf("syncAgeFromAuthMetadata") === -1, "no auth member_age sync (members can edit it)");
+  assert.ok(src.indexOf("Update your age in your profile") === -1, "no stale profile-age hint");
 
   var social = fs.readFileSync(path.join(root, "js/supabase-social.js"), "utf8");
   assert.ok(social.indexOf("friend_user_id.eq.") !== -1, "refreshFriends both directions");

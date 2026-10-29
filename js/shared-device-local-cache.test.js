@@ -175,10 +175,12 @@ function testOtherUsersLeftoversNoWrite() {
     assert.strictEqual(r.puts.length, 0, "Luna's leftovers are never written to Alex's account (got " + r.puts.length + ")");
     var blob = JSON.parse(r.ls.getItem(MEMBER));
     assert.strictEqual(blob.ownerUserId, "u-alex", "local copy now belongs to Alex");
-    assert.strictEqual(blob.age, 34, "Alex's server age, not Luna's 15");
+    /* Neither Luna's 15 nor Alex's self-set metadata member_age 34: the local
+       age only mirrors user_birth (none loaded in this harness), so it stays unset. */
+    assert.strictEqual(blob.age, null, "no age from Luna's leftovers or from auth metadata member_age");
     assert.strictEqual(blob.city, "Springfield");
     assert.strictEqual(r.swipe.getSeeDating(), false, "Luna's See dating flag reset to the default");
-    assert.strictEqual(r.win.CognationAgeFloor.viewerAge(), 34);
+    assert.strictEqual(r.win.CognationAgeFloor.viewerAge(), 0, "unknown (fail closed) until user_birth loads");
   });
 }
 

@@ -18,7 +18,6 @@
   var DEMO_CITY = "Demo City";
   var DEMO_STATE = "Demo";
   var DEMO_COUNTRY = "United States";
-  var DEMO_AGE = 22; /* within seed ages 13–26 */
   var MATERIALIZE_COUNT = 48; /* enough for dating spacing in a paced deck */
   var BOOT_FLAG = "cognation.seedops.communeAlive.v1";
 
@@ -204,12 +203,8 @@
     Object.keys(prev).forEach(function (k) {
       next[k] = prev[k];
     });
-    var age = parseInt(next.age, 10);
-    /* Sage (u13 test viewer) keeps her own age; no adult default (also while
-       her data is still loading at sign-in). */
-    var u13 = window.CognationU13TestViewer;
-    var sage = !!(u13 && (u13.mayBeU13TestViewer ? u13.mayBeU13TestViewer() : u13.isU13TestViewer()));
-    if (!(age > 0) && !sage) next.age = DEMO_AGE;
+    /* No age default: the profile age only mirrors user_birth (setDatingBirthAge),
+       so an unknown age stays unset and the 18+ gates fail closed. */
     if (!next.city && !next.locality) next.city = DEMO_CITY;
     if (!next.state) next.state = DEMO_STATE;
     if (!next.country) next.country = DEMO_COUNTRY;
@@ -346,7 +341,10 @@
     var rooms = roomPreview();
     var result = {
       ok: !!(mat && mat.ok),
-      memberAge: member && member.age,
+      memberAge:
+        window.CognationCommuneSwipe && typeof window.CognationCommuneSwipe.getMemberAge === "function"
+          ? window.CognationCommuneSwipe.getMemberAge()
+          : null,
       memberCity: member && (member.city || member.locality),
       materialized: mat && mat.count,
       datingProfiles: mat && mat.dating,
@@ -417,7 +415,6 @@
 
   window.CognationSeedOpsCommuneAlive = {
     DEMO_CITY: DEMO_CITY,
-    DEMO_AGE: DEMO_AGE,
     MATERIALIZE_COUNT: MATERIALIZE_COUNT,
     isSeedOrOpsSession: isSeedOrOpsSession,
     ensureMemberProfile: ensureMemberProfile,

@@ -487,7 +487,8 @@
   /* Access age. Signed-in (live) sessions: ONLY the user_birth age counts.
      Missing/unreadable birth = 13 for access (no dating, no 18+/MA) but never
      under-13: a lower stored age (e.g. Sage 11) still wins. The stale
-     member_age (28) in auth metadata / local cache can no longer lift it. */
+     member_age (28) in auth metadata can no longer lift it: nothing reads
+     member_age, and the local profile age only mirrors user_birth. */
   var ACCESS_AGE_UNKNOWN = 13;
   function liveSignedIn() {
     try {
@@ -522,8 +523,8 @@
     return !!(f && typeof f.enabled === "function" && f.enabled());
   }
   /* Dating age = user_birth (year + month) only, set by seedops-dating-hydrate.
-     NOT getMemberAge(): that reads auth member_age / local cache, which held a
-     stale 28 for every seed. Unknown age fails closed. */
+     Auth metadata member_age is never read (it held a stale 28 for every seed,
+     and members can edit it). Unknown age fails closed. */
   var datingBirthAge = null;
   var birthMissing = false;
   /* Shared devices: after an in-page sign-out the next account's birth age is
@@ -534,15 +535,55 @@
   var rebuildWhenAgeKnown = false;
   function setDatingBirthAge(age) {
     var n = parseInt(age, 10);
+    var prevBirthAge = datingBirthAge;
     datingBirthAge = !isNaN(n) && n > 0 ? n : null;
     birthMissing = datingBirthAge == null;
     awaitingBirthAge = false;
-    if (rebuildWhenAgeKnown) {
-      rebuildWhenAgeKnown = false;
-      if (state.deck) setTimeout(function () { rebuildDeck(); }, 0);
+    var waited = rebuildWhenAgeKnown;
+    rebuildWhenAgeKnown = false;
+    /* The local profile age mirrors user_birth only: set when the birth age
+       loads, removed when it is missing or reset. No other writer sets it.
+       Writing it emits cognation:member-profile-updated, which re-renders the
+       Tower feed, the Times and this deck (Peer Review, rooms, classrooms). */
+    var mirrored = syncLocalAgeToBirth();
+    if (!mirrored && (waited || prevBirthAge !== datingBirthAge) && state.deck) {
+      setTimeout(function () { rebuildDeck(); }, 0);
     }
+    emit("cognation:viewer-age-changed", { age: datingBirthAge });
+  }
+  function syncLocalAgeToBirth() {
+    var prof = readJson(localStorage, MEMBER_PROFILE_KEY, null);
+    var floorS = ageFloorApi();
+    var owned = !!prof && typeof prof === "object" &&
+      !(floorS && typeof floorS.memberProfileOwned === "function" && !floorS.memberProfileOwned(prof));
+    if (datingBirthAge == null) {
+      /* Nothing to clear (signed out, removed, or another user's blob). */
+      if (!owned || prof.age == null) return false;
+      var cleared = {};
+      Object.keys(prof).forEach(function (k) { if (k !== "age") cleared[k] = prof[k]; });
+      writeJson(localStorage, MEMBER_PROFILE_KEY, cleared);
+      emit("cognation:member-profile-updated", cleared);
+      return true;
+    }
+    if (owned && parseInt(prof.age, 10) === datingBirthAge) return false;
+    setMemberProfile({ age: datingBirthAge });
+    return true;
+  }
+  /* Age for 18+ checks that used to read the raw local profile (Tower rating,
+     COMMUNE live, Peer Review): getMemberAge() when signed in; unknown,
+     pending or signed out = 13. */
+  function getAccessAge() {
+    if (!liveSignedIn()) return ACCESS_AGE_UNKNOWN;
+    var a = getMemberAge();
+    return typeof a === "number" && a > 0 ? a : ACCESS_AGE_UNKNOWN;
   }
   function getDatingBirthAge() { return datingBirthAge; }
+  /* Signed in and this session's user_birth age is not known yet (not read, or
+     the read is still in flight). Not "missing": a read that found no row sets
+     birthMissing. Tower rates a pending viewer G/PG only. */
+  function viewerAgePending() {
+    return liveSignedIn() && datingBirthAge == null && !birthMissing;
+  }
   /* Signed in, and this session's birth age has not been read yet. */
   function birthAgePending() {
     return awaitingBirthAge && liveSignedIn();
@@ -2191,7 +2232,7 @@
         deck.unshift(add);
       }
       var peer = window.CognationPeerReview, interests = viewerInterestPhrases();
-      var peerExtra = peer && peer.cards ? omitPassed((peer.cards({ field: interests[0] || "", interests: interests, age: getMemberProfile().age }) || []).filter(function (c) {
+      var peerExtra = peer && peer.cards ? omitPassed((peer.cards({ field: interests[0] || "", interests: interests, age: getAccessAge() }) || []).filter(function (c) {
         return !peer.forInterest || peer.forInterest(c, interests);
       })) : [];
       if (peerExtra.length) deck = peerExtra.concat(deck);
@@ -3932,36 +3973,14 @@
     state.classroomId = session.id;
   }
 
-  function syncAgeFromAuthMetadata() {
-    try {
-      var sb = window.CognationSupabase;
-      if (!sb || typeof sb.getSession !== "function") return false;
-      var sess = sb.getSession();
-      var meta =
-        (sess && sess.user && (sess.user.user_metadata || sess.user.userMetadata)) ||
-        (sess && (sess.user_metadata || sess.userMetadata)) ||
-        null;
-      if (!meta) return false;
-      var age = parseInt(meta.member_age != null ? meta.member_age : meta.memberAge, 10);
-      if (isNaN(age) || age <= 0) return false;
-      setMemberProfile({ age: age });
-      return true;
-    } catch (eSync) {
-      return false;
-    }
-  }
-
   function openClassroom(sessionId, scroll) {
     sessionId = String(sessionId || "");
-    if (!classroomAllowed()) {
-      syncAgeFromAuthMetadata();
-    }
     if (liveBirthMissing()) {
       setBirthNeededStatus("Add your birth year and month in your profile to join classrooms.");
       return false;
     }
     if (!classroomAllowed()) {
-      setStatus("Classroom is for members 18+. Update your age in your profile to join.");
+      setStatus("Classroom is for members 18+. Your age comes from your birth month.");
       return false;
     }
     var cast = window.CognationLive && window.CognationLive.professionalBroadcast && window.CognationLive.professionalBroadcast();
@@ -4792,12 +4811,14 @@
     datingCandidateAgeOk: datingCandidateAgeOk,
     datingAgeOk: datingAgeOk,
     setDatingBirthAge: setDatingBirthAge,
+    getAccessAge: getAccessAge,
     roomSwipeIsNext: roomSwipeIsNext,
     openPersonTower: openPersonTower,
     buildProfessionalLanes: buildProfessionalLanes,
     roomTimeLabel: roomTimeLabel,
     getDatingBirthAge: getDatingBirthAge,
     birthAgePending: birthAgePending,
+    viewerAgePending: viewerAgePending,
     liveBirthMissing: liveBirthMissing,
     datingAllowed: datingAllowed,
     getSeeDating: getSeeDating,

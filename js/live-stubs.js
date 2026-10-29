@@ -40,12 +40,17 @@
     } catch (e) {}
     return "you";
   }
+  /* Viewer age for the COMMUNE 18+ gates: CognationAgeFloor.viewerAge() (the
+     user_birth age; never the raw local profile or auth metadata). Unknown,
+     pending or signed out = 13, so the gates fail closed. */
   function memberAge() {
+    var a = 0;
     try {
-      var p = readJson("cognation.member.profile.v1", null);
-      if (p && p.age != null) return parseInt(p.age, 10) || 0;
+      var floor = window.CognationAgeFloor;
+      var signedIn = !!(floor && typeof floor.sessionUserId === "function" && floor.sessionUserId());
+      if (signedIn && typeof floor.viewerAge === "function") a = parseInt(floor.viewerAge(), 10) || 0;
     } catch (e) {}
-    return 21;
+    return a > 0 ? a : 13;
   }
   function profileKind() {
     try {

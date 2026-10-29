@@ -3,8 +3,10 @@
 var assert = require("assert"), fs = require("fs"), path = require("path"), vm = require("vm");
 var root = path.join(__dirname, "..");
 function mem() { var d = {}; return { getItem: function (k) { return k in d ? d[k] : null; }, setItem: function (k, v) { d[k] = String(v); }, removeItem: function (k) { delete d[k]; } }; }
-function load(local, session) {
-  var win = {}, ctx = vm.createContext({
+function load(local, session, signedIn) {
+  /* 18+ Peer Review needs a signed-in viewer whose user_birth age is known
+     (a signed-out or pending viewer fails closed), so boot() signs in. */
+  var win = signedIn ? { CognationSupabase: { getSession: function () { return { access_token: "session", user: { id: "u-ada" } }; } } } : {}, ctx = vm.createContext({
     window: win, localStorage: local, sessionStorage: session, console: console,
     setTimeout: setTimeout, isFinite: isFinite, parseInt: parseInt, Date: Date, Math: Math, JSON: JSON, Object: Object, Array: Array, String: String, Number: Number,
     CustomEvent: function (n, i) { this.type = n; this.detail = i && i.detail; },
@@ -17,9 +19,11 @@ function load(local, session) {
 function boot(field, interests, age) {
   var local = mem(), session = mem();
   local.setItem("cognation.session.v2", JSON.stringify({ username: "ada", activeProfileId: "ada" }));
-  local.setItem("cognation.member.profile.v1", JSON.stringify({ age: age, field: field, interests: interests }));
+  local.setItem("cognation.member.profile.v1", JSON.stringify({ field: field, interests: interests }));
   session.setItem("cognation.commune.mode", "professional");
-  return { api: load(local, session).CognationCommuneSwipe, local: local };
+  var api = load(local, session, true).CognationCommuneSwipe;
+  api.setDatingBirthAge(age); /* the user_birth age, as hydrate sets it */
+  return { api: api, local: local };
 }
 var src = fs.readFileSync(path.join(root, "js/peer-review-room.js"), "utf8");
 assert.ok(!/getUserMedia|RTCPeerConnection|software engineering/i.test(src) && /no presenter/.test(src) && /no calendar/.test(src) && /data-peer-report/.test(src));

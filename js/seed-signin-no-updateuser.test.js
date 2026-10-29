@@ -128,7 +128,7 @@ function noMemberAge(puts) {
 var p = page();
 p.signIn().then(function () {
   var swipe = p.win.CognationCommuneSwipe;
-  assert.strictEqual(swipe.getMemberAge(), 22, "seed still gets local age 22 (defaults applied)");
+  assert.strictEqual(swipe.getMemberAge(), null, "no local age-22 default (age comes only from user_birth)");
   assert.strictEqual(swipe.getSeeDating(), true, "seed default See dating on");
   assert.strictEqual(p.puts.length, 0, "seed sign-in + defaults: 0 PUT /auth/v1/user (got " + JSON.stringify(p.puts) + ")");
 

@@ -382,7 +382,9 @@
     panel.setAttribute("role", "complementary");
     panel.setAttribute("aria-label", "SeedOps ops trigger");
     panel.style.cssText =
-      "position:fixed;z-index:9998;right:12px;bottom:12px;max-width:320px;padding:12px 14px;" +
+      /* max-width: at 390 (and other widths under 464px) the panel narrows so its left
+         edge clears the Times Report button column (x 49..121 at 390); 320px elsewhere. */
+      "position:fixed;z-index:9998;right:12px;bottom:12px;max-width:min(320px, calc(100vw - 144px));padding:12px 14px;" +
       "background:#111827;color:#f9fafb;border:1px solid #374151;border-radius:10px;" +
       "font:13px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.35);";
     panel.innerHTML =
@@ -440,7 +442,10 @@
         syncRunEnabled();
         return;
       }
+      var runSession = statusSession;
       runAfterAuth(pathway, target || undefined).then(function (result) {
+        /* The session ended or switched while this ran: leave the status empty. */
+        if (runSession !== statusSession) return;
         try {
           status.textContent = JSON.stringify(result, null, 2);
         } catch (e) {
@@ -509,12 +514,39 @@
     });
   }
 
+  /* Ops panel status box: cleared on sign-out and on a switch to a different
+     user, so one session's pathway results never show in the next. Bumped on
+     each clear so a run that finishes later does not write into it. */
+  var statusSession = 0;
+  var statusUserKey = "";
+  function sessionUserKey() {
+    try {
+      var s = window.CognationAuth && typeof window.CognationAuth.getSession === "function" ? window.CognationAuth.getSession() : null;
+      return s ? String(s.supabaseUserId || s.activeProfileId || s.username || "") : "";
+    } catch (e) {
+      return "";
+    }
+  }
+  function clearStatus() {
+    statusSession += 1;
+    var panel = document.querySelector("[" + PANEL_ATTR + "]");
+    var status = panel && panel.querySelector("[data-seedops-ops-status]");
+    if (status) status.textContent = "";
+  }
+  function clearStatusIfOtherUser() {
+    var key = sessionUserKey();
+    if (key !== statusUserKey) clearStatus();
+    statusUserKey = key;
+  }
+
   function boot() {
+    statusUserKey = sessionUserKey();
     syncPanel();
     syncAfterAuth();
     window.addEventListener("hashchange", syncPanel);
     window.addEventListener("popstate", syncPanel);
     document.addEventListener("cognation:auth-changed", function () {
+      clearStatusIfOtherUser();
       resetAuthUser();
       syncPanel();
       syncAfterAuth();
@@ -522,6 +554,12 @@
     /* login.js fires these on in-page sign-in / sign-out (auth-changed never fires). */
     ["cognation:session-started", "cognation:session-ended"].forEach(function (name) {
       document.addEventListener(name, function () {
+        if (name === "cognation:session-ended") {
+          clearStatus();
+          statusUserKey = "";
+        } else {
+          clearStatusIfOtherUser();
+        }
         resetAuthUser();
         syncPanel();
         syncAfterAuth();

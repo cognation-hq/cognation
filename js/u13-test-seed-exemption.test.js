@@ -49,7 +49,7 @@ assert.strictEqual(helper.LIST_FILTER, "or=(seed_fleet_id.is.null,seed_fleet_id.
 });
 assert.ok(/author:profiles![^(]+\([^)]*seed_fleet_id/.test(read("js/supabase-social.js")), "feed embeds the author's fleet id");
 assert.ok(read("js/people-search.js").indexOf("isSageRow") !== -1, "people search drops Sage");
-assert.ok(read("js/seedops-pathways.js").indexOf("isU13TestViewer") !== -1, "pathways skips the under-18 raise for Sage");
+assert.ok(!/next\.age = 22/.test(read("js/seedops-pathways.js")), "pathways has no under-18 age raise for anyone (Sage included)");
 var html = read("index.html");
 var at = function (s) { return html.indexOf('<script src="' + s + '"'); };
 assert.ok(at("js/seedops-u13-test-viewer.js") > at("js/supabase-client.js"), "helper loads after the Supabase client");
@@ -144,7 +144,8 @@ function testSageNoAdultDefaultsNoPut() {
   rerenders(w, 10);
   return settle(700).then(function () {
     assert.strictEqual(w.calls.puts.length, 0, "Sage: no PUT /auth/v1/user (got " + w.calls.puts.length + ")");
-    assert.strictEqual(w.win.CognationCommuneSwipe.getMemberAge(), 11, "Sage keeps age 11, not the age-22 default");
+    /* No age-22 default and no metadata member_age (11 here): only user_birth sets the age. */
+    assert.strictEqual(w.win.CognationCommuneSwipe.getMemberAge(), null, "Sage: no default and no metadata age");
     assert.strictEqual(w.win.CognationU13TestViewer.isU13TestViewer(), true);
     var bios = w.calls.queries.filter(function (q) { return /account_kind=eq\.seed/.test(q); });
     assert.ok(bios.length > 0, "seed bios list was fetched");
@@ -155,13 +156,13 @@ function testSageNoAdultDefaultsNoPut() {
 }
 
 function testSeedWithoutTestRoleStillGetsDefaults() {
-  /* Same fleet id, but no test_role: not the test viewer -> normal seed defaults, kept local (no PUT). */
+  /* Same fleet id, but no test_role: not the test viewer -> normal seed defaults (no age), kept local (no PUT). */
   var w = sageWorld({ user: { id: "u-sage", app_metadata: {}, user_metadata: {} } });
   w.load("js/seedops-dating-hydrate.js");
   setTimeout(function () { w.doc.dispatchEvent(new CustomEvent("cognation:session-started")); }, 5);
   rerenders(w, 6);
   return settle(700).then(function () {
-    assert.strictEqual(w.win.CognationCommuneSwipe.getMemberAge(), 22, "non-test seed still gets age 22");
+    assert.strictEqual(w.win.CognationCommuneSwipe.getMemberAge(), null, "non-test seed: no age-22 default either (age comes only from user_birth)");
     assert.strictEqual(w.calls.puts.length, 0, "seed defaults are never written to the account");
   });
 }
@@ -180,7 +181,7 @@ function testCommuneAliveSkipsDefault() {
     assert.strictEqual(other.win.CognationCommuneSwipe.getMemberAge(), null, "commune-alive: no default before the login data loads");
     return other.win.CognationU13TestViewer.ready().then(function () {
       other.win.CognationSeedOpsCommuneAlive.ensureMemberProfile();
-      assert.strictEqual(other.win.CognationCommuneSwipe.getMemberAge(), 22, "commune-alive: default unchanged for others once loaded");
+      assert.strictEqual(other.win.CognationCommuneSwipe.getMemberAge(), null, "commune-alive: no age default for anyone once loaded");
     });
   });
 }

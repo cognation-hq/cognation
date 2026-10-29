@@ -1,11 +1,11 @@
 /**
  * Sage (seed-0248) is SeedOps' under-13 test viewer. For her, the seed
- * "adult" defaults (age 22, the under-18 raise, saving prefs) are skipped so
- * she sees the app as an 11-year-old, and she is left out of member lists and
- * the Tower feed.
+ * "adult" defaults (saving prefs) are skipped, and she is left out of member
+ * lists and the Tower feed. Her age, like every viewer's, comes only from
+ * user_birth (no seed age default exists any more).
  *
- * Restrict-only: being the test viewer only takes things away (the age-22
- * default, saving prefs, list visibility). It never grants access to anything.
+ * Restrict-only: being the test viewer only takes things away (saving
+ * prefs, list visibility). It never grants access to anything.
  *
  * isU13TestViewer() needs ALL THREE, and is false on any missing data:
  *   1. account_kind === 'seed' on her profiles row (or in auth app_metadata),

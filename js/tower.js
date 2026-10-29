@@ -2652,13 +2652,22 @@
     return ar.rate(post.body || post.title || "", post.attachments || []).rating;
   }
   function ratingViewer() {
-    var age = null;
+    /* CognationAgeFloor.viewerAge(): the user_birth age, never the raw local
+       profile or auth metadata. A pending age (signed in, user_birth not read
+       yet), a signed-in account with no user_birth row, a signed-out demo and
+       an unknown age (helper missing) see G/PG only:
+       age 0 fails PG-13, R and MA in AutoRate.canSee. MA opt-in lives
+       server-side only. */
+    var age = 0;
     try {
-      var p = JSON.parse(localStorage.getItem("cognation.member.profile.v1") || "{}");
-      if (typeof p.age === "number" && isFinite(p.age)) age = p.age;
+      var swipe = window.CognationCommuneSwipe;
+      var pending = !!(swipe && typeof swipe.viewerAgePending === "function" && swipe.viewerAgePending());
+      var noBirth = !!(swipe && typeof swipe.getDatingBirthAge === "function" && !(swipe.getDatingBirthAge() > 0));
+      var floor = window.CognationAgeFloor;
+      var signedIn = !!(floor && typeof floor.sessionUserId === "function" && floor.sessionUserId());
+      if (!pending && !noBirth && signedIn && typeof floor.viewerAge === "function") age = parseInt(floor.viewerAge(), 10) || 0;
     } catch (e) {}
-    /* Unknown age: treat as 13 (when in doubt, younger). MA opt-in lives server-side only. */
-    return { age: age == null ? 13 : age, matureOptIn: false };
+    return { age: age > 0 ? age : 0, matureOptIn: false };
   }
   function ratingVisible(post) {
     var ar = window.CognationAutoRate;
@@ -2968,10 +2977,13 @@
   /* Minimum age for one photo. No rating (and a name that rates G/PG) stays open
      to whoever can already see the post. 21+ / MA never shows under 21. */
   function feedViewerAge() {
+    /* Same rule as ratingViewer(): pending, no birth row or unknown = 0 (G/PG photos only). */
+    var swipe = window.CognationCommuneSwipe;
+    if (swipe && typeof swipe.viewerAgePending === "function" && swipe.viewerAgePending()) return 0;
+    if (swipe && typeof swipe.getDatingBirthAge === "function" && !(swipe.getDatingBirthAge() > 0)) return 0;
     var floor = window.CognationAgeFloor;
     var n = floor && typeof floor.viewerAge === "function" ? floor.viewerAge() : 0;
-    if (typeof n === "number" && n > 0) return n;
-    return ratingViewer().age;
+    return typeof n === "number" && n > 0 ? n : 0;
   }
   function photoMinAge(a) {
     if (!a) return null;
@@ -13292,6 +13304,10 @@
     });
     /* Age edits can open or close a photo (13, 18, 21) without crossing under-13. */
     document.addEventListener("cognation:member-profile-updated", function () {
+      renderFeed(root);
+    });
+    /* The user_birth age loaded or reset (setDatingBirthAge): re-check R posts. */
+    document.addEventListener("cognation:viewer-age-changed", function () {
       renderFeed(root);
     });
     document.addEventListener("cognation:remote-profile-loaded", function () {

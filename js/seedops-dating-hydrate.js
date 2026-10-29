@@ -16,7 +16,7 @@
   "use strict";
 
   var LOG_CHANNEL = "dating-hydrate";
-  var BOOT_FLAG = "cognation.seedops.datingHydrate.v2"; /* v2: drops cached ages read from member_age (the stale 28) */
+  var BOOT_FLAG = "cognation.seedops.datingHydrate.v2"; /* v2: drops cached ages read from member_age (the stale 28). The cache is never a source of age: only user_birth sets it. */
 
   /* Deterministic seed age from fleet id (matches 20261016_seed_birth_backfill.sql).
      Ages 13..26; seed-0248 is the under-13 test viewer (age 11) until removed. */
@@ -44,7 +44,6 @@
   var DEMO_CITY = "Demo City";
   var DEMO_STATE = "Demo";
   var DEMO_COUNTRY = "United States";
-  var DEMO_AGE = 22; /* within seed ages 13–26 */
   var FETCH_LIMIT = 100; /* covers the ~79 enriched bios; hard cap below */
   var HARD_CAP = 250;
   var INTEREST_DEFAULT = ["tech", "mental health", "jobs", "insurance", "gamers"];
@@ -209,7 +208,6 @@
 
   function prefsFromMetadata(meta) {
     meta = meta || {};
-    var age = parseInt(meta.member_age != null ? meta.member_age : meta.memberAge, 10);
     var city = meta.member_city || meta.memberCity || "";
     var state = meta.member_state || meta.memberState || "";
     var country = meta.member_country || meta.memberCountry || "";
@@ -220,7 +218,6 @@
     if (seeRaw === true || seeRaw === "1" || seeRaw === 1 || seeRaw === "true") seeDating = true;
     if (seeRaw === false || seeRaw === "0" || seeRaw === 0 || seeRaw === "false") seeDating = false;
     return {
-      age: !isNaN(age) && age > 0 ? age : null,
       city: city ? String(city) : "",
       state: state ? String(state) : "",
       country: country ? String(country) : "",
@@ -228,7 +225,6 @@
       seeDating: seeDating,
       fromServer: !!(
         (seeDating != null) ||
-        (age > 0) ||
         city ||
         state ||
         country ||
@@ -238,8 +234,8 @@
   }
 
   /* Same shape and key order as prefsPayloadFromLocal(), from auth user_metadata.
-     No member_age: age comes only from user_birth and is never written to auth
-     metadata (an old member_age there is still read by prefsFromMetadata). */
+     No member_age: age comes only from user_birth. It is never written to auth
+     metadata, and an old (member-editable) member_age there is never read. */
   function prefsPayloadFromMetadata(meta) {
     meta = meta || {};
     var p = prefsFromMetadata(meta);
@@ -305,8 +301,10 @@
     Object.keys(prev).forEach(function (k) {
       next[k] = prev[k];
     });
-    if (prefs.age != null) next.age = prefs.age;
-    else if (!(parseInt(next.age, 10) > 0) && opts.seedDefaults) next.age = DEMO_AGE;
+    /* Age: only the user_birth age (setDatingBirthAge). Never prefs, metadata
+       or a demo default; unknown stays unset so the gates fail closed. */
+    var birthAge = swipe && typeof swipe.getDatingBirthAge === "function" ? swipe.getDatingBirthAge() : null;
+    next.age = birthAge != null && birthAge > 0 ? birthAge : null;
     if (prefs.city) {
       next.city = prefs.city;
       next.locality = prefs.city;
@@ -522,7 +520,7 @@
   var lastUserId = null;
   /* Age from the owner-only user_birth row (year + month) the backfill stored.
      This is the ONLY dating age source; auth metadata member_age / the local
-     profile cache / DEMO_AGE never gate dating (seed metadata carried a stale
+     profile cache / a demo default never gate dating (seed metadata carried a stale
      member_age 28). Unknown -> null -> dating refused. */
   function ageFromBirth(year, month, now) {
     var y = parseInt(year, 10);
@@ -711,11 +709,12 @@
         } catch (eStale) {}
         prior = null;
       } else {
-        /* Re-apply age + seeDating so Classroom/dating gates match last hydrate. */
-        var cachedPrefs = { age: prior.memberAge };
+        /* Re-apply the user_birth age + seeDating so Classroom/dating gates match
+           last hydrate. No cached member age is re-applied. */
+        var cachedPrefs = {};
         setDatingBirthAge(prior.birthAge != null ? prior.birthAge : null);
         if (prior.seeDating != null) cachedPrefs.seeDating = !!prior.seeDating;
-        if (prior.memberAge != null || prior.seeDating != null) {
+        if (prior.seeDating != null) {
           applyViewerPrefs(cachedPrefs, { seedDefaults: false });
           refillDeck();
         } else if (isSeedOrOpsSession() && !mayBeTestViewer()) {
@@ -787,10 +786,6 @@
               ? !!window.CognationCommuneSwipe.getSeeDating()
               : null,
           birthAge: birthAge,
-          memberAge:
-            window.CognationCommuneSwipe && window.CognationCommuneSwipe.getMemberAge
-              ? window.CognationCommuneSwipe.getMemberAge()
-              : null,
           at: new Date().toISOString(),
           error: result && result.bios && result.bios.error,
         };
@@ -899,7 +894,6 @@
 
   window.CognationSeedOpsDatingHydrate = {
     DEMO_CITY: DEMO_CITY,
-    DEMO_AGE: DEMO_AGE,
     HARD_CAP: HARD_CAP,
     FETCH_LIMIT: FETCH_LIMIT,
     hydrate: hydrate,

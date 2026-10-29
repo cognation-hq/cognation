@@ -5,7 +5,8 @@
  * state and profile row load, and "not loaded" was treated as "not Sage".
  * Here the login state is ready only after a delay and the profile row loads
  * even later. Expect: Sage 0 PUTs and her age never reads 22; a normal seed
- * still gets age 22 locally and nothing is written at sign-in.
+ * gets no age default either (age comes only from user_birth) and nothing is
+ * written at sign-in.
  * Run: node js/u13-sign-in-race.test.js
  */
 "use strict";
@@ -139,7 +140,8 @@ function testSageRowLate() {
   return signIn({ username: "seed-0248", user: clone(SAGE_USER), row: SAGE_ROW, rowDelay: 2500 }).then(function (r) {
     assert.strictEqual(r.puts.length, 0, "Sage: 0 PUT /auth/v1/user (got " + JSON.stringify(r.puts) + ")");
     assert.ok(r.ages.indexOf(22) === -1, "Sage's age never reads 22: " + JSON.stringify(r.ages.filter(function (a) { return a != null; }).slice(0, 12)));
-    assert.strictEqual(r.win.CognationCommuneSwipe.getMemberAge(), 11, "Sage ends at 11");
+    /* Metadata member_age 11 is never read; with no user_birth here the age stays unknown. */
+    assert.strictEqual(r.win.CognationCommuneSwipe.getMemberAge(), null, "Sage: no metadata age, no default");
     assert.strictEqual(r.win.CognationU13TestViewer.isU13TestViewer(), true, "profile row did load in the end");
   });
 }
@@ -156,7 +158,7 @@ function testNormalSeedOneWrite() {
   var user = { id: "u-0003", app_metadata: {}, user_metadata: {} };
   var row = { id: "p-seed-0003", user_id: "u-0003", account_kind: "seed", seed_fleet_id: "seed-0003" };
   return signIn({ username: "seed-0003", user: user, row: row, rowDelay: 2500 }).then(function (r) {
-    assert.strictEqual(r.win.CognationCommuneSwipe.getMemberAge(), 22, "normal seed still gets age 22");
+    assert.strictEqual(r.win.CognationCommuneSwipe.getMemberAge(), null, "normal seed: no age-22 default");
     assert.strictEqual(r.puts.length, 0, "normal seed: no write at sign-in (got " + JSON.stringify(r.puts) + ")");
   });
 }

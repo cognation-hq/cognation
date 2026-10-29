@@ -182,16 +182,8 @@
           if (!sessionId) sessionId = "class-insurance";
           var opened = false;
           if (swipe && typeof swipe.openClassroom === "function") {
-            /* Sage (u13 test viewer) is never raised to 18+, even before her data loads. */
-            var u13 = window.CognationU13TestViewer;
-            var sage = !!(u13 && (u13.mayBeU13TestViewer ? u13.mayBeU13TestViewer() : u13.isU13TestViewer()));
-            if (!sage && swipe.setMemberProfile && (!swipe.getMemberAge || swipe.getMemberAge() == null || swipe.getMemberAge() < 18)) {
-              var prev = (swipe.getMemberProfile && swipe.getMemberProfile()) || {};
-              var next = {};
-              Object.keys(prev).forEach(function (k) { next[k] = prev[k]; });
-              if (!(parseInt(next.age, 10) >= 18)) next.age = 22; /* within seed ages 13–26 */
-              swipe.setMemberProfile(next);
-            }
+            /* No age raise: the classroom opens only for a user_birth age of 18+
+               (under-18 or unknown seeds stop at the classroom gate). */
             opened = !!swipe.openClassroom(sessionId, false);
           }
           detail.sessionId = sessionId;

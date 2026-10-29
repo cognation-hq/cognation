@@ -470,12 +470,12 @@ aliveWin.CognationAuth.getSession = function () {
 })();
 var alive = aliveWin.CognationSeedOpsCommuneAlive;
 assert.ok(alive, "CognationSeedOpsCommuneAlive exports");
-assert.strictEqual(alive.DEMO_AGE, 22);
+assert.strictEqual(alive.DEMO_AGE, undefined, "no DEMO_AGE: the age comes only from user_birth");
 assert.strictEqual(alive.DEMO_CITY, "Demo City");
 assert.ok(alive.isSeedOrOpsSession());
 var boot = alive.bootstrap({ force: true, count: 12 });
 assert.ok(boot.ok, "bootstrap ok: " + JSON.stringify(boot));
-assert.strictEqual(boot.memberAge, 22);
+assert.ok(!(boot.memberAge >= 18), "no demo adult age before user_birth loads (got " + boot.memberAge + ")");
 assert.strictEqual(boot.memberCity, "Demo City");
 assert.ok(boot.materialized >= 12, "materialized dating sample");
 assert.ok(boot.datingProfiles >= 12, "dating profiles flagged");
@@ -685,7 +685,7 @@ hydrateWin.CognationCommuneSwipe = {
     member_city: "Demo City",
   });
   assert.strictEqual(fromMeta.seeDating, true);
-  assert.strictEqual(fromMeta.age, 29);
+  assert.strictEqual(fromMeta.age, undefined, "member_age (member-editable) is never read");
   var merged = api.mergeServerBios([
     {
       id: "srv-6",
@@ -744,7 +744,7 @@ hydrateWin.CognationCommuneSwipe = {
   }).then(function (out) {
     assert.ok(out && out.ok, "hydrate ok " + JSON.stringify(out));
     assert.strictEqual(hydrateSee, true, "seeDating hydrated");
-    assert.strictEqual(hydrateMember.age, 29, "age from metadata");
+    assert.notStrictEqual(hydrateMember.age, 29, "no age from metadata member_age");
     /* Server metadata already matches the hydrated prefs, so nothing is written. */
     assert.strictEqual(hydrateWin.__lastUpdateUser, undefined, "unchanged prefs send no PUT /auth/v1/user");
     console.log("seedops.test.js dating-hydrate: ok");

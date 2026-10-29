@@ -282,9 +282,9 @@
       state = stateText ? stateText.value.trim() : "";
     }
     return {
-      /* Whole-year age (existing Commune age gates read it). Only year + month go
-         to the server (owner-only); the full birthdate is never kept or sent. */
-      age: birthEl && g ? g.ageFromBirthdate(birthEl.value) : null,
+      /* Only year + month go to the server (owner-only user_birth); the full
+         birthdate is never kept or sent. No local age is written here: the
+         profile age mirrors user_birth once it loads (setDatingBirthAge). */
       birthYearMonth: birthEl && g && g.yearMonth ? g.yearMonth(birthEl.value) : null,
       country: country,
       state: state,

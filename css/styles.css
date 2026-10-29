@@ -13288,6 +13288,16 @@ a.site-switch-side:focus-visible {
   position: relative;
   z-index: 3 !important;
 }
+/* Owner resized a widget on the grid (layout-resize-reset): only that widget
+   scales from its top-left corner; its slot and every other widget stay put. */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-grid-w] {
+  position: relative;
+  z-index: 3 !important;
+  transform-origin: 0 0;
+}
+.tower-layout--scrapbook.is-sticker-stage.is-phone-stack [data-grid-w] {
+  scale: none !important;
+}
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > .tower-sticker.is-spawned.is-spawn-half {
   grid-column: auto;
 }

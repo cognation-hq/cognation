@@ -56,8 +56,9 @@ vm.runInContext([
   "function writeTopFriendLocal() {}",
   "function applyWidgetLayout() {} function applyPublicWidgets() {} function syncPublicWidgetsForm() {}",
   "function renderFriendPins() {} function renderBadgePins() {} function syncOwnerStickerHandles() {}",
+  "function renderFriendsPicker() {} function spawnUnplacedWidgets() {}",
   "function syncUndoButton() {} function setProfileStatusSafe(m) { statusMsg = m; }",
-  "var root = {};",
+  "var root = { querySelector: function () { return null; } };",
   "var runReset = " + resetFn + ";",
   "runReset();",
 ].join("\n"), ctx);

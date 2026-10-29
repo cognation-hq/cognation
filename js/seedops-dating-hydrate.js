@@ -59,6 +59,10 @@
   var retryTimer = null;
   var retryJson = "";
   var hydrating = false;
+  /* Session generation: bumped on in-page sign-out. A hydrate or prefs write
+     started under an earlier session drops its result instead of applying it
+     to the account signed in now. */
+  var sessionGen = 0;
   var ensureInFlight = null;
 
   function emitLog(payload) {
@@ -534,10 +538,12 @@
     if (!sb || typeof sb.getUser !== "function") {
       return Promise.resolve(null);
     }
+    var gen = sessionGen;
     return sb
       .getUser()
       .then(function (user) {
         if (!user) return null;
+        if (gen !== sessionGen) return null; /* earlier session: keep nothing */
         if (u13()) u13().noteUser(user);
         lastMeta = user.user_metadata || user.userMetadata || null;
         lastUserId = user.id || null;
@@ -573,6 +579,7 @@
     if (!session || !session.access_token) {
       return Promise.resolve({ ok: false, skipped: true, error: "not_signed_in" });
     }
+    var gen = sessionGen;
     /* One write at a time, and only when local prefs differ from what the
        server already has. Each page load fires several hydrates and
        member-profile-updated events; unchanged prefs must not PUT /auth/v1/user. */
@@ -610,6 +617,8 @@
         if (tries >= PERSIST_MAX_ATTEMPTS) return { ok: false, skipped: true, error: "persist_gave_up" };
         /* A retry for this value is already queued: don't queue or send another. */
         if (retryTimer && retryJson === json) return { ok: false, skipped: true, error: "retry_pending" };
+        /* Signed out since this write was asked for: never send it as the next account. */
+        if (gen !== sessionGen) return { ok: false, skipped: true, error: "session_changed" };
         persistAttempts[json] = tries + 1;
         return sb.updateUser(payload).then(function () {
           Object.keys(payload).forEach(function (k) { serverPrefs[k] = payload[k]; });
@@ -699,14 +708,19 @@
     hydrating = true;
     var seedish = isSeedOrOpsSession();
     var birthAge = null;
+    var gen = sessionGen;
+    var STALE = { stale: true };
     return fetchUserMetadata()
       .then(function (meta) {
+        if (gen !== sessionGen) return STALE;
         return fetchBirthAge().then(function (a) {
           birthAge = a;
           return meta;
         });
       })
       .then(function (meta) {
+        /* Started under an earlier session: never set this account's age or prefs. */
+        if (meta === STALE || gen !== sessionGen) return STALE;
         rememberServerPrefs(meta);
         /* Warm the test-viewer check (profile row) for the other readers; no wait. */
         if (u13() && typeof u13().ready === "function") u13().ready();
@@ -734,6 +748,11 @@
           });
       })
       .then(function (result) {
+        if (result === STALE || gen !== sessionGen) {
+          if (gen === sessionGen) hydrating = false;
+          emitLog({ action: "hydrate", ok: false, error: "session_changed" });
+          return { ok: false, stale: true, error: "session_changed" };
+        }
         refillDeck();
         var out = {
           ok: !!(result && (result.ok || (result.bios && result.bios.merged > 0))),
@@ -800,6 +819,26 @@
         } catch (eEager) {}
       }
       run(true);
+    });
+    /* In-page sign-out (shared devices): forget this account's cached data so
+       the next account starts clean, and drop anything still in flight. The
+       age and See dating reset lives in commune-swipe.js on the same event. */
+    document.addEventListener("cognation:session-ended", function () {
+      sessionGen += 1;
+      lastMeta = undefined;
+      lastUserId = null;
+      serverPrefsJson = null;
+      persistChain = null;
+      persistAttempts = {};
+      hydrating = false;
+      if (persistTimer) clearTimeout(persistTimer);
+      persistTimer = null;
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = null;
+      retryJson = "";
+      try {
+        sessionStorage.removeItem(BOOT_FLAG);
+      } catch (e4) {}
     });
     document.addEventListener("cognation:auth-changed", function () {
       lastMeta = undefined;

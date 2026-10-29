@@ -526,16 +526,32 @@
      stale 28 for every seed. Unknown age fails closed. */
   var datingBirthAge = null;
   var birthMissing = false;
+  /* Shared devices: after an in-page sign-out the next account's birth age is
+     not known until seedops-dating-hydrate reads its user_birth row. Until then
+     the age is pending: dating and classrooms stay closed, and the sign-in deck
+     rebuild waits for the age. */
+  var awaitingBirthAge = false;
+  var rebuildWhenAgeKnown = false;
   function setDatingBirthAge(age) {
     var n = parseInt(age, 10);
     datingBirthAge = !isNaN(n) && n > 0 ? n : null;
     birthMissing = datingBirthAge == null;
+    awaitingBirthAge = false;
+    if (rebuildWhenAgeKnown) {
+      rebuildWhenAgeKnown = false;
+      if (state.deck) setTimeout(function () { rebuildDeck(); }, 0);
+    }
   }
   function getDatingBirthAge() { return datingBirthAge; }
+  /* Signed in, and this session's birth age has not been read yet. */
+  function birthAgePending() {
+    return awaitingBirthAge && liveSignedIn();
+  }
   /* Signed-in account with no user_birth row yet (real accounts made before the
      birth month step; seeds were backfilled). Server treats null age as not
      13+, so rooms can't be joined and 18+ classrooms stay hidden until it's set. */
   function liveBirthMissing() {
+    if (birthAgePending()) return false; /* not read yet, not missing */
     return liveSignedIn() && datingBirthAge == null;
   }
   function datingAgeOk(age) {
@@ -543,8 +559,18 @@
   }
   function datingAllowed() {
     if (!datingSwitchOn()) return false;
+    if (birthAgePending()) return false;
     return !!(getSeeDating() && datingAgeOk(datingBirthAge));
   }
+  /* In-page sign-out: forget this account's birth age and See dating so the next
+     account on the device never reads them. */
+  function resetViewerAgeForSessionEnd() {
+    setDatingBirthAge(null);
+    birthMissing = false;
+    awaitingBirthAge = true;
+    setSeeDating(false);
+  }
+  document.addEventListener("cognation:session-ended", resetViewerAgeForSessionEnd);
 
   /* Algorithm Manager — Friends' shares (default on). */
   function getSeeFriendShares() {
@@ -924,6 +950,8 @@
   }
 
   function classroomAllowed() {
+    /* Age not read yet for this session: closed until it is. */
+    if (birthAgePending()) return false;
     /* Signed in: the saved birth month (user_birth) decides. */
     if (liveSignedIn() && datingBirthAge != null) return datingBirthAge >= 18;
     var age = getMemberAge();
@@ -4681,7 +4709,14 @@
     rebuildDeck();
     document.addEventListener("cognation:chatroom-rules", function () { if (state.deck) paintDeck(); });
     document.addEventListener("cognation:session-started", function () {
-      refreshSeedGates().then(function () { rebuildDeck(); });
+      refreshSeedGates().then(function () {
+        /* Age not read yet: rebuild once setDatingBirthAge() sets it. */
+        if (birthAgePending()) {
+          rebuildWhenAgeKnown = true;
+          return;
+        }
+        rebuildDeck();
+      });
     });
     document.addEventListener("cognation:member-profile-updated", function () {
       syncDatingVisibility();
@@ -4742,6 +4777,7 @@
     buildProfessionalLanes: buildProfessionalLanes,
     roomTimeLabel: roomTimeLabel,
     getDatingBirthAge: getDatingBirthAge,
+    birthAgePending: birthAgePending,
     liveBirthMissing: liveBirthMissing,
     datingAllowed: datingAllowed,
     getSeeDating: getSeeDating,

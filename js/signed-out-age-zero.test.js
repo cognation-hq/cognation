@@ -237,11 +237,12 @@ function settle(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   assert.strictEqual(out.auctionBid(), false, "stray birth age: no auction Bid button");
   assert.strictEqual(out.peerCardsAtMemberAge(), 0, "stray birth age: no Peer Review cards");
 
-  /* 3b) The signed-out Marketplace card keeps its note line and leaves no Bid button behind. */
+  /* 3b) LOOK: the signed-out Marketplace card says what opens bidding (not an age
+     line), and no Bid button is left behind. */
   var mug = Array.prototype.filter.call(out.swipe.marketplaceCards(), function (c) { return /-g$/.test(c.id); })[0];
   assert.ok(mug, "signed out: the G Marketplace card stays");
   var mugHtml = out.swipe.renderCard(mug).innerHTML;
-  assert.ok(/data-market-bid-note>Bidding is for ages 16 and up\.</.test(mugHtml), "signed out: bid note line shown");
+  assert.ok(/data-market-bid-note>Sign in to bid\.</.test(mugHtml), "signed out: bid note says Sign in to bid.");
   assert.ok(!/data-market-bid[\s>]/.test(mugHtml), "signed out: no Bid button on the card");
 
   /* 4) No network writes while signed out. */

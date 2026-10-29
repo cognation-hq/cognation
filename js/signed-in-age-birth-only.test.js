@@ -113,7 +113,7 @@ function world(opts) {
   var birthGate = opts.birth === "pending" ? new Promise(function (r) { birthRelease = r; }) : Promise.resolve();
   var birthRow = function () {
     if (opts.birth === "none") return [];
-    return [{ birth_year: new Date().getFullYear() - BIRTH_AGE, birth_month: 1 }];
+    return [{ birth_year: new Date().getFullYear() - (opts.birthAge || BIRTH_AGE), birth_month: 1 }];
   };
   var win = {
     document: doc, localStorage: ls, sessionStorage: ss,
@@ -191,6 +191,12 @@ function world(opts) {
       var rows = [classRow("g", "G"), classRow("p13", "PG-13"), classRow("r", "R")].map(api.normalizeRow);
       return api.publicAgenda(rows, {}).map(function (s) { return s.rating; }).join(",");
     },
+    bidNote: function () {
+      var mug = Array.prototype.filter.call(swipe.marketplaceCards(), function (c) { return /-g$/.test(c.id); })[0];
+      assert.ok(mug, "the G Marketplace card stays");
+      var m = /data-market-bid-note>([^<]*)</.exec(swipe.renderCard(mug).innerHTML);
+      return m ? m[1] : null;
+    },
     marketIds: function () {
       return Array.prototype.map.call(swipe.marketplaceCards(), function (c) { return String(c.id).replace(/^market-/, ""); }).sort().join(",");
     },
@@ -246,6 +252,8 @@ function closed(w, label) {
     assert.strictEqual(w.marketIds(), "g", label + ": no 18+/21+ Marketplace posts");
     assert.strictEqual(w.swipe.marketCanBid(), false, label + ": no Marketplace bids");
     assert.strictEqual(w.auctionBid(), false, label + ": no auction Bid button");
+    /* Signed in: the age line, not the signed-out "Sign in to bid." */
+    assert.strictEqual(w.bidNote(), "Bidding is for ages 16 and up.", label + ": signed in keeps the age line");
     assert.strictEqual(w.swipe.classroomAllowed(), false, label + ": COMMUNE classroom closed");
     assert.strictEqual(w.swipe.visibleClassroomSessions().length, 0, label + ": no COMMUNE classroom cards");
     assert.strictEqual(w.peerCards(), 0, label + ": no Peer Review cards");
@@ -327,6 +335,15 @@ function open(w, label) {
   assert.ok(seed.floor.sessionUserId(), "seed: signed in (not demo)");
   open(seed, "signed-in seed");
   assert.deepStrictEqual(seed.net.writes, [], "seed: no writes");
+
+  /* 7b) Signed in, user_birth age 14 (under 16): no bids, and the card keeps the age line. */
+  var teen = world({ page: "index", birth: "now", birthAge: 14 });
+  teen.emit("cognation:session-started", {});
+  await settle(60);
+  assert.strictEqual(teen.swipe.getMemberAge(), 14, "signed-in 14: member age from user_birth");
+  assert.strictEqual(teen.swipe.marketCanBid(), false, "signed-in 14: no Marketplace bids");
+  assert.strictEqual(teen.bidNote(), "Bidding is for ages 16 and up.", "signed-in 14: age line, not Sign in to bid.");
+  assert.deepStrictEqual(teen.net.writes, [], "signed-in 14: no writes");
 
   /* 8) Source: viewerAge never reads the local profile age. */
   var floorSrc = read("js/age-floor-keywords.js");

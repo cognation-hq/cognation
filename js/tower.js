@@ -203,6 +203,63 @@
     });
   }
 
+  /* Grid resize (layout-resize-reset): a resize grip used on the default grid
+     sets only that widget's size, { id: { w } } in widgetLayout._gridSize. Like
+     a nudge it is drawn with an independent CSS property (scale, from the top
+     left), so the widget's grid slot and every other widget stay put. The
+     layout stays the default grid; phones never apply it; Reset clears it. */
+  var GRID_SIZE_KEY = "_gridSize";
+  function cleanGridSize(src) {
+    var out = {};
+    if (!src || typeof src !== "object") return out;
+    Object.keys(src).slice(0, 60).forEach(function (id) {
+      var v = src[id];
+      if (!v || typeof v !== "object" || String(id).length > 64 || String(id).charAt(0) === "_") return;
+      var w = Math.round(Number(v.w));
+      if (!isFinite(w) || w <= 0) return;
+      out[id] = { w: Math.max(80, Math.min(4000, w)) };
+    });
+    return out;
+  }
+  function getGridSize(p) {
+    var l = p && p.widgetLayout;
+    return cleanGridSize(l && typeof l === "object" ? l[GRID_SIZE_KEY] : null);
+  }
+  function setGridSizeStyle(el, w) {
+    if (!el || !el.style) return;
+    var n = Math.round(Number(w));
+    /* offsetWidth is the grid slot's width: scale does not change it. */
+    var slot = el.offsetWidth || 0;
+    /* Never wider than the slot: growing past it overlaps the neighbours
+       (music 520 vs a ~448 column). A stored size over the slot is capped too. */
+    if (slot > 0 && n > slot) n = slot;
+    if (n > 0 && slot > 0 && n !== slot) {
+      el.style.setProperty("scale", String(Math.round((n / slot) * 10000) / 10000));
+      el.setAttribute("data-grid-w", String(n));
+    } else {
+      el.style.removeProperty("scale");
+      if (el.removeAttribute) el.removeAttribute("data-grid-w");
+    }
+  }
+  function readGridSizeStyle(el) {
+    var n = el && el.getAttribute ? parseInt(el.getAttribute("data-grid-w") || "", 10) : NaN;
+    return n > 0 ? n : 0;
+  }
+  function clearGridSize(stage) {
+    if (!stage || typeof stage.querySelectorAll !== "function") return;
+    stage.querySelectorAll("[data-grid-w]").forEach(function (el) { setGridSizeStyle(el, 0); });
+  }
+  function applyGridSize(stage, p) {
+    clearGridSize(stage);
+    if (!stage || !stage.classList.contains("is-default-grid") || isPhoneStage(stage)) return;
+    var sizes = getGridSize(p);
+    Object.keys(sizes).forEach(function (id) {
+      var el = stage.querySelector('[data-tower-widget="' + id + '"]');
+      if (!el || el.parentNode !== stage || el.hidden || (el.classList && el.classList.contains("is-widget-off"))) return;
+      setGridSizeStyle(el, sizes[id].w);
+    });
+  }
+
   /* One Pro check for spawn rows AND the music gate. The music gate read only
      _profileKind while the spawn rows also read kind, so a Pro page whose
      _profileKind came back "personal" got Pro rows (no music slot) plus a
@@ -519,6 +576,7 @@
     stage.classList.toggle("is-desktop-grid", useGrid && !phone);
     if (!useGrid) {
       clearGridNudge(stage);
+      clearGridSize(stage);
       unwrapProfileStrip(stage);
     }
 
@@ -558,6 +616,7 @@
       if (!tailOk) ordered.forEach(function (el) { stage.appendChild(el); });
       ensureProfileStrip(stage, p);
       applyGridNudge(stage, p);
+      applyGridSize(stage, p);
       /* Friend pins: in default grid they sit inside the Top Friends card flow via CSS;
          clear absolute spawn marks so they do not float over the grid. */
       stage.querySelectorAll("[data-tower-friend-pin].is-spawned").forEach(function (pin) {
@@ -982,8 +1041,14 @@
       });
       unwrapProfileStrip(stage);
     }
-    /* Spots above already include any grid nudge; the lifted stickers carry it. */
+    /* Spots above already include any grid nudge; the lifted stickers carry it.
+       A grid size becomes the sticker's own width once it is out of the grid. */
+    var liftSizes = [];
+    stage.querySelectorAll("[data-grid-w]").forEach(function (el) {
+      liftSizes.push({ el: el, w: readGridSizeStyle(el) });
+    });
     clearGridNudge(stage);
+    clearGridSize(stage);
     stage.classList.remove("is-default-grid", "is-desktop-grid");
     /* Out of the strip the members take their sticker size; lay them in one row
        from the strip's left edge and push everything below down by the extra height. */
@@ -1027,6 +1092,7 @@
       if (!el.getAttribute("data-sticker-z")) el.setAttribute("data-sticker-z", "2");
       spawnCache[el.getAttribute("data-tower-widget")] = { x: sp.x, y: sp.y, z: 2, tilt: 0 };
     });
+    liftSizes.forEach(function (ls) { if (ls.w > 0) setStickerWidth(ls.el, ls.w); });
     return true;
   }
 
@@ -1094,14 +1160,24 @@
       ev.preventDefault();
       ev.stopPropagation();
       var wid = sticker.getAttribute("data-tower-widget");
-      if (wid !== "quote") liftDefaultGrid(stage);
+      /* Default grid: size only this widget (a grid size, like a grid nudge).
+         The layout stays the grid and nothing else moves. */
+      var gridResize = wid !== "quote" && stage.classList.contains("is-default-grid") && sticker.parentNode === stage;
+      if (wid !== "quote" && !gridResize) liftDefaultGrid(stage);
       var startX = ev.clientX;
       var startW = sticker.offsetWidth || 0;
+      if (gridResize) {
+        var sr0 = sticker.getBoundingClientRect();
+        startW = Math.round((sr0 && sr0.width) || readGridSizeStyle(sticker) || startW);
+      }
       var curW = startW;
       sticker.classList.add("is-resizing");
       function onMove(e) {
         curW = clampResizeWidth(wid, startW + (e.clientX - startX));
-        setStickerWidth(sticker, curW);
+        /* Grid resize: cap at this widget's live slot width (no reflow). */
+        if (gridResize && sticker.offsetWidth > 0) curW = Math.min(curW, sticker.offsetWidth);
+        if (gridResize) setGridSizeStyle(sticker, curW);
+        else setStickerWidth(sticker, curW);
         if (e.cancelable) e.preventDefault();
       }
       function onUp() {
@@ -1120,6 +1196,27 @@
             return nq;
           });
           TowerProfileStore.save(p, { geometry: true });
+          return;
+        }
+        if (gridResize) {
+          /* Grid resize end: save only this widget's grid size. Nothing is
+             frozen, lifted or repaired, so the reload matches the screen. */
+          var gl = p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : {};
+          var gs = cleanGridSize(gl[GRID_SIZE_KEY]);
+          var slotW = sticker.offsetWidth || 0;
+          var prevW = gs[wid] ? gs[wid].w : 0;
+          if (curW > 0 && curW !== slotW) gs[wid] = { w: curW };
+          else delete gs[wid];
+          /* Nothing changed (e.g. a grow that hit the slot cap): no write. */
+          if ((gs[wid] ? gs[wid].w : 0) === prevW) {
+            setGridSizeStyle(sticker, prevW);
+            return;
+          }
+          if (Object.keys(gs).length) gl[GRID_SIZE_KEY] = gs;
+          else delete gl[GRID_SIZE_KEY];
+          p.widgetLayout = gl;
+          TowerProfileStore.save(p, { geometry: true });
+          setGridSizeStyle(sticker, gs[wid] ? gs[wid].w : 0);
           return;
         }
         var layout = getWidgetLayout(p) || {};
@@ -1183,7 +1280,10 @@
     /* Phone positions are a stacked view, never the website layout. */
     if (isPhoneStage(stage)) return layout;
     liftDefaultGrid(stage);
-    if (layout) delete layout[GRID_NUDGE_KEY];
+    if (layout) {
+      delete layout[GRID_NUDGE_KEY];
+      delete layout[GRID_SIZE_KEY];
+    }
     stage.querySelectorAll("[data-tower-widget].is-spawned").forEach(function (el) {
       var id = el.getAttribute("data-tower-widget");
       if (!id || el.hidden || el.classList.contains("is-widget-off")) return;
@@ -1929,7 +2029,7 @@
       Object.keys(saved.widgetLayout).forEach(function (id) {
         var pos = saved.widgetLayout[id];
         if (!pos || typeof pos !== "object") return;
-        if (id === GRID_NUDGE_KEY) return;
+        if (id === GRID_NUDGE_KEY || id === GRID_SIZE_KEY) return;
         var cur = base[id] && typeof base[id] === "object" ? base[id] : {};
         base[id] = {
           x: layoutCoord(pos.x, layoutCoord(cur.x, 0)),
@@ -1945,6 +2045,9 @@
       var savedNudge = cleanGridNudge(saved.widgetLayout[GRID_NUDGE_KEY]);
       if (Object.keys(savedNudge).length) base[GRID_NUDGE_KEY] = savedNudge;
       else delete base[GRID_NUDGE_KEY];
+      var savedSize = cleanGridSize(saved.widgetLayout[GRID_SIZE_KEY]);
+      if (Object.keys(savedSize).length) base[GRID_SIZE_KEY] = savedSize;
+      else delete base[GRID_SIZE_KEY];
       p.widgetLayout = base;
     }
     if (saved.musicYoutubeWidth != null && !isNaN(parseInt(saved.musicYoutubeWidth, 10))) {
@@ -11112,12 +11215,21 @@
         p.polaroidRemoved = false;
         p.removedFriendPinIds = [];
         p.featuredFriendIds = [];
+        p.friendPinLayout = {};
         writeTopFriendLocal(p._profileId, p.removedFriendPinIds, p.featuredFriendIds);
         TowerProfileStore.save(p, { geometry: true });
         applyWidgetLayout(root, p);
         applyPublicWidgets(root, p);
         syncPublicWidgetsForm(root, p);
-        renderFriendPins(root, p);
+        /* Render like a fresh open (layout-resize-reset): with no featured
+           friends the open path seats no friend pins (only the Top friends
+           picker does), so Reset drops them too. renderFriendPins here used to
+           fall back to the demo roster and stack three tiles above the avatar,
+           pushing the grid ~309px down until the next reload. */
+        var resetStage = root.querySelector("[data-tower-scrapbook]");
+        if (resetStage) resetStage.querySelectorAll("[data-tower-friend-pin]").forEach(function (el) { el.remove(); });
+        renderFriendsPicker(root, p);
+        spawnUnplacedWidgets(root, p);
         renderBadgePins(root, p);
         syncOwnerStickerHandles(root);
         root.__cognationWidgetUndo = [];

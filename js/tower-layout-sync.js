@@ -168,6 +168,13 @@
     /* Grid drags (layout-drag-keeps-grid): { id: { dx, dy } } px nudges on the default grid. */
     var nudge = cleanGridNudge(layout._gridNudge);
     if (Object.keys(nudge).length) out._gridNudge = nudge;
+    /* Grid resizes (layout-resize-reset): { id: { w } } px sizes on the default grid. */
+    var size = cleanGridSize(layout._gridSize);
+    if (Object.keys(size).length) out._gridSize = size;
+    /* The row's positions are the whole layout (every owner geometry save,
+       Reset included). A widget missing from such a row has no saved spot,
+       so an older local copy can't bring it back. */
+    if (layout._full) out._full = 1;
     if (layout._backup && typeof layout._backup === "object") {
       var bk = cleanBackup(layout._backup);
       if (bk) out._backup = bk;
@@ -191,6 +198,19 @@
     return out;
   }
 
+  function cleanGridSize(src) {
+    var out = {};
+    if (!src || typeof src !== "object") return out;
+    Object.keys(src).slice(0, 60).forEach(function (id) {
+      var v = src[id];
+      if (!v || typeof v !== "object" || String(id).length > 64 || String(id).charAt(0) === "_") return;
+      var w = Math.round(Number(v.w));
+      if (!isFinite(w) || w <= 0) return;
+      out[id] = { w: Math.max(80, Math.min(4000, w)) };
+    });
+    return out;
+  }
+
   /* One prior copy of widget positions, saved before an automatic overlap repair
      rewrites them: { at: ISO time, layout: {...positions} }. Last copy only. */
   function cleanBackup(b) {
@@ -199,6 +219,7 @@
     delete inner._public;
     delete inner._backup;
     delete inner._widgets;
+    delete inner._full;
     var positions = clean(inner);
     if (!Object.keys(positions).length) return null;
     var at = String(b.at || "");
@@ -277,7 +298,7 @@
       var base = p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : {};
       Object.keys(saved).forEach(function (wid) {
         if (wid === "_compacted") { base._compacted = 1; return; }
-        if (wid === "_gridNudge") return;
+        if (wid === "_gridNudge" || wid === "_gridSize" || wid === "_full") return;
         if (wid === "_public" || wid === "_backup") return;
         var next = saved[wid];
         var prev = base[wid];
@@ -294,6 +315,17 @@
       /* The row's grid nudges replace any local copy (none in the row = none). */
       if (saved._gridNudge) base._gridNudge = saved._gridNudge;
       else delete base._gridNudge;
+      if (saved._gridSize) base._gridSize = saved._gridSize;
+      else delete base._gridSize;
+      /* A full row (any owner geometry save, Reset included) is the whole
+         layout: drop positions only a local copy still has. After Reset that
+         is every position, so the page opens on the exact default grid. */
+      if (saved._full) {
+        Object.keys(base).forEach(function (wid) {
+          if (String(wid).charAt(0) === "_") return;
+          if (!Object.prototype.hasOwnProperty.call(saved, wid)) delete base[wid];
+        });
+      }
       p.widgetLayout = base;
     }
     if (saved && saved._widgets) applyWidgetsToProfile(p, saved._widgets);
@@ -336,6 +368,8 @@
     /* No built-in positions yet (only an added Quote, say) still uploads. */
     var layout = clean(p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : {});
     delete layout._widgets;
+    /* p's widgetLayout is the page's whole layout: mark the row as complete. */
+    layout._full = 1;
     var prevPub = publicCache[id] || (cache[id] && cache[id]._public) || null;
     if (prevPub) layout._public = cleanPublic(prevPub);
     if (p.musicUrl || (p.socialLinks && typeof p.socialLinks === "object")) {

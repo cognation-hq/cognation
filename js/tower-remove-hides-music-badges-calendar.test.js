@@ -210,8 +210,9 @@ vm.runInContext([
   "function isTowerOwner() { return true; } function writeTopFriendLocal() {}",
   "function applyWidgetLayout() {} function applyPublicWidgets() {} function syncPublicWidgetsForm() {}",
   "function renderFriendPins() {} function renderBadgePins() {} function syncOwnerStickerHandles() {}",
+  "function renderFriendsPicker() {} function spawnUnplacedWidgets() {}",
   "function syncUndoButton() {} function setProfileStatusSafe() {}",
-  "var root = {};",
+  "var root = { querySelector: function () { return null; } };",
   "(" + resetFn + ")();",
 ].join("\n"), rctx);
 THREE.forEach(function (id) { assert.strictEqual(rctx.saved.publicWidgets["shown." + id], false, id + " stays removed after Reset"); });

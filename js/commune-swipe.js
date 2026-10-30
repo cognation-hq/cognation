@@ -2636,11 +2636,19 @@
       }
       if (card.type === TYPE.CHAT) {
         html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room</button>';
+        /* Everything below Enter room scrolls inside the card, so the camera request never runs under Pass / Keep. */
+        html += '<div class="commune-card-scroll" data-commune-card-scroll>';
         var roomRules = window.CognationChatroomRules;
         html += roomRules && roomRules.extrasHtml
           ? roomRules.extrasHtml(card, escapeHtml)
           : '<p class="commune-card-meta">Live group chat — up to 100 people. Keep it kind.</p>';
         if (!liveChatEligible()) html += '<p class="commune-card-meta">Live group chat — sign in to join (up to 100 people).</p>';
+        html += "</div>";
+        /* Shown by syncMoreCue() only while the body can scroll further down. */
+        html += '<button type="button" class="commune-card-more" data-commune-card-more aria-label="Show more of this room" hidden>' +
+          '<svg class="commune-card-more-chevron" viewBox="0 0 12 8" width="10" height="7" aria-hidden="true" focusable="false">' +
+          '<path d="M1 1.5l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+          "<span>More</span></button>";
       }
       if (card.type === TYPE.CLASSROOM) {
         if (card.classroomEvent) {
@@ -4101,6 +4109,7 @@
     var el = renderCard(card);
     state.deck.appendChild(el);
     bindCard(el, card);
+    wireMoreCue(el);
     syncActionLabels();
   }
 
@@ -4456,29 +4465,86 @@
     paintDeck();
   }
 
+  /* A drag decides its axis once it has moved DRAG_LOCK_PX. Vertical (or a tie) belongs
+     to scrolling, e.g. the Chatroom card body; only a horizontal drag moves the card. */
+  var DRAG_LOCK_PX = 8;
+  var SWIPE_MIN_PX = 80;
+  function dragAxis(dx, dy) {
+    var ax = Math.abs(dx || 0), ay = Math.abs(dy || 0);
+    if (ax <= DRAG_LOCK_PX && ay <= DRAG_LOCK_PX) return null;
+    return ax > ay ? "x" : "y";
+  }
+  function swipeDecision(g) {
+    g = g || {};
+    if (g.cancelled || g.axis !== "x") return null;
+    var dx = Number(g.dx) || 0;
+    if (Math.abs(dx) < SWIPE_MIN_PX) return null;
+    return dx < 0 ? "left" : "right";
+  }
   function onPointerDown(ev) {
     var front = state.deck && state.deck.querySelector("[data-commune-card].is-active");
     if (!front) return;
     if (ev.target.closest && ev.target.closest("button, a, input, textarea, label, video, iframe")) return;
     var point = ev.touches ? ev.touches[0] : ev;
     state.lastDragDx = 0;
-    state.pointer = { x0: point.clientX, dx: 0, el: front };
+    state.pointer = { x0: point.clientX, y0: point.clientY, dx: 0, axis: null, el: front };
     front.classList.add("is-dragging");
   }
   function onPointerMove(ev) {
     if (!state.pointer) return;
     var point = ev.touches ? ev.touches[0] : ev;
     var dx = point.clientX - state.pointer.x0;
+    var dy = point.clientY - state.pointer.y0;
+    if (!state.pointer.axis) state.pointer.axis = dragAxis(dx, dy);
+    if (state.pointer.axis === "y") { clearPointer(); return; }
+    if (state.pointer.axis !== "x") return;
     state.pointer.dx = dx;
     if (state.pointer.el) state.pointer.el.style.transform = "translate(" + dx + "px,0) rotate(" + dx / 28 + "deg)";
   }
-  function onPointerUp() {
+  function endDrag(cancelled) {
     if (!state.pointer) return;
     var dx = state.pointer.dx || 0;
+    var dir = swipeDecision({ dx: dx, axis: state.pointer.axis, cancelled: cancelled });
     state.lastDragDx = dx;
     clearPointer();
-    if (Math.abs(dx) < 80) return;
-    swipe(dx < 0 ? "left" : "right");
+    if (dir) swipe(dir);
+  }
+  function onPointerUp() { endDrag(false); }
+  /* pointercancel: the browser took the gesture (a native scroll). Never a swipe. */
+  function onPointerCancel() { endDrag(true); }
+
+  /* Chatroom card "More" cue (its own row under the scroll body): visible only while the body can scroll further down. */
+  function moreCueVisible(scrollTop, scrollHeight, clientHeight) {
+    var left = (Number(scrollHeight) || 0) - (Number(clientHeight) || 0) - (Number(scrollTop) || 0);
+    return left > 1;
+  }
+  /* Top fade on the scroll body only once it has scrolled. */
+  function topFadeVisible(scrollTop) {
+    return (Number(scrollTop) || 0) >= 1;
+  }
+  function wireMoreCue(el) {
+    var body = el && el.querySelector && el.querySelector("[data-commune-card-scroll]");
+    var cue = el && el.querySelector && el.querySelector("[data-commune-card-more]");
+    if (!body || !cue) return;
+    var ro = null;
+    var sync = function () {
+      if (el.isConnected === false) { window.removeEventListener("resize", sync); if (ro) ro.disconnect(); return; }
+      cue.hidden = !moreCueVisible(body.scrollTop, body.scrollHeight, body.clientHeight);
+      body.classList.toggle("is-scrolled", topFadeVisible(body.scrollTop));
+    };
+    body.addEventListener("scroll", sync, { passive: true });
+    cue.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      var step = Math.max(40, Math.round(body.clientHeight * 0.8));
+      try { body.scrollBy({ top: step, behavior: "smooth" }); } catch (e) { body.scrollTop += step; }
+    });
+    if (typeof window.ResizeObserver === "function") {
+      try { ro = new window.ResizeObserver(sync); ro.observe(body); } catch (eRo) { ro = null; }
+    }
+    window.addEventListener("resize", sync);
+    sync();
+    if (typeof window.requestAnimationFrame === "function") window.requestAnimationFrame(sync);
   }
 
   function ensureDatingBiosThenRebuild() {
@@ -4758,7 +4824,7 @@
       deck.addEventListener("pointerdown", onPointerDown);
       deck.addEventListener("pointermove", onPointerMove);
       deck.addEventListener("pointerup", onPointerUp);
-      deck.addEventListener("pointercancel", onPointerUp);
+      deck.addEventListener("pointercancel", onPointerCancel);
     }
     document.addEventListener("keydown", function (ev) {
       var panel = document.getElementById("panel-commune");
@@ -4889,6 +4955,10 @@
     sampleDeck: sampleDeck,
     settleSwipe: settleSwipe,
     renderCard: renderCard,
+    moreCueVisible: moreCueVisible,
+    topFadeVisible: topFadeVisible,
+    dragAxis: dragAxis,
+    swipeDecision: swipeDecision,
     bindCard: bindCard,
     omitPassed: omitPassed,
     sendPersonalFriendRequest: sendPersonalFriendRequest,

@@ -13169,6 +13169,11 @@ a.site-switch-side:focus-visible {
   color: #d9d2f0 !important;
   font-size: 14px !important;
 }
+/* Signed out: the rooms end line uses the muted subline above (commune-swipe-end-sub),
+   and the note's lines sit 8px apart (8px under "You're caught up.", then 8px between sublines). */
+.commune-swipe-end.commune-swipe-end--signed-out {
+  gap: 8px;
+}
 .is-deck-end .commune-swipe-actions,
 .is-deck-end [data-commune-swipe-status] {
   display: none !important;

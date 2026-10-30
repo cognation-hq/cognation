@@ -151,19 +151,39 @@ test("More cue shows only while the body can scroll further down", function () {
   assert.strictEqual(api.moreCueVisible(0, 0, 0), false, "not laid out");
 });
 
-test("CSS: the More cue is small, muted, centered, with no yellow and no looping motion", function () {
+test("CSS: the More cue is its own 24px row under the scroll body (v2): small, muted, centered, no yellow, no loop", function () {
   var cue = rule(".commune-card-more");
-  assert.ok(/position\s*:\s*absolute/.test(cue), "absolute inside the card");
+  assert.ok(!/position\s*:\s*absolute/.test(cue), "not an overlay any more (it never covers the Chat log)");
+  assert.ok(/flex\s*:\s*none/.test(cue), "a fixed row: flex none");
+  assert.ok(/(^|[;\s])height\s*:\s*24px/.test(cue), "24px row");
+  assert.ok(/align-self\s*:\s*center/.test(cue), "centered in the card");
   assert.ok(/font-size\s*:\s*0\.75rem/.test(cue), "0.75rem");
   assert.ok(/color\s*:\s*#d9d2f0/i.test(cue), "#d9d2f0");
-  assert.ok(/left\s*:\s*50%/.test(cue) && /translateX\(-50%\)/.test(cue), "centered");
   assert.ok(!/animation/.test(cue), "no animation");
   var all = css.slice(css.indexOf(".commune-card-more"));
   all = all.slice(0, all.indexOf("/* end commune-card-more */"));
   assert.ok(all.length > 0, "cue rules are grouped with an end marker");
   assert.ok(!/animation|@keyframes|infinite/.test(all), "no motion loop anywhere in the cue rules");
   assert.ok(!/yellow|#ff[cdef][0-9a-f]0|#ffd|#fe[0-9a-f]{4}|gold|#f5c|#fc0/i.test(all), "no yellow");
-  assert.ok(/\.commune-card-more\[hidden\]\s*\{[^}]*display\s*:\s*none/.test(all), "[hidden] really hides it");
+  var hid = (all.match(/\.commune-card-more\[hidden\]\s*\{([^}]*)\}/) || [])[1] || "";
+  assert.ok(/visibility\s*:\s*hidden/.test(hid), "[hidden] hides it with visibility (the row keeps its 24px, no jump)");
+  assert.ok(/display\s*:\s*(inline-)?flex/.test(hid) && !/display\s*:\s*none/.test(hid), "[hidden] does not collapse the row");
+});
+
+test("CSS: a 16px top fade only once the body has scrolled, mirroring the 24px bottom fade", function () {
+  var on = rule(".commune-card-scroll.is-scrolled");
+  assert.ok(/mask-image\s*:[^;]*transparent[^;]*#000 16px[^;]*calc\(100% - 24px\)[^;]*transparent/.test(on), "16px top + 24px bottom mask when scrolled");
+  var base = rule(".commune-card-scroll");
+  assert.ok(!/mask-image\s*:[^;]*#000 16px/.test(base), "no top fade at scrollTop 0");
+});
+
+test("Top fade flag follows scrollTop > 0", function () {
+  var api = swipeApi();
+  assert.strictEqual(typeof api.topFadeVisible, "function", "topFadeVisible is exported");
+  assert.strictEqual(api.topFadeVisible(0), false);
+  assert.strictEqual(api.topFadeVisible(0.4), false, "sub-pixel rounding at the top is still the top");
+  assert.strictEqual(api.topFadeVisible(1), true);
+  assert.strictEqual(api.topFadeVisible(60), true);
 });
 
 test("Deck drag: axis locks after 8px; vertical (or a tie) never swipes, a cancelled drag never swipes", function () {

@@ -4513,10 +4513,14 @@
   /* pointercancel: the browser took the gesture (a native scroll). Never a swipe. */
   function onPointerCancel() { endDrag(true); }
 
-  /* Chatroom card "More" cue: visible only while the body can scroll further down. */
+  /* Chatroom card "More" cue (its own row under the scroll body): visible only while the body can scroll further down. */
   function moreCueVisible(scrollTop, scrollHeight, clientHeight) {
     var left = (Number(scrollHeight) || 0) - (Number(clientHeight) || 0) - (Number(scrollTop) || 0);
     return left > 1;
+  }
+  /* Top fade on the scroll body only once it has scrolled. */
+  function topFadeVisible(scrollTop) {
+    return (Number(scrollTop) || 0) >= 1;
   }
   function wireMoreCue(el) {
     var body = el && el.querySelector && el.querySelector("[data-commune-card-scroll]");
@@ -4526,6 +4530,7 @@
     var sync = function () {
       if (el.isConnected === false) { window.removeEventListener("resize", sync); if (ro) ro.disconnect(); return; }
       cue.hidden = !moreCueVisible(body.scrollTop, body.scrollHeight, body.clientHeight);
+      body.classList.toggle("is-scrolled", topFadeVisible(body.scrollTop));
     };
     body.addEventListener("scroll", sync, { passive: true });
     cue.addEventListener("click", function (ev) {
@@ -4951,6 +4956,7 @@
     settleSwipe: settleSwipe,
     renderCard: renderCard,
     moreCueVisible: moreCueVisible,
+    topFadeVisible: topFadeVisible,
     dragAxis: dragAxis,
     swipeDecision: swipeDecision,
     bindCard: bindCard,

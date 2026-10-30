@@ -140,9 +140,7 @@
     var none = { viewerId: id, friends: [], profiles: [], blocked: {} };
     if (!id || !client || typeof client.rest !== "function") return Promise.resolve(none);
     if (typeof client.configured === "function" && !client.configured()) return Promise.resolve(none);
-    return Promise.all([fetchFriendships(client, id), fetchBlocked(client, id)]).then(function (both) {
-      var friendships = both[0];
-      var blocked = both[1];
+    return fetchFriendships(client, id).then(function (friendships) {
       var ids = [id];
       var seen = {};
       seen[id] = true;
@@ -153,7 +151,9 @@
         });
       });
       return fetchProfiles(client, ids).then(function (profiles) {
-        return followsFor(client, id, profiles).then(function (extra) {
+        return Promise.all([followsFor(client, id, profiles), fetchBlocked(client, id)]).then(function (both) {
+          var extra = both[0];
+          var blocked = both[1];
           var all = profiles.concat(extra.profiles || []);
           var friends = friendsFromRows(id, friendships, all).filter(notBlocked(blocked));
           return { viewerId: id, friends: friends, profiles: all, follows: extra.follows || [], blocked: blocked };

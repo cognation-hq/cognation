@@ -5184,7 +5184,8 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   touch-action: none;
   display: none;
 }
-[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-emoji-resize {
+/* The grip shows on the selected emoji only (emoji-rotate-no-lift). */
+[data-tower-app][data-tower-is-owner="true"][data-tower-side="public"] .tower-sticker--emoji.is-widget-selected .tower-emoji-resize {
   display: block;
 }
 
@@ -11442,6 +11443,13 @@ body {
   border-color: var(--cgn-border) !important;
   background: rgba(16, 19, 48, 0.42) !important;
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.15) !important;
+}
+/* A rotated emoji is just the glyph (emoji-rotate-no-lift): no dark square
+   tile and no tilted tile edge. The selection outline still shows. */
+.tower-layout--scrapbook.is-sticker-stage .tower-sticker--emoji[data-sticker-tilt]:not([data-sticker-tilt="0"]) {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .tower-layout--scrapbook .tower-friend-pin.is-widget-selected,

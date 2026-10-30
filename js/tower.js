@@ -8001,6 +8001,27 @@
       TowerProfileStore.save(p, { geometry: true });
       return;
     }
+    /* Emoji Rotate on the default grid (emoji-rotate-no-lift): an emoji is
+       absolute over the grid, never grid-laid, so it used to fall through to
+       the freeze below, which lifted the whole grid. Its tilt is its own
+       layout entry (the one placeEmojiWidget seeds and renderEmojiStickers
+       reads): save just that, keep x/y/z, add no drag mark. Nothing else is
+       frozen, lifted or written. A lifted layout still takes the path below. */
+    if (tiltStage && tiltStage.classList.contains("is-default-grid") && el.hasAttribute("data-tower-emoji")) {
+      var el2 = p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : {};
+      var prevE = el2[wid] && typeof el2[wid] === "object" ? el2[wid] : {};
+      if (layoutCoord(prevE.tilt, 0) === tilt && el2[wid]) return;
+      var nextE = {};
+      Object.keys(prevE).forEach(function (k) { nextE[k] = prevE[k]; });
+      nextE.x = layoutCoord(prevE.x, layoutCoord(el.getAttribute("data-sticker-x"), 78));
+      nextE.y = layoutCoord(prevE.y, layoutCoord(el.getAttribute("data-sticker-y"), 12));
+      nextE.z = layoutCoord(prevE.z, layoutCoord(el.getAttribute("data-sticker-z"), 24));
+      nextE.tilt = tilt;
+      el2[wid] = nextE;
+      p.widgetLayout = el2;
+      TowerProfileStore.save(p, { geometry: true });
+      return;
+    }
     var layout = freezeSpawnedWidgets(el.closest ? el.closest("[data-tower-app]") || document : document, getWidgetLayout(p) || {});
     var prev = layout[wid] || {};
     /* Rotate on a layout a drag already lifted: keep this widget's dragged
@@ -10180,6 +10201,9 @@
       el.style.setProperty("--sticker-y", y + "%");
       el.style.setProperty("--sticker-z", String(z));
       el.style.setProperty("--sticker-tilt", tilt + "deg");
+      /* Marks a turned emoji so the page drops its tile (no square, no tilted edge). */
+      if (tilt) el.setAttribute("data-sticker-tilt", String(tilt));
+      else if (el.removeAttribute) el.removeAttribute("data-sticker-tilt");
       el.setAttribute("data-sticker-x", String(x));
       el.setAttribute("data-sticker-y", String(y));
       el.setAttribute("data-sticker-z", String(z));

@@ -552,7 +552,7 @@ test("1280: an emoji Rotate lifts the grid but every widget keeps its rect; musi
   assert.strictEqual(layoutWrites(r.env).length, 0, "the reload writes nothing (no repair shove)");
 });
 
-test("1280: a drag on the lifted stage moves only the dragged widget; the others are 0px from before the lift to the drop to the reload", async function () {
+test("1280: after an emoji Rotate (the grid stays), a drag moves only the dragged widget; the others are 0px from before the Rotate to the drop to the reload", async function () {
   var env = boot(null);
   var p = profile();
   ownStore(env, p);

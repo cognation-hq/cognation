@@ -11526,6 +11526,8 @@
 
     function onPointerDown(ev) {
       if (!ownerOnPublic()) return;
+      /* Phone shows a fixed single column; dragging there must not rewrite the website layout. */
+      if (isPhoneStage(stage)) return;
       /* A press on an emoji sticker: drop any page text selection, so a drag
          never leaves the glyph selected (a blue box behind the emoji). */
       var emojiPress = ev.target && ev.target.closest ? ev.target.closest("[data-tower-emoji]") : null;
@@ -11535,8 +11537,6 @@
           if (pageSel && pageSel.rangeCount) pageSel.removeAllRanges();
         } catch (_selErr) {}
       }
-      /* Phone shows a fixed single column; dragging there must not rewrite the website layout. */
-      if (isPhoneStage(stage)) return;
 
       var friendPin = ev.target.closest("[data-tower-friend-pin]");
       if (friendPin && stage.contains(friendPin)) {

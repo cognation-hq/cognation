@@ -225,6 +225,57 @@
     var l = p && p.widgetLayout;
     return cleanGridSize(l && typeof l === "object" ? l[GRID_SIZE_KEY] : null);
   }
+  /* Grid resize floor (Designer): a grid shrink never takes the widget's smallest
+     readable text under 11px on screen. The floor is measured from the widget's own
+     computed font sizes (CSS `scale` does not change them), not set per widget.
+     Text already under 11px at full size cannot be kept at 11px by any shrink, so it
+     does not set the floor. Hidden text, visually-hidden 1px labels and the widget's
+     own chrome (resize grip, drag handle) are left out. */
+  var GRID_MIN_TEXT_PX = 11;
+  var GRID_TEXT_SKIP_INPUT = { hidden: 1, file: 1, checkbox: 1, radio: 1, range: 1, color: 1 };
+  function hasOwnText(el) {
+    var tag = el.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+      if (tag === "INPUT" && GRID_TEXT_SKIP_INPUT[String(el.getAttribute("type") || el.type || "").toLowerCase()]) return false;
+      var v = (typeof el.value === "string" && el.value) || el.getAttribute("placeholder") || el.getAttribute("value") || "";
+      return /\S/.test(v) || tag === "SELECT";
+    }
+    var cn = el.childNodes;
+    if (cn && typeof cn.length === "number") {
+      for (var i = 0; i < cn.length; i++) if (cn[i].nodeType === 3 && /\S/.test(cn[i].nodeValue || "")) return true;
+      return false;
+    }
+    return !(el.children && el.children.length) && /\S/.test(el.textContent || "");
+  }
+  function gridTextMinScale(widget) {
+    var gcs = typeof window !== "undefined" && window.getComputedStyle;
+    if (!widget || typeof gcs !== "function") return 0;
+    var smallest = Infinity;
+    (function walk(node) {
+      var kids = node.children || [];
+      for (var i = 0; i < kids.length; i++) {
+        var c = kids[i];
+        if (!c || c.hidden) continue;
+        if (c.matches && c.matches("[data-tower-widget-resize], [data-tower-sticker-handle]")) continue;
+        var cs = gcs(c) || {};
+        if (cs.display === "none" || cs.visibility === "hidden") continue;
+        if (typeof c.getClientRects === "function" && !c.getClientRects().length) continue;
+        if (hasOwnText(c)) {
+          var r = c.getBoundingClientRect ? c.getBoundingClientRect() : null;
+          var tiny = r && (r.width || r.height) && r.width <= 1 && r.height <= 1;
+          var fs = parseFloat(cs.fontSize);
+          if (!tiny && fs >= GRID_MIN_TEXT_PX && fs < smallest) smallest = fs;
+        }
+        walk(c);
+      }
+    })(widget);
+    return isFinite(smallest) ? Math.min(1, GRID_MIN_TEXT_PX / smallest) : 0;
+  }
+  /* Narrowest grid size (px) for this widget in a slot of `slot` px. */
+  function gridMinWidth(el, slot) {
+    var s = slot > 0 ? gridTextMinScale(el) : 0;
+    return s > 0 ? Math.min(slot, Math.ceil(slot * s - 1e-9)) : 0;
+  }
   function setGridSizeStyle(el, w) {
     if (!el || !el.style) return;
     var n = Math.round(Number(w));
@@ -233,6 +284,8 @@
     /* Never wider than the slot: growing past it overlaps the neighbours
        (music 520 vs a ~448 column). A stored size over the slot is capped too. */
     if (slot > 0 && n > slot) n = slot;
+    /* Never narrower than the text floor; a stored size under it opens clamped. */
+    if (n > 0 && slot > 0) n = Math.max(n, gridMinWidth(el, slot));
     if (n > 0 && slot > 0 && n !== slot) {
       el.style.setProperty("scale", String(Math.round((n / slot) * 10000) / 10000));
       el.setAttribute("data-grid-w", String(n));
@@ -1171,11 +1224,14 @@
         startW = Math.round((sr0 && sr0.width) || readGridSizeStyle(sticker) || startW);
       }
       var curW = startW;
+      var gridMinPx = gridResize ? gridMinWidth(sticker, sticker.offsetWidth || 0) : 0;
       sticker.classList.add("is-resizing");
       function onMove(e) {
         curW = clampResizeWidth(wid, startW + (e.clientX - startX));
         /* Grid resize: cap at this widget's live slot width (no reflow). */
         if (gridResize && sticker.offsetWidth > 0) curW = Math.min(curW, sticker.offsetWidth);
+        /* ...and not under the text floor, so what is saved is what is on screen. */
+        if (gridResize && gridMinPx > 0) curW = Math.max(curW, gridMinPx);
         if (gridResize) setGridSizeStyle(sticker, curW);
         else setStickerWidth(sticker, curW);
         if (e.cancelable) e.preventDefault();

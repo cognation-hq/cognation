@@ -4510,6 +4510,67 @@
     if (dir) swipe(dir);
   }
   function onPointerUp() { endDrag(false); }
+  /* A drag is never a tap (echo-drag-no-click). Once a pointer that went down on the
+     deck has moved more than DRAG_CLICK_PX from where it went down (any direction:
+     vertical, diagonal, horizontal, or a drag the browser cancelled), the one click
+     the browser fires on release is swallowed in the capture phase, so no card
+     control (Enter room, the card-wide open, Find out more, ...) acts on it. A tap
+     (<= DRAG_CLICK_PX) clicks as before. Motion is unchanged (DRAG_LOCK_PX, SWIPE_MIN_PX). */
+  var DRAG_CLICK_PX = 10;
+  function dragIsNotTap(maxDx, maxDy) {
+    var ax = Math.abs(Number(maxDx) || 0), ay = Math.abs(Number(maxDy) || 0);
+    return ax > DRAG_CLICK_PX || ay > DRAG_CLICK_PX;
+  }
+  function bindDeck(deck) {
+    deck.addEventListener("pointerdown", onPointerDown);
+    deck.addEventListener("pointermove", onPointerMove);
+    deck.addEventListener("pointerup", onPointerUp);
+    deck.addEventListener("pointercancel", onPointerCancel);
+    wireDragClickGuard(deck);
+  }
+  function wireDragClickGuard(deck, win) {
+    win = win || window;
+    if (!deck || typeof deck.addEventListener !== "function") return null;
+    var g = null;
+    var swallow = false;
+    var timer = null;
+    var pt = function (ev) { return ev && ev.touches && ev.touches[0] ? ev.touches[0] : ev || {}; };
+    var onMove = function (ev) {
+      if (!g || g.moved) return;
+      var p = pt(ev);
+      var dx = (Number(p.clientX) || 0) - g.x0, dy = (Number(p.clientY) || 0) - g.y0;
+      if (dragIsNotTap(dx, dy)) g.moved = true;
+    };
+    var onEnd = function () {
+      if (g && g.moved) {
+        swallow = true;
+        if (timer) win.clearTimeout(timer);
+        /* No click follows a native scroll; never hold the swallow past this gesture. */
+        timer = win.setTimeout(function () { swallow = false; timer = null; }, 600);
+      }
+      g = null;
+      win.removeEventListener("pointermove", onMove, true);
+      win.removeEventListener("pointerup", onEnd, true);
+      win.removeEventListener("pointercancel", onEnd, true);
+    };
+    deck.addEventListener("pointerdown", function (ev) {
+      var p = pt(ev);
+      swallow = false;
+      g = { x0: Number(p.clientX) || 0, y0: Number(p.clientY) || 0, moved: false };
+      win.addEventListener("pointermove", onMove, true);
+      win.addEventListener("pointerup", onEnd, true);
+      win.addEventListener("pointercancel", onEnd, true);
+    }, true);
+    deck.addEventListener("click", function (ev) {
+      if (!swallow) return;
+      swallow = false;
+      if (timer) { win.clearTimeout(timer); timer = null; }
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (typeof ev.stopImmediatePropagation === "function") ev.stopImmediatePropagation();
+    }, true);
+    return { active: function () { return swallow; } };
+  }
   /* pointercancel: the browser took the gesture (a native scroll). Never a swipe. */
   function onPointerCancel() { endDrag(true); }
 
@@ -4820,12 +4881,7 @@
       });
     }
     var deck = shell.querySelector("[data-commune-deck]");
-    if (deck) {
-      deck.addEventListener("pointerdown", onPointerDown);
-      deck.addEventListener("pointermove", onPointerMove);
-      deck.addEventListener("pointerup", onPointerUp);
-      deck.addEventListener("pointercancel", onPointerCancel);
-    }
+    if (deck) bindDeck(deck);
     document.addEventListener("keydown", function (ev) {
       var panel = document.getElementById("panel-commune");
       if (!panel || panel.hidden || state.roomId || state.classroomId) return;
@@ -4959,6 +5015,9 @@
     topFadeVisible: topFadeVisible,
     dragAxis: dragAxis,
     swipeDecision: swipeDecision,
+    dragIsNotTap: dragIsNotTap,
+    wireDragClickGuard: wireDragClickGuard,
+    bindDeck: bindDeck,
     bindCard: bindCard,
     omitPassed: omitPassed,
     sendPersonalFriendRequest: sendPersonalFriendRequest,

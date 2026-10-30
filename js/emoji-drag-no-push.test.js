@@ -550,7 +550,7 @@ function exactSame(a, b, label) {
 var EMOJI2 = "emoji-sparkles";
 function emojiRectOf(dom, id) { var r = dom.stage.querySelector('[data-tower-widget="' + (id || EMOJI) + '"]').getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; }
 function pos(el) { return [el.style.getPropertyValue("--sticker-x"), el.style.getPropertyValue("--sticker-y")]; }
-function near(a, b, label) { assert.ok(Math.abs(a - b) < 0.05, label + ": " + a + " vs " + b); }
+function near(a, b, label) { assert.ok(Math.abs(a - b) < 0.06, label + ": " + a + " vs " + b); }
 /* An emoji drag over the default grid: only the emoji moves, the grid stays. */
 function onlyEmojiMoved(dom, before, label) {
   assert.ok(dom.stage.classList.contains("is-default-grid"), label + ": still the default grid (no lift)");

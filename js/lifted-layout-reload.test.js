@@ -1,12 +1,16 @@
 /**
- * Lifted layout survives a reload (lifted-layout-reload):
- *  A lift from the default grid that the owner causes with Rotate (the
- *  Polaroid, 5 degrees) is a real layout. A reload must open it lifted, every
- *  widget within 1px of where it was, with no write on reload, and the
- *  positions the owner saved never read as the factory grid.
- *  - the same after a grid resize before the lift (the 376 floor still holds);
- *  - Reset after a lifted reload gives the exact default grid (= fresh open);
- *  - 390 (phone stack) is unaffected: Rotate writes nothing, saved x/y ignored.
+ * Rotate on the default grid (lifted-layout-reload, #329 v2, Designer spec):
+ *  Rotate on a grid widget tilts only that widget, 5 degrees, and never takes
+ *  the others off the grid (no #321 sticker reshape). The tilt is stored per
+ *  widget on the grid, widgetLayout._gridTilt = { id: { deg } }, like
+ *  _gridNudge / _gridSize, and drawn as CSS rotate on the widget's photo frame
+ *  (the Polaroid photo turns inside its 448 slot; the card does not move).
+ *  - 0px rect diff on every widget, open -> Rotate -> reload, at 1280;
+ *  - the reload reapplies the tilt with 0 writes and stays the default grid;
+ *  - no sticker sizes (wPx 332 ...) or positions are stored by a Rotate;
+ *  - Reset clears the tilt;
+ *  - 390 (phone stack) is unchanged: no tilt shown, no write;
+ *  - a layout a drag already lifted keeps its dragged mark and yPx on Rotate.
  *
  * Same tiny fake DOM as resize-min-scale-carryover.test.js. Stubbed session
  * and client only; nothing leaves the process.
@@ -214,6 +218,8 @@ function buildRoot(stageW, fonts) {
     var w = new El("div", { "data-tower-widget": id, "class": "tower-sticker" });
     stage.appendChild(w);
     if (id === "music") musicText(w, fonts);
+    /* The Polaroid's photo frame: what a grid Rotate turns. */
+    if (id === "polaroid") w.appendChild(new El("div", { "class": "tower-avatar-wrap", "data-tower-avatar-frame": "polaroid", "data-tower-polaroid": "" }));
   });
   Object.defineProperty(stage, "clientWidth", { get: function () { return stageW || STAGE_W; } });
   Object.defineProperty(stage, "clientHeight", { get: function () { return STAGE_H; } });
@@ -450,48 +456,91 @@ function exactRects(stage) {
   return out;
 }
 
-test("lift (Rotate the Polaroid 5 degrees) then reload: every rect within 1px, no write on reload, not the factory grid", async function () {
+function frameOf(dom) { return dom.stage.querySelector('[data-tower-widget="polaroid"] [data-tower-avatar-frame]') || dom.stage.querySelector('[data-tower-avatar-frame]'); }
+function polaroidFrame(dom) {
+  var pol = dom.stage.querySelector('[data-tower-widget="polaroid"]');
+  return pol.children.filter(function (c) { return c.hasAttribute("data-tower-avatar-frame"); })[0];
+}
+/* Every stored entry a Rotate could have reshaped: no positions, no sizes. */
+function storedSizes(row) {
+  var out = [];
+  Object.keys(row || {}).forEach(function (k) {
+    var v = row[k];
+    if (k.charAt(0) === "_" || !v || typeof v !== "object") return;
+    if (typeof v.wPx === "number") out.push(k + ".wPx=" + v.wPx);
+    if (typeof v.x === "number" || typeof v.y === "number") out.push(k + ".pos");
+  });
+  return out;
+}
+
+test("1280: Rotate the Polaroid on the grid tilts only its photo; 0px diff on every widget open -> Rotate -> reload, 0 writes on reload", async function () {
   var env = boot(null);
   var p = profile();
   ownStore(env, p);
   var dom = await open(env, p);
   assert.ok(dom.stage.classList.contains("is-default-grid"), "a fresh open is the default grid");
+  var atOpen = exactRects(dom.stage);
+  assert.deepStrictEqual(atOpen.avatar.map(Math.round), [325, 31, 448, 374], "avatar slot at open");
+  assert.deepStrictEqual(atOpen.music, GRID.music, "music 448x175 at open");
   rotate(env, dom, "polaroid", 5);
-  assert.ok(!dom.stage.classList.contains("is-default-grid"), "Rotate lifted the grid");
-  var lifted = exactRects(dom.stage);
+  assert.ok(dom.stage.classList.contains("is-default-grid"), "Rotate keeps the default grid");
+  assert.deepStrictEqual(exactRects(dom.stage), atOpen, "Rotate: 0px diff on every widget");
+  var pol = dom.stage.querySelector('[data-tower-widget="polaroid"]');
+  assert.strictEqual(polaroidFrame(dom).style.getPropertyValue("rotate"), "5deg", "the photo frame turns 5 degrees");
+  assert.strictEqual(pol.style.getPropertyValue("rotate"), "", "the 448 card itself does not turn");
+  assert.strictEqual(pol.style.getPropertyValue("--sticker-tilt"), "", "no sticker tilt on a grid widget");
   await wait(700);
-  assert.ok(lastRow(env), "the lift was saved");
+  var row = lastRow(env);
+  assert.ok(row, "the Rotate was saved");
+  assert.deepStrictEqual(row._gridTilt, { polaroid: { deg: 5 } }, "saved as the grid tilt");
+  assert.deepStrictEqual(storedSizes(row), [], "no stored positions or sizes after a Rotate");
   var r = await reload(env);
-  assert.ok(!r.dom.stage.classList.contains("is-default-grid"), "the reload opens lifted, not the default grid");
-  within1(lifted, exactRects(r.dom.stage), "lift -> reload");
-  var pol = r.dom.stage.querySelector('[data-tower-widget="polaroid"]');
-  assert.strictEqual(pol.style.getPropertyValue("--sticker-tilt"), "5deg", "the Polaroid keeps its 5 degrees");
+  assert.ok(r.dom.stage.classList.contains("is-default-grid"), "the reload is the default grid");
+  assert.deepStrictEqual(exactRects(r.dom.stage), atOpen, "reload: 0px diff on every widget");
+  assert.strictEqual(polaroidFrame(r.dom).style.getPropertyValue("rotate"), "5deg", "the tilt survives the reload");
   await wait(700);
   assert.strictEqual(layoutWrites(r.env).length, 0, "the reload writes nothing");
 });
 
-test("resize (grid) then lift then reload: every rect within 1px, no write on reload, 376 floor kept", async function () {
+test("1280: grid resize then Rotate keeps the resize, stores no 332 or other sticker size, reload 0px", async function () {
   var env = boot(null);
   var p = profile();
   ownStore(env, p);
   var dom = await open(env, p);
-  resize(env, dom, "music", -400);
-  assert.strictEqual(Math.round(music(dom).getBoundingClientRect().width), 376, "grid shrink stops at the 376 floor");
-  resize(env, dom, "music", 22); /* 398 */
-  assert.strictEqual(Math.round(music(dom).getBoundingClientRect().width), 398);
+  resize(env, dom, "music", -50);
+  var before = exactRects(dom.stage);
   rotate(env, dom, "polaroid", 5);
-  assert.ok(!dom.stage.classList.contains("is-default-grid"), "Rotate lifted the grid");
-  var lifted = exactRects(dom.stage);
-  assert.strictEqual(Math.round(lifted.music[2]), 398, "the grid width carries over");
+  assert.ok(dom.stage.classList.contains("is-default-grid"), "still the default grid");
+  assert.deepStrictEqual(exactRects(dom.stage), before, "Rotate: 0px diff");
   await wait(700);
+  var row = lastRow(env);
+  assert.ok(row._gridSize && row._gridSize.music, "the grid resize is kept");
+  assert.deepStrictEqual(row._gridTilt, { polaroid: { deg: 5 } });
+  assert.deepStrictEqual(storedSizes(row), [], "no wPx (332 or any) and no positions stored");
   var r = await reload(env);
-  assert.ok(!r.dom.stage.classList.contains("is-default-grid"), "the reload opens lifted");
-  within1(lifted, exactRects(r.dom.stage), "resize -> lift -> reload");
+  assert.deepStrictEqual(exactRects(r.dom.stage), before, "reload: 0px diff");
   await wait(700);
   assert.strictEqual(layoutWrites(r.env).length, 0, "the reload writes nothing");
 });
 
-test("Reset after a lifted reload gives the default grid (same as a fresh open)", async function () {
+test("a second Rotate adds 5 more; rotating back to 0 drops the grid tilt", async function () {
+  var env = boot(null);
+  var p = profile();
+  ownStore(env, p);
+  var dom = await open(env, p);
+  rotate(env, dom, "polaroid", 5);
+  rotate(env, dom, "polaroid", 10);
+  assert.strictEqual(polaroidFrame(dom).style.getPropertyValue("rotate"), "10deg");
+  await wait(700);
+  assert.deepStrictEqual(lastRow(env)._gridTilt, { polaroid: { deg: 10 } });
+  rotate(env, dom, "polaroid", 0);
+  assert.strictEqual(polaroidFrame(dom).style.getPropertyValue("rotate"), "");
+  await wait(700);
+  assert.strictEqual(lastRow(env)._gridTilt, undefined, "no tilt left");
+  assert.ok(dom.stage.classList.contains("is-default-grid"));
+});
+
+test("Reset clears the grid tilt (and the reload after it shows none, 0 writes)", async function () {
   var freshEnv = boot(null);
   var pf = profile();
   ownStore(freshEnv, pf);
@@ -503,19 +552,21 @@ test("Reset after a lifted reload gives the default grid (same as a fresh open)"
   rotate(env, dom, "polaroid", 5);
   await wait(700);
   var r = await reload(env);
-  assert.ok(!r.dom.stage.classList.contains("is-default-grid"), "the reload opens lifted");
+  assert.strictEqual(polaroidFrame(r.dom).style.getPropertyValue("rotate"), "5deg");
   clickReset(r.dom);
   assert.ok(r.dom.stage.classList.contains("is-default-grid"), "Reset shows the default grid");
+  assert.strictEqual(polaroidFrame(r.dom).style.getPropertyValue("rotate"), "", "Reset clears the tilt");
   assert.deepStrictEqual(exactRects(r.dom.stage), fresh, "0px diff vs a fresh open");
   await wait(700);
+  assert.strictEqual(lastRow(r.env)._gridTilt, undefined, "Reset saved no tilt");
   var r2 = await reload(r.env);
-  assert.ok(r2.dom.stage.classList.contains("is-default-grid"), "reload after Reset is the default grid");
-  assert.deepStrictEqual(exactRects(r2.dom.stage), fresh, "reload after Reset: 0px diff vs a fresh open");
+  assert.strictEqual(polaroidFrame(r2.dom).style.getPropertyValue("rotate"), "", "no tilt after reload");
+  assert.deepStrictEqual(exactRects(r2.dom.stage), fresh);
   await wait(700);
   assert.strictEqual(layoutWrites(r2.env).length, 0, "reload after Reset writes nothing");
 });
 
-test("390 is unaffected: Rotate there writes no layout, and a lifted row still opens as the phone stack", async function () {
+test("390 is unchanged: Rotate there writes nothing, and a desktop grid tilt is not shown in the phone stack", async function () {
   var freshEnv = boot(null, 390);
   var pf = profile();
   ownStore(freshEnv, pf);
@@ -529,7 +580,6 @@ test("390 is unaffected: Rotate there writes no layout, and a lifted row still o
   await wait(700);
   assert.strictEqual(layoutWrites(env).length, 0, "no layout write from a phone Rotate");
   assert.deepStrictEqual(exactRects(dom.stage), fresh, "still the phone stack");
-  /* A row lifted on desktop opens as the same phone stack at 390. */
   var desk = boot(null);
   var pd = profile();
   ownStore(desk, pd);
@@ -538,7 +588,34 @@ test("390 is unaffected: Rotate there writes no layout, and a lifted row still o
   await wait(700);
   var r = await reload(desk, 390);
   assert.ok(r.dom.stage.classList.contains("is-phone-stack"), "phone stack");
-  assert.deepStrictEqual(exactRects(r.dom.stage), fresh, "the lifted row does not move anything at 390");
+  assert.deepStrictEqual(exactRects(r.dom.stage), fresh, "the tilted row moves nothing at 390");
+  assert.strictEqual(polaroidFrame(r.dom).style.getPropertyValue("rotate"), "", "no tilt shown at 390");
   await wait(700);
   assert.strictEqual(layoutWrites(r.env).length, 0, "the 390 reload writes nothing");
+});
+
+test("a layout a drag already lifted: Rotate keeps the widget's dragged mark, yPx and wPx", async function () {
+  var lifted = {
+    avatar: { x: 29.6, y: 3.1, z: 2, tilt: 0, yPx: 31, dragged: true },
+    music: { x: 29.6, y: 42, z: 2, tilt: 0, yPx: 421, wPx: 398, dragged: true },
+    polaroid: { x: 29.6, y: 61, z: 2, tilt: 0, yPx: 612, dragged: true },
+    instax: { x: 29.6, y: 75, z: 2, tilt: 0, yPx: 751, dragged: true },
+  };
+  var env = boot(lifted);
+  var p = profile();
+  p.widgetLayout = clone(lifted);
+  ownStore(env, p);
+  var dom = await open(env, p);
+  assert.ok(!dom.stage.classList.contains("is-default-grid"), "a dragged row opens lifted");
+  rotate(env, dom, "music", 5);
+  await wait(700);
+  var row = lastRow(env);
+  assert.strictEqual(row.music.tilt, 5);
+  assert.strictEqual(row.music.dragged, true, "dragged kept");
+  assert.strictEqual(row.music.yPx, 421, "yPx kept");
+  assert.strictEqual(row.music.wPx, 398, "wPx kept");
+  assert.strictEqual(row._gridTilt, undefined, "no grid tilt off the grid");
+  var r = await reload(env);
+  assert.ok(!r.dom.stage.classList.contains("is-default-grid"), "the reload opens lifted");
+  assert.strictEqual(r.dom.stage.querySelector('[data-tower-widget="music"]').style.getPropertyValue("--sticker-tilt"), "5deg");
 });

@@ -4079,8 +4079,11 @@
          line ("Passed …") hide until a card is back (is-deck-end on the shell). */
       if (state.shell) state.shell.classList.add("is-deck-end");
       setStatus("");
+      /* Signed out: the rooms end line is a muted subline (same size and color as
+         "New cards show up…"), and the note's lines sit 8px apart. */
+      var endSignedOut = signedOutViewer();
       var empty =
-        '<div class="commune-swipe-end" data-commune-deck-end>' +
+        '<div class="commune-swipe-end' + (endSignedOut ? " commune-swipe-end--signed-out" : "") + '" data-commune-deck-end>' +
         '<p class="commune-swipe-empty commune-swipe-end-title">You\'re caught up.</p>' +
         '<p class="commune-swipe-end-sub">New cards show up as people share.</p>' +
         (liveBirthMissing()
@@ -4088,7 +4091,7 @@
             '<p class="commune-swipe-empty"><button type="button" class="btn btn-primary" data-commune-add-birth>Add birth month</button></p>'
           : roomsOpen || birthAgePending()
             ? ''
-            : '<p class="commune-swipe-empty commune-swipe-empty--rooms">No chat rooms match your age and interests yet. Update age or interests in your profile, then come back.</p>') +
+            : '<p class="commune-swipe-empty commune-swipe-empty--rooms' + (endSignedOut ? " commune-swipe-end-sub" : "") + '">No chat rooms match your age and interests yet. Update age or interests in your profile, then come back.</p>') +
         "</div>";
       state.deck.innerHTML = empty;
       var addBirth = state.deck.querySelector("[data-commune-add-birth]");

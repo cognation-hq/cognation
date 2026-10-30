@@ -7,6 +7,9 @@
  * from Supabase: reactions on each other's PUBLIC Tower posts, @-tags in public Tower posts
  * and News comments, and reactions on each other's News comments.
  * Direct messages and chat rooms are never read and never count.
+ * Blocked people (user_blocks + CognationBlock.listMyBlocks) never appear,
+ * Personal or Pro, and Tower posts hidden by review never count. Ties go to
+ * the latest public interaction, oldest first (none at all first), then name.
  * Falling circles sit outside the ring and the five frames, smaller and
  * lighter than the frame photos; they breathe (no orbit), still for
  * prefers-reduced-motion. Server only, no demo fallback.
@@ -103,6 +106,29 @@
     } catch (e) { return ""; }
   }
 
+  /* People the viewer blocked: user_blocks (RLS: the blocker's own rows) plus the
+     existing client list (CognationBlock.listMyBlocks). A refused read adds nothing;
+     block_user also removes the friendship server side. */
+  function fetchBlocked(client, id) {
+    var set = {};
+    function add(u) { u = safeId(u); if (u) set[u] = true; }
+    function addRows(key) {
+      return function (rows) { (Array.isArray(rows) ? rows : []).forEach(function (r) { add(r && r[key]); }); };
+    }
+    var fromTable = Promise.resolve().then(function () {
+      return client.rest("user_blocks", { query: "select=blocked_user_id&blocker_user_id=eq." + id + "&limit=" + PAGE });
+    }).then(addRows("blocked_user_id"), function () {});
+    var cb = root && root.CognationBlock;
+    var fromList = cb && typeof cb.listMyBlocks === "function"
+      ? Promise.resolve().then(function () { return cb.listMyBlocks(); }).then(addRows("user_id"), function () {})
+      : Promise.resolve();
+    return Promise.all([fromTable, fromList]).then(function () { return set; });
+  }
+
+  function notBlocked(blocked) {
+    return function (f) { return !(f && f.userId && blocked && blocked[f.userId]); };
+  }
+
   /* Server only. Anything missing = empty list, never demo friends. */
   function loadFriends(client, id) {
     return loadRoster(client, id).then(function (r) { return r.friends; });
@@ -111,7 +137,7 @@
   function loadRoster(client, id) {
     client = client || (root && root.CognationSupabase);
     id = safeId(id || viewerId());
-    var none = { viewerId: id, friends: [], profiles: [] };
+    var none = { viewerId: id, friends: [], profiles: [], blocked: {} };
     if (!id || !client || typeof client.rest !== "function") return Promise.resolve(none);
     if (typeof client.configured === "function" && !client.configured()) return Promise.resolve(none);
     return fetchFriendships(client, id).then(function (friendships) {
@@ -125,9 +151,12 @@
         });
       });
       return fetchProfiles(client, ids).then(function (profiles) {
-        return followsFor(client, id, profiles).then(function (extra) {
+        return Promise.all([followsFor(client, id, profiles), fetchBlocked(client, id)]).then(function (both) {
+          var extra = both[0];
+          var blocked = both[1];
           var all = profiles.concat(extra.profiles || []);
-          return { viewerId: id, friends: friendsFromRows(id, friendships, all), profiles: all, follows: extra.follows || [] };
+          var friends = friendsFromRows(id, friendships, all).filter(notBlocked(blocked));
+          return { viewerId: id, friends: friends, profiles: all, follows: extra.follows || [], blocked: blocked };
         });
       });
     }).then(null, function () { return none; });
@@ -190,8 +219,15 @@
      comments, commentReactions}. Returns {userId: score}. Only rows between
      the viewer and one friend count; friend-to-friend rows are ignored. */
   function scoreEngagement(viewerUserId, friendIds, data) {
+    return engagementDetail(viewerUserId, friendIds, data).score;
+  }
+
+  /* scoreEngagement plus last{userId: ISO time}: the latest counted public interaction
+     that carries a time (post or comment created_at, Tower reaction created_at). */
+  function engagementDetail(viewerUserId, friendIds, data) {
     data = data || {};
     var score = {};
+    var last = {};
     var isFriend = {};
     (friendIds || []).forEach(function (u) { score[u] = 0; isFriend[u] = true; });
     var owner = data.profileOwner || {};
@@ -200,40 +236,47 @@
       if (u === viewerUserId) return "viewer";
       return u && isFriend[u] ? u : "";
     }
-    function bump(u, n) { if (n === undefined) n = 1; if (u && isFriend[u] && n > 0) score[u] += n; }
+    function bump(u, n, at) {
+      if (n === undefined) n = 1;
+      if (!(u && isFriend[u] && n > 0)) return;
+      score[u] += n;
+      var t = at ? Date.parse(at) : NaN;
+      if (!isNaN(t) && (!last[u] || t > Date.parse(last[u]))) last[u] = String(at);
+    }
     var handlesByUser = data.handlesByUser || {};
     var viewerHandles = data.viewerHandles || [];
-    function tags(authorSide, body) {
+    function tags(authorSide, body, at) {
       if (authorSide === "viewer") {
         Object.keys(handlesByUser).forEach(function (u) {
           if (!isFriend[u]) return;
-          (handlesByUser[u] || []).forEach(function (h) { bump(u, mentionCount(body, h)); });
+          (handlesByUser[u] || []).forEach(function (h) { bump(u, mentionCount(body, h), at); });
         });
       } else if (authorSide) {
-        viewerHandles.forEach(function (h) { bump(authorSide, mentionCount(body, h)); });
+        viewerHandles.forEach(function (h) { bump(authorSide, mentionCount(body, h), at); });
       }
     }
     var postAuthor = {};
     (data.posts || []).forEach(function (p) {
       if (!p || !p.id) return;
       if (p.visibility && p.visibility !== "public") return; /* public Tower posts only */
+      if (p.hidden_at) return; /* hidden by review: never counts */
       var side = who(p.author_profile_id);
       postAuthor[p.id] = side;
-      tags(side, p.body);
+      tags(side, p.body, p.created_at);
     });
     (data.postReactions || []).forEach(function (r) {
       if (!r) return;
       var author = postAuthor[r.post_id];
       var reactor = who(r.profile_id);
-      if (author === "viewer" && reactor && reactor !== "viewer") bump(reactor);
-      else if (reactor === "viewer" && author && author !== "viewer") bump(author);
+      if (author === "viewer" && reactor && reactor !== "viewer") bump(reactor, 1, r.created_at);
+      else if (reactor === "viewer" && author && author !== "viewer") bump(author, 1, r.created_at);
     });
     var commentAuthor = {};
     (data.comments || []).forEach(function (c) {
       if (!c || !c.id) return;
       var side = who(c.author_profile_id);
       commentAuthor[c.id] = side;
-      tags(side, c.body);
+      tags(side, c.body, c.created_at);
     });
     (data.commentReactions || []).forEach(function (r) {
       if (!r) return;
@@ -242,7 +285,7 @@
       if (author === "viewer" && reactor && reactor !== "viewer") bump(reactor);
       else if (reactor === "viewer" && author && author !== "viewer") bump(author);
     });
-    return score;
+    return { score: score, last: last };
   }
 
   function byName(a, b) {
@@ -250,15 +293,30 @@
     return x < y ? -1 : x > y ? 1 : String(a.userId) < String(b.userId) ? -1 : 1;
   }
 
-  /* Halo: five MOST engaged (ties by name). Falling: everyone else, LEAST first, cap 30. */
-  function rank(friends, scores) {
+  /* Latest public interaction time, or null when none carries a time. */
+  function lastAt(last, f) {
+    var t = last && last[f.userId] ? Date.parse(last[f.userId]) : NaN;
+    return isNaN(t) ? null : t;
+  }
+
+  /* Halo: five MOST engaged (ties: most recent interaction, then name). Falling:
+     everyone else, LEAST first; ties: no interaction first, then the oldest latest
+     interaction, then name. Cap 30. */
+  function rank(friends, scores, last) {
     scores = scores || {};
+    function older(a, b) {
+      var x = lastAt(last, a), y = lastAt(last, b);
+      if (x === y) return 0;
+      if (x === null) return -1;
+      if (y === null) return 1;
+      return x - y;
+    }
     var list = (friends || []).filter(function (f) { return f && f.userId; }).map(function (f) {
       return Object.assign({}, f, { engagement: scores[f.userId] || 0 });
     });
-    var most = list.slice().sort(function (a, b) { return b.engagement - a.engagement || byName(a, b); });
+    var most = list.slice().sort(function (a, b) { return b.engagement - a.engagement || older(b, a) || byName(a, b); });
     var halo = most.slice(0, HALO_COUNT);
-    var fall = most.slice(HALO_COUNT).sort(function (a, b) { return a.engagement - b.engagement || byName(a, b); });
+    var fall = most.slice(HALO_COUNT).sort(function (a, b) { return a.engagement - b.engagement || older(a, b) || byName(a, b); });
     return { halo: halo, fall: fall.slice(0, PULSE_FALL_CAP) };
   }
 
@@ -311,43 +369,48 @@
       return promise.then(null, function () { gaps.push(name); return []; });
     }
     var data = { profileOwner: profileOwner, handlesByUser: handlesByUser, viewerHandles: viewerHandles };
-    /* PUBLIC Tower posts only (PM 2026-10-21): friends-only posts never count. */
-    var postsP = soft("tower_posts", readAll(client, "tower_posts", "id,author_profile_id,body,visibility", "author_profile_id", people, 50, true, "visibility=eq.public"));
-    var commentsP = soft("news_story_comments", readAll(client, "news_story_comments", "id,author_profile_id,body", "author_profile_id", people, 50, true));
+    /* PUBLIC Tower posts only (PM 2026-10-21): friends-only posts never count.
+       Posts hidden by review never count (PM 2026-10-30): RLS still returns them to their author. */
+    var postsP = soft("tower_posts", readAll(client, "tower_posts", "id,author_profile_id,body,visibility,created_at", "author_profile_id", people, 50, true, "visibility=eq.public&hidden_at=is.null"));
+    /* news_story_comments has no review-hidden column. */
+    var commentsP = soft("news_story_comments", readAll(client, "news_story_comments", "id,author_profile_id,body,created_at", "author_profile_id", people, 50, true));
     return Promise.all([postsP, commentsP]).then(function (r) {
       data.posts = r[0];
       data.comments = r[1];
       var postIds = r[0].map(function (p) { return p.id; }).filter(safeId);
       var commentIds = r[1].map(function (c) { return c.id; }).filter(safeId);
       return Promise.all([
-        soft("tower_post_reactions", readAll(client, "tower_post_reactions", "post_id,profile_id", "post_id", postIds, 100)),
+        soft("tower_post_reactions", readAll(client, "tower_post_reactions", "post_id,profile_id,created_at", "post_id", postIds, 100)),
+        /* no created_at column on this table yet: these count but carry no time */
         soft("news_story_comment_reactions", readAll(client, "news_story_comment_reactions", "comment_id,profile_id", "comment_id", commentIds, 100)),
       ]);
     }).then(function (r) {
       data.postReactions = r[0];
       data.commentReactions = r[1];
-      return { scores: scoreEngagement(viewer, friendIds, data), gaps: gaps };
+      var detail = engagementDetail(viewer, friendIds, data);
+      return { scores: detail.score, last: detail.last, gaps: gaps };
     });
   }
 
   function loadRanked(client, id) {
     client = client || (root && root.CognationSupabase);
     return loadRoster(client, id).then(function (roster) {
-      var pro = proFromFollows(roster.follows, roster.profiles);
+      var pro = proFromFollows(roster.follows, roster.profiles).filter(notBlocked(roster.blocked));
       if (!roster.friends.length && !pro.length) return { halo: [], fall: [], scores: {}, gaps: [], professional: { halo: [], fall: [] } };
       var seen = {}, merged = roster.friends.slice();
       roster.friends.forEach(function (f) { seen[f.userId] = 1; });
       pro.forEach(function (f) { if (!seen[f.userId]) merged.push(f); });
       var scoreRoster = { viewerId: roster.viewerId, friends: merged, profiles: roster.profiles };
-      function pack(scores, gaps) {
-        var r = rank(roster.friends, scores);
+      function pack(scores, gaps, last) {
+        var r = rank(roster.friends, scores, last);
         r.scores = scores;
+        r.last = last || {};
         r.gaps = gaps;
-        r.professional = rank(pro, scores);
+        r.professional = rank(pro, scores, last);
         return r;
       }
       return fetchEngagement(client, scoreRoster).then(function (e) {
-        return pack(e.scores, e.gaps);
+        return pack(e.scores, e.gaps, e.last);
       }, function () { return pack({}, ["engagement"]); });
     });
   }

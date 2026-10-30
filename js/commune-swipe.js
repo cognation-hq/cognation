@@ -4522,6 +4522,8 @@
     return ax > DRAG_CLICK_PX || ay > DRAG_CLICK_PX;
   }
   function bindDeck(deck) {
+    /* init() sets state.deck before it binds; a deck bound on its own (tests) is the deck. */
+    if (!state.deck) state.deck = deck;
     deck.addEventListener("pointerdown", onPointerDown);
     deck.addEventListener("pointermove", onPointerMove);
     deck.addEventListener("pointerup", onPointerUp);

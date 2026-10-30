@@ -527,7 +527,7 @@ function reshapedWidths(row) {
   return out;
 }
 
-test("1280: an emoji Rotate lifts the grid but every widget keeps its rect; music stays 448x175, no overlap, reload 0px, nothing shoved", async function () {
+test("1280: an emoji Rotate keeps the grid (no lift) and every widget keeps its rect; music stays 448x175, no overlap, reload 0px, nothing shoved", async function () {
   var env = boot(null);
   var p = profile();
   ownStore(env, p);

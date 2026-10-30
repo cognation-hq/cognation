@@ -5155,9 +5155,17 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   justify-content: center;
   padding: 0.35rem 0.45rem 0.7rem;
   line-height: 1;
+  /* A drag starting on the glyph must not text-select it (Chrome paints the
+     selection as a blue box behind a rotated emoji) or start a native drag. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 .tower-emoji-glyph {
   display: block;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
   font-size: var(--emoji-size, 64px);
   line-height: 1;
   font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji" !important;

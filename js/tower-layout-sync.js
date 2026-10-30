@@ -171,6 +171,9 @@
     /* Grid resizes (layout-resize-reset): { id: { w } } px sizes on the default grid. */
     var size = cleanGridSize(layout._gridSize);
     if (Object.keys(size).length) out._gridSize = size;
+    /* Grid Rotates (#329 v2): { id: { deg } } per-widget tilts on the default grid. */
+    var tilt = cleanGridTilt(layout._gridTilt);
+    if (Object.keys(tilt).length) out._gridTilt = tilt;
     /* The row's positions are the whole layout (every owner geometry save,
        Reset included). A widget missing from such a row has no saved spot,
        so an older local copy can't bring it back. */
@@ -207,6 +210,22 @@
       var w = Math.round(Number(v.w));
       if (!isFinite(w) || w <= 0) return;
       out[id] = { w: Math.max(80, Math.min(4000, w)) };
+    });
+    return out;
+  }
+
+  function cleanGridTilt(src) {
+    var out = {};
+    if (!src || typeof src !== "object") return out;
+    Object.keys(src).slice(0, 60).forEach(function (id) {
+      var v = src[id];
+      if (!v || typeof v !== "object" || String(id).length > 64 || String(id).charAt(0) === "_") return;
+      var n = Number(v.deg);
+      if (!isFinite(n)) return;
+      n = ((n % 360) + 360) % 360;
+      if (n > 180) n -= 360;
+      n = Math.round(n * 10) / 10;
+      if (n) out[id] = { deg: n };
     });
     return out;
   }
@@ -298,7 +317,7 @@
       var base = p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : {};
       Object.keys(saved).forEach(function (wid) {
         if (wid === "_compacted") { base._compacted = 1; return; }
-        if (wid === "_gridNudge" || wid === "_gridSize" || wid === "_full") return;
+        if (wid === "_gridNudge" || wid === "_gridSize" || wid === "_gridTilt" || wid === "_full") return;
         if (wid === "_public" || wid === "_backup") return;
         var next = saved[wid];
         var prev = base[wid];
@@ -317,6 +336,8 @@
       else delete base._gridNudge;
       if (saved._gridSize) base._gridSize = saved._gridSize;
       else delete base._gridSize;
+      if (saved._gridTilt) base._gridTilt = saved._gridTilt;
+      else delete base._gridTilt;
       /* A full row (any owner geometry save, Reset included) is the whole
          layout: drop positions only a local copy still has. After Reset that
          is every position, so the page opens on the exact default grid. */

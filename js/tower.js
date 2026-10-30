@@ -313,6 +313,76 @@
     });
   }
 
+  /* Grid tilt (#329 v2): Rotate on a default-grid widget tilts only that
+     widget, { id: { deg } } in widgetLayout._gridTilt. Like a nudge or a grid
+     size it is drawn with an independent CSS property (rotate) that never
+     changes layout, so no widget leaves the grid and no other rect moves.
+     The rotate goes on the widget's photo frame when it has one (Polaroid,
+     avatar), so the frame tilts inside its slot and the card stays put.
+     The layout stays the default grid; phones never apply it; Reset clears it. */
+  var GRID_TILT_KEY = "_gridTilt";
+  function cleanGridTilt(src) {
+    var out = {};
+    if (!src || typeof src !== "object") return out;
+    Object.keys(src).slice(0, 60).forEach(function (id) {
+      var v = src[id];
+      if (!v || typeof v !== "object" || String(id).length > 64 || String(id).charAt(0) === "_") return;
+      var n = Number(v.deg);
+      if (!isFinite(n)) return;
+      n = ((n % 360) + 360) % 360;
+      if (n > 180) n -= 360;
+      n = Math.round(n * 10) / 10;
+      if (n) out[id] = { deg: n };
+    });
+    return out;
+  }
+  function getGridTilt(p) {
+    var l = p && p.widgetLayout;
+    return cleanGridTilt(l && typeof l === "object" ? l[GRID_TILT_KEY] : null);
+  }
+  /* What turns on screen: the photo frame inside the widget, else the widget. */
+  function gridTiltTarget(el) {
+    var f = el && typeof el.querySelector === "function" ? el.querySelector("[data-tower-avatar-frame]") : null;
+    return f || el;
+  }
+  function setGridTiltStyle(el, deg) {
+    if (!el || !el.style) return;
+    var t = gridTiltTarget(el);
+    var n = Math.round(Number(deg) * 10) / 10;
+    if (n && isFinite(n)) {
+      t.style.setProperty("rotate", n + "deg");
+      el.setAttribute("data-grid-tilt", String(n));
+    } else {
+      t.style.removeProperty("rotate");
+      if (el.removeAttribute) el.removeAttribute("data-grid-tilt");
+    }
+  }
+  function readGridTiltStyle(el) {
+    var n = el && el.getAttribute ? parseFloat(el.getAttribute("data-grid-tilt") || "") : NaN;
+    return isFinite(n) ? n : 0;
+  }
+  function clearGridTilt(stage) {
+    if (!stage || typeof stage.querySelectorAll !== "function") return;
+    stage.querySelectorAll("[data-grid-tilt]").forEach(function (el) { setGridTiltStyle(el, 0); });
+  }
+  /* A widget the grid laid out: a direct grid child or a profile-card member. */
+  function isGridLaidWidget(stage, el) {
+    if (!stage || !el || el.hidden || (el.classList && el.classList.contains("is-widget-off"))) return false;
+    if (!el.classList || !el.classList.contains("is-spawned")) return false;
+    var par = el.parentNode;
+    return par === stage || !!(par && par.parentNode === stage && par.hasAttribute && par.hasAttribute("data-tower-profile-strip"));
+  }
+  function applyGridTilt(stage, p) {
+    clearGridTilt(stage);
+    if (!stage || !stage.classList.contains("is-default-grid") || isPhoneStage(stage)) return;
+    var tilts = getGridTilt(p);
+    Object.keys(tilts).forEach(function (id) {
+      var el = stage.querySelector('[data-tower-widget="' + id + '"]');
+      if (!isGridLaidWidget(stage, el)) return;
+      setGridTiltStyle(el, tilts[id].deg);
+    });
+  }
+
   /* One Pro check for spawn rows AND the music gate. The music gate read only
      _profileKind while the spawn rows also read kind, so a Pro page whose
      _profileKind came back "personal" got Pro rows (no music slot) plus a
@@ -630,6 +700,7 @@
     if (!useGrid) {
       clearGridNudge(stage);
       clearGridSize(stage);
+      clearGridTilt(stage);
       unwrapProfileStrip(stage);
     }
 
@@ -670,6 +741,7 @@
       ensureProfileStrip(stage, p);
       applyGridNudge(stage, p);
       applyGridSize(stage, p);
+      applyGridTilt(stage, p);
       /* Friend pins: in default grid they sit inside the Top Friends card flow via CSS;
          clear absolute spawn marks so they do not float over the grid. */
       stage.querySelectorAll("[data-tower-friend-pin].is-spawned").forEach(function (pin) {
@@ -1100,8 +1172,14 @@
     stage.querySelectorAll("[data-grid-w]").forEach(function (el) {
       liftSizes.push({ el: el, w: readGridSizeStyle(el) });
     });
+    /* A grid tilt becomes the sticker's own tilt once it is out of the grid. */
+    var liftTilts = [];
+    stage.querySelectorAll("[data-grid-tilt]").forEach(function (el) {
+      liftTilts.push({ el: el, deg: readGridTiltStyle(el) });
+    });
     clearGridNudge(stage);
     clearGridSize(stage);
+    clearGridTilt(stage);
     stage.classList.remove("is-default-grid", "is-desktop-grid");
     /* Out of the strip the members take their sticker size; lay them in one row
        from the strip's left edge and push everything below down by the extra height. */
@@ -1146,6 +1224,12 @@
       spawnCache[el.getAttribute("data-tower-widget")] = { x: sp.x, y: sp.y, z: 2, tilt: 0 };
     });
     liftSizes.forEach(function (ls) { if (ls.w > 0) setStickerWidth(ls.el, ls.w); });
+    liftTilts.forEach(function (lt) {
+      if (!lt.deg) return;
+      lt.el.style.setProperty("--sticker-tilt", lt.deg + "deg");
+      var sc = spawnCache[lt.el.getAttribute("data-tower-widget")];
+      if (sc) sc.tilt = lt.deg;
+    });
     return true;
   }
 
@@ -1339,6 +1423,7 @@
     if (layout) {
       delete layout[GRID_NUDGE_KEY];
       delete layout[GRID_SIZE_KEY];
+      delete layout[GRID_TILT_KEY];
     }
     stage.querySelectorAll("[data-tower-widget].is-spawned").forEach(function (el) {
       var id = el.getAttribute("data-tower-widget");
@@ -1349,7 +1434,8 @@
         x: parseFloat(el.getAttribute("data-sticker-x") || "0"),
         y: parseFloat(el.getAttribute("data-sticker-y") || "0"),
         z: parseInt(el.getAttribute("data-sticker-z") || "2", 10),
-        tilt: 0,
+        /* 0 unless the lift carried a grid tilt over (#329 v2). */
+        tilt: parseFloat(el.style.getPropertyValue("--sticker-tilt")) || 0,
       };
       if (typeof el.offsetTop === "number" && (stage.clientHeight || 0) > 0) layout[id].yPx = Math.round(el.offsetTop);
       var frozenW = parseFloat(el.getAttribute("data-sticker-w") || "");
@@ -2085,7 +2171,7 @@
       Object.keys(saved.widgetLayout).forEach(function (id) {
         var pos = saved.widgetLayout[id];
         if (!pos || typeof pos !== "object") return;
-        if (id === GRID_NUDGE_KEY || id === GRID_SIZE_KEY) return;
+        if (id === GRID_NUDGE_KEY || id === GRID_SIZE_KEY || id === GRID_TILT_KEY) return;
         var cur = base[id] && typeof base[id] === "object" ? base[id] : {};
         base[id] = {
           x: layoutCoord(pos.x, layoutCoord(cur.x, 0)),
@@ -2104,6 +2190,9 @@
       var savedSize = cleanGridSize(saved.widgetLayout[GRID_SIZE_KEY]);
       if (Object.keys(savedSize).length) base[GRID_SIZE_KEY] = savedSize;
       else delete base[GRID_SIZE_KEY];
+      var savedTilt = cleanGridTilt(saved.widgetLayout[GRID_TILT_KEY]);
+      if (Object.keys(savedTilt).length) base[GRID_TILT_KEY] = savedTilt;
+      else delete base[GRID_TILT_KEY];
       p.widgetLayout = base;
     }
     if (saved.musicYoutubeWidth != null && !isNaN(parseInt(saved.musicYoutubeWidth, 10))) {
@@ -7757,6 +7846,7 @@
 
   function readTiltFromElement(el) {
     if (!el) return 0;
+    if (el.hasAttribute && el.hasAttribute("data-grid-tilt")) return readGridTiltStyle(el);
     var raw = el.style.getPropertyValue("--sticker-tilt") || "";
     var n = parseFloat(String(raw).replace("deg", ""));
     if (isNaN(n)) n = 0;
@@ -7819,14 +7909,38 @@
       TowerProfileStore.save(p, { geometry: true });
       return;
     }
+    /* Grid Rotate (#329 v2): a widget the default grid laid out keeps the grid.
+       Only its _gridTilt is saved; nothing is frozen, lifted, resized or
+       repaired, so every other rect stays put and the reload matches. */
+    if (tiltStage && tiltStage.classList.contains("is-default-grid") && isGridLaidWidget(tiltStage, el)) {
+      el.style.removeProperty("--sticker-tilt");
+      if (el.removeAttribute) el.removeAttribute("data-sticker-tilt");
+      var gl = p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : {};
+      var gt = cleanGridTilt(gl[GRID_TILT_KEY]);
+      var prevT = gt[wid] ? gt[wid].deg : 0;
+      if (tilt) gt[wid] = { deg: tilt };
+      else delete gt[wid];
+      setGridTiltStyle(el, tilt);
+      if ((gt[wid] ? gt[wid].deg : 0) === prevT) return;
+      if (Object.keys(gt).length) gl[GRID_TILT_KEY] = gt;
+      else delete gl[GRID_TILT_KEY];
+      p.widgetLayout = gl;
+      TowerProfileStore.save(p, { geometry: true });
+      return;
+    }
     var layout = freezeSpawnedWidgets(el.closest ? el.closest("[data-tower-app]") || document : document, getWidgetLayout(p) || {});
     var prev = layout[wid] || {};
+    /* Rotate on a layout a drag already lifted: keep this widget's dragged
+       mark and its stage-pixel y / width, so the reload lands where it is. */
     layout[wid] = {
       x: typeof prev.x === "number" ? prev.x : parseFloat(el.getAttribute("data-sticker-x") || "0"),
       y: typeof prev.y === "number" ? prev.y : parseFloat(el.getAttribute("data-sticker-y") || "0"),
       z: typeof prev.z === "number" ? prev.z : parseInt(el.getAttribute("data-sticker-z") || "1", 10),
       tilt: tilt,
+      dragged: true,
     };
+    if (typeof prev.yPx === "number") layout[wid].yPx = prev.yPx;
+    if (typeof prev.wPx === "number" && prev.wPx > 0) layout[wid].wPx = prev.wPx;
     p.widgetLayout = layout;
     TowerProfileStore.save(p, { geometry: true });
   }

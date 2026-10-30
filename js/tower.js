@@ -7821,14 +7821,40 @@
     }
     var layout = freezeSpawnedWidgets(el.closest ? el.closest("[data-tower-app]") || document : document, getWidgetLayout(p) || {});
     var prev = layout[wid] || {};
+    /* A Rotate is an owner placement, like a drop: mark it dragged so the saved
+       (often lifted-from-grid) layout reloads as saved. Without the mark
+       getWidgetLayout read it as never-dragged and reopened the default grid.
+       Keep the frozen yPx / wPx so the reload lands on the same pixels. */
     layout[wid] = {
       x: typeof prev.x === "number" ? prev.x : parseFloat(el.getAttribute("data-sticker-x") || "0"),
       y: typeof prev.y === "number" ? prev.y : parseFloat(el.getAttribute("data-sticker-y") || "0"),
       z: typeof prev.z === "number" ? prev.z : parseInt(el.getAttribute("data-sticker-z") || "1", 10),
       tilt: tilt,
+      dragged: true,
     };
+    if (typeof prev.yPx === "number") layout[wid].yPx = prev.yPx;
+    if (typeof prev.wPx === "number" && prev.wPx > 0) layout[wid].wPx = prev.wPx;
+    /* The lift above reset every sticker's tilt to 0deg; show the new tilt now. */
+    applyTiltToElement(el, tilt);
     p.widgetLayout = layout;
     TowerProfileStore.save(p, { geometry: true });
+    /* Same as a drop or a resize: settle overlaps with this owner action, so the
+       saved row is what a reload renders (the open-time repair then moves nothing). */
+    if (tiltStage) {
+      /* Pin the lifted stickers at their saved stage pixels (as a reload does),
+         so a taller stage after the repair never slides a %-placed one down. */
+      Object.keys(layout).forEach(function (lid) {
+        var pos = layout[lid];
+        if (!pos || typeof pos !== "object" || typeof pos.yPx !== "number" || String(lid).charAt(0) === "_") return;
+        var lel = tiltStage.querySelector('[data-tower-widget="' + lid + '"]');
+        if (lel && lel.parentNode === tiltStage) lel.style.setProperty("--sticker-y", Math.round(pos.yPx) + "px");
+      });
+      try {
+        var spawnIdsT = {};
+        spawnRowsFor(p).forEach(function (r) { r.forEach(function (w) { spawnIdsT[w] = true; }); });
+        repairLayoutOverlaps(tiltStage, p, getWidgetLayout(p), spawnIdsT, { ownerAction: true });
+      } catch (eRt) {}
+    }
   }
 
   /** delta: number degrees to add, or absolute via mode */

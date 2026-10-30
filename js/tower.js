@@ -302,6 +302,44 @@
     if (!stage || typeof stage.querySelectorAll !== "function") return;
     stage.querySelectorAll("[data-grid-w]").forEach(function (el) { setGridSizeStyle(el, 0); });
   }
+  /* Grid look (lifted-player-no-cover): a lift keeps each untouched grid
+     widget's rendered rect. data-grid-look is its grid slot width (px); CSS
+     keeps the grid card look on it off the grid (compact MP3 row, card chrome).
+     --grid-look-w is the on-screen width: the slot, or a grid resize carried as
+     the sticker's own width (d79fbca, no scale left). The MP3 row zooms by
+     w / slot (--grid-look-zoom) so a 398 resize stays 398x155, as on the grid.
+     Saved on the widget's layout entry as gridLook (slot) with wPx; never shown
+     on the grid or at 390. */
+  function setGridLook(el, slotW, w) {
+    if (!el || !el.style) return;
+    var s = Math.round(Number(slotW));
+    if (s > 0) {
+      var n = Math.round(Number(w));
+      if (!(n > 0)) n = s;
+      el.setAttribute("data-grid-look", String(s));
+      el.style.setProperty("--grid-look-w", n + "px");
+      if (n !== s) el.style.setProperty("--grid-look-zoom", String(Math.round((n / s) * 10000) / 10000));
+      else el.style.removeProperty("--grid-look-zoom");
+    } else if (el.hasAttribute && el.hasAttribute("data-grid-look")) {
+      el.removeAttribute("data-grid-look");
+      el.style.removeProperty("--grid-look-w");
+      el.style.removeProperty("--grid-look-zoom");
+    }
+  }
+  function readGridLook(el) {
+    var n = el && el.getAttribute ? parseInt(el.getAttribute("data-grid-look") || "", 10) : NaN;
+    return n > 0 ? n : 0;
+  }
+  function clearGridLook(stage) {
+    if (!stage || typeof stage.querySelectorAll !== "function") return;
+    stage.querySelectorAll("[data-grid-look]").forEach(function (el) { setGridLook(el, 0); });
+  }
+  /* A saved entry's grid look, when the stage shows free placement. */
+  function applyGridLookFromLayout(stage, el, pos) {
+    var look = pos && typeof pos === "object" && typeof pos.gridLook === "number" && pos.gridLook > 0 ? pos.gridLook : 0;
+    if (!look || isPhoneStage(stage)) { setGridLook(el, 0); return; }
+    setGridLook(el, look, pos.wPx);
+  }
   function applyGridSize(stage, p) {
     clearGridSize(stage);
     if (!stage || !stage.classList.contains("is-default-grid") || isPhoneStage(stage)) return;
@@ -705,6 +743,7 @@
     }
 
     if (useGrid) {
+      clearGridLook(stage);
       var ordered = [];
       var gridCache = {};
       rows.forEach(function (row) {
@@ -817,6 +856,7 @@
         el.setAttribute("data-sticker-y", String(by.pct));
         el.setAttribute("data-sticker-z", String(layoutCoord(back.z, 2)));
         setStickerWidth(el, back.wPx);
+        applyGridLookFromLayout(stage, el, back);
       }
       occupied.push({ x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight });
     });
@@ -938,7 +978,10 @@
       if (!isFinite(rx) || rx < 0) rx = 0;
       rowItems.forEach(function (it) {
         var bx = Math.max(0, Math.min(Math.max(0, stageW - it.w), rx));
-        var box = { x: bx, y: gap, w: it.w, h: it.h };
+        /* A card the lift carried from the grid (grid look) keeps its own top:
+           the grid seats it at its own y (31px at 1280), not at the gap. */
+        var by = it.look && isFinite(it.y) && it.y >= 0 ? it.y : gap;
+        var box = { x: bx, y: by, w: it.w, h: it.h };
         if (box.x !== it.x || box.y !== it.y) moves[it.id] = { x: box.x, y: box.y };
         fixed.push(box);
         rx = bx + it.w + 12;
@@ -1024,7 +1067,7 @@
       if (!id || el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
       if (el.classList.contains("is-dragging") || !spawnIds[id]) return;
       if (!el.offsetWidth || !el.offsetHeight) return;
-      items.push({ id: id, el: el, x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight, dragged: !!(layout && layout[id] && layout[id].dragged === true) });
+      items.push({ id: id, el: el, x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight, dragged: !!(layout && layout[id] && layout[id].dragged === true), look: readGridLook(el) > 0 });
     });
     /* One-time pass: an owner layout saved before compaction existed. */
     var owner = !!(p && layout && isTowerOwner(p) && !p._loading);
@@ -1146,7 +1189,10 @@
       if (el.parentNode !== stage || el.hidden || el.classList.contains("is-widget-off")) return;
       if (isAddedSticker(el)) return;
       var r = el.getBoundingClientRect();
-      spots.push({ el: el, left: r.left - sr.left, top: r.top - sr.top, w: r.width, half: el.classList.contains("is-spawn-half") });
+      /* A grid-laid widget keeps its grid look off the grid: its layout width
+         (offsetWidth; a grid resize's scale does not change it) and its look. */
+      var look = isGridLaidWidget(stage, el) ? el.offsetWidth || 0 : 0;
+      spots.push({ el: el, left: r.left - sr.left, top: r.top - sr.top, w: r.width, look: look, half: el.classList.contains("is-spawn-half") });
     });
     /* Profile strip (avatar | name/@handle/quote) is one grid row. Freeze its
        members too, in the same top row, so the first drag on a fresh page never
@@ -1209,9 +1255,12 @@
       el.classList.remove("is-spawn-full", "is-spawn-half");
       if (sp.w && stripMembers.indexOf(el) < 0) {
         el.style.setProperty("--spawn-max-w", Math.ceil(sp.w) + "px");
-        /* Half-row widgets keep their column width. Full rows (YouTube, Music)
-           were height-capped by the grid, so they return to their own size. */
+        /* Every grid-laid widget keeps its grid rect (lifted-player-no-cover):
+           half rows their column width, full rows (YouTube, Music) their slot
+           width and grid look, so the MP3 player stays the compact 448x175 row
+           and never grows to the tall iPod over the Polaroid and Instax. */
         if (sp.half) setStickerWidth(el, sp.w);
+        else if (sp.look) setStickerWidth(el, sp.w);
       }
       el.classList.add("is-spawned");
       el.style.setProperty("--sticker-x", sp.x + "%");
@@ -1224,6 +1273,14 @@
       spawnCache[el.getAttribute("data-tower-widget")] = { x: sp.x, y: sp.y, z: 2, tilt: 0 };
     });
     liftSizes.forEach(function (ls) { if (ls.w > 0) setStickerWidth(ls.el, ls.w); });
+    /* After the sizes: each untouched grid widget keeps its grid look at its
+       grid rect. */
+    spots.forEach(function (sp) {
+      if (!(sp.look > 0) || stripMembers.indexOf(sp.el) >= 0) return;
+      /* A grid resize (d79fbca) carries as the sticker's own width (no scale);
+         the grid look keeps the slot so the MP3 row keeps its grid height. */
+      setGridLook(sp.el, sp.look, sp.w);
+    });
     liftTilts.forEach(function (lt) {
       if (!lt.deg) return;
       lt.el.style.setProperty("--sticker-tilt", lt.deg + "deg");
@@ -1307,6 +1364,12 @@
         var sr0 = sticker.getBoundingClientRect();
         startW = Math.round((sr0 && sr0.width) || readGridSizeStyle(sticker) || startW);
       }
+      /* A lifted widget with the grid look: start from what is on screen. */
+      var lookResize = !gridResize && readGridLook(sticker) > 0;
+      if (lookResize) {
+        var lr0 = sticker.getBoundingClientRect();
+        startW = Math.round((lr0 && lr0.width) || startW);
+      }
       var curW = startW;
       var gridMinPx = gridResize ? gridMinWidth(sticker, sticker.offsetWidth || 0) : 0;
       sticker.classList.add("is-resizing");
@@ -1318,6 +1381,8 @@
         if (gridResize && gridMinPx > 0) curW = Math.max(curW, gridMinPx);
         if (gridResize) setGridSizeStyle(sticker, curW);
         else setStickerWidth(sticker, curW);
+        /* Its own resize changes its own rect only: the grid look stays. */
+        if (lookResize) setGridLook(sticker, readGridLook(sticker), curW);
         if (e.cancelable) e.preventDefault();
       }
       function onUp() {
@@ -1371,6 +1436,7 @@
           dragged: true,
           wPx: curW,
         };
+        if (readGridLook(sticker) > 0) layout[wid].gridLook = readGridLook(sticker);
         if (typeof cur.yPx === "number") layout[wid].yPx = cur.yPx;
         else if (typeof sticker.offsetTop === "number") layout[wid].yPx = Math.round(sticker.offsetTop);
         p.widgetLayout = layout;
@@ -1419,7 +1485,11 @@
     if (!stage) return layout;
     /* Phone positions are a stacked view, never the website layout. */
     if (isPhoneStage(stage)) return layout;
-    liftDefaultGrid(stage);
+    var lifted = liftDefaultGrid(stage);
+    /* The lifted grid is already compact. Mark it so the one-time compaction
+       pass (old layouts) never re-packs these untouched widgets (the avatar
+       card jumped 31 -> 24px on the first drop / reload). */
+    if (lifted && layout) layout._compacted = 1;
     if (layout) {
       delete layout[GRID_NUDGE_KEY];
       delete layout[GRID_SIZE_KEY];
@@ -1440,6 +1510,8 @@
       if (typeof el.offsetTop === "number" && (stage.clientHeight || 0) > 0) layout[id].yPx = Math.round(el.offsetTop);
       var frozenW = parseFloat(el.getAttribute("data-sticker-w") || "");
       if (frozenW > 0) layout[id].wPx = Math.round(frozenW);
+      var frozenLook = readGridLook(el);
+      if (frozenLook > 0) layout[id].gridLook = frozenLook;
       el.classList.remove("is-spawned");
     });
     return layout;
@@ -2181,6 +2253,7 @@
         };
         if (typeof pos.yPx === "number" && isFinite(pos.yPx)) base[id].yPx = pos.yPx;
         if (typeof pos.wPx === "number" && isFinite(pos.wPx) && pos.wPx > 0) base[id].wPx = pos.wPx;
+        if (typeof pos.gridLook === "number" && isFinite(pos.gridLook) && pos.gridLook > 0) base[id].gridLook = pos.gridLook;
         if (pos.dragged === true) base[id].dragged = true;
       });
       if (saved.widgetLayout._compacted) base._compacted = saved.widgetLayout._compacted;
@@ -7941,6 +8014,8 @@
     };
     if (typeof prev.yPx === "number") layout[wid].yPx = prev.yPx;
     if (typeof prev.wPx === "number" && prev.wPx > 0) layout[wid].wPx = prev.wPx;
+    var tiltLook = readGridLook(el) || (typeof prev.gridLook === "number" ? prev.gridLook : 0);
+    if (tiltLook > 0) layout[wid].gridLook = tiltLook;
     p.widgetLayout = layout;
     TowerProfileStore.save(p, { geometry: true });
   }
@@ -10290,6 +10365,7 @@
       el.setAttribute("data-sticker-y", String(y));
       el.setAttribute("data-sticker-z", String(z));
       setStickerWidth(el, pos && typeof pos === "object" && isPlacedPos(layout, id) ? pos.wPx : 0);
+      applyGridLookFromLayout(stage, el, pos && typeof pos === "object" && isPlacedPos(layout, id) ? pos : null);
     });
     stage.querySelectorAll("[data-tower-polaroid-extra]").forEach(function (extraEl) {
       if (extraEl.classList.contains("is-dragging")) return;
@@ -11741,6 +11817,9 @@
           };
           var dropW = parseFloat(sticker.getAttribute("data-sticker-w") || "") || (prev && prev.wPx) || 0;
           if (dropW > 0) layout[id].wPx = Math.round(dropW);
+          /* A moved widget keeps its grid look: a drag changes its spot only. */
+          var dropLook = readGridLook(sticker);
+          if (dropLook > 0) layout[id].gridLook = dropLook;
           var dropYPx = stickerYPxFromDrop(dropY, stage.clientHeight || rect.height || 0);
           if (dropYPx != null) layout[id].yPx = dropYPx;
           p.widgetLayout = layout;

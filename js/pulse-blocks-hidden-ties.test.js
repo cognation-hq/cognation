@@ -26,13 +26,13 @@ function World() {
   this.friendships = []; this.profiles = []; this.follows = []; this.posts = []; this.postReactions = [];
   this.comments = []; this.commentReactions = []; this.blocks = []; this.queries = {};
   this.blocksFail = false;
-  this.profiles.push({ id: MEP, user_id: ME, kind: "personal", handle: "me", display_name: "Me", account_kind: "real" });
+  this.profiles.push({ id: MEP, user_id: ME, kind: "personal", handle: "me", display_name: "Me", account_kind: "real", photo_url: "" });
   this.myPost = this.post(MEP, "my public post", { created_at: ago(20) });
 }
 World.prototype.person = function (n, name, opts) {
   opts = opts || {};
   var u = uid("00000000", n), p = uid("dddddddd", n);
-  this.profiles.push({ id: p, user_id: u, kind: opts.kind || "personal", handle: name.toLowerCase(), display_name: name, account_kind: "real" });
+  this.profiles.push({ id: p, user_id: u, kind: opts.kind || "personal", handle: name.toLowerCase(), display_name: name, account_kind: "real", photo_url: "" });
   if (opts.friend !== false) this.friendships.push({ user_id: ME, friend_user_id: u, created_at: ago(100) });
   return { u: u, p: p, name: name };
 };

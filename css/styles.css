@@ -8959,6 +8959,9 @@ body { padding-top: 0 !important; }
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* The body is its own scroll container, so the stage's pan-y does not reach it: allow only
+     vertical pan here, and a sideways touch drag swipes the card (echo-swipe-no-stuck). */
+  touch-action: pan-y;
   display: flex;
   flex-direction: column;
   gap: 0.55rem;

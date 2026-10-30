@@ -113,8 +113,9 @@ function ready(api, viewerAge, ids) {
   if (viewerAge !== undefined) api.setDatingBirthAge(viewerAge);
 }
 
+/* Copy into this realm: arrays made inside the vm context fail deepStrictEqual. */
 function knowIds(list) {
-  return list.map(function (c) { return c.profileId; }).sort();
+  return Array.from(list, function (c) { return String(c.profileId); }).sort();
 }
 
 function flush() { return new Promise(function (r) { setTimeout(r, 5); }); }
@@ -132,50 +133,50 @@ var MIXED_IDS = MIXED.map(function (c) { return c.id; });
 test("unknown viewer age shows nothing", function () {
   var api = loadSwipe(stores(MIXED));
   ready(api, undefined, MIXED_IDS);
-  assert.deepStrictEqual(api.peopleYouMayKnow(), [], "user_birth not read yet");
+  assert.deepStrictEqual(knowIds(api.peopleYouMayKnowCards()), [], "user_birth not read yet");
   api.setDatingBirthAge(null);
-  assert.deepStrictEqual(api.peopleYouMayKnow(), [], "no user_birth row");
+  assert.deepStrictEqual(knowIds(api.peopleYouMayKnowCards()), [], "no user_birth row");
 });
 
 test("signed-out viewer shows nothing", function () {
   var api = loadSwipe(stores(MIXED), { signedOut: true });
   ready(api, 30, MIXED_IDS);
-  assert.deepStrictEqual(api.peopleYouMayKnow(), []);
+  assert.deepStrictEqual(knowIds(api.peopleYouMayKnowCards()), []);
 });
 
 test("adult viewer sees adults only; unknown candidate age is never shown", function () {
   var api = loadSwipe(stores(MIXED));
   ready(api, 30, MIXED_IDS);
-  assert.deepStrictEqual(knowIds(api.peopleYouMayKnow()), ["adult", "eighteen"]);
+  assert.deepStrictEqual(knowIds(api.peopleYouMayKnowCards()), ["adult", "eighteen"]);
 });
 
 test("18-year-old viewer is on the adult side", function () {
   var api = loadSwipe(stores(MIXED));
   ready(api, 18, MIXED_IDS);
-  assert.deepStrictEqual(knowIds(api.peopleYouMayKnow()), ["adult", "eighteen"]);
+  assert.deepStrictEqual(knowIds(api.peopleYouMayKnowCards()), ["adult", "eighteen"]);
 });
 
 test("minor viewer sees minors (13-17) only, never under-13", function () {
   var api = loadSwipe(stores(MIXED));
   ready(api, 16, MIXED_IDS);
-  assert.deepStrictEqual(knowIds(api.peopleYouMayKnow()), ["teen"]);
+  assert.deepStrictEqual(knowIds(api.peopleYouMayKnowCards()), ["teen"]);
 });
 
 test("under-13 is never suggested, to anyone", function () {
   [11, 13, 17, 18, 50].forEach(function (age) {
     var api = loadSwipe(stores(MIXED));
     ready(api, age, MIXED_IDS);
-    assert.ok(api.peopleYouMayKnow().every(function (c) { return c.profileId !== "kid"; }), "viewer age " + age);
+    assert.ok(api.peopleYouMayKnowCards().every(function (c) { return c.profileId !== "kid"; }), "viewer age " + age);
   });
   var kidViewer = loadSwipe(stores(MIXED));
   ready(kidViewer, 11, MIXED_IDS);
-  assert.deepStrictEqual(kidViewer.peopleYouMayKnow(), [], "an under-13 viewer has no same-band candidate");
+  assert.deepStrictEqual(knowIds(kidViewer.peopleYouMayKnowCards()), [], "an under-13 viewer has no same-band candidate");
 });
 
 test("candidate age as a string still reads; a bad string is unknown", function () {
   var api = loadSwipe(stores([{ id: "s1", user_id: "u-s1", age: "35" }, { id: "s2", user_id: "u-s2", age: "n/a" }]));
   ready(api, 30, ["s1", "s2"]);
-  assert.deepStrictEqual(knowIds(api.peopleYouMayKnow()), ["s1"]);
+  assert.deepStrictEqual(knowIds(api.peopleYouMayKnowCards()), ["s1"]);
 });
 
 function blockStub(rows) {
@@ -204,36 +205,36 @@ test("nothing shows until the block list answers; then blocked people stay out",
   var block = blockStub([{ user_id: "u-bob", handle: "bob" }, { user_id: "u-cal", handle: "cal" }]);
   var api = loadSwipe(stores(ADULTS), { block: block });
   ready(api, 30, ADULT_IDS);
-  assert.deepStrictEqual(api.peopleYouMayKnow(), [], "block list not answered yet");
+  assert.deepStrictEqual(knowIds(api.peopleYouMayKnowCards()), [], "block list not answered yet");
   assert.ok(block.calls() >= 1, "asked list_my_blocks");
   block.answer();
   await flush();
-  assert.deepStrictEqual(knowIds(api.peopleYouMayKnow()), ["amy", "dee"]);
+  assert.deepStrictEqual(knowIds(api.peopleYouMayKnowCards()), ["amy", "dee"]);
 });
 
 test("a person blocked in a live room is excluded", async function () {
   var block = blockStub([]);
   var api = loadSwipe(stores(ADULTS), { block: block });
   ready(api, 30, ADULT_IDS);
-  api.peopleYouMayKnow();
+  api.peopleYouMayKnowCards();
   block.answer();
   await flush();
-  assert.deepStrictEqual(knowIds(api.peopleYouMayKnow()), ADULT_IDS.slice().sort());
+  assert.deepStrictEqual(knowIds(api.peopleYouMayKnowCards()), ADULT_IDS.slice().sort());
   api.hideLiveMessagesFromAuthor("u-dee");
-  assert.deepStrictEqual(knowIds(api.peopleYouMayKnow()), ["amy", "bob", "cal"]);
+  assert.deepStrictEqual(knowIds(api.peopleYouMayKnowCards()), ["amy", "bob", "cal"]);
 });
 
 test("the block list is read again for each new sign-in", async function () {
   var block = blockStub([]);
   var api = loadSwipe(stores(ADULTS), { block: block });
   ready(api, 30, ADULT_IDS);
-  api.peopleYouMayKnow();
+  api.peopleYouMayKnowCards();
   block.answer();
   await flush();
   var before = block.calls();
   api.__fire("cognation:session-started", {});
   assert.ok(block.calls() > before, "session-started re-reads list_my_blocks");
-  assert.deepStrictEqual(api.peopleYouMayKnow(), [], "held until the new list answers");
+  assert.deepStrictEqual(knowIds(api.peopleYouMayKnowCards()), [], "held until the new list answers");
 });
 
 test("people with a pending request to me are excluded (local incoming)", function () {
@@ -245,7 +246,7 @@ test("people with a pending request to me are excluded (local incoming)", functi
   });
   var api = loadSwipe(local);
   ready(api, 30, ADULT_IDS);
-  assert.deepStrictEqual(knowIds(api.peopleYouMayKnow()), ["amy", "cal", "dee"]);
+  assert.deepStrictEqual(knowIds(api.peopleYouMayKnowCards()), ["amy", "cal", "dee"]);
 });
 
 test("people with a pending request to me are excluded (remote notifications)", function () {
@@ -255,25 +256,25 @@ test("people with a pending request to me are excluded (remote notifications)", 
     notifications: [],
     requests: [{ id: "r1", sender_user_id: "u-amy" }, { id: "r2", sender_user_id: "u-cal" }],
   });
-  assert.deepStrictEqual(knowIds(api.peopleYouMayKnow()), ["bob", "dee"]);
+  assert.deepStrictEqual(knowIds(api.peopleYouMayKnowCards()), ["bob", "dee"]);
   api.__fire("cognation:session-ended", {});
   ready(api, 30, ADULT_IDS);
-  assert.deepStrictEqual(knowIds(api.peopleYouMayKnow()), ADULT_IDS.slice().sort(), "cleared on sign-out");
+  assert.deepStrictEqual(knowIds(api.peopleYouMayKnowCards()), ADULT_IDS.slice().sort(), "cleared on sign-out");
 });
 
 test("seed/real separation unchanged", function () {
   var api = loadSwipe(stores(ADULTS));
   ready(api, 30, ADULT_IDS);
   api.noteProfileSeedStatus("bob", true);
-  assert.deepStrictEqual(knowIds(api.peopleYouMayKnow()), ["amy", "cal", "dee"], "real viewer never sees a seed");
+  assert.deepStrictEqual(knowIds(api.peopleYouMayKnowCards()), ["amy", "cal", "dee"], "real viewer never sees a seed");
   api.noteViewerSeedStatus(true);
-  assert.deepStrictEqual(knowIds(api.peopleYouMayKnow()), ["bob"], "seed viewer sees seeds only");
+  assert.deepStrictEqual(knowIds(api.peopleYouMayKnowCards()), ["bob"], "seed viewer sees seeds only");
 });
 
 test("wording, rotation and per-device Pass unchanged", function () {
   var api = loadSwipe(stores(ADULTS));
   ready(api, 30, ADULT_IDS);
-  var cards = api.peopleYouMayKnow();
+  var cards = api.peopleYouMayKnowCards();
   assert.ok(cards.length);
   cards.forEach(function (c) {
     assert.strictEqual(c.type, "know");

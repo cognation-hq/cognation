@@ -13363,6 +13363,15 @@ a.site-switch-side:focus-visible {
   position: relative;
   z-index: 3 !important;
 }
+/* An emoji sticker is never a grid item (emoji-stale-nudge-render): an older
+   row may still carry an emoji in _gridNudge (from before #334). Its nudge
+   moves only that emoji, which stays absolute over the grid at its own spot
+   and stacking, so it adds no height to the grid flow. Render only: the saved
+   row is not touched; the owner's next emoji drag drops the old nudge. */
+.tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-tower-emoji][data-grid-nudge] {
+  position: absolute;
+  z-index: var(--sticker-z, 2) !important;
+}
 /* Owner resized a widget on the grid (layout-resize-reset): only that widget
    scales from its top-left corner; its slot and every other widget stay put. */
 .tower-layout--scrapbook.is-sticker-stage.is-default-grid > [data-grid-w] {

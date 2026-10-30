@@ -597,7 +597,7 @@ test("1280: the first free drop's freeze (drag lift path) keeps every grid rect 
   same(before, exactRects(r.dom.stage), UNTOUCHED, "reload");
 });
 
-test("1280: a grid-resized music (398) keeps 398x155 through an emoji-Rotate lift and the reload", async function () {
+test("1280: a grid-resized music (398) keeps 398x155 through an emoji Rotate (the grid stays) and the reload", async function () {
   var env = boot(null);
   var p = profile();
   ownStore(env, p);
@@ -618,7 +618,7 @@ test("1280: a grid-resized music (398) keeps 398x155 through an emoji-Rotate lif
   assert.strictEqual(layoutWrites(r.env).length, 0, "the reload writes nothing");
 });
 
-test("1280: resizing music itself after the lift changes only music", async function () {
+test("1280: after an emoji Rotate (the grid stays), resizing music itself changes only music", async function () {
   var env = boot(null);
   var p = profile();
   ownStore(env, p);

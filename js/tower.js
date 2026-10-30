@@ -170,6 +170,13 @@
     }
     return { el: el, key: el ? el.getAttribute("data-tower-widget") : "" };
   }
+  /* An emoji sticker floats over the default grid (absolute, never a grid cell).
+     Dragging it must not nudge it: [data-grid-nudge] is position: relative on the
+     grid, which put the emoji into the grid flow and pushed every widget down
+     ~89px. Its drag moves only it and saves only its own x/y. */
+  function floatsOverGrid(stage, el) {
+    return !!(el && el.parentNode === stage && el.hasAttribute && el.hasAttribute("data-tower-emoji"));
+  }
   function setGridNudgeStyle(el, dx, dy) {
     if (!el || !el.style) return;
     if (dx || dy) {
@@ -11663,6 +11670,8 @@
       var dragStarted = false;
       /* Default grid: nudge the widget in place instead of lifting the grid. */
       var gridDrag = null;
+      /* Default grid, emoji: move only the emoji; no grid lift, no nudge. */
+      var floatDrag = false;
       var freeStarted = false;
 
       function onMove(e) {
@@ -11673,25 +11682,40 @@
           if (Math.abs(dxPx) < 5 && Math.abs(dyPx) < 5) return;
           dragStarted = true;
           if (wid !== "quote" && stage.classList.contains("is-default-grid") && !isPhoneStage(stage)) {
-            var tgt = gridNudgeTarget(stage, sticker);
-            var n0 = readGridNudgeStyle(tgt.el);
-            var tr = tgt.el.getBoundingClientRect();
-            gridDrag = {
-              el: tgt.el,
-              key: tgt.key,
-              dx0: n0.dx,
-              dy0: n0.dy,
-              /* The widget's grid slot (rect without its nudge), in stage px. */
-              left: tr.left - rect.left - n0.dx,
-              top: tr.top - rect.top - n0.dy,
-              w: tr.width,
-              h: tr.height,
-              dx: n0.dx,
-              dy: n0.dy,
-            };
-            sticker.classList.add("is-dragging");
-            if (e.pointerId != null && sticker.setPointerCapture) {
-              try { sticker.setPointerCapture(e.pointerId); } catch (errCapG) {}
+            if (floatsOverGrid(stage, sticker)) {
+              floatDrag = true;
+              if (sticker.hasAttribute("data-grid-nudge")) {
+                /* An older row nudged this emoji into the grid flow: start from
+                   where it is drawn, then take it back out of the flow. */
+                var fr = sticker.getBoundingClientRect();
+                setGridNudgeStyle(sticker, 0, 0);
+                rect = stage.getBoundingClientRect();
+                if (rect.width > 0) startX = ((fr.left - rect.left) / rect.width) * 100;
+                if (rect.height > 0) startY = ((fr.top - rect.top) / rect.height) * 100;
+                sticker.style.setProperty("--sticker-x", startX + "%");
+                sticker.style.setProperty("--sticker-y", startY + "%");
+              }
+            } else {
+              var tgt = gridNudgeTarget(stage, sticker);
+              var n0 = readGridNudgeStyle(tgt.el);
+              var tr = tgt.el.getBoundingClientRect();
+              gridDrag = {
+                el: tgt.el,
+                key: tgt.key,
+                dx0: n0.dx,
+                dy0: n0.dy,
+                /* The widget's grid slot (rect without its nudge), in stage px. */
+                left: tr.left - rect.left - n0.dx,
+                top: tr.top - rect.top - n0.dy,
+                w: tr.width,
+                h: tr.height,
+                dx: n0.dx,
+                dy: n0.dy,
+              };
+              sticker.classList.add("is-dragging");
+              if (e.pointerId != null && sticker.setPointerCapture) {
+                try { sticker.setPointerCapture(e.pointerId); } catch (errCapG) {}
+              }
             }
           }
         }
@@ -11716,13 +11740,18 @@
              widgets out of the default grid. That lift only lived in this
              browser, so the drop spot sat next to different neighbours on the
              next load (Designer LOOK NO on #223). */
-          if (wid !== "quote" && liftDefaultGrid(stage)) {
+          if (floatDrag) {
+            /* An emoji over the grid never lifts it (it moves alone). */
+          } else if (wid !== "quote" && liftDefaultGrid(stage)) {
             rect = stage.getBoundingClientRect();
             startX = parseFloat(sticker.getAttribute("data-sticker-x") || "0");
             startY = parseFloat(sticker.getAttribute("data-sticker-y") || "0");
           }
-          stickerZCounter += 1;
-          sticker.style.setProperty("--sticker-z", String(stickerZCounter));
+          /* A floating emoji keeps its own layer (z) over the grid. */
+          if (!floatDrag) {
+            stickerZCounter += 1;
+            sticker.style.setProperty("--sticker-z", String(stickerZCounter));
+          }
           sticker.classList.add("is-dragging");
           if (e.pointerId != null && sticker.setPointerCapture) {
             try { sticker.setPointerCapture(e.pointerId); } catch (errCap) {}
@@ -11747,7 +11776,7 @@
         sticker.style.setProperty("--sticker-y", ny + "%");
         sticker.setAttribute("data-sticker-x", String(Math.round(nx * 10) / 10));
         sticker.setAttribute("data-sticker-y", String(Math.round(ny * 10) / 10));
-        sticker.setAttribute("data-sticker-z", String(stickerZCounter));
+        if (!floatDrag) sticker.setAttribute("data-sticker-z", String(stickerZCounter));
       }
 
       var dropCommitted = false;
@@ -11780,6 +11809,40 @@
           sticker.classList.remove("is-dragging");
           TowerProfileStore.save(gp, { geometry: true });
           setGridNudgeStyle(gridDrag.el, gridDrag.dx, gridDrag.dy);
+          return;
+        }
+        if (floatDrag) {
+          /* Emoji over the grid: save only its own spot (the x/y that
+             renderEmojiStickers reads). No freeze, no repair, no drag mark,
+             so the grid stays exactly as it is, now and after reload. */
+          var fx = parseFloat(sticker.getAttribute("data-sticker-x") || "0");
+          var fy = parseFloat(sticker.getAttribute("data-sticker-y") || "0");
+          var fz = parseInt(sticker.getAttribute("data-sticker-z") || "1", 10);
+          var fTilt = parseFloat(String(sticker.style.getPropertyValue("--sticker-tilt") || "0").replace("deg", "")) || 0;
+          var fp = TowerProfileStore.get();
+          var fl = fp.widgetLayout && typeof fp.widgetLayout === "object" ? fp.widgetLayout : {};
+          var fPrev = fl[wid] && typeof fl[wid] === "object" ? fl[wid] : {};
+          var fNext = {};
+          Object.keys(fPrev).forEach(function (k) { fNext[k] = fPrev[k]; });
+          fNext.x = fx;
+          fNext.y = fy;
+          fNext.z = typeof fPrev.z === "number" ? fPrev.z : fz;
+          fNext.tilt = typeof fPrev.tilt === "number" ? fPrev.tilt : fTilt;
+          fl[wid] = fNext;
+          /* Its own stale nudge (an older row) goes with the drag. */
+          var fn = cleanGridNudge(fl[GRID_NUDGE_KEY]);
+          if (fn[wid]) {
+            delete fn[wid];
+            if (Object.keys(fn).length) fl[GRID_NUDGE_KEY] = fn;
+            else delete fl[GRID_NUDGE_KEY];
+          }
+          fp.widgetLayout = fl;
+          sticker.classList.remove("is-dragging");
+          TowerProfileStore.save(fp, { geometry: true });
+          sticker.style.setProperty("--sticker-x", fx + "%");
+          sticker.style.setProperty("--sticker-y", fy + "%");
+          sticker.setAttribute("data-sticker-x", String(fx));
+          sticker.setAttribute("data-sticker-y", String(fy));
           return;
         }
         /* Read the drop before get()/save(). A profile refresh inside save

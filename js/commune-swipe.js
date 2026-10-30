@@ -1050,14 +1050,12 @@
 
   /* A live session is a Classroom (Personal deck) or a Webinar (Professional deck).
      A live page with no session kind fills both, as #193 did. */
+  /* Only the real Go live state counts: a classroom_sessions row that is live now
+     (CognationProLive). A browser-local Classroom event from Tower Add event (#257,
+     classroom-event.js) is scheduled, local to this browser, and never live, so it
+     stays on the calendar and is not an ECHO card. */
   function classroomCatalog() {
-    var live = liveProPages().filter(function (page) { return page.sessionKind !== "webinar"; }).map(classroomCard);
-    var extra = [];
-    try {
-      var api = window.CognationClassroomEvent;
-      if (api && api.echoCards) extra = api.echoCards() || [];
-    } catch (eEv) {}
-    return live.concat(extra);
+    return liveProPages().filter(function (page) { return page.sessionKind !== "webinar"; }).map(classroomCard);
   }
 
   function visibleClassroomSessions() {

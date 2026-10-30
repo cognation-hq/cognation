@@ -155,6 +155,9 @@
       if (typeof pos.yPx === "number" && isFinite(pos.yPx)) entry.yPx = Math.round(Math.max(0, Math.min(20000, pos.yPx)));
       /* Width (px) a widget had on the grid when it was first frozen or dragged. */
       if (typeof pos.wPx === "number" && isFinite(pos.wPx) && pos.wPx > 0) entry.wPx = Math.round(Math.max(80, Math.min(4000, pos.wPx)));
+      /* Grid look (lifted-player-no-cover): the grid layout width a lifted,
+         untouched widget keeps its grid card look at. */
+      if (typeof pos.gridLook === "number" && isFinite(pos.gridLook) && pos.gridLook > 0) entry.gridLook = Math.round(Math.max(80, Math.min(4000, pos.gridLook)));
       out[id] = entry;
     });
     if (layout._public && typeof layout._public === "object") {
@@ -328,6 +331,7 @@
           };
           if (typeof saved[wid].yPx === "number") next.yPx = saved[wid].yPx;
           if (typeof saved[wid].wPx === "number") next.wPx = saved[wid].wPx;
+          if (typeof saved[wid].gridLook === "number") next.gridLook = saved[wid].gridLook;
         }
         base[wid] = next;
       });

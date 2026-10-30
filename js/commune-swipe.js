@@ -3871,12 +3871,18 @@
     return true;
   }
   function clearPointer() {
-    var el = state.pointer && state.pointer.el;
+    var p = state.pointer;
+    var el = p && p.el;
+    state.pointer = null;
     if (el) {
       el.classList.remove("is-dragging");
       el.style.transform = "";
+      if (p.captured) {
+        if (typeof el.removeEventListener === "function") el.removeEventListener("lostpointercapture", onLostCapture);
+        try { if (el.hasPointerCapture && el.hasPointerCapture(p.id)) el.releasePointerCapture(p.id); } catch (e) { /* already released */ }
+      }
     }
-    state.pointer = null;
+    if (p) watchPointerEnd(false);
   }
 
   function releaseRoomSurface() {
@@ -4481,21 +4487,61 @@
     if (Math.abs(dx) < SWIPE_MIN_PX) return null;
     return dx < 0 ? "left" : "right";
   }
+  /* echo-swipe-no-stuck: a drag always ends. On a horizontal lock the card captures the
+     pointer, so a release anywhere comes back to it; endDrag also runs on a window
+     pointerup / pointercancel and on lostpointercapture, so a release off the card (or
+     off the deck) resets or swipes the card and never leaves it at a half-way transform. */
+  function samePointer(ev) {
+    var id = state.pointer && state.pointer.id;
+    return !(ev && typeof ev.pointerId === "number" && typeof id === "number" && ev.pointerId !== id);
+  }
+  function onWindowPointerUp(ev) { if (samePointer(ev)) endDrag(false); }
+  function onWindowPointerCancel(ev) { if (samePointer(ev)) endDrag(true); }
+  /* lostpointercapture bubbles: a touch's implicit capture on the pressed child (lost when
+     the card takes the capture) is not the card losing it. */
+  function onLostCapture(ev) {
+    var el = state.pointer && state.pointer.el;
+    if (ev && ev.target && el && ev.target !== el) return;
+    if (samePointer(ev)) endDrag(true);
+  }
+  function watchPointerEnd(on) {
+    var fn = on ? "addEventListener" : "removeEventListener";
+    if (typeof window[fn] !== "function") return;
+    window[fn]("pointerup", onWindowPointerUp, true);
+    window[fn]("pointercancel", onWindowPointerCancel, true);
+  }
   function onPointerDown(ev) {
     var front = state.deck && state.deck.querySelector("[data-commune-card].is-active");
     if (!front) return;
-    if (ev.target.closest && ev.target.closest("button, a, input, textarea, label, video, iframe")) return;
+    var onControl = ev.target.closest && ev.target.closest("button, a, input, textarea, label, video, iframe");
+    /* A drag still open (its release never reached the page) ends here: the card resets.
+       The click after this press is swallowed by wireDragClickGuard (never a tap). */
+    if (state.pointer) endDrag(true);
+    if (onControl) return;
     var point = ev.touches ? ev.touches[0] : ev;
     state.lastDragDx = 0;
-    state.pointer = { x0: point.clientX, y0: point.clientY, dx: 0, axis: null, el: front };
+    state.pointer = { x0: point.clientX, y0: point.clientY, dx: 0, axis: null, el: front,
+      id: typeof ev.pointerId === "number" ? ev.pointerId : null, captured: false };
     front.classList.add("is-dragging");
+    watchPointerEnd(true);
+  }
+  function capturePointer() {
+    var p = state.pointer, el = p && p.el;
+    if (!el || p.captured || typeof p.id !== "number") return;
+    p.captured = true;
+    if (typeof el.addEventListener === "function") el.addEventListener("lostpointercapture", onLostCapture);
+    try { if (typeof el.setPointerCapture === "function") el.setPointerCapture(p.id); } catch (e) { /* pointer already gone */ }
   }
   function onPointerMove(ev) {
     if (!state.pointer) return;
+    if (!samePointer(ev)) return;
     var point = ev.touches ? ev.touches[0] : ev;
     var dx = point.clientX - state.pointer.x0;
     var dy = point.clientY - state.pointer.y0;
-    if (!state.pointer.axis) state.pointer.axis = dragAxis(dx, dy);
+    if (!state.pointer.axis) {
+      state.pointer.axis = dragAxis(dx, dy);
+      if (state.pointer.axis === "x") capturePointer();
+    }
     if (state.pointer.axis === "y") { clearPointer(); return; }
     if (state.pointer.axis !== "x") return;
     state.pointer.dx = dx;
@@ -4504,8 +4550,10 @@
   function endDrag(cancelled) {
     if (!state.pointer) return;
     var dx = state.pointer.dx || 0;
-    var dir = swipeDecision({ dx: dx, axis: state.pointer.axis, cancelled: cancelled });
+    var axis = state.pointer.axis;
+    var dir = swipeDecision({ dx: dx, axis: axis, cancelled: cancelled });
     state.lastDragDx = dx;
+    state.lastDrag = { dx: dx, axis: axis || null, cancelled: !!cancelled, dir: dir };
     clearPointer();
     if (dir) swipe(dir);
   }
@@ -4522,6 +4570,8 @@
     return ax > DRAG_CLICK_PX || ay > DRAG_CLICK_PX;
   }
   function bindDeck(deck) {
+    /* init() sets state.deck before it binds; a deck bound on its own (tests) is the deck. */
+    if (!state.deck) state.deck = deck;
     deck.addEventListener("pointerdown", onPointerDown);
     deck.addEventListener("pointermove", onPointerMove);
     deck.addEventListener("pointerup", onPointerUp);
@@ -4556,7 +4606,10 @@
     deck.addEventListener("pointerdown", function (ev) {
       var p = pt(ev);
       swallow = false;
-      g = { x0: Number(p.clientX) || 0, y0: Number(p.clientY) || 0, moved: false };
+      /* A press while a drag is still open (a stuck card) only frees the card: its click is
+         never a tap, so it cannot open or join a room (echo-swipe-no-stuck). */
+      var freeing = !!(state.pointer || (deck.querySelector && deck.querySelector(".is-dragging")));
+      g = { x0: Number(p.clientX) || 0, y0: Number(p.clientY) || 0, moved: freeing };
       win.addEventListener("pointermove", onMove, true);
       win.addEventListener("pointerup", onEnd, true);
       win.addEventListener("pointercancel", onEnd, true);
@@ -5016,6 +5069,7 @@
     dragAxis: dragAxis,
     swipeDecision: swipeDecision,
     dragIsNotTap: dragIsNotTap,
+    lastDragOutcome: function () { return state.lastDrag ? Object.assign({}, state.lastDrag) : null; },
     wireDragClickGuard: wireDragClickGuard,
     bindDeck: bindDeck,
     bindCard: bindCard,

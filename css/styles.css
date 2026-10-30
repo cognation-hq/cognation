@@ -8951,7 +8951,24 @@ body { padding-top: 0 !important; }
 }
 .commune-card[data-card-type="chatroom"] {
   border-color: var(--color-navy);
+  overflow: hidden;
 }
+/* Chatroom card: below Enter room the body scrolls inside the card's deck height, fading 24px into the glass. */
+.commune-card-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding-bottom: 24px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+}
+.commune-card-scroll > * { flex-shrink: 0; }
+/* The scroll body takes the spare height, so the blurb (flex: 1 elsewhere) does not grow and push Enter room down. */
+.commune-card[data-card-type="chatroom"] .commune-card-body { flex: none; }
 .commune-card[data-card-type="classroom"] {
   border-color: #2a6f7c;
   background: linear-gradient(165deg, #f3fbfd, #e8f6f8 60%, #fff);

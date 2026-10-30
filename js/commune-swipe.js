@@ -2638,11 +2638,14 @@
       }
       if (card.type === TYPE.CHAT) {
         html += '<button type="button" class="btn btn-primary" data-commune-enter-sim>Enter room</button>';
+        /* Everything below Enter room scrolls inside the card, so the camera request never runs under Pass / Keep. */
+        html += '<div class="commune-card-scroll" data-commune-card-scroll>';
         var roomRules = window.CognationChatroomRules;
         html += roomRules && roomRules.extrasHtml
           ? roomRules.extrasHtml(card, escapeHtml)
           : '<p class="commune-card-meta">Live group chat — up to 100 people. Keep it kind.</p>';
         if (!liveChatEligible()) html += '<p class="commune-card-meta">Live group chat — sign in to join (up to 100 people).</p>';
+        html += "</div>";
       }
       if (card.type === TYPE.CLASSROOM) {
         if (card.classroomEvent) {

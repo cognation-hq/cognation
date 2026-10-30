@@ -13504,12 +13504,12 @@ a.site-switch-side:focus-visible {
   margin: 0;
 }
 /* Free layout too: the name's move handle sits in a gutter, not on the first letter. */
-.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--identity:not([data-grid-look]) {
+:where(:not(:has(> .tower-sticker--identity[data-grid-look]))).tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--identity {
   padding-left: 36px;
 }
 /* Followers has no frame of its own (the grid gave it one). Keep the same card
    frame once it is dragged and after every reload, with the handle in a gutter. */
-.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--followers:not([data-grid-look]) {
+:where(:not(:has(> .tower-sticker--followers[data-grid-look]))).tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--followers {
   background: rgba(16, 19, 48, 0.42);
   border: 1px solid rgba(209, 241, 255, 0.28);
   border-radius: 1rem;
@@ -14168,7 +14168,7 @@ body.is-circle-open .circle-spot.is-filled {
 /* r143: in the free layout (after any drag, and on old saved layouts) the
    avatar card stacked GO LIVE and Edit profile. Keep them in one row under the
    avatar. */
-.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar:not([data-grid-look]) {
+:where(:not(:has(> .tower-sticker--avatar[data-grid-look]))).tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar {
   display: grid;
   grid-template-columns: auto auto;
   justify-content: center;
@@ -14176,30 +14176,30 @@ body.is-circle-open .circle-spot.is-filled {
   column-gap: 8px;
   row-gap: 6px;
 }
-.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar:not([data-grid-look]) .tower-avatar-stack {
+:where(:not(:has(> .tower-sticker--avatar[data-grid-look]))).tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-avatar-stack {
   display: contents;
 }
-.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar:not([data-grid-look]) .tower-avatar-wrap {
+:where(:not(:has(> .tower-sticker--avatar[data-grid-look]))).tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-avatar-wrap {
   grid-row: 1;
   grid-column: 1 / -1;
   justify-self: center;
 }
-.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar:not([data-grid-look]) .tower-live-panel {
+:where(:not(:has(> .tower-sticker--avatar[data-grid-look]))).tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-live-panel {
   grid-row: 3;
   grid-column: 1 / -1;
 }
-.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar:not([data-grid-look]) .tower-profile-actions {
+:where(:not(:has(> .tower-sticker--avatar[data-grid-look]))).tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-profile-actions {
   grid-row: 2;
   grid-column: 1;
   order: 0;
 }
-.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar:not([data-grid-look]) .tower-profile-edit {
+:where(:not(:has(> .tower-sticker--avatar[data-grid-look]))).tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-profile-edit {
   grid-row: 2;
   grid-column: 2;
   order: 0;
 }
-.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar:not([data-grid-look]) .tower-profile-actions,
-.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar:not([data-grid-look]) .tower-profile-edit {
+:where(:not(:has(> .tower-sticker--avatar[data-grid-look]))).tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-profile-actions,
+:where(:not(:has(> .tower-sticker--avatar[data-grid-look]))).tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-profile-edit {
   width: auto;
   margin: 0;
   white-space: nowrap;
@@ -14305,7 +14305,7 @@ body.commune-room-view-open .tabs-section { z-index: 10000 !important; }
   max-width: 100%;
   box-sizing: border-box;
 }
-.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--music[data-sticker-w]:not([data-grid-look]) > .tower-music {
+:where(:not(:has(> .tower-sticker--music[data-grid-look]))).tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--music[data-sticker-w] > .tower-music {
   zoom: var(--music-zoom, 1);
 }
 
@@ -15733,10 +15733,10 @@ body.cgn-cal-page {
 /* Bio card order for visitors on a saved (free) layout, same as the default grid:
    photo, name, + follow, then Mutual friends and the message button. The owner's
    r143 row (actions | Edit profile) is unchanged. */
-#panel-tower [data-tower-is-owner="false"] .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar:not([data-grid-look]) .tower-sticker--identity { grid-row: 2; grid-column: 1 / -1; }
-#panel-tower [data-tower-is-owner="false"] .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar:not([data-grid-look]) .tower-profile-actions { grid-row: 3; grid-column: 1 / -1; justify-self: center; }
-#panel-tower [data-tower-is-owner="false"] .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar:not([data-grid-look]) .tower-under-photo { grid-row: 4; grid-column: 1 / -1; }
-#panel-tower [data-tower-is-owner="false"] .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar:not([data-grid-look]) .tower-live-panel { grid-row: 5; }
+#panel-tower [data-tower-is-owner="false"] :where(:not(:has(> .tower-sticker--avatar[data-grid-look]))).tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-sticker--identity { grid-row: 2; grid-column: 1 / -1; }
+#panel-tower [data-tower-is-owner="false"] :where(:not(:has(> .tower-sticker--avatar[data-grid-look]))).tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-profile-actions { grid-row: 3; grid-column: 1 / -1; justify-self: center; }
+#panel-tower [data-tower-is-owner="false"] :where(:not(:has(> .tower-sticker--avatar[data-grid-look]))).tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-under-photo { grid-row: 4; grid-column: 1 / -1; }
+#panel-tower [data-tower-is-owner="false"] :where(:not(:has(> .tower-sticker--avatar[data-grid-look]))).tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--avatar .tower-live-panel { grid-row: 5; }
 
 /* Cream follow-up (PM + Designer, Oct 21). Website colours only: Times ink #16120c,
    cream #fbf7ec, muted ink #6b6458. */
@@ -16237,11 +16237,11 @@ body.cgn-cal-page {
    the layout pass) with an 18.5rem floor, capped at the stage; a saved width
    (data-sticker-w) still wins but never drops below the floor. Grid layouts and phone
    (always the grid) are unchanged. */
-.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--youtube:not([data-grid-look]) {
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--youtube {
   min-width: min(18.5rem, 100%);
   box-sizing: border-box;
 }
-.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--youtube:not([data-sticker-w]):not([data-grid-look]) {
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid) > .tower-sticker--youtube:not([data-sticker-w]) {
   width: max(18.5rem, var(--yt-col-w, 18.5rem));
   max-width: 100%;
 }
@@ -16644,13 +16644,13 @@ body.cgn-cal-page {
    default grid. Untouched widgets keep the rect the grid drew: their grid width
    (--grid-look-w), the grid card chrome and the compact MP3 row, instead of
    their own sticker look (the tall iPod that covered the Polaroid and Instax).
-   data-grid-look is set by the lift and saved as gridLook; a carried grid size
-   is the widget's `scale` from its top-left. Never on the grid or at 390. */
+   data-grid-look is set by the lift and saved as gridLook (the slot); a carried
+   grid size is the sticker's own width, and the MP3 row zooms by width / slot
+   (--grid-look-zoom) to keep its grid height. Never on the grid or at 390. */
 .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker[data-grid-look] {
   width: var(--grid-look-w) !important;
   max-width: none;
   min-width: 0;
-  transform-origin: 0 0;
   background: rgba(16, 19, 48, 0.42);
   border: 1px solid rgba(209, 241, 255, 0.28);
   border-radius: 1rem;
@@ -16660,6 +16660,8 @@ body.cgn-cal-page {
   box-sizing: border-box;
 }
 .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--youtube[data-grid-look] {
+  /* Same 18.5rem floor as the free side-column rule (youtube-sidecol-width). */
+  min-width: min(18.5rem, 100%);
   max-height: none;
   overflow: visible;
   height: auto;
@@ -16670,6 +16672,12 @@ body.cgn-cal-page {
   max-height: none;
   height: auto;
   aspect-ratio: 16 / 9;
+}
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--music[data-grid-look] {
+  padding: calc(8px * var(--grid-look-zoom, 1)) calc(12px * var(--grid-look-zoom, 1));
+}
+.tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--music[data-grid-look] > .tower-music {
+  zoom: var(--grid-look-zoom, 1);
 }
 .tower-layout--scrapbook.is-sticker-stage:not(.is-default-grid):not(.is-phone-stack) > .tower-sticker--music[data-grid-look] .tower-ipod {
   max-height: 72px;

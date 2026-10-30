@@ -303,23 +303,27 @@
     stage.querySelectorAll("[data-grid-w]").forEach(function (el) { setGridSizeStyle(el, 0); });
   }
   /* Grid look (lifted-player-no-cover): a lift keeps each untouched grid
-     widget's rendered rect. data-grid-look is its grid layout width (px); CSS
-     keeps the grid card look on it off the grid (compact MP3 row, card chrome,
-     slot width), and `scale` keeps a grid resize (398 in a 448 slot). Saved on
-     the widget's layout entry as gridLook; never shown on the grid or at 390. */
+     widget's rendered rect. data-grid-look is its grid slot width (px); CSS
+     keeps the grid card look on it off the grid (compact MP3 row, card chrome).
+     --grid-look-w is the on-screen width: the slot, or a grid resize carried as
+     the sticker's own width (d79fbca, no scale left). The MP3 row zooms by
+     w / slot (--grid-look-zoom) so a 398 resize stays 398x155, as on the grid.
+     Saved on the widget's layout entry as gridLook (slot) with wPx; never shown
+     on the grid or at 390. */
   function setGridLook(el, slotW, w) {
     if (!el || !el.style) return;
     var s = Math.round(Number(slotW));
     if (s > 0) {
-      el.setAttribute("data-grid-look", String(s));
-      el.style.setProperty("--grid-look-w", s + "px");
       var n = Math.round(Number(w));
-      if (n > 0 && n !== s) el.style.setProperty("scale", String(Math.round((n / s) * 10000) / 10000));
-      else el.style.removeProperty("scale");
+      if (!(n > 0)) n = s;
+      el.setAttribute("data-grid-look", String(s));
+      el.style.setProperty("--grid-look-w", n + "px");
+      if (n !== s) el.style.setProperty("--grid-look-zoom", String(Math.round((n / s) * 10000) / 10000));
+      else el.style.removeProperty("--grid-look-zoom");
     } else if (el.hasAttribute && el.hasAttribute("data-grid-look")) {
       el.removeAttribute("data-grid-look");
       el.style.removeProperty("--grid-look-w");
-      el.style.removeProperty("scale");
+      el.style.removeProperty("--grid-look-zoom");
     }
   }
   function readGridLook(el) {
@@ -1255,7 +1259,8 @@
            half rows their column width, full rows (YouTube, Music) their slot
            width and grid look, so the MP3 player stays the compact 448x175 row
            and never grows to the tall iPod over the Polaroid and Instax. */
-        if (sp.half || sp.look) setStickerWidth(el, sp.w);
+        if (sp.half) setStickerWidth(el, sp.w);
+        else if (sp.look) setStickerWidth(el, sp.w);
       }
       el.classList.add("is-spawned");
       el.style.setProperty("--sticker-x", sp.x + "%");
@@ -1268,10 +1273,13 @@
       spawnCache[el.getAttribute("data-tower-widget")] = { x: sp.x, y: sp.y, z: 2, tilt: 0 };
     });
     liftSizes.forEach(function (ls) { if (ls.w > 0) setStickerWidth(ls.el, ls.w); });
-    /* After the sizes: a grid-resized widget is drawn at its slot width with
-       the same scale, so its rect (398x155 in a 448 slot) is kept too. */
+    /* After the sizes: each untouched grid widget keeps its grid look at its
+       grid rect. */
     spots.forEach(function (sp) {
-      if (sp.look > 0 && stripMembers.indexOf(sp.el) < 0) setGridLook(sp.el, sp.look, sp.w);
+      if (!(sp.look > 0) || stripMembers.indexOf(sp.el) >= 0) return;
+      /* A grid resize (d79fbca) carries as the sticker's own width (no scale);
+         the grid look keeps the slot so the MP3 row keeps its grid height. */
+      setGridLook(sp.el, sp.look, sp.w);
     });
     liftTilts.forEach(function (lt) {
       if (!lt.deg) return;
@@ -1356,8 +1364,7 @@
         var sr0 = sticker.getBoundingClientRect();
         startW = Math.round((sr0 && sr0.width) || readGridSizeStyle(sticker) || startW);
       }
-      /* A lifted widget with the grid look: start from what is on screen (a
-         carried grid size is drawn with scale; offsetWidth is the slot). */
+      /* A lifted widget with the grid look: start from what is on screen. */
       var lookResize = !gridResize && readGridLook(sticker) > 0;
       if (lookResize) {
         var lr0 = sticker.getBoundingClientRect();
@@ -1374,9 +1381,8 @@
         if (gridResize && gridMinPx > 0) curW = Math.max(curW, gridMinPx);
         if (gridResize) setGridSizeStyle(sticker, curW);
         else setStickerWidth(sticker, curW);
-        /* Its own resize changes its own rect only: the grid look stays, laid
-           out at the new width (no carried scale). */
-        if (lookResize) setGridLook(sticker, curW, curW);
+        /* Its own resize changes its own rect only: the grid look stays. */
+        if (lookResize) setGridLook(sticker, readGridLook(sticker), curW);
         if (e.cancelable) e.preventDefault();
       }
       function onUp() {

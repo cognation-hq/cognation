@@ -7,7 +7,7 @@
  *  tall ~316x423 iPod (523 tall at 398) and covered the Polaroid and Instax;
  *  the avatar card and Instax shrank to 178 / 154 wide.
  *  Now the lift carries the grid-rendered rect (grid width, grid look, grid
- *  size scale) into the lifted state and the saved row (wPx + gridLook), so:
+ *  size) into the lifted state and the saved row (wPx + gridLook), so:
  *  - every untouched widget is 0px off: before -> drop / Rotate -> reload;
  *  - music stays 448x175 (398x155 after a grid resize) unless it is itself resized;
  *  - no overlap, nothing is shoved, no reshaped (natural) sizes are saved;
@@ -212,10 +212,12 @@ function layoutRect(el) {
   var stageH = px(stage.style.minHeight) || STAGE_H; /* % of the stage's height (min-height grows it) */
   var y = /px$/.test(yRaw) ? px(yRaw) : (px(yRaw) || 0) / 100 * stageH;
   var nat = NATURAL[id] || [100, 100];
-  /* Grid look (lifted, untouched): the grid card at its grid layout width, so
-     its height is the grid's (compact player, not the iPod). */
+  /* Grid look (lifted, untouched): the grid card at its on-screen width, so
+     its height is the grid's (compact player, not the iPod); the MP3 row and
+     its padding zoom by --grid-look-zoom (a carried grid resize, 398 / 448). */
   var look = px(el.style.getPropertyValue("--grid-look-w"));
-  if (el.hasAttribute("data-grid-look") && look) return [(x || 0) / 100 * STAGE_W, y, look, GRID[id][3]];
+  var zoom = parseFloat(el.style.getPropertyValue("--grid-look-zoom")) || 1;
+  if (el.hasAttribute("data-grid-look") && look) return [(x || 0) / 100 * STAGE_W, y, look, id === "music" ? GRID[id][3] * zoom : GRID[id][3]];
   var w = px(el.style.getPropertyValue("--sticker-w")) || Math.min(nat[0], px(el.style.getPropertyValue("--spawn-max-w")) || Infinity);
   var h = id === "music" ? Math.round(nat[1] * w / 316) : nat[1];
   return [(x || 0) / 100 * STAGE_W, y, w, h];
@@ -435,7 +437,6 @@ function lastRow(env) { var w = layoutWrites(env); return w.length ? w[w.length 
 function pins(dom) { return dom.stage.querySelectorAll("[data-tower-friend-pin]").map(function (e) { return e.getAttribute("data-tower-friend-pin"); }); }
 
 function music(dom) { return dom.stage.querySelector('[data-tower-widget="music"]'); }
-function scaleOf(el) { var s = parseFloat(el.style.getPropertyValue("scale")); return isFinite(s) && s > 0 ? s : 1; }
 function savedGridW(env) { var r = lastRow(env); return r && r._gridSize && r._gridSize.music ? r._gridSize.music.w : null; }
 var SLOT = GRID.music[2]; /* 448 */
 

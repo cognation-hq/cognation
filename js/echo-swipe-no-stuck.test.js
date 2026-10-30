@@ -203,6 +203,10 @@ test("window pointercancel and lostpointercapture end the drag too (reset, no sw
   assert.strictEqual(t.stuck(), false, "window pointercancel");
   assert.strictEqual(t.outcome().dir, null, "a cancel never swipes");
   press(t, t.p, "mouse", [[-120, 0]]);
+  /* A touch's implicit capture on the pressed child is lost when the card takes it; that
+     event bubbles to the card and must not end the drag. */
+  fire(t.win, t.p, "lostpointercapture", ev("mouse", 0, 300));
+  assert.strictEqual(t.stuck(), true, "a child's lostpointercapture (bubbling) does not end the drag");
   fire(t.win, t.card, "lostpointercapture", ev("mouse", 0, 300));
   assert.strictEqual(t.stuck(), false, "lostpointercapture");
   assert.strictEqual(t.outcome().dir, null);

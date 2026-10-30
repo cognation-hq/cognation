@@ -83,7 +83,7 @@ test("Chatroom card: Enter room first, then one scroll body that holds the camer
   var inner = html.slice(scroll);
   assert.ok(/data-chatroom-camera[ >]/.test(inner), "Request to join on camera is inside the scroll body");
   assert.ok(/data-chatroom-camera-count/.test(inner), "the camera count is inside the scroll body");
-  assert.ok(/<\/div>\s*$/.test(html), "the scroll body closes at the end of the card");
+  assert.ok(/<\/div>\s*<button[^>]*data-commune-card-more[\s\S]*<\/button>\s*$/.test(html), "the scroll body closes, then only the More cue follows");
 });
 
 test("CSS: the card keeps its deck height and clips; the body scrolls with a 24px bottom fade", function () {
@@ -106,4 +106,87 @@ test("CSS: Pass / Keep stay at least 12px below the card", function () {
   assert.ok(m, "the stage has a bottom margin");
   var px = m[2] === "rem" ? parseFloat(m[1]) * 16 : parseFloat(m[1]);
   assert.ok(px >= 12, "gap " + px + "px >= 12px");
+});
+
+/* ---- PM conditions (2026-10-30 10:00 CT): a "More" cue, and touch scroll vs deck swipe ---- */
+
+function swipeApi() {
+  var local = memoryStorage();
+  var doc = {
+    readyState: "complete", createElement: fakeEl,
+    querySelector: function () { return null; }, querySelectorAll: function () { return []; },
+    addEventListener: function () {}, dispatchEvent: function () { return true; },
+  };
+  var win = { localStorage: local, sessionStorage: memoryStorage(), document: doc, addEventListener: function () {} };
+  win.window = win;
+  var ctx = vm.createContext({ window: win, document: doc, localStorage: local, sessionStorage: win.sessionStorage, console: console,
+    CustomEvent: function CustomEvent() {}, setTimeout: function () { return 0; }, clearTimeout: function () {} });
+  vm.runInContext(src("js/chatroom-rules.js"), ctx);
+  vm.runInContext(src("js/commune-swipe.js"), ctx);
+  return win.CognationCommuneSwipe;
+}
+
+test("Chatroom card: a 'More' cue button sits outside the scroll body, hidden until JS sees overflow", function () {
+  var html = renderChatroom().innerHTML;
+  var m = /<button[^>]*data-commune-card-more[^>]*>([\s\S]*?)<\/button>/.exec(html);
+  assert.ok(m, "the card has a [data-commune-card-more] button");
+  assert.ok(/\shidden[\s>]/.test(m[0]), "hidden by default (no cue before overflow is measured)");
+  assert.ok(/type="button"/.test(m[0]), "type=button");
+  assert.ok(/aria-label="[^"]+"/.test(m[0]), "has an aria-label");
+  assert.ok(/>\s*More\s*</.test(m[1]) || /\bMore\b/.test(m[1].replace(/<[^>]+>/g, "")), "reads 'More'");
+  var scrollStart = html.indexOf("data-commune-card-scroll");
+  assert.ok(html.indexOf("data-commune-card-more") > scrollStart, "after the scroll body opens");
+  var inner = html.slice(scrollStart, html.indexOf("data-commune-card-more"));
+  assert.ok(/<\/div>\s*<button[^>]*$/.test(inner), "outside the scroll body, so the fade mask never hides it");
+});
+
+test("More cue shows only while the body can scroll further down", function () {
+  var api = swipeApi();
+  assert.strictEqual(typeof api.moreCueVisible, "function");
+  assert.strictEqual(api.moreCueVisible(0, 277, 169), true, "top of an overflowing body");
+  assert.strictEqual(api.moreCueVisible(60, 277, 169), true, "part way down");
+  assert.strictEqual(api.moreCueVisible(108, 277, 169), false, "at the bottom");
+  assert.strictEqual(api.moreCueVisible(107.4, 277, 169), false, "within 1px of the bottom (sub-pixel scrollTop)");
+  assert.strictEqual(api.moreCueVisible(0, 120, 120), false, "nothing overflows");
+  assert.strictEqual(api.moreCueVisible(0, 0, 0), false, "not laid out");
+});
+
+test("CSS: the More cue is small, muted, centered, with no yellow and no looping motion", function () {
+  var cue = rule(".commune-card-more");
+  assert.ok(/position\s*:\s*absolute/.test(cue), "absolute inside the card");
+  assert.ok(/font-size\s*:\s*0\.75rem/.test(cue), "0.75rem");
+  assert.ok(/color\s*:\s*#d9d2f0/i.test(cue), "#d9d2f0");
+  assert.ok(/left\s*:\s*50%/.test(cue) && /translateX\(-50%\)/.test(cue), "centered");
+  assert.ok(!/animation/.test(cue), "no animation");
+  var all = css.slice(css.indexOf(".commune-card-more"));
+  all = all.slice(0, all.indexOf("/* end commune-card-more */"));
+  assert.ok(all.length > 0, "cue rules are grouped with an end marker");
+  assert.ok(!/animation|@keyframes|infinite/.test(all), "no motion loop anywhere in the cue rules");
+  assert.ok(!/yellow|#ff[cdef][0-9a-f]0|#ffd|#fe[0-9a-f]{4}|gold|#f5c|#fc0/i.test(all), "no yellow");
+  assert.ok(/\.commune-card-more\[hidden\]\s*\{[^}]*display\s*:\s*none/.test(all), "[hidden] really hides it");
+});
+
+test("Deck drag: axis locks after 8px; vertical (or a tie) never swipes, a cancelled drag never swipes", function () {
+  var api = swipeApi();
+  assert.strictEqual(typeof api.dragAxis, "function");
+  assert.strictEqual(api.dragAxis(3, 2), null, "under the lock distance");
+  assert.strictEqual(api.dragAxis(2, -20), "y");
+  assert.strictEqual(api.dragAxis(10, 10), "y", "a tie favors scrolling");
+  assert.strictEqual(api.dragAxis(30, 5), "x");
+  assert.strictEqual(api.dragAxis(-30, -12), "x");
+  assert.strictEqual(typeof api.swipeDecision, "function");
+  assert.strictEqual(api.swipeDecision({ dx: -150, axis: "x" }), "left");
+  assert.strictEqual(api.swipeDecision({ dx: 150, axis: "x" }), "right");
+  assert.strictEqual(api.swipeDecision({ dx: 79, axis: "x" }), null, "under 80px");
+  assert.strictEqual(api.swipeDecision({ dx: -150, axis: "y" }), null, "vertical gesture with drift");
+  assert.strictEqual(api.swipeDecision({ dx: -150, axis: null }), null, "never locked");
+  assert.strictEqual(api.swipeDecision({ dx: -150, axis: "x", cancelled: true }), null, "pointercancel (browser took the scroll)");
+});
+
+test("CSS: the More cue beats the global !important button skins (no orange or glass fill, stays #d9d2f0)", () => {
+  const m = css.match(/\.commune-card \.commune-card-more,[^{]*\{([^}]*)\}/);
+  assert.ok(m, "a .commune-card .commune-card-more override rule exists");
+  assert.match(m[1], /background:\s*transparent\s*!important/);
+  assert.match(m[1], /border:\s*0\s*!important/);
+  assert.match(m[1], /color:\s*#d9d2f0\s*!important/i);
 });

@@ -8969,6 +8969,43 @@ body { padding-top: 0 !important; }
 .commune-card-scroll > * { flex-shrink: 0; }
 /* The scroll body takes the spare height, so the blurb (flex: 1 elsewhere) does not grow and push Enter room down. */
 .commune-card[data-card-type="chatroom"] .commune-card-body { flex: none; }
+/* "More" cue: centered over the bottom fade, only while the body can scroll further down. */
+.commune-card-more {
+  position: absolute;
+  left: 50%;
+  bottom: calc(1.5rem + 2px);
+  transform: translateX(-50%);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0.15rem 0.6rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #d9d2f0;
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.commune-card-more[hidden] { display: none; }
+/* Beat the global button skins (orange fill, glass fill + border, both !important). */
+.commune-card .commune-card-more,
+.commune-card .commune-card-more:hover,
+.commune-card .commune-card-more:active {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: #d9d2f0 !important;
+  text-shadow: none;
+}
+.commune-card .commune-card-more:hover { color: #ffffff !important; }
+.commune-card-more:focus-visible { outline: 2px solid #c5a6ff; outline-offset: 2px; }
+.commune-card-more-chevron { display: block; }
+/* end commune-card-more */
 .commune-card[data-card-type="classroom"] {
   border-color: #2a6f7c;
   background: linear-gradient(165deg, #f3fbfd, #e8f6f8 60%, #fff);

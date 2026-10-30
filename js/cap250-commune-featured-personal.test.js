@@ -30,8 +30,10 @@ function memoryStorage() {
   };
 }
 
-function loadSwipe(localStorage, sessionStorage) {
+function loadSwipe(localStorage, sessionStorage, signedInUserId) {
   var windowStub = {};
+  /* PYMK (#151) needs a signed-in viewer whose age comes from user_birth. */
+  if (signedInUserId) windowStub.CognationSupabase = { getSession: function () { return { access_token: "t-" + signedInUserId, user: { id: signedInUserId } }; } };
   var documentStub = {
     readyState: "complete",
     querySelector: function () { return null; },
@@ -149,10 +151,11 @@ knowLocal.setItem("cognation.profiles.v1", JSON.stringify({
   profiles: {
     ada: { id: "ada", kind: "personal", displayName: "Ada", friendIds: ["friend"] },
     friend: { id: "friend", kind: "personal", displayName: "Friend", friendIds: ["ada", "sam"] },
-    sam: { id: "sam", kind: "personal", displayName: "Sam", friendIds: ["friend"] },
+    sam: { id: "sam", kind: "personal", displayName: "Sam", age: 30, friendIds: ["friend"] },
   },
 }));
-var knowApi = loadSwipe(knowLocal, memoryStorage());
+var knowApi = loadSwipe(knowLocal, memoryStorage(), ["u", "ada"].join("-"));
+knowApi.setDatingBirthAge(30); /* PYMK needs a known, same-band age (#151) */
 if (knowApi.noteViewerSeedStatus) knowApi.noteViewerSeedStatus(false);
 if (knowApi.noteProfileSeedStatus) {
   knowApi.noteProfileSeedStatus("ada", false);

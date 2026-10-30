@@ -399,7 +399,7 @@ function testRightSwipeStillKeeps() {
     profiles: {
       ada: { id: "ada", kind: "personal", displayName: "Ada", friendIds: ["friend"] },
       friend: { id: "friend", kind: "personal", displayName: "Friend", friendIds: ["ada", "sam"] },
-      sam: { id: "sam", kind: "personal", displayName: "Sam", friendIds: ["friend"] },
+      sam: { id: "sam", kind: "personal", displayName: "Sam", age: 30, friendIds: ["friend"] }, /* PYMK needs a known, same-band age (#151) */
       pro: {
         id: "pro",
         kind: "professional",

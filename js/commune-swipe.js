@@ -620,6 +620,25 @@
     setSeeDating(false);
   }
   document.addEventListener("cognation:session-ended", resetViewerAgeForSessionEnd);
+  /* People you may know: each sign-in reads its own block list; sign-out
+     forgets the last account's blocks and incoming requests. */
+  document.addEventListener("cognation:session-started", function () { refreshBlockedShares(); });
+  document.addEventListener("cognation:session-ended", function () {
+    pymkBlocks.gen += 1;
+    pymkBlocks.asked = false;
+    pymkBlocks.ready = false;
+    pymkBlocks.held = false;
+    pymkBlocks.handles = {};
+    state.blockedShareUserIds = {};
+    pymkIncomingUserIds = {};
+  });
+  document.addEventListener("cognation:remote-notifications-loaded", function (ev) {
+    var reqs = ev && ev.detail && Array.isArray(ev.detail.requests) ? ev.detail.requests : [];
+    var map = {};
+    reqs.forEach(function (r) { if (r && r.sender_user_id) map[String(r.sender_user_id)] = true; });
+    pymkIncomingUserIds = map;
+    pymkRebuildIfStale();
+  });
 
   /* Algorithm Manager — Friends' shares (default on). */
   function getSeeFriendShares() {
@@ -1727,12 +1746,78 @@
     return true;
   }
 
+  /* People you may know: age bands from user_birth only. Viewer = getMemberAge()
+     (the dating and classroom gates' source); candidate = rec.age, which
+     seedops-dating-hydrate sets from user_birth (the dating candidate gate's
+     source). Unknown (0, missing, unparsable) on either side = no band.
+     Under 13 is never suggested, so an under-13 viewer has no candidates. */
+  function pymkAgeBand(age) {
+    var n = parseInt(age, 10);
+    if (isNaN(n) || n <= 0) return "";
+    if (n < 13) return "under13";
+    return n < 18 ? "minor" : "adult";
+  }
+  /* Block list (list_my_blocks: people I blocked) for this sign-in. Until it
+     answers, a live viewer gets no suggestions (fail closed). */
+  var pymkBlocks = { asked: false, ready: false, gen: 0, held: false, handles: {} };
+  /* Pending friend requests to me, from cognation:remote-notifications-loaded. */
+  var pymkIncomingUserIds = {};
+  function pymkNeedsBlockList() {
+    return !!(window.CognationBlock && typeof window.CognationBlock.listMyBlocks === "function" && liveSignedIn());
+  }
+  function pymkBlocked(rec) {
+    var users = state.blockedShareUserIds || {};
+    var profiles = state.blockedShareProfileIds || {};
+    var room = state.roomBlockedUserIds || {};
+    if (profiles[String(rec.id)]) return true;
+    var uids = [rec.user_id, rec.userId];
+    for (var i = 0; i < uids.length; i++) {
+      if (!uids[i]) continue;
+      var u = String(uids[i]);
+      if (users[u] || room[u]) return true;
+    }
+    var handle = String(rec.handle || "").replace(/^@/, "").toLowerCase();
+    return !!(handle && pymkBlocks.handles[handle]);
+  }
+  function pymkIncomingFrom() {
+    var from = {};
+    var doc = readJson(localStorage, REQUESTS_KEY, { incoming: [] });
+    var mine = viewerIds();
+    (Array.isArray(doc.incoming) ? doc.incoming : []).forEach(function (req) {
+      if (req && req.fromId && mine.indexOf(String(req.toId)) >= 0) from[String(req.fromId)] = true;
+    });
+    return from;
+  }
+  function pymkRequestedMe(rec, incomingFrom) {
+    if (incomingFrom[String(rec.id)]) return true;
+    if (rec.user_id && pymkIncomingUserIds[String(rec.user_id)]) return true;
+    if (rec.userId && pymkIncomingUserIds[String(rec.userId)]) return true;
+    return false;
+  }
+  /* A mounted deck showing a KNOW card that is now excluded rebuilds. */
+  function pymkRebuildIfStale() {
+    if (!state.deck) return;
+    var allowed = {};
+    peopleYouMayKnow().forEach(function (c) { allowed[c.id] = true; });
+    var stale = (state.cards || []).some(function (c) {
+      return c && c.type === TYPE.KNOW && !allowed[c.id];
+    });
+    if (stale) rebuildDeck();
+  }
+
   function peopleYouMayKnow() {
     /* Fail closed: unknown viewer → nothing. Seeds never appear for real viewers;
        reals never appear for seed viewers. */
     var viewerSt = resolveViewerSeedStatus();
     if (viewerSt !== true && viewerSt !== false) return [];
     var wantSeed = viewerSt === true;
+    var viewerBand = pymkAgeBand(getMemberAge());
+    if (!viewerBand || viewerBand === "under13") return [];
+    if (pymkNeedsBlockList() && !pymkBlocks.ready) {
+      if (!pymkBlocks.asked) refreshBlockedShares();
+      pymkBlocks.held = true;
+      return [];
+    }
     var me = viewerPersonal();
     if (!me || !Array.isArray(me.friendIds) || !me.friendIds.length) return [];
     var mine = {};
@@ -1743,6 +1828,7 @@
     (pending.outgoing || []).forEach(function (req) {
       if (req && viewerIds().indexOf(String(req.fromId)) >= 0) mine[String(req.toId)] = true;
     });
+    var incomingFrom = pymkIncomingFrom();
     var seen = {};
     var out = [];
     me.friendIds.forEach(function (fid) {
@@ -1754,6 +1840,8 @@
         var rec = profileById(id);
         if (!rec || rec.kind === "professional" || !rec.displayName) return;
         if (profileLooksSeed(rec) !== wantSeed) return;
+        if (pymkAgeBand(rec.age) !== viewerBand) return;
+        if (pymkBlocked(rec) || pymkRequestedMe(rec, incomingFrom)) return;
         seen[id] = true;
         out.push({
           id: "know-" + rec.id,
@@ -2368,13 +2456,28 @@
     state.blockedShareUserIds = state.blockedShareUserIds || {};
     state.blockedShareProfileIds = state.blockedShareProfileIds || {};
     if (!window.CognationBlock || typeof window.CognationBlock.listMyBlocks !== "function") return;
+    var gen = ++pymkBlocks.gen;
+    pymkBlocks.asked = true;
+    pymkBlocks.ready = false;
     try {
       window.CognationBlock.listMyBlocks().then(function (rows) {
+        if (gen !== pymkBlocks.gen) return;
         var map = {};
+        var handles = {};
         (Array.isArray(rows) ? rows : []).forEach(function (row) {
           if (row && row.user_id) map[String(row.user_id)] = true;
+          if (row && row.handle) handles[String(row.handle).replace(/^@/, "").toLowerCase()] = true;
         });
         state.blockedShareUserIds = map;
+        pymkBlocks.handles = handles;
+        pymkBlocks.ready = true;
+        /* People you may know waited for this list: show it now. */
+        if (pymkBlocks.held) {
+          pymkBlocks.held = false;
+          if (state.deck) rebuildDeck();
+        } else {
+          pymkRebuildIfStale();
+        }
       }, function () {});
     } catch (eBlk) {}
   }
@@ -4169,16 +4272,29 @@
     writeJson(localStorage, SHARES_KEY, shares.slice(-200));
   }
 
-  function sendPersonalFriendRequest(targetId) {
-    targetId = String(targetId || "");
+  function personalFriendListFull() {
     var personal = viewerPersonal();
     var cap = (window.CognationTowerFriends && window.CognationTowerFriends.cap) || FRIEND_CAP;
     var count = personal && Array.isArray(personal.friendIds) ? personal.friendIds.length : 0;
-    if (count >= cap) return { ok: false, full: true, message: "This list is full." };
+    return count >= cap;
+  }
+
+  /* Live session: the request goes to send_friend_request and the result is
+     awaited (result.done). Failure removes the local pending record and says
+     "Could not send that request." — never "Friend request sent.". A live
+     session that cannot reach the server fails the same way. Signed-out /
+     demo profiles keep the local-only request. */
+  function sendPersonalFriendRequest(targetId) {
+    targetId = String(targetId || "");
+    var personal = viewerPersonal();
+    if (personalFriendListFull()) return { ok: false, full: true, message: "This list is full." };
     if (!targetId || !personal) return { ok: false, message: "Could not send that request." };
     if (personal.friendIds && personal.friendIds.map(String).indexOf(targetId) >= 0) {
       return { ok: true, already: true, message: "You're already friends." };
     }
+    var social = window.CognationSocialGraph;
+    var remote = !!(social && typeof social.isReady === "function" && social.isReady() && typeof social.isRemoteProfileId === "function" && social.isRemoteProfileId(targetId) && typeof social.act === "function");
+    if (!remote && liveSignedIn()) return { ok: false, message: "Could not send that request." };
     var doc = readJson(localStorage, REQUESTS_KEY, { outgoing: [], incoming: [] });
     if (!Array.isArray(doc.outgoing)) doc.outgoing = [];
     if (!Array.isArray(doc.incoming)) doc.incoming = [];
@@ -4191,11 +4307,31 @@
       doc.incoming.push({ fromId: fromId, toId: targetId, at: Date.now() });
       writeJson(localStorage, REQUESTS_KEY, doc);
     }
-    var social = window.CognationSocialGraph;
-    if (social && typeof social.isReady === "function" && social.isReady() && typeof social.isRemoteProfileId === "function" && social.isRemoteProfileId(targetId) && typeof social.act === "function") {
-      try { social.act(targetId, "personal"); } catch (e) {}
-    }
-    return { ok: true, message: "Friend request sent." };
+    if (!remote) return { ok: true, message: "Friend request sent." };
+    var call;
+    try { call = Promise.resolve(social.act(targetId, "personal")); } catch (eAct) { call = Promise.reject(eAct); }
+    var done = call.then(function (rel) {
+      var mode = rel && rel.mode;
+      if (mode === "requested" || mode === "friend") return { ok: true, message: "Friend request sent." };
+      if (mode === "friends") return { ok: true, already: true, message: "You're already friends." };
+      throw new Error("not sent");
+    }).catch(function () {
+      if (!dup) {
+        var cur = readJson(localStorage, REQUESTS_KEY, { outgoing: [], incoming: [] });
+        var keep = function (req) { return !(req && String(req.fromId) === fromId && String(req.toId) === targetId); };
+        cur.outgoing = (Array.isArray(cur.outgoing) ? cur.outgoing : []).filter(keep);
+        cur.incoming = (Array.isArray(cur.incoming) ? cur.incoming : []).filter(keep);
+        writeJson(localStorage, REQUESTS_KEY, cur);
+      }
+      return { ok: false, message: "Could not send that request." };
+    });
+    return { pending: true, message: "", done: done };
+  }
+
+  /* Promise of the final result ({ ok, message }) for a KNOW-card request. */
+  function sendKnowFriendRequest(targetId) {
+    var sent = sendPersonalFriendRequest(targetId);
+    return sent.done ? sent.done : Promise.resolve(sent);
   }
 
   function datingRights() {
@@ -4306,9 +4442,13 @@
       }
     }
     if (dir === "right" && card.type === TYPE.KNOW) {
-      var sent = sendPersonalFriendRequest(card.profileId);
-      setStatus(sent.message || (sent.full ? "This list is full." : "Friend request sent."));
-      if (sent.full) return;
+      if (personalFriendListFull()) {
+        setStatus("This list is full.");
+        return;
+      }
+      /* No status until the request answers: success or the real failure. */
+      setStatus("");
+      sendKnowFriendRequest(card.profileId).then(function (sent) { setStatus(sent.message); });
     }
     friction("begin", pathwayForCard(card), "commune-swipe");
     state.busy = true;
@@ -5075,6 +5215,9 @@
     bindCard: bindCard,
     omitPassed: omitPassed,
     sendPersonalFriendRequest: sendPersonalFriendRequest,
+    sendKnowFriendRequest: sendKnowFriendRequest,
+    peopleYouMayKnowCards: peopleYouMayKnow,
+    hideLiveMessagesFromAuthor: hideLiveMessagesFromAuthor,
     publicEvents: publicEvents,
     towerLiveContentCards: towerLiveContentCards,
     marketplaceCards: marketplaceCards,

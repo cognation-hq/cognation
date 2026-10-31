@@ -49,7 +49,7 @@ function load(records) {
   vm.runInContext([
     src.slice(src.indexOf("  var FRIEND_AVATAR_COLORS = ["), src.indexOf("];", src.indexOf("  var FRIEND_AVATAR_COLORS = [")) + 2),
     extract(/  function friendHandleFromId\(/), extract(/  function friendInitials\(/),
-    extract(/  function friendAvatarStyle\(/), extract(/  function paintFriendPicture\(/),
+    extract(/  function friendAvatarStyle\(/), maybe("localRecordShown"), extract(/  function paintFriendPicture\(/),
     maybe("pulseRingInitials"), maybe("paintRingFace"), svgAvatarSrc,
     "this.face = function (spot, person, i) { return " + FACE + "(spot, person, i); };",
     "this.svgAvatar = svgAvatar;",

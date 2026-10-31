@@ -407,15 +407,21 @@
   function updateProfileTower(id, towerFields) {
     var rec = getProfileById(id);
     if (!rec) return { ok: false, error: "Profile not found." };
+    var stored = { handle: rec.handle };
     var merged = mergeTowerFields(stripMeta(rec), towerFields || {});
     Object.keys(merged).forEach(function (k) {
       rec[k] = merged[k];
     });
+    /* Every Tower save carries the handle; check for a clash only when it
+       changes, so a record that already holds the same handle (e.g. an old
+       demo-record merge) can't refuse the owner's own save. */
     if (towerFields && towerFields.handle != null) {
       var h = normalizeHandle(towerFields.handle);
-      var clash = getProfileByHandle(h);
-      if (clash && clash.id !== id) {
-        return { ok: false, error: "Handle @" + h + " is already taken." };
+      if (h !== normalizeHandle(stored.handle)) {
+        var clash = getProfileByHandle(h);
+        if (clash && clash.id !== id) {
+          return { ok: false, error: "Handle @" + h + " is already taken." };
+        }
       }
       rec.handle = h;
     }
@@ -439,6 +445,9 @@
     var acct = getAccountByUsername(DEMO_ALEXA.username);
     var profilesDoc = loadProfilesDoc();
     var legacy = readLegacyProfile();
+    /* A copy stamped with ownerUserId is a signed-in user's own Tower copy, not
+       demo data: never merge it into the demo record (create or soft merge). */
+    if (legacy && legacy.ownerUserId) legacy = null;
     var personal = getProfileById(DEMO_ALEXA.personalId) || getProfilesForUsername(DEMO_ALEXA.username).filter(function (p) {
       return p.kind === "personal";
     })[0];

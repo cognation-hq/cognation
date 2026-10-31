@@ -304,6 +304,13 @@
   function syncButton(btn) {
     var api = swipeApi();
     var graph = socialApi();
+    /* No profile id in the store (e.g. signed out with no profile hash): drop
+       the last page's id so the attribute fallback cannot bring it back. The
+       markup's empty value is left as it is. */
+    var shown = activeProfile();
+    if (!(shown && shown._profileId) && btn.getAttribute("data-profile-id")) {
+      btn.removeAttribute("data-profile-id");
+    }
     var id = resolveProfileId(btn);
     if (id) btn.setAttribute("data-profile-id", id);
     var row = btn.closest("[data-tower-follow-row]");

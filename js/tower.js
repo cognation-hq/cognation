@@ -2196,10 +2196,10 @@
     if (p._remote && (!nextAvatar || String(nextAvatar).indexOf("data:image/") !== 0) && prevOwn.avatarDataUrl) {
       nextAvatar = prevOwn.avatarDataUrl;
     }
-    /* opts.musicCleared: the owner cleared the link. Store it cleared. */
+    /* p._musicCleared: the owner cleared the link. Store it cleared. */
     var nextMusic = p.musicUrl && String(p.musicUrl).trim()
       ? String(p.musicUrl).trim()
-      : (p._remote && prevOwn.musicUrl && !opts.musicCleared ? String(prevOwn.musicUrl).trim() : (p.musicUrl || ""));
+      : (p._remote && prevOwn.musicUrl && !p._musicCleared ? String(prevOwn.musicUrl).trim() : (p.musicUrl || ""));
     var record = {
       widgetLayout: nextLayout,
       quoteStickers: nextQuotes,
@@ -2868,7 +2868,7 @@
         if (sync && typeof sync.stage === "function") sync.stage(data);
         return true;
       }
-      writeScrapbookLayout(data, { keepLayout: !opts.geometry, musicCleared: !!opts.musicCleared });
+      writeScrapbookLayout(data, { keepLayout: !opts.geometry });
       /* Account layout row is written only on a real geometry edit (drag end,
          rotate, resize). Opening the Tower must never POST a layout. */
       /* Signed-in owner only (this save already returned for anyone else):
@@ -5690,7 +5690,8 @@
           CognationTowerLayoutSync.savePublic(cur);
         }
       } catch (eYt) {}
-      if (!TowerProfileStore.save(cur, { musicCleared: !next })) return;
+      if (!next) cur._musicCleared = true; /* page-only mark, never saved */
+      if (!TowerProfileStore.save(cur)) return;
       var saved = TowerProfileStore.get();
       applyPublicWidgets(root, saved);
       initTowerMusic(root, saved);

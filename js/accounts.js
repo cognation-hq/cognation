@@ -317,8 +317,12 @@
      copy. With sign-in configured it is written only for a record stamped to the
      signed-in user, so a seed/other-person record (hydrates) or a late write after
      logout can't leave someone else's unstamped copy behind. Local preview keeps
-     the old mirror. */
+     the old mirror. The demo record (prof-alexa-personal) is never mirrored while
+     it carries an owner stamp: that is a copy the old ensureSeeded merge left on
+     the browser (before #347), not the member's own record, and mirroring it put
+     its old values back over the member's cleared or changed copy. */
   function legacyMirrorAllowed(rec) {
+    if (rec && rec.id === DEMO_ALEXA.personalId && String(rec.ownerUserId || "")) return false;
     var sb = window.CognationSupabase;
     if (!sb || typeof sb.configured !== "function" || !sb.configured()) return true;
     var uid = "";

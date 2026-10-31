@@ -908,10 +908,17 @@
     return "A friend";
   }
 
+  /* Shared device: signed in with live sign-in, only the member's own local
+     records (CognationAccounts.localRecordVisible); signed out / preview: all. */
   function eachProfile(fn) {
     var doc = readJson(localStorage, "cognation.profiles.v1", null);
     var profiles = doc && doc.profiles ? doc.profiles : {};
-    Object.keys(profiles).forEach(function (id) { fn(profiles[id], id); });
+    var accounts = window.CognationAccounts;
+    var visible = accounts && typeof accounts.localRecordVisible === "function" ? accounts.localRecordVisible : null;
+    Object.keys(profiles).forEach(function (id) {
+      if (visible && !visible(profiles[id])) return;
+      fn(profiles[id], id);
+    });
   }
   function profileById(id) {
     var accounts = window.CognationAccounts;

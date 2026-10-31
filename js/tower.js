@@ -3129,6 +3129,13 @@
     return ratingVisible(post) && (!viewerUnder13() || newsPostAppropriate(post));
   }
 
+  /* Shared device: signed in with live sign-in, only the member's own local
+     records (CognationAccounts.localRecordVisible); signed out / preview: all. */
+  function localRecordShown(rec) {
+    var accounts = window.CognationAccounts;
+    return !(accounts && typeof accounts.localRecordVisible === "function") || accounts.localRecordVisible(rec);
+  }
+
   function newsProfessionalPosts() {
     var out = [];
     try {
@@ -3141,6 +3148,7 @@
       Object.keys(profiles).forEach(function (id) {
         var rec = profiles[id];
         if (!rec || rec.kind !== "professional") return;
+        if (!localRecordShown(rec)) return;
         var posts = Array.isArray(rec.featuredPosts) ? rec.featuredPosts : [];
         posts.forEach(function (post, idx) {
           if (!post) return;
@@ -14651,7 +14659,11 @@
       var raw = localStorage.getItem("cognation.profiles.v1");
       var doc = raw ? JSON.parse(raw) : null;
       var profiles = doc && doc.profiles ? doc.profiles : {};
-      return Object.keys(profiles).map(function (id) { return profiles[id]; });
+      var accounts = window.CognationAccounts;
+      var visible = accounts && typeof accounts.localRecordVisible === "function" ? accounts.localRecordVisible : null;
+      return Object.keys(profiles).map(function (id) { return profiles[id]; }).filter(function (rec) {
+        return !visible || visible(rec);
+      });
     } catch (e) {
       return [];
     }

@@ -23,6 +23,8 @@
   var pending = {};
   var saveTimers = {};
   var widgetsSeen = {}; /* profileId -> signature of the widgets last loaded or saved */
+  var publicBefore = {}; /* profileId -> owner's _public values when the page opened, row not read yet */
+  var publicKept = {}; /* profileId -> _public fields the owner changed or cleared before the read */
 
   var MAX_QUOTES = 12;
   var MAX_QUOTE_TEXT = 400;
@@ -271,6 +273,49 @@
       .then(function () { pending[id] = false; });
   }
 
+  /* The page's own _public values: { musicUrl, socialLinks } with every value a
+     trimmed string ("" = empty or cleared). */
+  function publicOf(p) {
+    var links = {};
+    var src = p && p.socialLinks && typeof p.socialLinks === "object" ? p.socialLinks : {};
+    Object.keys(src).forEach(function (k) { links[k] = String(src[k] || "").trim(); });
+    return { musicUrl: String((p && p.musicUrl) || "").trim(), socialLinks: links };
+  }
+
+  /* An owner edit in the not-loaded window (savePublic could not write yet):
+     remember each field that differs from what the page opened with, with the
+     owner's value, so the row read later does not put the old value back. */
+  function keepEditedPublic(id, p) {
+    var before = publicBefore[id];
+    if (!before) return;
+    var now = publicOf(p);
+    var kept = publicKept[id] || { socialLinks: {} };
+    if (now.musicUrl !== before.musicUrl || Object.prototype.hasOwnProperty.call(kept, "musicUrl")) {
+      kept.musicUrl = now.musicUrl;
+    }
+    var keys = {};
+    Object.keys(before.socialLinks).concat(Object.keys(now.socialLinks), Object.keys(kept.socialLinks)).forEach(function (k) { keys[k] = 1; });
+    Object.keys(keys).forEach(function (k) {
+      var v = now.socialLinks[k] || "";
+      if (v !== (before.socialLinks[k] || "") || Object.prototype.hasOwnProperty.call(kept.socialLinks, k)) {
+        kept.socialLinks[k] = v;
+      }
+    });
+    if (Object.prototype.hasOwnProperty.call(kept, "musicUrl") || Object.keys(kept.socialLinks).length) publicKept[id] = kept;
+  }
+
+  /* The stored _public with the owner's window edits on top ("" = cleared). */
+  function publicWithKept(id, pub) {
+    var kept = publicKept[id];
+    if (!kept) return pub;
+    var src = pub && typeof pub === "object" ? pub : {};
+    var out = {
+      musicUrl: Object.prototype.hasOwnProperty.call(kept, "musicUrl") ? kept.musicUrl : String(src.musicUrl || ""),
+      socialLinks: Object.assign({}, src.socialLinks && typeof src.socialLinks === "object" ? src.socialLinks : {}, kept.socialLinks),
+    };
+    return out;
+  }
+
   function applyPublicToProfile(p, pub) {
     if (!p || !pub) return;
     if (pub.musicUrl && (!p.musicUrl || !String(p.musicUrl).trim())) {
@@ -312,9 +357,11 @@
     var id = profileId(p);
     if (!id) return p;
     if (!Object.prototype.hasOwnProperty.call(cache, id)) {
+      if (!publicBefore[id]) publicBefore[id] = publicOf(p);
       load(id);
       return p;
     }
+    delete publicBefore[id];
     var saved = cache[id];
     if (saved && Object.keys(saved).length) {
       var base = p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : {};
@@ -354,7 +401,7 @@
       p.widgetLayout = base;
     }
     if (saved && saved._widgets) applyWidgetsToProfile(p, saved._widgets);
-    var pub = (saved && saved._public) || publicCache[id];
+    var pub = publicWithKept(id, (saved && saved._public) || publicCache[id]);
     if (pub) applyPublicToProfile(p, pub);
     widgetsSeen[id] = widgetsSignature(p);
     return p;
@@ -395,7 +442,7 @@
     delete layout._widgets;
     /* p's widgetLayout is the page's whole layout: mark the row as complete. */
     layout._full = 1;
-    var prevPub = publicCache[id] || (cache[id] && cache[id]._public) || null;
+    var prevPub = publicWithKept(id, publicCache[id] || (cache[id] && cache[id]._public) || null);
     if (prevPub) layout._public = cleanPublic(prevPub);
     if (p.musicUrl || (p.socialLinks && typeof p.socialLinks === "object")) {
       layout._public = cleanPublic({
@@ -418,6 +465,7 @@
     if (!id) return false;
     var ok = upsert(id, buildLayout(id, p));
     if (ok) widgetsSeen[id] = widgetsSignature(p);
+    if (ok) delete publicKept[id]; /* the row now holds the owner's values */
     return ok;
   }
 
@@ -474,6 +522,7 @@
     if (!id) return false;
     /* Not loaded yet: never overwrite a row we have not read. */
     if (!Object.prototype.hasOwnProperty.call(cache, id)) {
+      keepEditedPublic(id, p);
       load(id);
       return false;
     }
@@ -482,7 +531,9 @@
       musicUrl: p && p.musicUrl,
       socialLinks: p && p.socialLinks,
     });
-    return upsert(id, base);
+    var ok = upsert(id, base);
+    if (ok) delete publicKept[id]; /* the row now holds the owner's values */
+    return ok;
   }
 
   var api = {
@@ -496,6 +547,7 @@
     _widgetsSeen: widgetsSeen,
     _cache: cache,
     _publicCache: publicCache,
+    _publicKept: publicKept,
     _clean: clean,
     _cleanPublic: cleanPublic,
     _cleanBackup: cleanBackup,

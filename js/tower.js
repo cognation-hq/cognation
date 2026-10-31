@@ -8138,6 +8138,8 @@
     if (window.CognationAccounts && typeof window.CognationAccounts.getProfileByHandle === "function") {
       rec = window.CognationAccounts.getProfileByHandle(friendHandleFromId(friend.id));
     }
+    /* Shared browser: another account's stamped leftover keeps the initials (as on a fresh browser). */
+    if (rec && !localRecordShown(rec)) rec = null;
     var url = rec && rec.avatarDataUrl && String(rec.avatarDataUrl).indexOf("data:image/") === 0
       ? String(rec.avatarDataUrl)
       : "";

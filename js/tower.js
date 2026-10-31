@@ -5620,6 +5620,14 @@
         var next = (inline.value || "").trim().slice(0, 500);
         if (next === String(cur.musicUrl || "")) return;
         cur.musicUrl = next;
+        /* Row copy first, from the edited profile (same as Pro YouTube). Before
+           the row is read savePublic writes nothing (#343). */
+        try {
+          if (window.CognationTowerLayoutSync && CognationTowerLayoutSync.savePublic) {
+            CognationTowerLayoutSync.savePublic(cur);
+          }
+        } catch (eMu) {}
+        if (!next) cur._musicCleared = true; /* page-only mark, never saved */
         if (!TowerProfileStore.save(cur)) return;
         var saved = TowerProfileStore.get();
         applyPublicWidgets(root, saved);

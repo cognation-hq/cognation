@@ -137,3 +137,10 @@ test("unchanged: sign-in off and a demo session paint every local photo as befor
     assert.strictEqual(hasLocalPhoto(t.paint("loose", "Loose")), true, tag + ": unstamped");
   });
 });
+
+test("signed in (or a live token): an unstamped record that is not the viewer's keeps initials (localRecordVisible rule)", function () {
+  var t = boot({ mode: "live", session: B_SESSION });
+  assert.strictEqual(hasLocalPhoto(t.paint("loose", "Loose")), false, "signed in");
+  var back = boot({ mode: "live", session: null, liveToken: { access_token: "x", user: { id: "u-other" } } });
+  assert.strictEqual(hasLocalPhoto(back.paint("loose", "Loose")), false, "live token");
+});

@@ -134,9 +134,13 @@
     };
   }
 
-  /* Pages created by signup. Demo seeds and sample handles are left out. */
+  /* Pages created by signup. Demo seeds and sample handles are left out.
+     Shared device, live sign-in: another member's local leftover is left out
+     (CognationAccounts.localRecordVisible); the server search covers them. */
   function localSignedUp(q) {
     var out = [];
+    var accounts = window.CognationAccounts;
+    var visible = accounts && typeof accounts.localRecordVisible === "function" ? accounts.localRecordVisible : null;
     try {
       var raw = localStorage.getItem("cognation.profiles.v1");
       var doc = raw ? JSON.parse(raw) : null;
@@ -144,6 +148,7 @@
       Object.keys(profiles).forEach(function (id) {
         var rec = profiles[id];
         if (!rec || !rec.handle || sampleHandle(rec.handle)) return;
+        if (visible && !visible(rec)) return;
         if (DEMO_IDS[rec.id] || DEMO_USERNAMES[String(rec.accountUsername || "").toLowerCase()]) return;
         if (rec.kind !== "personal" && rec.kind !== "professional") return;
         if (!nameHits(rec.displayName || rec.handle, rec.handle, q)) return;

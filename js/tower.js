@@ -2026,10 +2026,12 @@
     }
     if (slug) {
       /* Author links carry the profile id (handle only when there is no id);
-         resolve the id first. Display names are never used. */
+         resolve the id first. Display names are never used. A local record is
+         used only when localRecordShown allows it: signed out with live sign-in,
+         a member's stamped leftover is not resolved (the server lookups decide). */
       if (window.CognationAccounts && window.CognationAccounts.getProfileById) {
         var byIdHash = window.CognationAccounts.getProfileById(slug);
-        if (byIdHash && byIdHash.id) return byIdHash.id;
+        if (byIdHash && byIdHash.id && localRecordShown(byIdHash)) return byIdHash.id;
       }
       var socialById = remoteSocial();
       if (socialById && typeof socialById.getProfile === "function") {
@@ -2038,7 +2040,7 @@
       }
       if (window.CognationAccounts && window.CognationAccounts.getProfileByHandle) {
         var byHash = window.CognationAccounts.getProfileByHandle(slug);
-        if (byHash && byHash.id) return byHash.id;
+        if (byHash && byHash.id && localRecordShown(byHash)) return byHash.id;
       }
       var namedFriend = directoryFriendBySlug(slug);
       if (namedFriend) return "directory-" + namedFriend.id;

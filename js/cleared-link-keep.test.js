@@ -178,3 +178,20 @@ test("after that Save, the stored copy is the owner's and reads stay that way", 
   assert.strictEqual(p.socialLinks.instagram, undefined);
   assert.strictEqual(p.socialLinks.x, "https://x.com/new");
 });
+
+/* Save profile only has fields for some links. Venmo, Pay for services and Buy
+   ads are edited on their own widgets, so Save profile must leave them as they
+   are, not blank them (a blank there would now count as the owner's clear). */
+test("Save profile keeps links that have no Edit profile field", function () {
+  var tower = fs.readFileSync(path.join(__dirname, "tower.js"), "utf8");
+  var html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  ["venmo", "services", "ads"].forEach(function (id) {
+    assert.ok(html.indexOf('data-tower-social="' + id + '"') === -1, id + " has no Edit profile field");
+  });
+  var i = tower.indexOf('var handleInputSave = root.querySelector("[data-tower-handle]");');
+  assert.ok(i > 0);
+  var block = tower.slice(i, tower.indexOf("p.customHtml = htmlInput", i));
+  assert.ok(!/p\.socialLinks\[net\.id\] = input \? storedSocialValue\(net\.id, input\.value\) : "";/.test(block),
+    "a link with no field is not blanked");
+  assert.ok(/if \(!input\) return;/.test(block), "a link with no field is left as it is");
+});

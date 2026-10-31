@@ -60,7 +60,16 @@
   function localRows(store) {
     store = store || (root && root.localStorage);
     var doc = readStore(store, "cognation.profiles.v1");
-    var map = doc && doc.profiles ? doc.profiles : {};
+    var all = doc && doc.profiles ? doc.profiles : {};
+    /* Shared device: signed in with live sign-in, only the member's own local
+       records (CognationAccounts.localRecordVisible); signed out / preview: all. */
+    var accounts = root && root.CognationAccounts;
+    var visible = accounts && typeof accounts.localRecordVisible === "function" ? accounts.localRecordVisible : null;
+    var map = all;
+    if (visible) {
+      map = {};
+      Object.keys(all).forEach(function (id) { if (visible(all[id])) map[id] = all[id]; });
+    }
     var best = null;
     function keep(at, rows) {
       var people = (rows || []).filter(Boolean);

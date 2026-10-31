@@ -330,6 +330,47 @@
     return !!(uid && rec && String(rec.ownerUserId || "") === uid);
   }
 
+  /* Shared devices, local-record readers (Commune lanes, PULSE, News plate,
+     Circle topics): with sign-in configured and a member signed in, a local
+     cognation.profiles.v1 record is shown only when it is that member's own:
+     stamped to their user id, or unstamped and one of their own profile ids.
+     Server data covers everyone else. A seed/ops viewer also keeps the unstamped
+     seed/ops fleet records the SeedOps hydrates write (live seed dating pool).
+     Sign-in off (local preview), signed-out and demo sessions: every record, as
+     before. A live auth session with no user id yet: nothing (fail closed). */
+  function localRecordVisible(rec) {
+    var sb = window.CognationSupabase;
+    if (!sb || typeof sb.configured !== "function" || !sb.configured()) return true;
+    var s = null;
+    try { s = JSON.parse(localStorage.getItem("cognation.session.v2") || "null"); } catch (e) {}
+    if (s && s.source === "demo") return true;
+    var uid = s && s.source === "supabase" && s.supabaseUserId ? String(s.supabaseUserId) : "";
+    var live = null;
+    try { live = typeof sb.getSession === "function" ? sb.getSession() : null; } catch (e2) {}
+    if (!uid && live && live.user && live.user.id) uid = String(live.user.id);
+    if (!uid) return !(live && (live.user || live.access_token));
+    if (!rec || typeof rec !== "object") return false;
+    var owner = String(rec.ownerUserId || "");
+    if (owner) return owner === uid;
+    var id = String(rec.id || "");
+    if (id && s && s.activeProfileId && id === String(s.activeProfileId)) return true;
+    try {
+      var social = window.CognationSupabaseSocial;
+      var mine = social && typeof social.getMyProfiles === "function" ? social.getMyProfiles() : [];
+      for (var i = 0; id && mine && i < mine.length; i++) {
+        if (mine[i] && String(mine[i].id || "") === id) return true;
+      }
+    } catch (e3) {}
+    var kind = String(rec.accountKind || rec.account_kind || "").toLowerCase();
+    if (kind === "seed" || kind === "ops") {
+      try {
+        var alive = window.CognationSeedOpsCommuneAlive;
+        return !!(alive && typeof alive.isSeedOrOpsSession === "function" && alive.isSeedOrOpsSession() === true);
+      } catch (e4) { return false; }
+    }
+    return false;
+  }
+
   function saveProfileRecord(rec) {
     var doc = loadProfilesDoc();
     rec.updatedAt = Date.now();
@@ -656,6 +697,7 @@
     LEGACY_PROFILE_KEY: LEGACY_PROFILE_KEY,
     MAX_PROFILES_PER_PHONE: MAX_PROFILES_PER_PHONE,
     DEMO_ALEXA: DEMO_ALEXA,
+    localRecordVisible: localRecordVisible,
     /* SeedOps bridge — prefer CognationSeedOps.materializeSample */
     materializeSeedSample: function (count) {
       if (window.CognationSeedOps && window.CognationSeedOps.materializeSample) {

@@ -61,8 +61,9 @@
     store = store || (root && root.localStorage);
     var doc = readStore(store, "cognation.profiles.v1");
     var all = doc && doc.profiles ? doc.profiles : {};
-    /* Shared device: signed in with live sign-in, only the member's own local
-       records (CognationAccounts.localRecordVisible); signed out / preview: all. */
+    /* Shared device, live sign-in: signed in, only the member's own local records;
+       signed out, no member-stamped records (CognationAccounts.localRecordVisible).
+       Local preview and demo: all. */
     var accounts = root && root.CognationAccounts;
     var visible = accounts && typeof accounts.localRecordVisible === "function" ? accounts.localRecordVisible : null;
     var map = all;
@@ -84,7 +85,16 @@
       var g = byShare[s.adId] || (byShare[s.adId] = { at: 0, seen: {}, rows: [] });
       g.seen[s.swiperId] = true;
       if ((s.at || 0) > g.at) g.at = s.at || 0;
-      var rec = map[s.swiperId] || { id: s.swiperId, displayName: s.sharerName, handle: "" };
+      var rec = map[s.swiperId];
+      if (!rec) {
+        /* A share whose sharer's record is left out above is that member's: no
+           name fallback. With no local record at all, the share was written by a
+           signed-in member (sign-in configured), so it is treated as stamped to
+           an unknown member: shown only where every record is (sign-in off, demo). */
+        if (visible && all[s.swiperId]) return;
+        rec = { id: s.swiperId, displayName: s.sharerName, handle: "" };
+        if (visible && !visible({ id: s.swiperId, ownerUserId: "share:unknown" })) return;
+      }
       g.rows.push(rowFrom(rec, "They shared the same content.", s.at || 0));
     });
     Object.keys(byShare).forEach(function (k) { keep(byShare[k].at, byShare[k].rows); });

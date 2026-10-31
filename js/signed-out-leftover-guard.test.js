@@ -188,11 +188,11 @@ var MEMBER = /p-ada|p-cal/;
 function testSignedOutSeesNoneOfA() {
   var s = ids(surfaces(boot({ mode: "live" })));
   assert.deepStrictEqual(none(s.deck, /error/), [], "deck builds");
-  assert.deepStrictEqual(none(s.deck, MEMBER), [], "no A ads, events or going-live in the signed-out Commune deck");
+  assert.deepStrictEqual(none(s.deck, MEMBER), [], "no A events or going-live in the signed-out Commune deck");
   assert.deepStrictEqual(none(s.pulse, MEMBER), [], "no A PULSE rows");
   assert.deepStrictEqual(none(s.plate, MEMBER), [], "no A News posts (feedPlate)");
   assert.deepStrictEqual(none(s.news, MEMBER), [], "no A News posts (newsList)");
-  assert.ok(some(s.deck, /^ad-prof-demo-zed-pro-ad1/), "demo ad still shows");
+  /* (Placed ads do not render for a signed-out viewer, age 0, before or after.) */
   assert.ok(some(s.deck, /^event-prof-demo-zed-pro-ev1/), "demo event still shows");
   assert.ok(some(s.deck, /^content-live-prof-demo-zed-pro/), "demo going-live still shows");
   assert.deepStrictEqual(s.plate, ["pro-prof-demo-zed-pro-fp1"], "demo News post still shows");

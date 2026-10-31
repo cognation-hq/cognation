@@ -908,8 +908,9 @@
     return "A friend";
   }
 
-  /* Shared device: signed in with live sign-in, only the member's own local
-     records (CognationAccounts.localRecordVisible); signed out / preview: all. */
+  /* Shared device, live sign-in: signed in, only the member's own local records;
+     signed out, no member-stamped records (CognationAccounts.localRecordVisible).
+     Local preview and demo: all. */
   function eachProfile(fn) {
     var doc = readJson(localStorage, "cognation.profiles.v1", null);
     var profiles = doc && doc.profiles ? doc.profiles : {};
@@ -1838,13 +1839,19 @@
     var incomingFrom = pymkIncomingFrom();
     var seen = {};
     var out = [];
+    /* Shared device, live sign-in: a friend's or candidate's local leftover is
+       not read (CognationAccounts.localRecordVisible), like eachProfile. */
+    var accounts = window.CognationAccounts;
+    var visible = accounts && typeof accounts.localRecordVisible === "function" ? accounts.localRecordVisible : null;
     me.friendIds.forEach(function (fid) {
       var friend = profileById(fid);
+      if (friend && visible && !visible(friend)) friend = null;
       var ids = friend && Array.isArray(friend.friendIds) ? friend.friendIds : [];
       ids.forEach(function (id) {
         id = String(id || "");
         if (!id || mine[id] || seen[id]) return;
         var rec = profileById(id);
+        if (rec && visible && !visible(rec)) return;
         if (!rec || rec.kind === "professional" || !rec.displayName) return;
         if (profileLooksSeed(rec) !== wantSeed) return;
         if (pymkAgeBand(rec.age) !== viewerBand) return;

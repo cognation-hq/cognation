@@ -331,13 +331,16 @@
   }
 
   /* Shared devices, local-record readers (Commune lanes, PULSE, News plate,
-     Circle topics): with sign-in configured and a member signed in, a local
-     cognation.profiles.v1 record is shown only when it is that member's own:
-     stamped to their user id, or unstamped and one of their own profile ids.
-     Server data covers everyone else. A seed/ops viewer also keeps the unstamped
-     seed/ops fleet records the SeedOps hydrates write (live seed dating pool).
-     Sign-in off (local preview), signed-out and demo sessions: every record, as
-     before. A live auth session with no user id yet: nothing (fail closed). */
+     Circle topics, people search, people you may know): with sign-in configured
+     and a member signed in, a local cognation.profiles.v1 record is shown only
+     when it is that member's own: stamped to their user id, or unstamped and one
+     of their own profile ids. Server data covers everyone else. A seed/ops viewer
+     also keeps the unstamped seed/ops fleet records the SeedOps hydrates write
+     (live seed dating pool). Signed out with sign-in configured: a record stamped
+     to any member is that member's leftover and is left out; unstamped demo and
+     seed records show as before. Sign-in off (local preview) and demo sessions:
+     every record, as before. A live auth session with no user id yet: nothing
+     (fail closed). */
   function localRecordVisible(rec) {
     var sb = window.CognationSupabase;
     if (!sb || typeof sb.configured !== "function" || !sb.configured()) return true;
@@ -348,7 +351,10 @@
     var live = null;
     try { live = typeof sb.getSession === "function" ? sb.getSession() : null; } catch (e2) {}
     if (!uid && live && live.user && live.user.id) uid = String(live.user.id);
-    if (!uid) return !(live && (live.user || live.access_token));
+    if (!uid) {
+      if (live && (live.user || live.access_token)) return false;
+      return !(rec && typeof rec === "object" && String(rec.ownerUserId || ""));
+    }
     if (!rec || typeof rec !== "object") return false;
     var owner = String(rec.ownerUserId || "");
     if (owner) return owner === uid;

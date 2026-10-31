@@ -3129,8 +3129,9 @@
     return ratingVisible(post) && (!viewerUnder13() || newsPostAppropriate(post));
   }
 
-  /* Shared device: signed in with live sign-in, only the member's own local
-     records (CognationAccounts.localRecordVisible); signed out / preview: all. */
+  /* Shared device, live sign-in: signed in, only the member's own local records;
+     signed out, no member-stamped records (CognationAccounts.localRecordVisible).
+     Local preview and demo: all. */
   function localRecordShown(rec) {
     var accounts = window.CognationAccounts;
     return !(accounts && typeof accounts.localRecordVisible === "function") || accounts.localRecordVisible(rec);

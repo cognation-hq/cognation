@@ -6,7 +6,7 @@
  *   commune-swipe eachProfile lanes (placed ads, public events, dating pool,
  *   Tower going-live content, Pro interest), pulse-mutual localRows,
  *   tower.js newsProfessionalPosts (feedPlate / newsList) and circleProfileRecords.
- * B's own local records still show. Signed-out demo and local preview (sign-in
+ * B's own local records still show. Demo session and local preview (sign-in
  * off) are unchanged. Seed/ops viewers keep the unstamped seed fleet records the
  * SeedOps hydrates write (live seed dating pool).
  * Real js/accounts.js + reader modules in a vm. No network, no DB.
@@ -192,14 +192,14 @@ function testRealViewerNoUnstampedFleet() {
   assert.ok(!some(s.deck, /prof-seed-0042/), "a real viewer never gets a seed fleet record");
 }
 
-/* 5. Unchanged paths: local preview (sign-in off), signed-out demo, signed out with
-   sign-in configured. The readers still list every local record, as before. */
+/* 5. Unchanged paths: local preview (sign-in off) and a demo session. The readers
+   still list every local record, as before. (Signed out with sign-in configured:
+   member-stamped records are left out, js/signed-out-leftover-guard.test.js.) */
 function testUnchangedPaths() {
   [
     { label: "local preview, sign-in off, no session", opts: { mode: "off", withB: true } },
     { label: "local preview, sign-in off, B session", opts: { mode: "off", session: B_SESSION, withB: true } },
-    { label: "signed-out demo", opts: { mode: "live", session: DEMO_SESSION, withB: true } },
-    { label: "signed out, sign-in configured", opts: { mode: "live", withB: true } }
+    { label: "signed-out demo", opts: { mode: "live", session: DEMO_SESSION, withB: true } }
   ].forEach(function (c) {
     var s = ids(surfaces(boot(c.opts)));
     assert.ok(some(s.deck, /^event-p-ada-pro-ev1/), c.label + ": A event listed as before");

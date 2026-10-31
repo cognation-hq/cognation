@@ -13283,7 +13283,10 @@
         p.socialLinks = p.socialLinks || {};
         socialLinkDefs().forEach(function (net) {
           var input = root.querySelector('[data-tower-social="' + net.id + '"]');
-          p.socialLinks[net.id] = input ? storedSocialValue(net.id, input.value) : "";
+          /* Venmo, Pay for services and Buy ads have no field here (their own
+             widgets edit them): leave them as they are. */
+          if (!input) return;
+          p.socialLinks[net.id] = storedSocialValue(net.id, input.value);
         });
         p.customHtml = htmlInput ? sanitizeProfileHtml(htmlInput.value) : (p.customHtml || "");
         var sloganIn = root.querySelector("[data-tower-slogan]");

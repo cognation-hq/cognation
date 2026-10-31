@@ -2165,6 +2165,52 @@
     return null;
   }
 
+  /* Shared device, live sign-in (#350 B): a scrapbook entry has no owner stamp of
+     its own, and a member's saves write it under their profile id AND handle. Read
+     one for painting only when its key is not the id or handle of a local record
+     that localRecordShown hides (e.g. signed out: a member's stamped leftover).
+     Sign-in off and demo sessions: localRecordShown shows every record, so nothing
+     is skipped. Read-only: writes still use readSavedScrapbook. */
+  function scrapbookKeyHidden(key) {
+    var k = key ? String(key).trim().replace(/^@/, "").toLowerCase() : "";
+    if (!k) return false;
+    var accounts = window.CognationAccounts;
+    if (!accounts || typeof accounts.localRecordVisible !== "function") return false;
+    var profiles = null;
+    try {
+      var raw = localStorage.getItem(accounts.PROFILES_KEY || "cognation.profiles.v1");
+      var doc = raw ? JSON.parse(raw) : null;
+      profiles = doc && doc.profiles && typeof doc.profiles === "object" ? doc.profiles : null;
+    } catch (eProfiles) {
+      return false;
+    }
+    if (!profiles) return false;
+    var ids = Object.keys(profiles);
+    for (var i = 0; i < ids.length; i++) {
+      var rec = profiles[ids[i]];
+      if (!rec || typeof rec !== "object") continue;
+      var recId = String(rec.id || ids[i]).trim().toLowerCase();
+      var recHandle = String(rec.handle || "").trim().replace(/^@/, "").toLowerCase();
+      if (recId !== k && recHandle !== k) continue;
+      if (!localRecordShown(rec)) return true;
+    }
+    return false;
+  }
+
+  function readShownScrapbook(p) {
+    var doc = readScrapbookLayouts();
+    var keys = scrapbookLayoutKeys(p).filter(function (key) { return !scrapbookKeyHidden(key); });
+    var i;
+    for (i = 0; i < keys.length; i++) {
+      var hit = doc[keys[i]];
+      if (hit && hit.widgetLayout && typeof hit.widgetLayout === "object") return hit;
+    }
+    for (i = 0; i < keys.length; i++) {
+      if (doc[keys[i]] && typeof doc[keys[i]] === "object") return doc[keys[i]];
+    }
+    return null;
+  }
+
   function writeScrapbookLayout(p, opts) {
     if (!p) return;
     opts = opts || {};
@@ -2246,7 +2292,7 @@
   }
 
   function mergeLocalScrapbookLayout(p) {
-    var saved = readSavedScrapbook(p);
+    var saved = readShownScrapbook(p);
     if (!saved || typeof saved !== "object") return p;
     if (saved.widgetLayout && typeof saved.widgetLayout === "object") {
       var base = p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : {};
@@ -2312,7 +2358,8 @@
   function accountTowerBlob(id) {
     if (!id || !window.CognationAccounts || typeof window.CognationAccounts.getProfileById !== "function") return null;
     var rec = window.CognationAccounts.getProfileById(id);
-    if (!rec) return null;
+    /* Shared device, live sign-in: never another member's stamped leftover (#350 B). */
+    if (!rec || !localRecordShown(rec)) return null;
     return window.CognationAccounts.stripMeta ? window.CognationAccounts.stripMeta(rec) : rec;
   }
 
@@ -2588,7 +2635,7 @@
     }
     var savedDoc = readScrapbookLayouts();
     var savedId = p._profileId || p.id || "";
-    var savedLayout = savedId && savedDoc[savedId] ? savedDoc[savedId] : null;
+    var savedLayout = savedId && savedDoc[savedId] && !scrapbookKeyHidden(savedId) ? savedDoc[savedId] : null;
     if (savedLayout) {
       if (
         (!p.avatarDataUrl || String(p.avatarDataUrl).indexOf("data:image/") !== 0) &&
@@ -2671,7 +2718,7 @@
       var metaPhone = "";
       if (profileId && window.CognationAccounts && window.CognationAccounts.getProfileById) {
         var full = window.CognationAccounts.getProfileById(profileId);
-        if (full) {
+        if (full && localRecordShown(full)) {
           metaKind = full.kind === "professional" ? "professional" : "personal";
           metaPhone = full.phone || "";
         }
@@ -8470,9 +8517,16 @@
     return full ? [full] : [];
   }
 
+  /* Readers only (calendar, going-live paint): the same records minus another
+     member's stamped leftover on a shared device (#350 B). Writers keep
+     accountProfilesFor. */
+  function accountProfilesShownFor(profile) {
+    return accountProfilesFor(profile).filter(function (rec) { return localRecordShown(rec); });
+  }
+
   /* One calendar for personal, professional, Tower, and Circle. Personal events win on the same id. */
   function sharedCalendarEvents(profile) {
-    var recs = accountProfilesFor(profile).slice().sort(function (a, b) {
+    var recs = accountProfilesShownFor(profile).slice().sort(function (a, b) {
       if (a && a.kind === "personal") return -1;
       if (b && b.kind === "personal") return 1;
       return 0;
@@ -8565,7 +8619,7 @@
   function sharedGoingLive(profile) {
     var own = normalizeGoingLive(profile && profile.goingLive);
     if (own) return own;
-    var recs = accountProfilesFor(profile);
+    var recs = accountProfilesShownFor(profile);
     var i;
     for (i = 0; i < recs.length; i++) {
       var found = normalizeGoingLive(recs[i] && recs[i].goingLive);

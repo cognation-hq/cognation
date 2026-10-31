@@ -14,6 +14,7 @@
      dropped instead of closing, marking or announcing for the next one. */
   var sessionGen = 0;
   var UNKNOWN = { unknown: true };
+  var lookup = null; /* the user_birth lookup in flight: { id, gen } */
 
   function session() {
     try {
@@ -231,8 +232,13 @@
     if (alreadyShownFor(id)) return;
     var login = document.querySelector(".login-gate:not(.birth-prompt-gate)");
     if (login && !login.hidden) return;
+    /* One lookup per user and session: boot and session-started share it. */
+    if (lookup && lookup.id === id && lookup.gen === sessionGen) return;
     var gen = sessionGen;
+    var mine = { id: id, gen: gen };
+    lookup = mine;
     hasBirthRow().then(function (row) {
+      if (lookup === mine) lookup = null;
       if (gen !== sessionGen) return; /* signed out meanwhile */
       if (row === UNKNOWN) return; /* lookup failed: never block the page on a guess */
       if (row) {

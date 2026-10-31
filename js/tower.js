@@ -2196,9 +2196,10 @@
     if (p._remote && (!nextAvatar || String(nextAvatar).indexOf("data:image/") !== 0) && prevOwn.avatarDataUrl) {
       nextAvatar = prevOwn.avatarDataUrl;
     }
+    /* opts.musicCleared: the owner cleared the link. Store it cleared. */
     var nextMusic = p.musicUrl && String(p.musicUrl).trim()
       ? String(p.musicUrl).trim()
-      : (p._remote && prevOwn.musicUrl ? String(prevOwn.musicUrl).trim() : (p.musicUrl || ""));
+      : (p._remote && prevOwn.musicUrl && !opts.musicCleared ? String(prevOwn.musicUrl).trim() : (p.musicUrl || ""));
     var record = {
       widgetLayout: nextLayout,
       quoteStickers: nextQuotes,
@@ -2867,7 +2868,7 @@
         if (sync && typeof sync.stage === "function") sync.stage(data);
         return true;
       }
-      writeScrapbookLayout(data, { keepLayout: !opts.geometry });
+      writeScrapbookLayout(data, { keepLayout: !opts.geometry, musicCleared: !!opts.musicCleared });
       /* Account layout row is written only on a real geometry edit (drag end,
          rotate, resize). Opening the Tower must never POST a layout. */
       /* Signed-in owner only (this save already returned for anyone else):
@@ -5682,12 +5683,14 @@
       var next = (input.value || "").trim().slice(0, 500);
       if (next === String(cur.musicUrl || "")) return;
       cur.musicUrl = next;
-      if (!TowerProfileStore.save(cur)) return;
+      /* Row copy first, from the edited profile (like removing a social
+         widget): a fresh get() would paint the old link back before it goes up. */
       try {
         if (window.CognationTowerLayoutSync && CognationTowerLayoutSync.savePublic) {
-          CognationTowerLayoutSync.savePublic(TowerProfileStore.get());
+          CognationTowerLayoutSync.savePublic(cur);
         }
       } catch (eYt) {}
+      if (!TowerProfileStore.save(cur, { musicCleared: !next })) return;
       var saved = TowerProfileStore.get();
       applyPublicWidgets(root, saved);
       initTowerMusic(root, saved);

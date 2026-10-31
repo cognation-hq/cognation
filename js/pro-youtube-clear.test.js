@@ -48,7 +48,7 @@ function scrapbook(initial) {
 
 test("same-browser copy: an owner clear of Pro YouTube stores no link", function () {
   var sb = scrapbook({ [A]: { musicUrl: OLD_MUSIC } });
-  sb.write({ _profileId: A, _remote: true, musicUrl: "" }, { keepLayout: true, musicCleared: true });
+  sb.write({ _profileId: A, _remote: true, musicUrl: "", _musicCleared: true }, { keepLayout: true });
   assert.strictEqual(sb.saved().musicUrl, "", "cleared link is not kept in the local copy");
 });
 
@@ -58,18 +58,13 @@ test("same-browser copy: a remote profile with no link still keeps the stored on
   assert.strictEqual(sb.saved().musicUrl, OLD_MUSIC, "no clear, no loss");
 });
 
-test("TowerProfileStore.save hands the clear to the local copy", function () {
-  var save = TOWER.slice(TOWER.indexOf("    save: function (data, opts) {"));
-  save = save.slice(0, save.indexOf("writeScrapbookLayout(data") + 200);
-  assert.ok(/writeScrapbookLayout\(data, \{ keepLayout: !opts\.geometry, musicCleared: !!opts\.musicCleared \}\)/.test(save));
-});
-
 test("Pro YouTube commit: row copy is written from the edited profile, before the store save", function () {
   var fn = fnSource(TOWER, "bindProYoutubeUrl");
   var pub = fn.indexOf("CognationTowerLayoutSync.savePublic(cur)");
-  var save = fn.indexOf("TowerProfileStore.save(cur, { musicCleared: !next })");
+  var save = fn.indexOf("TowerProfileStore.save(cur)");
+  var mark = fn.indexOf("if (!next) cur._musicCleared = true;");
   assert.ok(pub > 0, "savePublic gets the edited profile, not a fresh get()");
-  assert.ok(save > 0, "the store save marks an explicit clear");
+  assert.ok(mark > 0 && mark < save, "the store save is told about an explicit clear");
   assert.ok(pub < save, "row copy first (same order as removing a social widget)");
   assert.ok(fn.indexOf("savePublic(TowerProfileStore.get())") < 0, "no savePublic of a re-read profile");
 });

@@ -23,7 +23,14 @@ assert.ok(/max-width: 600px[\s\S]*pulse-bg-760\.webp/.test(tail), "phones load t
 assert.ok(/animation: pulse-strand-drift/.test(tail) && /@keyframes pulse-strand-drift/.test(tail), "strand drift");
 assert.ok(/prefers-reduced-motion: reduce\)\s*\{\s*\.circle-fall\[data-pulse-bg\]::after \{ animation: none/.test(tail), "drift off for reduced motion");
 assert.ok(/\.pulse-fall-stack \{ z-index: 3; \}/.test(tail), "friend circles above the ring");
-assert.ok(!/yellow|#ff[cd]|#fe[0-9a-f]{4}|255, ?2[0-9]{2}, ?[0-9]{1,2}\)/i.test(tail), "no yellow");
+/* No yellow in any PULSE rule, anywhere in styles.css (not just the tail, which
+   since #266 also holds unrelated people-search rules appended after it). */
+var YELLOW = /yellow|#ff[cd]|#fe[0-9a-f]{4}|255, ?2[0-9]{2}, ?[0-9]{1,2}\)/i;
+var PULSE_SEL = /pulse|circle-(fall|ring|bolt|spot)/i;
+var pulseRules = [], ruleRe = /([^{}]+)\{([^{}]*)\}/g, rm, noComments = css.replace(/\/\*[\s\S]*?\*\//g, "");
+while ((rm = ruleRe.exec(noComments))) { if (PULSE_SEL.test(rm[1])) pulseRules.push({ sel: rm[1].trim(), body: rm[2] }); }
+assert.ok(pulseRules.length >= 40, "PULSE rules found (" + pulseRules.length + ")");
+pulseRules.forEach(function (r) { assert.ok(!YELLOW.test(r.sel + "{" + r.body), "no yellow: " + r.sel); });
 assert.ok(/layer\.setAttribute\("data-pulse-bg", ""\)/.test(tower), "PULSE layer opts in");
 assert.ok(/PULSE_BG_SQUARES/.test(tower) && /pinCircleSpotsToBackground\(spots\)/.test(tower), "spots sit where the squares were");
 assert.ok(/\.circle-fall\[data-pulse-bg\] svg\.circle-bolt \{ display: none; \}/.test(tail), "lightning + bolt hidden on PULSE (r4)");

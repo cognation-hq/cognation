@@ -472,6 +472,11 @@
   function savePublic(p) {
     var id = profileId(p);
     if (!id) return false;
+    /* Not loaded yet: never overwrite a row we have not read. */
+    if (!Object.prototype.hasOwnProperty.call(cache, id)) {
+      load(id);
+      return false;
+    }
     var base = clean((cache[id] && typeof cache[id] === "object" ? cache[id] : null) || (p.widgetLayout && typeof p.widgetLayout === "object" ? p.widgetLayout : {}) || {});
     base._public = cleanPublic({
       musicUrl: p && p.musicUrl,

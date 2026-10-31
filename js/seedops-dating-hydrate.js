@@ -535,8 +535,10 @@
     var swipe = window.CognationCommuneSwipe;
     if (swipe && typeof swipe.setDatingBirthAge === "function") swipe.setDatingBirthAge(age);
   }
-  /* One user_birth read in flight per user and session: a forced hydrate that
-     starts while the cached path's read is out shares it. */
+  /* One user_birth read per user and session: a forced hydrate (login.js fires
+     session-started on a reload) shares the read in flight or its answer.
+     A failed read is not kept. A new user or session (session-ended bumps
+     sessionGen), auth-changed and birth-saved all read fresh. */
   var birthInFlight = null;
   function fetchBirthAge() {
     var sb = client();
@@ -554,11 +556,8 @@
         return row ? ageFromBirth(row.birth_year, row.birth_month) : null;
       })
       .catch(function () {
-        return null;
-      })
-      .then(function (age) {
         if (birthInFlight === flight) birthInFlight = null;
-        return age;
+        return null;
       });
     birthInFlight = flight;
     return flight.promise;

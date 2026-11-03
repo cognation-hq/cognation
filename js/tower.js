@@ -8279,6 +8279,7 @@
         minAge: 16, payInRoom: false,
       };
     }
+    if (ev.kind === "podcast") normalized.kind = "podcast";
     return normalized;
   }
 
@@ -9058,6 +9059,7 @@
       escapeHtml(owner ? formatCalendarDayLabel(selected) : selected) +
       "</h5>" +
       renderDayEventList(events, selected, { ownerControls: owner, busyOnly: !owner }) +
+      (owner && window.CognationEchoPodcast && window.CognationEchoPodcast.addBar ? window.CognationEchoPodcast.addBar() : "") +
       "</div>" +
       schedulerHtml;
   }
@@ -9199,6 +9201,9 @@
     document.addEventListener("cognation:classroom-sessions-updated", function () {
       try { renderVisitorCalendar(root); } catch (eSess) {}
     });
+    document.addEventListener("cognation:podcast-calendar", function () {
+      try { refreshTowerCalendars(root); } catch (ePod) {}
+    });
 
     root.addEventListener("click", function (ev) {
       var t = ev.target;
@@ -9308,6 +9313,16 @@
             /* date filled after re-render */
           }
         }
+        refreshTowerCalendars(root);
+        return;
+      }
+
+      var podAdd = t.closest("[data-podcast-cal-add]");
+      if (podAdd && window.CognationEchoPodcast) {
+        ev.preventDefault();
+        var podType = podAdd.parentNode && podAdd.parentNode.querySelector("[data-podcast-cal-type]");
+        var podDay = getCalendarViewState(root, "public").selected;
+        window.CognationEchoPodcast.addOwn(podType && podType.value, podDay);
         refreshTowerCalendars(root);
         return;
       }

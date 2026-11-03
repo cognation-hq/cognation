@@ -2920,11 +2920,6 @@ body.login-gate-open .app-topbar {
   flex: 1 0 100%;
 }
 
-.tower-compose-audience {
-  margin: 0.4rem 0 0;
-}
-
-
 /* TOWER layout: profile+messages rail | feed */
 .tower-layout {
   display: grid;

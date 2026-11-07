@@ -19,6 +19,35 @@
     jobTitleColumn: null,
   };
 
+  /* In-memory only. A new login (even to the same account) invalidates
+     readiness and every outstanding profile load from the previous session. */
+  var profileEpoch = 0;
+  var profileUserId = "";
+  var readyProfileIds = {};
+  function profileScope() {
+    var me = session();
+    var uid = me && me.source === "supabase" ? String(me.supabaseUserId || "") : "";
+    if (uid !== profileUserId) resetProfileScope();
+    return { epoch: profileEpoch, userId: profileUserId };
+  }
+  function resetProfileScope() {
+    var me = session();
+    profileUserId = me && me.source === "supabase" ? String(me.supabaseUserId || "") : "";
+    profileEpoch += 1;
+    readyProfileIds = {};
+  }
+  function currentProfileScope(scope) {
+    var now = profileScope();
+    return scope.epoch === now.epoch && scope.userId === now.userId;
+  }
+  function profilesReady(rows, scope) {
+    if (!currentProfileScope(scope)) return;
+    (Array.isArray(rows) ? rows : []).forEach(function (row) {
+      if (row && row.id) readyProfileIds[String(row.id)] = true;
+    });
+    emit("cognation:server-profiles-ready", { userId: scope.userId, epoch: scope.epoch });
+  }
+
   function client() {
     var c = window.CognationSupabase || null;
     return c ? jobTitleAware(c) : null;
@@ -259,15 +288,22 @@
   }
 
   function selectProfiles() {
+    var scope = profileScope();
     return client()
       .rest("profiles", {
         query:
           "select=" + PROFILE_RETURN_COLUMNS + "&order=created_at.desc&limit=400" + listFilter(),
       })
-      .then(cacheProfiles);
+      .then(function (rows) {
+        if (!currentProfileScope(scope)) return [];
+        cacheProfiles(rows);
+        profilesReady(rows, scope);
+        return rows;
+      });
   }
 
   function refreshMyProfiles() {
+    var scope = profileScope();
     var me = identity();
     if (!me) return Promise.resolve([]);
     return client()
@@ -277,7 +313,9 @@
           encodeURIComponent(me.supabaseUserId),
       })
       .then(function (rows) {
+        if (!currentProfileScope(scope)) return [];
         state.myProfiles = (Array.isArray(rows) ? rows : []).map(cacheProfile);
+        profilesReady(rows, scope);
         return state.myProfiles;
       });
   }
@@ -453,6 +491,7 @@
   }
 
   function refreshFeed() {
+    var scope = profileScope();
     if (!active()) return Promise.resolve([]);
     var me = identity();
     return client()
@@ -477,14 +516,18 @@
           });
       })
       .then(function (res) {
-        var posts = (Array.isArray(res.rows) ? res.rows : [])
+        if (!currentProfileScope(scope)) return [];
+        var rows = (Array.isArray(res.rows) ? res.rows : [])
           .filter(function (row) {
             if (isSageRow(row && (row.author || row.profiles))) return false;
             if (!res.unrated) return true;
             var author = row && (row.author || row.profiles);
             return !!(author && me && author.user_id && author.user_id === me.supabaseUserId);
-          })
-          .map(mapPost);
+          });
+        var posts = rows.map(mapPost);
+        profilesReady(rows.map(function (row) {
+          return row && (row.author || row.profiles);
+        }), scope);
         replaceTowerFeed(posts);
         return posts;
       });
@@ -611,6 +654,7 @@
   }
 
   function updateCurrentProfile(data) {
+    var scope = profileScope();
     var me = identity();
     if (!me || !me.activeProfileId) {
       return Promise.reject(new Error("Sign in before editing your profile."));
@@ -653,14 +697,16 @@
         body: changes,
       })
       .then(function (rows) {
+        if (!currentProfileScope(scope)) return null;
         var profile = cacheProfile(Array.isArray(rows) ? rows[0] : null);
-        if (profile) setActiveProfile(profile);
+        if (profile) { profilesReady([profile], scope); setActiveProfile(profile); }
         emit("cognation:remote-profile-loaded", { profileId: me.activeProfileId });
         return profile;
       });
   }
 
   function createProfessionalProfile(fields) {
+    var scope = profileScope();
     var me = identity();
     if (!me) return Promise.reject(new Error("Sign in before creating a professional page."));
     var base = normalizeHandle(fields && fields.handle);
@@ -679,9 +725,11 @@
         },
       })
       .then(function (rows) {
+        if (!currentProfileScope(scope)) return null;
         var profile = cacheProfile(Array.isArray(rows) ? rows[0] : null);
         if (!profile) throw new Error("Could not create a professional page.");
         state.myProfiles.push(profile);
+        profilesReady([profile], scope);
         setActiveProfile(profile);
         return profile;
       });
@@ -934,10 +982,12 @@
   }
 
   function refresh() {
+    var scope = profileScope();
     if (!active()) return Promise.resolve(null);
     return selectProfiles()
-      .then(refreshMyProfiles)
+      .then(function () { if (currentProfileScope(scope)) return refreshMyProfiles(); })
       .then(function () {
+        if (!currentProfileScope(scope)) return;
         var current = session();
         if (!current.activeProfileId && state.myProfiles[0]) {
           setActiveProfile(state.myProfiles[0]);
@@ -945,12 +995,20 @@
         return Promise.all([refreshFeed(), refreshFriends(), refreshNotifications()]);
       })
       .then(function () {
+        if (!currentProfileScope(scope)) return null;
         emit("cognation:remote-profile-loaded", {
           profileId: viewedProfileId(),
         });
         return state;
       });
   }
+
+  ["cognation:session-ended", "cognation:session-started"].forEach(function (name) {
+    document.addEventListener(name, function () {
+      resetProfileScope();
+      profilesReady([], profileScope());
+    });
+  });
 
   /* Sign-out: forget the member's Feed held in memory (shared devices). The
      Tower store copy is cleared by tower.js on the same event. */
@@ -1027,6 +1085,25 @@
       return state.feed.slice();
     },
     getViewedProfileId: viewedProfileId,
+    /* Badge identity must come from rows fetched in this session, never a
+       local Tower record or a public cache left by an earlier login. */
+    getReadyTowerProfile: function () {
+      var scope = profileScope();
+      var id = viewedProfileId();
+      if (!scope.userId || !readyProfileIds[id]) return null;
+      var row = profileForId(id);
+      var profile = toTowerProfile(row);
+      /* Legacy Pro classification may inherit its owner's kind. That owner
+         must also have been fetched in this session, not an older cache. */
+      var owner = row && profileForUser(row.user_id, "personal");
+      if (profile && ownerFleetKind(row) && !(owner && readyProfileIds[owner.id])) {
+        profile.accountKind = fleetKindOf(row) || row.account_kind || "";
+        profile.isSeed = profile.accountKind === "seed";
+        profile.isOpsBot = profile.accountKind === "ops";
+        profile.seedFleetId = row.seed_fleet_id || "";
+      }
+      return profile;
+    },
     getTowerProfile: function (id) {
       return toTowerProfile(profileForId(id));
     },

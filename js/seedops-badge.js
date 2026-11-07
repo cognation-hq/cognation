@@ -69,12 +69,19 @@
         root.querySelector("[data-tower-widget='identity']");
       if (!nameWrap) return;
       var profile = null;
+      var sb = window.CognationSupabase;
+      var auth = window.CognationAuth;
+      var session = auth && auth.getSession ? auth.getSession() : null;
+      var live = sb && sb.configured && sb.configured() && !(session && session.source === "demo");
+      var social = window.CognationSupabaseSocial;
       try {
-        if (window.CognationTowerProfileStore && window.CognationTowerProfileStore.get) {
+        if (live) {
+          profile = social && social.getReadyTowerProfile ? social.getReadyTowerProfile() : null;
+        } else if (window.CognationTowerProfileStore && window.CognationTowerProfileStore.get) {
           profile = window.CognationTowerProfileStore.get();
         }
       } catch (e) {}
-      if (!profile && window.CognationAccounts) {
+      if (!live && !profile && window.CognationAccounts) {
         var id = root.getAttribute("data-view-profile-id") || "";
         if (id) profile = window.CognationAccounts.getProfileById(id);
       }
@@ -176,6 +183,11 @@
     syncAll();
   }
 
+  document.addEventListener("cognation:server-profiles-ready", syncTowerBadges);
+  document.addEventListener("cognation:session-ended", syncTowerBadges);
+  document.addEventListener("cognation:active-profile-changed", syncTowerBadges);
+  document.addEventListener("cognation:remote-profile-loaded", syncTowerBadges);
+  if (window.addEventListener) window.addEventListener("hashchange", syncTowerBadges);
   document.addEventListener("cognation:tower-view-changed", syncAll);
   document.addEventListener("cognation:tower-profile-updated", syncAll);
   document.addEventListener("cognation:people-added", syncAll);

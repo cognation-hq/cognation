@@ -190,6 +190,8 @@ function bootSocial(rowHandle) {
     client: function () { return { rest: function (t, o) { sent.push(o.method + ":" + (o.body.handle || "")); return Promise.resolve([o.body]); } }; },
     cacheProfile: function (r) { return r; }, setActiveProfile: function () {}, emit: function () {},
     state: { myProfiles: [] }, PROFILE_RETURN_COLUMNS: "id",
+    // These extracted mutation functions now also guard session-scoped cache replies.
+    profileScope: function () { return {}; }, currentProfileScope: function () { return true; }, profilesReady: function () {},
   };
   if (rulesSrc) { var rc = { window: ctx.window }; vm.createContext(rc); vm.runInContext(rulesSrc, rc); }
   vm.createContext(ctx);

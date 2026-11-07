@@ -88,7 +88,7 @@ function openTower(viewerId, targetId) {
       if (table === "profiles") { var m = /id=eq\.([^&]+)/.exec(o.query); return Promise.resolve(m && ROWS[decodeURIComponent(m[1])] ? [ROWS[decodeURIComponent(m[1])]] : []); }
       return Promise.resolve([]);
     }, rpc: function () { return Promise.resolve(null); } },
-    CognationSupabaseSocial: { getProfile: function (id) { return ROWS[id] || null; }, getMyProfiles: function () { return [viewerRow]; }, getProfileForHandle: function () { return null; } },
+    CognationSupabaseSocial: { getReadyTowerProfile: function () { return toTowerProfile(ROWS[targetId]); }, getProfile: function (id) { return ROWS[id] || null; }, getMyProfiles: function () { return [viewerRow]; }, getProfileForHandle: function () { return null; } },
     CognationTowerProfileStore: { get: function () { return toTowerProfile(ROWS[targetId]); } },
     CustomEvent: function (t, i) { this.type = t; this.detail = i && i.detail; },
   };

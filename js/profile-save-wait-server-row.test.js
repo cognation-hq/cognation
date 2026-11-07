@@ -90,7 +90,12 @@ function boot(storage, session) {
     win: win, patches: patches,
     store: win.CognationTowerProfileStore,
     sessionStarted: function () { documentStub.dispatchEvent(new win.CustomEvent("cognation:session-started")); },
-    release: function () { held.splice(0).forEach(function (fn) { fn(); }); return tick().then(tick); },
+    release: function () {
+      // Boot's earlier request is now correctly stale after session-started.
+      // Drain it, the current-session list, and own profiles in their real order.
+      function batch() { held.splice(0).forEach(function (fn) { fn(); }); return tick().then(tick); }
+      return batch().then(batch).then(batch);
+    },
   };
 }
 /* What renderBadgePins / renderFriendPins do after seeding a missing pin position. */

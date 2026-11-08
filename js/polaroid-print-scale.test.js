@@ -75,5 +75,10 @@ assert.ok(tower.indexOf("pullChosenPolaroids") !== -1 && /multiple[^>]*data-towe
 assert.ok(tower.indexOf("polaroidShell") === -1, "blank polaroid is not the upload control");
 assert.ok(tower.indexOf('closest(\'[data-tower-widget="instax"]\')') !== -1, "camera opens the image picker");
 assert.ok(tower.indexOf("normalized.length > 6") === -1 && tower.indexOf("normalized.push({ url: dataUrl, scale: 1 })") !== -1, "each upload adds a polaroid and earlier ones stay");
+var applyInstax = tower.slice(tower.indexOf("function applyInstaxFile"), tower.indexOf("function applyInstaxFiles"));
+assert.ok(applyInstax.indexOf("polaroidRemoved") === -1, "camera upload does not restore the empty Polaroid");
+assert.ok(!/if \(!personal \|\| \(p && p\.polaroidRemoved\)\)/.test(tower), "a removed shell does not hide photo widgets");
+assert.ok(tower.indexOf("shellOff") === -1 && tower.indexOf("The empty frame stays off the page") !== -1, "empty polaroid stays off the page");
+assert.ok(tower.indexOf("seatPolaroidPrints") !== -1 && tower.indexOf("data-tower-polaroid-band") !== -1, "photos sit with the camera");
 
 console.log("polaroid-print-scale.test.js: ok");
